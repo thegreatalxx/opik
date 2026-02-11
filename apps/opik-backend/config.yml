@@ -773,6 +773,8 @@ serviceToggles:
   # Default: false
   # Description: Whether or not Agent Configuration feature is enabled
   agentConfigurationEnabled: ${TOGGLE_AGENT_CONFIGURATION_ENABLED:-"false"}
+  # Description: Whether or not LLM Judge direct JSONPath mode is enabled (skips variable mapping in UI)
+  llmJudgeDirectJsonpathEnabled: ${TOGGLE_LLM_JUDGE_DIRECT_JSONPATH_ENABLED:-"false"}
 
 # Local Runner configuration
 localRunner:
