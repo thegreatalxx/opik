@@ -773,8 +773,8 @@ serviceToggles:
   # Default: false
   # Description: Whether or not Agent Configuration feature is enabled
   agentConfigurationEnabled: ${TOGGLE_AGENT_CONFIGURATION_ENABLED:-"false"}
-  # Description: Whether or not online scoring direct data mode is enabled (skips variable mapping in UI)
-  onlineScoringDirectDataEnabled: ${TOGGLE_ONLINE_SCORING_DIRECT_DATA_ENABLED:-"false"}
+  # Description: Whether or not online evaluation optional variable mapping is enabled
+  onlineEvaluationOptionalVariableMappingEnabled: ${TOGGLE_ONLINE_EVALUATION_OPTIONAL_VARIABLE_MAPPING_ENABLED:-"false"}
 
 # Local Runner configuration
 localRunner:
