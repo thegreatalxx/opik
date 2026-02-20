@@ -1,5 +1,5 @@
 import React from "react";
-import { FileText, Table2, SlidersHorizontal } from "lucide-react";
+import { FileText } from "lucide-react";
 import {
   HoverCard,
   HoverCardContent,
@@ -28,35 +28,73 @@ const PARAM_LABELS: Record<string, string> = {
   optimizationId: "Optimization",
 };
 
-function summarizeTableState(tableState: OllieTableState): string {
-  const parts: string[] = [];
+// Priority order: most specific entity first — determines what the chip label shows.
+const LEAF_ENTITY_PRIORITY = [
+  "spanId",
+  "traceId",
+  "threadId",
+  "annotationQueueId",
+  "alertId",
+  "optimizationId",
+  "promptId",
+  "datasetId",
+  "dashboardId",
+  "projectId",
+];
 
+function getChipLabel(
+  pageLabel: string,
+  params: Record<string, string>,
+): string {
+  for (const key of LEAF_ENTITY_PRIORITY) {
+    if (params[key]) {
+      return PARAM_LABELS[key] ?? key;
+    }
+  }
+  return pageLabel;
+}
+
+function getTableStateSummary(tableState: OllieTableState): {
+  filterCount: number | null;
+  search: string | null;
+  sortField: string | null;
+  sortDirection: string | null;
+  page: number | undefined;
+  size: number | undefined;
+} {
+  let filterCount: number | null = null;
   if (tableState.filters) {
     try {
       const parsed = JSON.parse(tableState.filters);
       const count = Array.isArray(parsed) ? parsed.length : 1;
-      if (count > 0) parts.push(`${count} filter${count > 1 ? "s" : ""}`);
+      if (count > 0) filterCount = count;
     } catch {
-      parts.push("filters");
+      /* ignore */
     }
   }
 
-  if (tableState.search) {
-    parts.push(`search: "${tableState.search}"`);
-  }
-
+  let sortField: string | null = null;
+  let sortDirection: string | null = null;
   if (tableState.sorting) {
     try {
       const parsed = JSON.parse(tableState.sorting);
-      const col =
-        Array.isArray(parsed) && parsed[0]?.field ? parsed[0].field : null;
-      if (col) parts.push(`sorted by ${col}`);
+      if (Array.isArray(parsed) && parsed[0]?.field) {
+        sortField = parsed[0].field;
+        sortDirection = parsed[0].direction ?? null;
+      }
     } catch {
-      parts.push("sorted");
+      /* ignore */
     }
   }
 
-  return parts.length > 0 ? parts.join(", ") : "active";
+  return {
+    filterCount,
+    search: tableState.search ?? null,
+    sortField,
+    sortDirection,
+    page: tableState.page,
+    size: tableState.size,
+  };
 }
 
 function hasTableStateContent(tableState: OllieTableState): boolean {
@@ -72,24 +110,6 @@ function hasTableStateContent(tableState: OllieTableState): boolean {
   return !!(tableState.search || tableState.sorting || tableState.groups);
 }
 
-const ContextChip: React.FC<{
-  icon?: React.ReactNode;
-  label: string;
-  hoverContent: React.ReactNode;
-}> = ({ icon, label, hoverContent }) => (
-  <HoverCard openDelay={200} closeDelay={100}>
-    <HoverCardTrigger asChild>
-      <div className="flex cursor-default items-center gap-1 rounded-full border border-border bg-muted/50 px-2 py-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
-        {icon && <span className="shrink-0">{icon}</span>}
-        <span className="comet-body-xs max-w-[120px] truncate">{label}</span>
-      </div>
-    </HoverCardTrigger>
-    <HoverCardContent className="w-72" side="top" align="start" sideOffset={8}>
-      {hoverContent}
-    </HoverCardContent>
-  </HoverCard>
-);
-
 const OllieContextBar: React.FC<OllieContextBarProps> = ({
   pageId,
   pageDescription,
@@ -97,135 +117,99 @@ const OllieContextBar: React.FC<OllieContextBarProps> = ({
   tableState,
 }) => {
   const pageLabel = PAGE_SHORT_LABELS[pageId] ?? pageId;
+  const chipLabel = getChipLabel(pageLabel, params);
   const entityParams = Object.entries(params).filter(([, v]) => v);
   const showTableState =
     tableState !== null && hasTableStateContent(tableState);
+  const tableSummary = showTableState
+    ? getTableStateSummary(tableState!)
+    : null;
 
   return (
     <div className="border-t px-4 py-2">
-      <div className="flex flex-wrap gap-1.5">
-        <ContextChip
-          icon={<FileText className="size-3" />}
-          label={pageLabel}
-          hoverContent={
-            <div className="space-y-1.5">
+      <HoverCard openDelay={200} closeDelay={100}>
+        <HoverCardTrigger asChild>
+          <div className="inline-flex cursor-default items-center gap-1 rounded-full border border-border bg-muted/50 px-2 py-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
+            <FileText className="size-3 shrink-0" />
+            <span className="comet-body-xs max-w-[200px] truncate">
+              {chipLabel}
+            </span>
+          </div>
+        </HoverCardTrigger>
+        <HoverCardContent
+          className="w-72"
+          side="top"
+          align="start"
+          sideOffset={8}
+        >
+          <div className="space-y-2">
+            <div>
               <p className="comet-body-s-accented text-foreground">
-                Current page
+                Page context
               </p>
-              <p className="comet-body-xs text-muted-foreground">
+              <p className="comet-body-xs mt-0.5 text-muted-foreground">
                 {pageDescription}
               </p>
             </div>
-          }
-        />
 
-        {entityParams.map(([key, value]) => {
-          const humanLabel = PARAM_LABELS[key] ?? key;
-          const displayValue =
-            value.length > 12 ? `${value.slice(0, 12)}…` : value;
-          return (
-            <ContextChip
-              key={key}
-              label={`${humanLabel}: ${displayValue}`}
-              hoverContent={
-                <div className="space-y-1.5">
-                  <p className="comet-body-s-accented text-foreground">
-                    {humanLabel} ID
-                  </p>
-                  <p className="comet-body-xs break-all font-mono text-muted-foreground">
-                    {value}
-                  </p>
-                </div>
-              }
-            />
-          );
-        })}
-
-        {showTableState && (
-          <ContextChip
-            icon={<SlidersHorizontal className="size-3" />}
-            label={`Table: ${summarizeTableState(tableState!)}`}
-            hoverContent={
-              <div className="space-y-2">
-                <p className="comet-body-s-accented text-foreground">
-                  Table state
-                </p>
-                <div className="space-y-1">
-                  {tableState!.filters &&
-                    (() => {
-                      try {
-                        const parsed = JSON.parse(tableState!.filters!);
-                        const count = Array.isArray(parsed) ? parsed.length : 1;
-                        return count > 0 ? (
-                          <p className="comet-body-xs text-muted-foreground">
-                            <span className="font-medium text-foreground">
-                              Filters:
-                            </span>{" "}
-                            {count} active
-                          </p>
-                        ) : null;
-                      } catch {
-                        return null;
-                      }
-                    })()}
-                  {tableState!.search && (
-                    <p className="comet-body-xs text-muted-foreground">
+            {entityParams.length > 0 && (
+              <div className="space-y-0.5 border-t pt-2">
+                {entityParams.map(([key, value]) => {
+                  const humanLabel = PARAM_LABELS[key] ?? key;
+                  return (
+                    <p
+                      key={key}
+                      className="comet-body-xs text-muted-foreground"
+                    >
                       <span className="font-medium text-foreground">
-                        Search:
+                        {humanLabel}:
                       </span>{" "}
-                      &ldquo;{tableState!.search}&rdquo;
+                      <span className="font-mono">{value}</span>
                     </p>
-                  )}
-                  {tableState!.sorting &&
-                    (() => {
-                      try {
-                        const parsed = JSON.parse(tableState!.sorting!);
-                        if (Array.isArray(parsed) && parsed[0]?.field) {
-                          return (
-                            <p className="comet-body-xs text-muted-foreground">
-                              <span className="font-medium text-foreground">
-                                Sort:
-                              </span>{" "}
-                              {parsed[0].field}{" "}
-                              {parsed[0].direction === "DESC"
-                                ? "(descending)"
-                                : "(ascending)"}
-                            </p>
-                          );
-                        }
-                      } catch {
-                        /* ignore */
-                      }
-                      return null;
-                    })()}
-                  {tableState!.page !== undefined && (
-                    <p className="comet-body-xs text-muted-foreground">
-                      <span className="font-medium text-foreground">Page:</span>{" "}
-                      {tableState!.page}
-                      {tableState!.size !== undefined
-                        ? `, ${tableState!.size} rows`
-                        : ""}
-                    </p>
-                  )}
-                </div>
+                  );
+                })}
               </div>
-            }
-          />
-        )}
+            )}
 
-        {pageId === PAGE_ID.unknown && (
-          <ContextChip
-            icon={<Table2 className="size-3" />}
-            label="No page context"
-            hoverContent={
-              <p className="comet-body-xs text-muted-foreground">
-                OllieAI could not determine the current page. Navigate to a
-                specific page for more targeted assistance.
-              </p>
-            }
-          />
-        )}
-      </div>
+            {tableSummary && (
+              <div className="space-y-0.5 border-t pt-2">
+                {tableSummary.filterCount !== null && (
+                  <p className="comet-body-xs text-muted-foreground">
+                    <span className="font-medium text-foreground">
+                      Filters:
+                    </span>{" "}
+                    {tableSummary.filterCount} active
+                  </p>
+                )}
+                {tableSummary.search && (
+                  <p className="comet-body-xs text-muted-foreground">
+                    <span className="font-medium text-foreground">Search:</span>{" "}
+                    &ldquo;{tableSummary.search}&rdquo;
+                  </p>
+                )}
+                {tableSummary.sortField && (
+                  <p className="comet-body-xs text-muted-foreground">
+                    <span className="font-medium text-foreground">Sort:</span>{" "}
+                    {tableSummary.sortField}{" "}
+                    {tableSummary.sortDirection === "DESC"
+                      ? "(descending)"
+                      : "(ascending)"}
+                  </p>
+                )}
+                {tableSummary.page !== undefined && (
+                  <p className="comet-body-xs text-muted-foreground">
+                    <span className="font-medium text-foreground">Page:</span>{" "}
+                    {tableSummary.page}
+                    {tableSummary.size !== undefined
+                      ? `, ${tableSummary.size} rows`
+                      : ""}
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+        </HoverCardContent>
+      </HoverCard>
     </div>
   );
 };

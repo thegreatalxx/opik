@@ -21,6 +21,7 @@ from .logger_config import logger
 from .opik_backend_client import OpikBackendClient
 
 COPILOT_APP_NAME = "opik-copilot"
+MAX_PAGE_SIZE = 100
 
 COPILOT_SYSTEM_PROMPT = """You are OllieAI, a helpful AI assistant for the Opik platform. Opik is an open-source LLM evaluation and observability platform.
 
@@ -77,14 +78,15 @@ def _make_list_projects(opik_client: OpikBackendClient) -> Callable[..., Any]:
         """List projects in the user's workspace.
         
         Args:
-            size: Number of projects to return per page (default: 25)
-            page: Page number to return (default: 1)
+            size: Number of projects to return per page (default: 25, max: 100)
+            page: Page number to return (default: 1). Use pagination to retrieve more results. The response includes 'total' to know how many projects exist.
             
         Returns:
             Dictionary containing projects list and pagination info
         """
-        logger.info(f"[COPILOT_TOOL] list_projects called with size={size}, page={page}")
-        result = await opik_client.list_projects(size=size, page=page)
+        clamped_size = min(size, MAX_PAGE_SIZE)
+        logger.info(f"[COPILOT_TOOL] list_projects called with size={clamped_size}, page={page}")
+        result = await opik_client.list_projects(size=clamped_size, page=page)
         logger.debug(f"[COPILOT_TOOL] list_projects returned {len(result.get('content', []))} projects")
         return result
     
@@ -107,7 +109,7 @@ def _make_get_current_table_view_traces(
         logger.info(f"[COPILOT_TOOL] get_current_table_view (traces) called for project={project_id}")
         result = await opik_client.list_traces(
             project_id=project_id,
-            size=table_state.get("size", 25),
+            size=min(table_state.get("size", 25), MAX_PAGE_SIZE),
             page=table_state.get("page", 1),
             filters=table_state.get("filters"),
             sorting=table_state.get("sorting"),
@@ -129,7 +131,7 @@ def _make_get_current_table_view_datasets(
         active filters, sorting, and pagination. Returns the same data the user sees."""
         logger.info("[COPILOT_TOOL] get_current_table_view (datasets) called")
         result = await opik_client.list_datasets(
-            size=table_state.get("size", 25),
+            size=min(table_state.get("size", 25), MAX_PAGE_SIZE),
             page=table_state.get("page", 1),
             filters=table_state.get("filters"),
             sorting=table_state.get("sorting"),
@@ -162,7 +164,7 @@ def _make_get_current_table_view_experiments(
         else:
             logger.info("[COPILOT_TOOL] get_current_table_view (experiments) called")
             result = await opik_client.list_experiments(
-                size=table_state.get("size", 25),
+                size=min(table_state.get("size", 25), MAX_PAGE_SIZE),
                 page=table_state.get("page", 1),
                 filters=table_state.get("filters"),
                 sorting=table_state.get("sorting"),
@@ -186,7 +188,7 @@ def _make_get_current_table_view_spans(
         logger.info(f"[COPILOT_TOOL] get_current_table_view (spans) called for project={project_id}")
         result = await opik_client.list_spans(
             project_id=project_id,
-            size=table_state.get("size", 25),
+            size=min(table_state.get("size", 25), MAX_PAGE_SIZE),
             page=table_state.get("page", 1),
             filters=table_state.get("filters"),
             sorting=table_state.get("sorting"),
@@ -210,7 +212,7 @@ def _make_get_current_table_view_threads(
         logger.info(f"[COPILOT_TOOL] get_current_table_view (threads) called for project={project_id}")
         result = await opik_client.list_threads(
             project_id=project_id,
-            size=table_state.get("size", 25),
+            size=min(table_state.get("size", 25), MAX_PAGE_SIZE),
             page=table_state.get("page", 1),
             filters=table_state.get("filters"),
             sorting=table_state.get("sorting"),
@@ -232,7 +234,7 @@ def _make_get_current_table_view_prompts(
         active filters, sorting, and pagination. Returns the same data the user sees."""
         logger.info("[COPILOT_TOOL] get_current_table_view (prompts) called")
         result = await opik_client.list_prompts(
-            size=table_state.get("size", 25),
+            size=min(table_state.get("size", 25), MAX_PAGE_SIZE),
             page=table_state.get("page", 1),
             filters=table_state.get("filters"),
             sorting=table_state.get("sorting"),
@@ -255,17 +257,18 @@ def _make_list_traces(opik_client: OpikBackendClient, project_id: str) -> Callab
         Tool function for listing traces
     """
     async def list_traces(size: int = 25, page: int = 1) -> dict[str, Any]:
-        """List traces in the current project.
+        """List traces in the current project. Returns truncated data (input/output/metadata are shortened).
         
         Args:
-            size: Number of traces to return per page (default: 25)
-            page: Page number to return (default: 1)
+            size: Number of traces to return per page (default: 25, max: 100)
+            page: Page number to return (default: 1). Use pagination to retrieve more results. The response includes 'total' to know how many traces exist.
             
         Returns:
             Dictionary containing traces list and pagination info
         """
-        logger.info(f"[COPILOT_TOOL] list_traces called for project={project_id}, size={size}, page={page}")
-        result = await opik_client.list_traces(project_id=project_id, size=size, page=page)
+        clamped_size = min(size, MAX_PAGE_SIZE)
+        logger.info(f"[COPILOT_TOOL] list_traces called for project={project_id}, size={clamped_size}, page={page}")
+        result = await opik_client.list_traces(project_id=project_id, size=clamped_size, page=page)
         logger.debug(f"[COPILOT_TOOL] list_traces returned {len(result.get('content', []))} traces")
         return result
     
@@ -311,14 +314,15 @@ def _make_list_datasets(opik_client: OpikBackendClient) -> Callable[..., Any]:
         """List datasets in the user's workspace.
         
         Args:
-            size: Number of datasets to return per page (default: 25)
-            page: Page number to return (default: 1)
+            size: Number of datasets to return per page (default: 25, max: 100)
+            page: Page number to return (default: 1). Use pagination to retrieve more results. The response includes 'total' to know how many datasets exist.
             
         Returns:
             Dictionary containing datasets list and pagination info
         """
-        logger.info(f"[COPILOT_TOOL] list_datasets called with size={size}, page={page}")
-        result = await opik_client.list_datasets(size=size, page=page)
+        clamped_size = min(size, MAX_PAGE_SIZE)
+        logger.info(f"[COPILOT_TOOL] list_datasets called with size={clamped_size}, page={page}")
+        result = await opik_client.list_datasets(size=clamped_size, page=page)
         logger.debug(f"[COPILOT_TOOL] list_datasets returned {len(result.get('content', []))} datasets")
         return result
     
@@ -339,14 +343,15 @@ def _make_list_dataset_items(opik_client: OpikBackendClient, dataset_id: str) ->
         """List items in the current dataset.
         
         Args:
-            size: Number of items to return per page (default: 25)
-            page: Page number to return (default: 1)
+            size: Number of items to return per page (default: 25, max: 100)
+            page: Page number to return (default: 1). Use pagination to retrieve more results. The response includes 'total' to know how many items exist.
             
         Returns:
             Dictionary containing dataset items list and pagination info
         """
-        logger.info(f"[COPILOT_TOOL] list_dataset_items called for dataset={dataset_id}, size={size}, page={page}")
-        result = await opik_client.list_dataset_items(dataset_id=dataset_id, size=size, page=page)
+        clamped_size = min(size, MAX_PAGE_SIZE)
+        logger.info(f"[COPILOT_TOOL] list_dataset_items called for dataset={dataset_id}, size={clamped_size}, page={page}")
+        result = await opik_client.list_dataset_items(dataset_id=dataset_id, size=clamped_size, page=page)
         logger.debug(f"[COPILOT_TOOL] list_dataset_items returned {len(result.get('content', []))} items")
         return result
     
@@ -366,14 +371,15 @@ def _make_list_prompts(opik_client: OpikBackendClient) -> Callable[..., Any]:
         """List prompts in the user's workspace.
         
         Args:
-            size: Number of prompts to return per page (default: 25)
-            page: Page number to return (default: 1)
+            size: Number of prompts to return per page (default: 25, max: 100)
+            page: Page number to return (default: 1). Use pagination to retrieve more results. The response includes 'total' to know how many prompts exist.
             
         Returns:
             Dictionary containing prompts list and pagination info
         """
-        logger.info(f"[COPILOT_TOOL] list_prompts called with size={size}, page={page}")
-        result = await opik_client.list_prompts(size=size, page=page)
+        clamped_size = min(size, MAX_PAGE_SIZE)
+        logger.info(f"[COPILOT_TOOL] list_prompts called with size={clamped_size}, page={page}")
+        result = await opik_client.list_prompts(size=clamped_size, page=page)
         logger.debug(f"[COPILOT_TOOL] list_prompts returned {len(result.get('content', []))} prompts")
         return result
     
@@ -393,14 +399,15 @@ def _make_list_experiments(opik_client: OpikBackendClient) -> Callable[..., Any]
         """List experiments in the user's workspace.
         
         Args:
-            size: Number of experiments to return per page (default: 25)
-            page: Page number to return (default: 1)
+            size: Number of experiments to return per page (default: 25, max: 100)
+            page: Page number to return (default: 1). Use pagination to retrieve more results. The response includes 'total' to know how many experiments exist.
             
         Returns:
             Dictionary containing experiments list and pagination info
         """
-        logger.info(f"[COPILOT_TOOL] list_experiments called with size={size}, page={page}")
-        result = await opik_client.list_experiments(size=size, page=page)
+        clamped_size = min(size, MAX_PAGE_SIZE)
+        logger.info(f"[COPILOT_TOOL] list_experiments called with size={clamped_size}, page={page}")
+        result = await opik_client.list_experiments(size=clamped_size, page=page)
         logger.debug(f"[COPILOT_TOOL] list_experiments returned {len(result.get('content', []))} experiments")
         return result
     
