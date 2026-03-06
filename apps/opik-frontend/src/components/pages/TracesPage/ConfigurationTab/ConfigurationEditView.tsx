@@ -6,8 +6,10 @@ import {
   BlueprintValue,
   ConfigHistoryItem,
 } from "@/types/agent-configs";
+import { useQueryClient } from "@tanstack/react-query";
 import useAgentConfigById from "@/api/agent-configs/useAgentConfigById";
 import useAgentConfigCreateMutation from "@/api/agent-configs/useAgentConfigCreateMutation";
+import { AGENT_CONFIGS_KEY } from "@/api/api";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -36,12 +38,16 @@ const ConfigurationEditView: React.FC<ConfigurationEditViewProps> = ({
   const { data: agentConfig, isPending } = useAgentConfigById({
     blueprintId: item.id,
   });
+  const queryClient = useQueryClient();
   const { mutate: createConfig, isPending: isSaving } =
     useAgentConfigCreateMutation();
 
   const [description, setDescription] = useState("");
   const [draftValues, setDraftValues] = useState<Record<string, string>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [dirtyPromptKeys, setDirtyPromptKeys] = useState<
+    Record<string, boolean>
+  >({});
   const originalValues = useRef<Record<string, string>>({});
   const initialized = useRef(false);
   const promptRefs = useRef<Record<string, BlueprintValuePromptHandle | null>>(
@@ -102,6 +108,17 @@ const ConfigurationEditView: React.FC<ConfigurationEditViewProps> = ({
         .filter(Boolean)
         .map((handle) => handle!.saveVersion()),
     );
+
+    const hasNonPromptChanges = agentConfig.values
+      .filter((v) => v.type !== "prompt")
+      .some((v) => draftValues[v.key] !== originalValues.current[v.key]);
+
+    if (!hasNonPromptChanges) {
+      // ALEX
+      queryClient.invalidateQueries({ queryKey: [AGENT_CONFIGS_KEY] });
+      onSaved();
+      return;
+    }
 
     const values: BlueprintValue[] = agentConfig.values.map((v) => ({
       key: v.key,
@@ -172,9 +189,10 @@ const ConfigurationEditView: React.FC<ConfigurationEditViewProps> = ({
       <div className="flex flex-col divide-y">
         {(agentConfig?.values ?? []).map((v) => {
           const isChanged =
-            v.type !== "prompt" &&
-            draftValues[v.key] !== undefined &&
-            draftValues[v.key] !== originalValues.current[v.key];
+            v.type === "prompt"
+              ? !!dirtyPromptKeys[v.key]
+              : draftValues[v.key] !== undefined &&
+                draftValues[v.key] !== originalValues.current[v.key];
           return (
             <div key={v.key} className="flex flex-col gap-2 py-3">
               <div className="flex items-center gap-2">
@@ -198,6 +216,12 @@ const ConfigurationEditView: React.FC<ConfigurationEditViewProps> = ({
                   ref={(el) => {
                     promptRefs.current[v.key] = el;
                   }}
+                  onDirtyChange={(isDirty) =>
+                    setDirtyPromptKeys((prev) => ({
+                      ...prev,
+                      [v.key]: isDirty,
+                    }))
+                  }
                 />
               ) : v.type === "boolean" ? (
                 <Switch

@@ -42,3 +42,27 @@ export interface PromptCommitInfo {
   prompt_id?: string;
   prompt_name?: string;
 }
+
+export interface PromptVersionByCommit {
+  id: string;
+  commit: string;
+  template: string;
+  metadata: object | null;
+  type?: PROMPT_TYPE;
+  change_description?: string;
+  variables?: string[];
+  created_at: string;
+  created_by: string;
+}
+
+export interface PromptByCommit {
+  id: string;
+  name: string;
+  template_structure?: PROMPT_TEMPLATE_STRUCTURE;
+  created_at: string;
+  created_by: string;
+  last_updated_at: string;
+  last_updated_by: string;
+  version_count: number;
+  requested_version: PromptVersionByCommit;
+}

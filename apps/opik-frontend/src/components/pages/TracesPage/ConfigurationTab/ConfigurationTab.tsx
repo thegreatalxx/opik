@@ -95,3 +95,9 @@ const ConfigurationTab: React.FC<ConfigurationTabProps> = ({ projectId }) => {
 };
 
 export default ConfigurationTab;
+
+// ALEX
+// SCROLLING
+// DESCRIPTIONS
+// PROMPT UPDATES WITH REGULAR UPDATES
+// width of editing
