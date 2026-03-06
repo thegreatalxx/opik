@@ -1,24 +1,13 @@
 import React, { useState } from "react";
-import {
-  Clock,
-  FilePen,
-  Pencil,
-  Rocket,
-  User,
-} from "lucide-react";
+import { Clock, FilePen, Pencil, Rocket, User } from "lucide-react";
 
-import {
-  ConfigHistoryItem,
-  EnrichedBlueprintValue,
-} from "@/types/agent-configs";
+import { ConfigHistoryItem } from "@/types/agent-configs";
 import { getTimeFromNow } from "@/lib/date";
-import { formatNumericData } from "@/lib/utils";
 import ColoredTag from "@/components/shared/ColoredTag/ColoredTag";
 import Loader from "@/components/shared/Loader/Loader";
 import { Card } from "@/components/ui/card";
-import BlueprintValuePrompt from "./BlueprintValuePrompt";
 import ProdTag from "./ProdTag";
-import BlueprintTypeIcon from "./BlueprintTypeIcon";
+import BlueprintValuesList from "./BlueprintValuesList";
 import {
   getVersionDescription,
   isProdTag,
@@ -39,34 +28,6 @@ type ConfigurationDetailViewProps = {
 
 const renderTag = (tag: string) =>
   isProdTag(tag) ? <ProdTag key={tag} /> : <ColoredTag key={tag} label={tag} />;
-
-const renderValue = (v: EnrichedBlueprintValue) => {
-  switch (v.type) {
-    case "int":
-    case "float": {
-      const num = Number(v.value);
-      return (
-        <div className="comet-body-s whitespace-pre-wrap break-words rounded-md border bg-primary-foreground p-3 text-foreground">
-          {isNaN(num) ? v.value : formatNumericData(num)}
-        </div>
-      );
-    }
-    case "boolean":
-      return (
-        <div className="comet-body-s whitespace-pre-wrap break-words rounded-md border bg-primary-foreground p-3 text-foreground">
-          {v.value === "true" ? "true" : "false"}
-        </div>
-      );
-    case "prompt":
-      return <BlueprintValuePrompt value={v} />;
-    default:
-      return (
-        <div className="comet-body-s whitespace-pre-wrap break-words rounded-md border bg-primary-foreground p-3 text-foreground">
-          {v.value}
-        </div>
-      );
-  }
-};
 
 const ConfigurationDetailView: React.FC<ConfigurationDetailViewProps> = ({
   item,
@@ -135,24 +96,7 @@ const ConfigurationDetailView: React.FC<ConfigurationDetailViewProps> = ({
         {isPending ? (
           <Loader />
         ) : (
-          <div className="flex flex-col divide-y">
-            {(agentConfig?.values ?? []).map((v) => (
-              <div key={v.key} className="flex flex-col gap-2 py-3">
-                <div className="flex items-center gap-2">
-                  <BlueprintTypeIcon type={v.type} />
-                  <span className="comet-body-xs-accented text-foreground">
-                    {v.key}
-                  </span>
-                </div>
-                {v.description && (
-                  <span className="comet-body-xs text-light-slate">
-                    {v.description}
-                  </span>
-                )}
-                <div className="overflow-hidden">{renderValue(v)}</div>
-              </div>
-            ))}
-          </div>
+          <BlueprintValuesList values={agentConfig?.values ?? []} />
         )}
       </Card>
 
