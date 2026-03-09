@@ -48,19 +48,19 @@ const DiffSection: React.FC<DiffSectionProps> = ({
       <div className="mb-2 flex items-center gap-2">
         <span className="comet-body-s-accented">{label}</span>
         {isAdded && (
-          <span className="comet-body-xs rounded-full bg-green-100 px-2 py-0.5 text-green-700">
+          <Tag variant="green" size="sm">
             Added
-          </span>
+          </Tag>
         )}
         {isRemoved && (
-          <span className="comet-body-xs rounded-full bg-red-100 px-2 py-0.5 text-red-700">
+          <Tag variant="red" size="sm">
             Removed
-          </span>
+          </Tag>
         )}
         {!isAdded && !isRemoved && (
-          <span className="comet-body-xs rounded-full bg-amber-100 px-2 py-0.5 text-amber-700">
+          <Tag variant="orange" size="sm">
             Changed
-          </span>
+          </Tag>
         )}
       </div>
       <div className="comet-code whitespace-pre-wrap break-words text-sm">

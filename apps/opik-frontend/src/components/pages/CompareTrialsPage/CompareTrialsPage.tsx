@@ -95,10 +95,15 @@ const CompareTrialsPage: React.FunctionComponent = () => {
       .slice()
       .sort((a, b) => a.created_at.localeCompare(b.created_at));
     const baseline = sorted[0];
-    const score = getFeedbackScoreValue(
-      baseline.feedback_scores ?? [],
-      optimization.objective_name,
-    );
+    const score =
+      getFeedbackScoreValue(
+        baseline.feedback_scores ?? [],
+        optimization.objective_name,
+      ) ??
+      getFeedbackScoreValue(
+        baseline.experiment_scores ?? [],
+        optimization.objective_name,
+      );
     return {
       baselineExperimentId: baseline.id,
       baselineScore: score ?? undefined,
