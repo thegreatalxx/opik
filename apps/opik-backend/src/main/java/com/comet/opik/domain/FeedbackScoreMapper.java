@@ -127,7 +127,7 @@ public interface FeedbackScoreMapper {
                     .reason(getIfNotEmpty(tuple.get(1)))
                     .categoryName(getIfNotEmpty(tuple.get(2)))
                     .source(ScoreSource.fromString((String) tuple.get(3)))
-                    .lastUpdatedAt(Instant.parse(tuple.get(4).toString()));
+                    .lastUpdatedAt(parseInstant(tuple.get(4).toString()));
 
             // span_type is the 6th element (index 5), span_id is the 7th element (index 6)
             // only present for span feedback scores
@@ -160,8 +160,8 @@ public interface FeedbackScoreMapper {
                             .reason(Optional.ofNullable(feedbackScore.get(4)).map(Object::toString)
                                     .filter(StringUtils::isNotEmpty).orElse(null))
                             .source(ScoreSource.fromString(feedbackScore.get(5).toString()))
-                            .createdAt(Instant.parse(feedbackScore.get(6).toString()))
-                            .lastUpdatedAt(Instant.parse(feedbackScore.get(7).toString()))
+                            .createdAt(parseInstant(feedbackScore.get(6).toString()))
+                            .lastUpdatedAt(parseInstant(feedbackScore.get(7).toString()))
                             .createdBy(feedbackScore.get(8).toString())
                             .lastUpdatedBy(feedbackScore.get(9).toString())
                             .valueByAuthor(parseValueByAuthor(feedbackScore.get(10)))
@@ -170,5 +170,9 @@ public interface FeedbackScoreMapper {
             return feedbackScores.isEmpty() ? null : feedbackScores;
         }
         return null;
+    }
+
+    private static Instant parseInstant(String date) {
+        return Instant.parse(date);
     }
 }

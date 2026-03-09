@@ -186,6 +186,8 @@ class ExperimentAggregatesIntegrationTest {
         mockTargetWorkspace(apiKey, workspaceName, workspaceId);
 
         // Given: Create test data
+        var namePrefix = "count-filter-test-" + UUID.randomUUID() + "-";
+
         List<Project> projects = IntStream.range(0, 5)
                 .parallel()
                 .mapToObj(i -> createProject(apiKey, workspaceName))
@@ -196,9 +198,13 @@ class ExperimentAggregatesIntegrationTest {
                 .mapToObj(i -> createDataset(apiKey, workspaceName))
                 .toList();
 
-        List<Experiment> experiments = datasets
-                .parallelStream()
-                .map(dataset -> createExperiment(dataset, apiKey, workspaceName))
+        // Use named experiments with alternating REGULAR/TRIAL types to cover name and types filters
+        List<Experiment> experiments = IntStream.range(0, 5)
+                .mapToObj(i -> createNamedExperiment(
+                        datasets.get(i),
+                        namePrefix + i,
+                        i % 2 == 0 ? ExperimentType.REGULAR : ExperimentType.TRIAL,
+                        apiKey, workspaceName))
                 .toList();
 
         // Create experiment items with feedback scores
@@ -232,7 +238,8 @@ class ExperimentAggregatesIntegrationTest {
                 datasets.stream().map(Dataset::id).toList(),
                 experiments.stream().map(Experiment::id).toList(),
                 projects.stream().map(Project::id).toList(),
-                feedbackScores);
+                feedbackScores,
+                namePrefix);
         var criteria = criteriaBuilder.apply(testData);
 
         // When: Count using both methods
@@ -360,11 +367,32 @@ class ExperimentAggregatesIntegrationTest {
                                         .build()))
                                 .entityType(EntityType.TRACE)
                                 .sortingFields(List.of())
+                                .build()),
+                Arguments.of("Filter by name",
+                        (Function<CountTestData, ExperimentSearchCriteria>) data -> ExperimentSearchCriteria
+                                .builder()
+                                .name(data.namePrefix())
+                                .entityType(EntityType.TRACE)
+                                .sortingFields(List.of())
+                                .build()),
+                Arguments.of("Filter by types REGULAR",
+                        (Function<CountTestData, ExperimentSearchCriteria>) data -> ExperimentSearchCriteria
+                                .builder()
+                                .types(Set.of(ExperimentType.REGULAR))
+                                .entityType(EntityType.TRACE)
+                                .sortingFields(List.of())
+                                .build()),
+                Arguments.of("Filter by types TRIAL",
+                        (Function<CountTestData, ExperimentSearchCriteria>) data -> ExperimentSearchCriteria
+                                .builder()
+                                .types(Set.of(ExperimentType.TRIAL))
+                                .entityType(EntityType.TRACE)
+                                .sortingFields(List.of())
                                 .build()));
     }
 
     private record CountTestData(List<UUID> datasetIds, List<UUID> experimentIds, List<UUID> projectIds,
-            List<String> scoreNames) {
+            List<String> scoreNames, String namePrefix) {
     }
 
     @Test
@@ -796,6 +824,16 @@ class ExperimentAggregatesIntegrationTest {
                                 .builder()
                                 .groups(data.groups())
                                 .name("nonexistent-experiment-name-" + UUID.randomUUID())
+                                .build()),
+                Arguments.of("Filter by experiment-level filter (tags IS_EMPTY exercises filters template var)",
+                        (Function<GroupCriteriaTestData, ExperimentGroupCriteria>) data -> ExperimentGroupCriteria
+                                .builder()
+                                .groups(data.groups())
+                                .filters(List.of(ExperimentFilter.builder()
+                                        .field(ExperimentField.TAGS)
+                                        .operator(Operator.IS_EMPTY)
+                                        .value("")
+                                        .build()))
                                 .build()));
     }
 
@@ -1147,6 +1185,21 @@ class ExperimentAggregatesIntegrationTest {
                                         .build()))
                                 .search(data.experimentIds().iterator().next().toString())
                                 .truncate(false)
+                                .build()),
+
+                Arguments.of("Combined filter and search with truncation",
+                        (Function<DatasetItemCountTestData, DatasetItemSearchCriteria>) data -> DatasetItemSearchCriteria
+                                .builder()
+                                .datasetId(data.datasetId())
+                                .experimentIds(data.experimentIds())
+                                .entityType(EntityType.TRACE)
+                                .filters(List.of(ExperimentsComparisonFilter.builder()
+                                        .field(ExperimentsComparisonValidKnownField.DURATION.getQueryParamField())
+                                        .operator(Operator.GREATER_THAN)
+                                        .value("0")
+                                        .type(FieldType.NUMBER)
+                                        .build()))
+                                .truncate(true)
                                 .build()));
     }
 
@@ -1387,6 +1440,511 @@ class ExperimentAggregatesIntegrationTest {
                 .withComparatorForFields(StatsUtils::closeToEpsilonComparator, "value")
                 .ignoringCollectionOrder()
                 .isEqualTo(statsFromOriginal);
+    }
+
+    @Test
+    @DisplayName("ExperimentDAO.FIND returns consistent results before and after populating experiment_aggregates (UNION ALL hybrid)")
+    void experimentFindIsConsistentBeforeAndAfterAggregates() {
+        var workspaceName = UUID.randomUUID().toString();
+        var apiKey = UUID.randomUUID().toString();
+        var workspaceId = UUID.randomUUID().toString();
+
+        mockTargetWorkspace(apiKey, workspaceName, workspaceId);
+
+        var project = createProject(apiKey, workspaceName);
+        var dataset = createDataset(apiKey, workspaceName);
+        var experiment = createExperiment(dataset, apiKey, workspaceName);
+        List<String> feedbackScoreNames = PodamFactoryUtils.manufacturePojoList(factory, String.class);
+        createExperimentItemWithData(experiment.id(), dataset.id(), project.name(), feedbackScoreNames, apiKey,
+                workspaceName);
+
+        var criteria = ExperimentSearchCriteria.builder()
+                .experimentIds(Set.of(experiment.id()))
+                .entityType(EntityType.TRACE)
+                .sortingFields(List.of())
+                .build();
+
+        // Query BEFORE populating aggregates — Branch 2: on-the-fly JOINs
+        var beforeAggregation = experimentService.find(1, 10, criteria)
+                .contextWrite(ctx -> ctx
+                        .put(RequestContext.USER_NAME, USER)
+                        .put(RequestContext.WORKSPACE_ID, workspaceId))
+                .block();
+
+        assertThat(beforeAggregation).isNotNull();
+        assertThat(beforeAggregation.content()).isNotEmpty();
+
+        // Populate experiment_aggregates
+        experimentAggregatesService.populateAggregations(experiment.id())
+                .contextWrite(ctx -> ctx
+                        .put(RequestContext.USER_NAME, USER)
+                        .put(RequestContext.WORKSPACE_ID, workspaceId))
+                .block();
+
+        // Query AFTER populating aggregates — Branch 1: pre-computed data
+        var afterAggregation = experimentService.find(1, 10, criteria)
+                .contextWrite(ctx -> ctx
+                        .put(RequestContext.USER_NAME, USER)
+                        .put(RequestContext.WORKSPACE_ID, workspaceId))
+                .block();
+
+        assertThat(afterAggregation).isNotNull();
+        assertThat(afterAggregation.content()).isNotEmpty();
+
+        assertThat(afterAggregation)
+                .as("FIND must return identical results before and after populating experiment_aggregates")
+                .usingRecursiveComparison(RecursiveComparisonConfiguration.builder()
+                        .withComparatorForType(StatsUtils::bigDecimalComparator, BigDecimal.class)
+                        .build())
+                .ignoringCollectionOrderInFields("content.feedbackScores", "content.experimentScores")
+                .isEqualTo(beforeAggregation);
+    }
+
+    @Test
+    @DisplayName("ExperimentDAO.FIND_GROUPS returns consistent results before and after populating experiment_aggregates (UNION ALL hybrid)")
+    void experimentFindGroupsIsConsistentBeforeAndAfterAggregates() {
+        var workspaceName = UUID.randomUUID().toString();
+        var apiKey = UUID.randomUUID().toString();
+        var workspaceId = UUID.randomUUID().toString();
+
+        mockTargetWorkspace(apiKey, workspaceName, workspaceId);
+
+        var project = createProject(apiKey, workspaceName);
+        var dataset = createDataset(apiKey, workspaceName);
+        var experiment = createExperiment(dataset, apiKey, workspaceName);
+        List<String> feedbackScoreNames = PodamFactoryUtils.manufacturePojoList(factory, String.class);
+        createExperimentItemWithData(experiment.id(), dataset.id(), project.name(), feedbackScoreNames, apiKey,
+                workspaceName);
+
+        var criteria = ExperimentGroupCriteria.builder()
+                .groups(List.of(
+                        GroupBy.builder().field(GroupingFactory.DATASET_ID).type(FieldType.STRING).build()))
+                .build();
+
+        // Query BEFORE populating aggregates — Branch 2: on-the-fly JOINs
+        var beforeAggregation = experimentService.findGroups(criteria)
+                .contextWrite(ctx -> ctx
+                        .put(RequestContext.USER_NAME, USER)
+                        .put(RequestContext.WORKSPACE_ID, workspaceId))
+                .block();
+
+        assertThat(beforeAggregation).isNotNull();
+        assertThat(beforeAggregation.content()).isNotEmpty();
+
+        // Populate experiment_aggregates
+        experimentAggregatesService.populateAggregations(experiment.id())
+                .contextWrite(ctx -> ctx
+                        .put(RequestContext.USER_NAME, USER)
+                        .put(RequestContext.WORKSPACE_ID, workspaceId))
+                .block();
+
+        // Query AFTER populating aggregates — Branch 1: pre-computed data
+        var afterAggregation = experimentService.findGroups(criteria)
+                .contextWrite(ctx -> ctx
+                        .put(RequestContext.USER_NAME, USER)
+                        .put(RequestContext.WORKSPACE_ID, workspaceId))
+                .block();
+
+        assertThat(afterAggregation).isNotNull();
+        assertThat(afterAggregation.content()).isNotEmpty();
+
+        assertThat(afterAggregation)
+                .as("FIND_GROUPS must return identical results before and after populating experiment_aggregates")
+                .usingRecursiveComparison()
+                .isEqualTo(beforeAggregation);
+    }
+
+    @Test
+    @DisplayName("ExperimentDAO.FIND_GROUPS_AGGREGATIONS returns consistent results before and after populating experiment_aggregates (UNION ALL hybrid)")
+    void experimentFindGroupsAggregationsIsConsistentBeforeAndAfterAggregates() {
+        var workspaceName = UUID.randomUUID().toString();
+        var apiKey = UUID.randomUUID().toString();
+        var workspaceId = UUID.randomUUID().toString();
+
+        mockTargetWorkspace(apiKey, workspaceName, workspaceId);
+
+        var project = createProject(apiKey, workspaceName);
+        var dataset = createDataset(apiKey, workspaceName);
+        var experiment = createExperiment(dataset, apiKey, workspaceName);
+        List<String> feedbackScoreNames = PodamFactoryUtils.manufacturePojoList(factory, String.class);
+        createExperimentItemWithData(experiment.id(), dataset.id(), project.name(), feedbackScoreNames, apiKey,
+                workspaceName);
+
+        var criteria = ExperimentGroupCriteria.builder()
+                .groups(List.of(
+                        GroupBy.builder().field(GroupingFactory.DATASET_ID).type(FieldType.STRING).build()))
+                .build();
+
+        // Query BEFORE populating aggregates — Branch 2: on-the-fly JOINs
+        var beforeAggregation = experimentService.findGroupsAggregations(criteria)
+                .contextWrite(ctx -> ctx
+                        .put(RequestContext.USER_NAME, USER)
+                        .put(RequestContext.WORKSPACE_ID, workspaceId))
+                .block();
+
+        assertThat(beforeAggregation).isNotNull();
+        assertThat(beforeAggregation.content()).isNotEmpty();
+
+        // Populate experiment_aggregates
+        experimentAggregatesService.populateAggregations(experiment.id())
+                .contextWrite(ctx -> ctx
+                        .put(RequestContext.USER_NAME, USER)
+                        .put(RequestContext.WORKSPACE_ID, workspaceId))
+                .block();
+
+        // Query AFTER populating aggregates — Branch 1: pre-computed data
+        var afterAggregation = experimentService.findGroupsAggregations(criteria)
+                .contextWrite(ctx -> ctx
+                        .put(RequestContext.USER_NAME, USER)
+                        .put(RequestContext.WORKSPACE_ID, workspaceId))
+                .block();
+
+        assertThat(afterAggregation).isNotNull();
+        assertThat(afterAggregation.content()).isNotEmpty();
+
+        assertThat(afterAggregation)
+                .as("FIND_GROUPS_AGGREGATIONS must return identical results before and after populating experiment_aggregates")
+                .usingRecursiveComparison(RecursiveComparisonConfiguration.builder()
+                        .withComparatorForType(StatsUtils::bigDecimalComparator, BigDecimal.class)
+                        .build())
+                .ignoringCollectionOrderInFields("feedbackScores", "experimentScores")
+                .isEqualTo(beforeAggregation);
+    }
+
+    @Test
+    @DisplayName("ExperimentItemDAO.STREAM returns consistent results before and after populating experiment_item_aggregates (UNION ALL hybrid)")
+    void streamExperimentItemsIsConsistentBeforeAndAfterAggregates() {
+        var workspaceName = UUID.randomUUID().toString();
+        var apiKey = UUID.randomUUID().toString();
+        var workspaceId = UUID.randomUUID().toString();
+
+        mockTargetWorkspace(apiKey, workspaceName, workspaceId);
+
+        var project = createProject(apiKey, workspaceName);
+        var dataset = createDataset(apiKey, workspaceName);
+        var experiment1 = createExperiment(dataset, apiKey, workspaceName);
+        var experiment2 = createExperiment(dataset, apiKey, workspaceName);
+
+        List<String> feedbackScoreNames = PodamFactoryUtils.manufacturePojoList(factory, String.class);
+        createExperimentItemWithData(experiment1.id(), dataset.id(), project.name(), feedbackScoreNames, apiKey,
+                workspaceName);
+        createExperimentItemWithData(experiment2.id(), dataset.id(), project.name(), feedbackScoreNames, apiKey,
+                workspaceName);
+
+        var experimentIds = List.of(experiment1.id(), experiment2.id());
+
+        // Query BEFORE populating aggregates — Branch 2: on-the-fly JOINs
+        var beforeAggregation = datasetResourceClient.getDatasetItemsWithExperimentItems(
+                dataset.id(), experimentIds, null, null, apiKey, workspaceName);
+
+        assertThat(beforeAggregation).isNotNull();
+        assertThat(beforeAggregation.content()).isNotEmpty();
+
+        // Populate experiment_item_aggregates
+        experimentIds.forEach(id -> experimentAggregatesService.populateAggregations(id)
+                .contextWrite(ctx -> ctx
+                        .put(RequestContext.USER_NAME, USER)
+                        .put(RequestContext.WORKSPACE_ID, workspaceId))
+                .block());
+
+        // Query AFTER populating aggregates — Branch 1: pre-computed data
+        var afterAggregation = datasetResourceClient.getDatasetItemsWithExperimentItems(
+                dataset.id(), experimentIds, null, null, apiKey, workspaceName);
+
+        assertThat(afterAggregation).isNotNull();
+        assertThat(afterAggregation.content()).isNotEmpty();
+
+        assertDatasetItemsWithExperimentItems(beforeAggregation.content(), afterAggregation.content());
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("countFilterScenarios")
+    @DisplayName("ExperimentDAO.FIND returns consistent results before and after populating experiment_aggregates for all filter types (UNION ALL hybrid)")
+    void experimentFindIsConsistentForAllFiltersBeforeAndAfterAggregates(
+            String scenarioName,
+            Function<CountTestData, ExperimentSearchCriteria> criteriaBuilder) {
+
+        var workspaceName = UUID.randomUUID().toString();
+        var apiKey = UUID.randomUUID().toString();
+        var workspaceId = UUID.randomUUID().toString();
+
+        mockTargetWorkspace(apiKey, workspaceName, workspaceId);
+
+        var namePrefix = "find-filter-test-" + UUID.randomUUID() + "-";
+
+        List<Project> projects = IntStream.range(0, 5)
+                .parallel()
+                .mapToObj(i -> createProject(apiKey, workspaceName))
+                .toList();
+
+        List<Dataset> datasets = IntStream.range(0, 5)
+                .parallel()
+                .mapToObj(i -> createDataset(apiKey, workspaceName))
+                .toList();
+
+        // Use named experiments with alternating REGULAR/TRIAL types to cover name and types filters
+        List<Experiment> experiments = IntStream.range(0, 5)
+                .mapToObj(i -> createNamedExperiment(
+                        datasets.get(i),
+                        namePrefix + i,
+                        i % 2 == 0 ? ExperimentType.REGULAR : ExperimentType.TRIAL,
+                        apiKey, workspaceName))
+                .toList();
+
+        List<String> feedbackScoreNames = PodamFactoryUtils.manufacturePojoList(factory, String.class);
+        IntStream.range(0, 5)
+                .parallel()
+                .forEach(i -> createExperimentItemWithData(
+                        experiments.get(i).id(),
+                        datasets.get(i).id(),
+                        projects.get(i).name(),
+                        feedbackScoreNames, apiKey, workspaceName));
+
+        var testData = new CountTestData(
+                datasets.stream().map(Dataset::id).toList(),
+                experiments.stream().map(Experiment::id).toList(),
+                projects.stream().map(Project::id).toList(),
+                feedbackScoreNames,
+                namePrefix);
+        var criteria = criteriaBuilder.apply(testData);
+
+        // Query BEFORE populating aggregates — Branch 2: on-the-fly JOINs
+        var beforeAggregation = experimentService.find(1, 10, criteria)
+                .contextWrite(ctx -> ctx
+                        .put(RequestContext.USER_NAME, USER)
+                        .put(RequestContext.WORKSPACE_ID, workspaceId))
+                .block();
+
+        assertThat(beforeAggregation).isNotNull();
+
+        // Populate experiment_aggregates for all experiments
+        experiments.parallelStream()
+                .forEach(experiment -> experimentAggregatesService.populateAggregations(experiment.id())
+                        .contextWrite(ctx -> ctx
+                                .put(RequestContext.USER_NAME, USER)
+                                .put(RequestContext.WORKSPACE_ID, workspaceId))
+                        .block());
+
+        // Query AFTER populating aggregates — Branch 1: pre-computed data
+        var afterAggregation = experimentService.find(1, 10, criteria)
+                .contextWrite(ctx -> ctx
+                        .put(RequestContext.USER_NAME, USER)
+                        .put(RequestContext.WORKSPACE_ID, workspaceId))
+                .block();
+
+        assertThat(afterAggregation).isNotNull();
+
+        assertThat(afterAggregation)
+                .as("FIND must return identical results before and after populating experiment_aggregates for scenario: %s",
+                        scenarioName)
+                .usingRecursiveComparison(RecursiveComparisonConfiguration.builder()
+                        .withComparatorForType(StatsUtils::bigDecimalComparator, BigDecimal.class)
+                        .build())
+                .ignoringCollectionOrderInFields("content.feedbackScores", "content.experimentScores")
+                .isEqualTo(beforeAggregation);
+    }
+
+    @ParameterizedTest(name = "Criteria filter: {0}")
+    @MethodSource("groupingCriteriaFilterTestCases")
+    @DisplayName("ExperimentDAO.FIND_GROUPS returns consistent results before and after populating experiment_aggregates for all criteria filter types (UNION ALL hybrid)")
+    void experimentFindGroupsIsConsistentForAllFiltersBeforeAndAfterAggregates(
+            String scenarioName,
+            Function<GroupCriteriaTestData, ExperimentGroupCriteria> criteriaBuilder) {
+
+        var workspaceName = UUID.randomUUID().toString();
+        var apiKey = UUID.randomUUID().toString();
+        var workspaceId = UUID.randomUUID().toString();
+
+        mockTargetWorkspace(apiKey, workspaceName, workspaceId);
+
+        var namePrefix = "find-groups-filter-test-" + UUID.randomUUID() + "-";
+        var project1 = createProject(apiKey, workspaceName);
+        var project2 = createProject(apiKey, workspaceName);
+        var dataset1 = createDataset(apiKey, workspaceName);
+        var dataset2 = createDataset(apiKey, workspaceName);
+
+        var exp1 = createNamedExperiment(dataset1, namePrefix + "alpha", ExperimentType.REGULAR, apiKey, workspaceName);
+        var exp2 = createNamedExperiment(dataset1, namePrefix + "beta", ExperimentType.REGULAR, apiKey, workspaceName);
+        var exp3 = createNamedExperiment(dataset2, namePrefix + "gamma", ExperimentType.TRIAL, apiKey, workspaceName);
+
+        var feedbackScores = PodamFactoryUtils.manufacturePojoList(factory, String.class);
+        createExperimentItemWithData(exp1.id(), dataset1.id(), project1.name(), feedbackScores, apiKey, workspaceName);
+        createExperimentItemWithData(exp2.id(), dataset1.id(), project1.name(), feedbackScores, apiKey, workspaceName);
+        createExperimentItemWithData(exp3.id(), dataset2.id(), project2.name(), feedbackScores, apiKey, workspaceName);
+
+        var testData = new GroupCriteriaTestData(
+                project1.id(),
+                namePrefix,
+                List.of(
+                        GroupBy.builder().field(GroupingFactory.DATASET_ID).type(FieldType.STRING).build(),
+                        GroupBy.builder().field(GroupingFactory.PROJECT_ID).type(FieldType.STRING).build()));
+
+        var criteria = criteriaBuilder.apply(testData);
+
+        // Query BEFORE populating aggregates — Branch 2: on-the-fly JOINs
+        var beforeAggregation = experimentService.findGroups(criteria)
+                .contextWrite(ctx -> ctx
+                        .put(RequestContext.USER_NAME, USER)
+                        .put(RequestContext.WORKSPACE_ID, workspaceId))
+                .block();
+
+        assertThat(beforeAggregation).isNotNull();
+
+        // Populate experiment_aggregates for all experiments
+        List.of(exp1, exp2, exp3)
+                .forEach(experiment -> experimentAggregatesService.populateAggregations(experiment.id())
+                        .contextWrite(ctx -> ctx
+                                .put(RequestContext.USER_NAME, USER)
+                                .put(RequestContext.WORKSPACE_ID, workspaceId))
+                        .block());
+
+        // Query AFTER populating aggregates — Branch 1: pre-computed data
+        var afterAggregation = experimentService.findGroups(criteria)
+                .contextWrite(ctx -> ctx
+                        .put(RequestContext.USER_NAME, USER)
+                        .put(RequestContext.WORKSPACE_ID, workspaceId))
+                .block();
+
+        assertThat(afterAggregation).isNotNull();
+
+        assertThat(afterAggregation)
+                .as("FIND_GROUPS must return identical results before and after populating experiment_aggregates for scenario: %s",
+                        scenarioName)
+                .usingRecursiveComparison()
+                .isEqualTo(beforeAggregation);
+    }
+
+    @ParameterizedTest(name = "Criteria filter: {0}")
+    @MethodSource("groupingCriteriaFilterTestCases")
+    @DisplayName("ExperimentDAO.FIND_GROUPS_AGGREGATIONS returns consistent results before and after populating experiment_aggregates for all criteria filter types (UNION ALL hybrid)")
+    void experimentFindGroupsAggregationsIsConsistentForAllFiltersBeforeAndAfterAggregates(
+            String scenarioName,
+            Function<GroupCriteriaTestData, ExperimentGroupCriteria> criteriaBuilder) {
+
+        var workspaceName = UUID.randomUUID().toString();
+        var apiKey = UUID.randomUUID().toString();
+        var workspaceId = UUID.randomUUID().toString();
+
+        mockTargetWorkspace(apiKey, workspaceName, workspaceId);
+
+        var namePrefix = "find-groups-agg-filter-test-" + UUID.randomUUID() + "-";
+        var project1 = createProject(apiKey, workspaceName);
+        var project2 = createProject(apiKey, workspaceName);
+        var dataset1 = createDataset(apiKey, workspaceName);
+        var dataset2 = createDataset(apiKey, workspaceName);
+
+        var exp1 = createNamedExperiment(dataset1, namePrefix + "alpha", ExperimentType.REGULAR, apiKey, workspaceName);
+        var exp2 = createNamedExperiment(dataset1, namePrefix + "beta", ExperimentType.REGULAR, apiKey, workspaceName);
+        var exp3 = createNamedExperiment(dataset2, namePrefix + "gamma", ExperimentType.TRIAL, apiKey, workspaceName);
+
+        var feedbackScores = PodamFactoryUtils.manufacturePojoList(factory, String.class);
+        createExperimentItemWithData(exp1.id(), dataset1.id(), project1.name(), feedbackScores, apiKey, workspaceName);
+        createExperimentItemWithData(exp2.id(), dataset1.id(), project1.name(), feedbackScores, apiKey, workspaceName);
+        createExperimentItemWithData(exp3.id(), dataset2.id(), project2.name(), feedbackScores, apiKey, workspaceName);
+
+        var testData = new GroupCriteriaTestData(
+                project1.id(),
+                namePrefix,
+                List.of(
+                        GroupBy.builder().field(GroupingFactory.DATASET_ID).type(FieldType.STRING).build(),
+                        GroupBy.builder().field(GroupingFactory.PROJECT_ID).type(FieldType.STRING).build()));
+
+        var criteria = criteriaBuilder.apply(testData);
+
+        // Query BEFORE populating aggregates — Branch 2: on-the-fly JOINs
+        var beforeAggregation = experimentService.findGroupsAggregations(criteria)
+                .contextWrite(ctx -> ctx
+                        .put(RequestContext.USER_NAME, USER)
+                        .put(RequestContext.WORKSPACE_ID, workspaceId))
+                .block();
+
+        assertThat(beforeAggregation).isNotNull();
+
+        // Populate experiment_aggregates for all experiments
+        List.of(exp1, exp2, exp3)
+                .forEach(experiment -> experimentAggregatesService.populateAggregations(experiment.id())
+                        .contextWrite(ctx -> ctx
+                                .put(RequestContext.USER_NAME, USER)
+                                .put(RequestContext.WORKSPACE_ID, workspaceId))
+                        .block());
+
+        // Query AFTER populating aggregates — Branch 1: pre-computed data
+        var afterAggregation = experimentService.findGroupsAggregations(criteria)
+                .contextWrite(ctx -> ctx
+                        .put(RequestContext.USER_NAME, USER)
+                        .put(RequestContext.WORKSPACE_ID, workspaceId))
+                .block();
+
+        assertThat(afterAggregation).isNotNull();
+
+        assertThat(afterAggregation)
+                .as("FIND_GROUPS_AGGREGATIONS must return identical results before and after populating experiment_aggregates for scenario: %s",
+                        scenarioName)
+                .usingRecursiveComparison(RecursiveComparisonConfiguration.builder()
+                        .withComparatorForType(StatsUtils::bigDecimalComparator, BigDecimal.class)
+                        .build())
+                .ignoringCollectionOrderInFields("feedbackScores", "experimentScores")
+                .isEqualTo(beforeAggregation);
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("datasetItemCountFilterScenarios")
+    @DisplayName("ExperimentItemDAO.STREAM returns consistent results before and after populating experiment_item_aggregates for all filter types (UNION ALL hybrid)")
+    void streamExperimentItemsIsConsistentForAllFiltersBeforeAndAfterAggregates(
+            String scenarioName,
+            Function<DatasetItemCountTestData, DatasetItemSearchCriteria> criteriaBuilder) {
+
+        var workspaceName = UUID.randomUUID().toString();
+        var apiKey = UUID.randomUUID().toString();
+        var workspaceId = UUID.randomUUID().toString();
+
+        mockTargetWorkspace(apiKey, workspaceName, workspaceId);
+
+        var project = createProject(apiKey, workspaceName);
+        var dataset = createDataset(apiKey, workspaceName);
+        var experiment1 = createExperiment(dataset, apiKey, workspaceName);
+        var experiment2 = createExperiment(dataset, apiKey, workspaceName);
+
+        List<String> feedbackScoreNames = PodamFactoryUtils.manufacturePojoList(factory, String.class);
+        createExperimentItemWithData(experiment1.id(), dataset.id(), project.name(), feedbackScoreNames, apiKey,
+                workspaceName);
+        createExperimentItemWithData(experiment2.id(), dataset.id(), project.name(), feedbackScoreNames, apiKey,
+                workspaceName);
+
+        var experimentIds = Set.of(experiment1.id(), experiment2.id());
+        var testData = new DatasetItemCountTestData(dataset.id(), experimentIds, feedbackScoreNames);
+        var criteria = criteriaBuilder.apply(testData);
+
+        // Query BEFORE populating aggregates — Branch 2: on-the-fly JOINs
+        var beforeAggregation = datasetResourceClient.getDatasetItemsWithExperimentItems(
+                criteria.datasetId(),
+                List.copyOf(criteria.experimentIds()),
+                criteria.search(),
+                criteria.filters(),
+                apiKey,
+                workspaceName);
+
+        assertThat(beforeAggregation).isNotNull();
+
+        // Populate experiment_item_aggregates for all experiments
+        List.of(experiment1.id(), experiment2.id()).forEach(id -> experimentAggregatesService.populateAggregations(id)
+                .contextWrite(ctx -> ctx
+                        .put(RequestContext.USER_NAME, USER)
+                        .put(RequestContext.WORKSPACE_ID, workspaceId))
+                .block());
+
+        // Query AFTER populating aggregates — Branch 1: pre-computed data
+        var afterAggregation = datasetResourceClient.getDatasetItemsWithExperimentItems(
+                criteria.datasetId(),
+                List.copyOf(criteria.experimentIds()),
+                criteria.search(),
+                criteria.filters(),
+                apiKey,
+                workspaceName);
+
+        assertThat(afterAggregation).isNotNull();
+
+        assertDatasetItemsWithExperimentItems(beforeAggregation.content(), afterAggregation.content());
     }
 
 }

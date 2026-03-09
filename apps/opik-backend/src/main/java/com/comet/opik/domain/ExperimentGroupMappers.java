@@ -29,6 +29,8 @@ import static com.comet.opik.utils.ValidationUtils.SCALE;
  */
 public final class ExperimentGroupMappers {
 
+    public static final String ZERO_UUID = "00000000-0000-0000-0000-000000000000";
+
     private ExperimentGroupMappers() {
     }
 

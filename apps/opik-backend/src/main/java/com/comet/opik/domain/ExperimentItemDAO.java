@@ -92,9 +92,9 @@ class ExperimentItemDAO {
             """;
 
     private static final String STREAM = """
-            WITH experiment_items_scope as (
+            WITH experiment_items_ids AS (
                 SELECT
-                    *
+                    DISTINCT id, trace_id
                 FROM experiment_items
                 WHERE workspace_id = :workspace_id
                 AND experiment_id IN :experiment_ids
@@ -102,216 +102,285 @@ class ExperimentItemDAO {
                 ORDER BY id DESC, last_updated_at DESC
                 LIMIT 1 BY id
                 LIMIT :limit
-            ), feedback_scores_combined_raw AS (
+            ), aggregated_experiment_items AS (
                 SELECT
-                    workspace_id,
-                    project_id,
-                    entity_id,
-                    name,
-                    category_name,
-                    value,
-                    reason,
-                    source,
-                    created_by,
-                    last_updated_by,
-                    created_at,
-                    last_updated_at,
-                    feedback_scores.last_updated_by AS author
-                FROM feedback_scores FINAL
-                WHERE entity_type = 'trace'
-                  AND workspace_id = :workspace_id
-                  AND entity_id IN (SELECT trace_id FROM experiment_items_scope)
-                UNION ALL
-                SELECT
-                    workspace_id,
-                    project_id,
-                    entity_id,
-                    name,
-                    category_name,
-                    value,
-                    reason,
-                    source,
-                    created_by,
-                    last_updated_by,
-                    created_at,
-                    last_updated_at,
-                    author
-                FROM authored_feedback_scores FINAL
-                WHERE entity_type = 'trace'
-                  AND workspace_id = :workspace_id
-                  AND entity_id IN (SELECT trace_id FROM experiment_items_scope)
-            ), feedback_scores_with_ranking AS (
-                SELECT workspace_id,
-                       project_id,
-                       entity_id,
-                       name,
-                       category_name,
-                       value,
-                       reason,
-                       source,
-                       created_by,
-                       last_updated_by,
-                       created_at,
-                       last_updated_at,
-                       author,
-                       ROW_NUMBER() OVER (
-                           PARTITION BY workspace_id, project_id, entity_id, name, author
-                           ORDER BY last_updated_at DESC
-                       ) as rn
-                FROM feedback_scores_combined_raw
-            ), feedback_scores_combined AS (
-                SELECT workspace_id,
-                       project_id,
-                       entity_id,
-                       name,
-                       category_name,
-                       value,
-                       reason,
-                       source,
-                       created_by,
-                       last_updated_by,
-                       created_at,
-                       last_updated_at,
-                       author
-                FROM feedback_scores_with_ranking
-                WHERE rn = 1
-            ), feedback_scores_combined_grouped AS (
-                SELECT
-                    workspace_id,
-                    project_id,
-                    entity_id,
-                    name,
-                    groupArray(value) AS values,
-                    groupArray(reason) AS reasons,
-                    groupArray(category_name) AS categories,
-                    groupArray(author) AS authors,
-                    groupArray(source) AS sources,
-                    groupArray(created_by) AS created_bies,
-                    groupArray(last_updated_by) AS updated_bies,
-                    groupArray(created_at) AS created_ats,
-                    groupArray(last_updated_at) AS last_updated_ats
-                FROM feedback_scores_combined
-                GROUP BY workspace_id, project_id, entity_id, name
-            ), feedback_scores_final AS (
-                SELECT
-                    workspace_id,
-                    project_id,
-                    entity_id,
-                    name,
-                    arrayStringConcat(categories, ', ') AS category_name,
-                    IF(length(values) = 1, arrayElement(values, 1), toDecimal64(arrayAvg(values), 9)) AS value,
-                    arrayStringConcat(reasons, ', ') AS reason,
-                    arrayElement(sources, 1) AS source,
-                    mapFromArrays(
-                        authors,
-                        arrayMap(
-                            i -> tuple(values[i], reasons[i], categories[i], sources[i], last_updated_ats[i]),
-                            arrayEnumerate(values)
-                        )
-                    ) AS value_by_author,
-                    arrayStringConcat(created_bies, ', ') AS created_by,
-                    arrayStringConcat(updated_bies, ', ') AS last_updated_by,
-                    arrayMin(created_ats) AS created_at,
-                    arrayMax(last_updated_ats) AS last_updated_at
-                FROM feedback_scores_combined_grouped
-            ), comments_final AS (
-                SELECT
-                    id AS comment_id,
-                    text,
-                    created_at AS comment_created_at,
-                    last_updated_at AS comment_last_updated_at,
-                    created_by AS comment_created_by,
-                    last_updated_by AS comment_last_updated_by,
-                    entity_id
-                FROM comments
+                    DISTINCT id
+                FROM experiment_item_aggregates
                 WHERE workspace_id = :workspace_id
-                AND entity_id IN (SELECT trace_id FROM experiment_items_scope)
-                ORDER BY (workspace_id, project_id, entity_id, id) DESC, last_updated_at DESC
-                LIMIT 1 BY id
-            )
-            SELECT
-                ei.id,
-                ei.experiment_id,
-                ei.dataset_item_id,
-                ei.trace_id,
-                ei.project_id,
-                tfs.input,
-                tfs.output,
-                tfs.feedback_scores_array,
-                tfs.comments_array_agg,
-                tfs.total_estimated_cost,
-                tfs.usage,
-                tfs.duration,
-                ei.created_at,
-                ei.last_updated_at,
-                ei.created_by,
-                ei.last_updated_by,
-                tfs.visibility_mode AS trace_visibility_mode
-            FROM experiment_items_scope AS ei
-            LEFT JOIN (
+                AND experiment_id IN :experiment_ids
+                AND id IN (SELECT id FROM experiment_items_ids)
+            ), experiment_items_scope AS (
                 SELECT
-                    t.id,
-                    t.input,
-                    t.output,
-                    t.duration,
-                    t.visibility_mode,
-                    s.total_estimated_cost,
-                    s.usage,
-                    groupUniqArray(tuple(
-                        fs.entity_id,
-                        fs.name,
-                        fs.category_name,
-                        fs.value,
-                        fs.reason,
-                        fs.source,
-                        fs.created_at,
-                        fs.last_updated_at,
-                        fs.created_by,
-                        fs.last_updated_by,
-                        fs.value_by_author
-                    )) AS feedback_scores_array,
-                    groupUniqArray(tuple(c.*)) AS comments_array_agg
-                FROM (
-                    SELECT
-                        id,
-                        if(end_time IS NOT NULL AND start_time IS NOT NULL
-                             AND notEquals(start_time, toDateTime64('1970-01-01 00:00:00.000', 9)),
-                         (dateDiff('microsecond', start_time, end_time) / 1000.0),
-                         NULL) AS duration,
-                        <if(truncate)> replaceRegexpAll(if(notEmpty(input_slim), input_slim, truncated_input), '<truncate>', '"[image]"') as input <else> input <endif>,
-                        <if(truncate)> replaceRegexpAll(if(notEmpty(output_slim), output_slim, truncated_output), '<truncate>', '"[image]"') as output <else> output <endif>,
-                        visibility_mode
-                    FROM traces
-                    WHERE workspace_id = :workspace_id
-                    AND id IN (SELECT trace_id FROM experiment_items_scope)
-                    ORDER BY (workspace_id, project_id, id) DESC, last_updated_at DESC
-                    LIMIT 1 BY id
-                ) AS t
-                LEFT JOIN (
-                    SELECT
-                        trace_id,
-                        sum(total_estimated_cost) AS total_estimated_cost,
-                        sumMap(usage) AS usage
-                    FROM spans final
-                    WHERE workspace_id = :workspace_id
-                    AND trace_id IN (SELECT trace_id FROM experiment_items_scope)
-                    GROUP BY workspace_id, project_id, trace_id
-                ) s ON s.trace_id = t.id
-                LEFT JOIN feedback_scores_final AS fs ON t.id = fs.entity_id
-                LEFT JOIN comments_final AS c ON t.id = c.entity_id
-                GROUP BY
-                    t.id,
-                    t.input,
-                    t.output,
-                    t.duration,
-                    t.visibility_mode,
-                    s.total_estimated_cost,
-                    s.usage
-            ) AS tfs ON ei.trace_id = tfs.id
-            ORDER BY ei.experiment_id DESC
-            SETTINGS log_comment = '<log_comment>'
-            ;
-            """;
+                    *
+                FROM experiment_items
+                WHERE workspace_id = :workspace_id
+                AND experiment_id IN :experiment_ids
+                AND id IN (SELECT id FROM experiment_items_ids)
+                AND id NOT IN (SELECT id FROM aggregated_experiment_items)
+                ORDER BY id DESC, last_updated_at DESC
+                LIMIT 1 BY id
+            ), feedback_scores_combined_raw AS (
+                  SELECT
+                      workspace_id,
+                      project_id,
+                      entity_id,
+                      name,
+                      category_name,
+                      value,
+                      reason,
+                      source,
+                      created_by,
+                      last_updated_by,
+                      created_at,
+                      last_updated_at,
+                      feedback_scores.last_updated_by AS author
+                  FROM feedback_scores FINAL
+                  WHERE entity_type = 'trace'
+                    AND workspace_id = :workspace_id
+                    AND entity_id IN (SELECT trace_id FROM experiment_items_scope)
+                  UNION ALL
+                  SELECT
+                      workspace_id,
+                      project_id,
+                      entity_id,
+                      name,
+                      category_name,
+                      value,
+                      reason,
+                      source,
+                      created_by,
+                      last_updated_by,
+                      created_at,
+                      last_updated_at,
+                      author
+                  FROM authored_feedback_scores FINAL
+                  WHERE entity_type = 'trace'
+                    AND workspace_id = :workspace_id
+                    AND entity_id IN (SELECT trace_id FROM experiment_items_scope)
+            ), feedback_scores_with_ranking AS (
+                  SELECT workspace_id,
+                         project_id,
+                         entity_id,
+                         name,
+                         category_name,
+                         value,
+                         reason,
+                         source,
+                         created_by,
+                         last_updated_by,
+                         created_at,
+                         last_updated_at,
+                         author,
+                         ROW_NUMBER() OVER (
+                             PARTITION BY workspace_id, project_id, entity_id, name, author
+                             ORDER BY last_updated_at DESC
+                         ) as rn
+                  FROM feedback_scores_combined_raw
+            ), feedback_scores_combined AS (
+                  SELECT workspace_id,
+                         project_id,
+                         entity_id,
+                         name,
+                         category_name,
+                         value,
+                         reason,
+                         source,
+                         created_by,
+                         last_updated_by,
+                         created_at,
+                         last_updated_at,
+                         author
+                  FROM feedback_scores_with_ranking
+                  WHERE rn = 1
+            ), feedback_scores_combined_grouped AS (
+                  SELECT
+                      workspace_id,
+                      project_id,
+                      entity_id,
+                      name,
+                      groupArray(value) AS values,
+                      groupArray(reason) AS reasons,
+                      groupArray(category_name) AS categories,
+                      groupArray(author) AS authors,
+                      groupArray(source) AS sources,
+                      groupArray(created_by) AS created_bies,
+                      groupArray(last_updated_by) AS updated_bies,
+                      groupArray(created_at) AS created_ats,
+                      groupArray(last_updated_at) AS last_updated_ats
+                  FROM feedback_scores_combined
+                  GROUP BY workspace_id, project_id, entity_id, name
+            ), feedback_scores_final AS (
+                  SELECT
+                      workspace_id,
+                      project_id,
+                      entity_id,
+                      name,
+                      arrayStringConcat(categories, ', ') AS category_name,
+                      IF(length(values) = 1, arrayElement(values, 1), toDecimal64(arrayAvg(values), 9)) AS value,
+                      arrayStringConcat(reasons, ', ') AS reason,
+                      arrayElement(sources, 1) AS source,
+                      mapFromArrays(
+                          authors,
+                          arrayMap(
+                              i -> tuple(values[i], reasons[i], categories[i], sources[i], last_updated_ats[i]),
+                              arrayEnumerate(values)
+                          )
+                      ) AS value_by_author,
+                      arrayStringConcat(created_bies, ', ') AS created_by,
+                      arrayStringConcat(updated_bies, ', ') AS last_updated_by,
+                      arrayMin(created_ats) AS created_at,
+                      arrayMax(last_updated_ats) AS last_updated_at
+                  FROM feedback_scores_combined_grouped
+            ), comments_final AS (
+                  SELECT
+                      id AS comment_id,
+                      text,
+                      created_at AS comment_created_at,
+                      last_updated_at AS comment_last_updated_at,
+                      created_by AS comment_created_by,
+                      last_updated_by AS comment_last_updated_by,
+                      entity_id
+                  FROM comments
+                  WHERE workspace_id = :workspace_id
+                  AND entity_id IN (SELECT trace_id FROM experiment_items_ids)
+                  ORDER BY (workspace_id, project_id, entity_id, id) DESC, last_updated_at DESC
+                  LIMIT 1 BY id
+            ), experiments_in_agg AS (
+                  SELECT
+                      id,
+                      trace_id,
+                      input,
+                      output,
+                      input_slim,
+                      output_slim,
+                      duration,
+                      total_estimated_cost,
+                      usage,
+                      visibility_mode,
+                      feedback_scores_array,
+                      experiment_id,
+                      dataset_item_id,
+                      project_id,
+                      created_at,
+                      last_updated_at,
+                      created_by,
+                      last_updated_by
+                  FROM experiment_item_aggregates FINAL
+                  WHERE workspace_id = :workspace_id
+                  AND experiment_id IN :experiment_ids
+                  AND id IN (SELECT id FROM experiment_items_ids)
+            ), feedback_scores_per_trace AS (
+                  SELECT
+                      entity_id,
+                      groupUniqArray(tuple(
+                          entity_id,
+                          name,
+                          category_name,
+                          value,
+                          reason,
+                          source,
+                          created_at,
+                          last_updated_at,
+                          created_by,
+                          last_updated_by,
+                          value_by_author
+                      )) AS feedback_scores_array
+                  FROM feedback_scores_final
+                  GROUP BY entity_id
+            ), comments_per_trace AS (
+                  SELECT
+                      entity_id,
+                      groupUniqArray(tuple(comment_id, text, comment_created_at, comment_last_updated_at, comment_created_by, comment_last_updated_by, entity_id)) AS comments_array_agg
+                  FROM comments_final
+                  GROUP BY entity_id
+            )
+              SELECT
+                  *
+              FROM (
+                  -- Branch 1: pre-computed values from experiment_item_aggregates (COMPLETED/CANCELLED experiments)
+                  SELECT
+                      ei.id,
+                      ei.experiment_id,
+                      ei.dataset_item_id,
+                      ei.trace_id,
+                      ei.project_id,
+                      <if(truncate)> replaceRegexpAll(if(notEmpty(ei.input_slim), ei.input_slim, ei.input), '<truncate>', '"[image]"') <else> ei.input <endif> AS input,
+                      <if(truncate)> replaceRegexpAll(if(notEmpty(ei.output_slim), ei.output_slim, ei.output), '<truncate>', '"[image]"') <else> ei.output <endif> AS output,
+                      JSONExtract(ei.feedback_scores_array, 'Array(Tuple(entity_id String, name String, category_name String, value Decimal64(9), reason String, source String, created_at DateTime64(9, ''UTC''), last_updated_at DateTime64(9, ''UTC''), created_by String, last_updated_by String, value_by_author Map(String, Tuple(value Decimal64(9), reason String, category_name String, source String, last_updated_at DateTime64(9, ''UTC'')))))') as feedback_scores_array,
+                      cp.comments_array_agg,
+                      ei.total_estimated_cost,
+                      ei.usage,
+                      ei.duration,
+                      ei.created_at,
+                      ei.last_updated_at,
+                      ei.created_by,
+                      ei.last_updated_by,
+                      ei.visibility_mode AS trace_visibility_mode
+                  FROM experiments_in_agg AS ei
+                  LEFT JOIN comments_per_trace AS cp ON ei.trace_id = cp.entity_id
+
+                  UNION ALL
+
+                  -- Branch 2: on-the-fly computation via JOINs for experiments not in aggregates
+                  SELECT
+                      ei.id,
+                      ei.experiment_id,
+                      ei.dataset_item_id,
+                      ei.trace_id,
+                      ei.project_id,
+                      tfs.input,
+                      tfs.output,
+                      fsp.feedback_scores_array,
+                      cp.comments_array_agg,
+                      tfs.total_estimated_cost,
+                      tfs.usage,
+                      tfs.duration,
+                      ei.created_at,
+                      ei.last_updated_at,
+                      ei.created_by,
+                      ei.last_updated_by,
+                      tfs.visibility_mode AS trace_visibility_mode
+                  FROM experiment_items_scope AS ei
+                  LEFT JOIN (
+                      SELECT
+                          t.id,
+                          t.input,
+                          t.output,
+                          t.duration,
+                          t.visibility_mode,
+                          s.total_estimated_cost,
+                          s.usage
+                      FROM (
+                          SELECT
+                              id,
+                              duration,
+                              <if(truncate)> replaceRegexpAll(if(notEmpty(input_slim), input_slim, truncated_input), '<truncate>', '"[image]"') as input <else> input <endif>,
+                              <if(truncate)> replaceRegexpAll(if(notEmpty(output_slim), output_slim, truncated_output), '<truncate>', '"[image]"') as output <else> output <endif>,
+                              visibility_mode
+                          FROM traces
+                          WHERE workspace_id = :workspace_id
+                          AND id IN (SELECT trace_id FROM experiment_items_scope)
+                          ORDER BY (workspace_id, project_id, id) DESC, last_updated_at DESC
+                          LIMIT 1 BY id
+                      ) AS t
+                      LEFT JOIN (
+                          SELECT
+                              trace_id,
+                              sum(total_estimated_cost) AS total_estimated_cost,
+                              sumMap(usage) AS usage
+                          FROM spans final
+                          WHERE workspace_id = :workspace_id
+                          AND trace_id IN (SELECT trace_id FROM experiment_items_scope)
+                          GROUP BY workspace_id, project_id, trace_id
+                      ) s ON s.trace_id = t.id
+                  ) AS tfs ON ei.trace_id = tfs.id
+                  LEFT JOIN feedback_scores_per_trace AS fsp ON ei.trace_id = fsp.entity_id
+                  LEFT JOIN comments_per_trace AS cp ON ei.trace_id = cp.entity_id
+              )  as final_result
+              ORDER BY final_result.id DESC, final_result.last_updated_at DESC
+              SETTINGS log_comment = '<log_comment>'
+              ;
+              """;
 
     private static final String DELETE = """
             DELETE FROM experiment_items
