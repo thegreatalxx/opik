@@ -8,7 +8,7 @@ import {
   formatAsCurrency,
 } from "@/lib/optimization-formatters";
 import { Experiment } from "@/types/datasets";
-import { getFeedbackScoreValue } from "@/lib/feedback-scores";
+import { getObjectiveScoreValue } from "@/lib/feedback-scores";
 
 type TrialKPICardsProps = {
   experiments: Experiment[];
@@ -34,9 +34,7 @@ const aggregateExperiments = (
     totalTraceCount += tc;
 
     if (objectiveName) {
-      const score =
-        getFeedbackScoreValue(exp.feedback_scores ?? [], objectiveName) ??
-        getFeedbackScoreValue(exp.experiment_scores ?? [], objectiveName);
+      const score = getObjectiveScoreValue(exp, objectiveName);
       if (score != null) {
         totalWeightedScore += score * tc;
         hasScore = true;

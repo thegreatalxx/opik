@@ -17,7 +17,7 @@ import { Experiment, EXPERIMENT_TYPE } from "@/types/datasets";
 import useOptimizationById from "@/api/optimizations/useOptimizationById";
 import useAppStore from "@/store/AppStore";
 import { checkIsEvaluationSuite } from "@/lib/optimizations";
-import { getFeedbackScoreValue } from "@/lib/feedback-scores";
+import { getObjectiveScoreValue } from "@/lib/feedback-scores";
 import { keepPreviousData } from "@tanstack/react-query";
 import { useParams } from "@tanstack/react-router";
 import { usePermissions } from "@/contexts/PermissionsContext";
@@ -95,15 +95,7 @@ const CompareTrialsPage: React.FunctionComponent = () => {
       .slice()
       .sort((a, b) => a.created_at.localeCompare(b.created_at));
     const baseline = sorted[0];
-    const score =
-      getFeedbackScoreValue(
-        baseline.feedback_scores ?? [],
-        optimization.objective_name,
-      ) ??
-      getFeedbackScoreValue(
-        baseline.experiment_scores ?? [],
-        optimization.objective_name,
-      );
+    const score = getObjectiveScoreValue(baseline, optimization.objective_name);
     return {
       baselineExperimentId: baseline.id,
       baselineScore: score ?? undefined,

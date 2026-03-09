@@ -28,7 +28,7 @@ import {
   AggregatedCandidate,
   ExperimentOptimizationMetadata,
 } from "@/types/optimizations";
-import { getFeedbackScoreValue } from "@/lib/feedback-scores";
+import { getObjectiveScoreValue } from "@/lib/feedback-scores";
 
 const MAX_EXPERIMENTS_LOADED = 1000;
 
@@ -151,10 +151,7 @@ const aggregateCandidates = (
       totalDatasetItemCount += exp.dataset_item_count ?? tc;
 
       if (objectiveName) {
-        const score = getFeedbackScoreValue(
-          exp.feedback_scores ?? [],
-          objectiveName,
-        );
+        const score = getObjectiveScoreValue(exp, objectiveName);
         if (score != null) {
           totalWeightedScore += score * tc;
           hasScore = true;
