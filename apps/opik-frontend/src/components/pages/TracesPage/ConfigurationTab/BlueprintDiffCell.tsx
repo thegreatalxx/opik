@@ -1,10 +1,7 @@
 import React from "react";
 
 import { cn, formatNumericData } from "@/lib/utils";
-import {
-  BlueprintValueType,
-  BlueprintValue,
-} from "@/types/agent-configs";
+import { BlueprintValueType, BlueprintValue } from "@/types/agent-configs";
 import { GitCommitVertical } from "lucide-react";
 import usePromptByCommit from "@/api/prompts/usePromptByCommit";
 import Loader from "@/components/shared/Loader/Loader";
