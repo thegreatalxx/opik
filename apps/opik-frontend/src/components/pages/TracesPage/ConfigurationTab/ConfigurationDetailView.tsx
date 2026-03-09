@@ -183,7 +183,7 @@ const ConfigurationDetailView: React.FC<ConfigurationDetailViewProps> = ({
         setOpen={setDuplicateConfirmOpen}
         onConfirm={handleConfirmDuplicate}
         title="Duplicate as new blueprint"
-        description={`This will create a new blueprint with all values copied from v${version}. Are you sure you want to continue?`}
+        description={`This will create a new blueprint with all values copied from v${version}. Are you sure you want to continue? It will ignore the updates for prompts.`}
         confirmText="Duplicate"
       />
     </>

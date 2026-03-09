@@ -22,7 +22,7 @@ import {
 } from "@/lib/llm";
 
 export interface BlueprintValuePromptHandle {
-  saveVersion: () => Promise<void>;
+  saveVersion: () => Promise<{ key: string; commit: string } | null>;
 }
 
 type BlueprintValuePromptProps = {
@@ -87,7 +87,7 @@ const BlueprintValuePrompt = forwardRef<
     ref,
     () => ({
       saveVersion: async () => {
-        if (!prompt) return;
+        if (!prompt) return null;
 
         const currentTemplate = isChatPrompt
           ? JSON.stringify(
@@ -97,15 +97,18 @@ const BlueprintValuePrompt = forwardRef<
             )
           : draftTemplate;
 
-        if (currentTemplate === initialTemplate.current) return;
+        if (currentTemplate === initialTemplate.current) return null;
 
-        await createVersion({
+        const data = await createVersion({
           name: prompt.name,
           template: currentTemplate,
           type: promptVersion?.type,
           templateStructure: prompt.template_structure,
+          action: "no_action",
           onSuccess: () => {},
         });
+
+        return { key: value.key, commit: data.commit };
       },
     }),
     [
@@ -115,6 +118,7 @@ const BlueprintValuePrompt = forwardRef<
       isChatPrompt,
       prompt,
       promptVersion,
+      value.key,
     ],
   );
 

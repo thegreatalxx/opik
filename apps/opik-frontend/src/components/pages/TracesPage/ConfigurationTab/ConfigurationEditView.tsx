@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Pencil } from "lucide-react";
+import { Info, Pencil } from "lucide-react";
 import { z } from "zod";
 
 import {
@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import Loader from "@/components/shared/Loader/Loader";
+import TooltipWrapper from "@/components/shared/TooltipWrapper/TooltipWrapper";
 import BlueprintTypeIcon from "./BlueprintTypeIcon";
 import BlueprintValuePrompt, {
   BlueprintValuePromptHandle,
@@ -100,6 +101,11 @@ const ConfigurationEditView: React.FC<ConfigurationEditViewProps> = ({
 
   const hasErrors = Object.values(errors).some(Boolean);
 
+  const hasChanges =
+    Object.keys(draftValues).some(
+      (key) => draftValues[key] !== originalValues.current[key],
+    ) || Object.values(dirtyPromptKeys).some(Boolean);
+
   const handleSave = async () => {
     if (!agentConfig) return;
 
@@ -120,21 +126,35 @@ const ConfigurationEditView: React.FC<ConfigurationEditViewProps> = ({
       return;
     }
 
-    await Promise.all(
+    const promptResults = await Promise.all(
       Object.values(promptRefs.current)
         .filter(Boolean)
         .map((handle) => handle!.saveVersion()),
     );
 
-    const values: BlueprintValue[] = agentConfig.values.map((v) => ({
-      key: v.key,
-      type: v.type,
-      value:
-        v.type !== BlueprintValueType.PROMPT
-          ? draftValues[v.key] ?? v.value
-          : v.value,
-      ...(v.description ? { description: v.description } : {}),
-    }));
+    const newCommits = new Map<string, string>();
+    for (const result of promptResults) {
+      if (result) {
+        newCommits.set(result.key, result.commit);
+      }
+    }
+
+    const values: BlueprintValue[] = agentConfig.values
+      .filter((v) => {
+        if (v.type === BlueprintValueType.PROMPT) {
+          return newCommits.has(v.key);
+        }
+        return draftValues[v.key] !== originalValues.current[v.key];
+      })
+      .map((v) => ({
+        key: v.key,
+        type: v.type,
+        value:
+          v.type === BlueprintValueType.PROMPT
+            ? newCommits.get(v.key)!
+            : draftValues[v.key],
+        ...(v.description ? { description: v.description } : {}),
+      }));
 
     createConfig(
       {
@@ -174,13 +194,21 @@ const ConfigurationEditView: React.FC<ConfigurationEditViewProps> = ({
           >
             Cancel
           </Button>
-          <Button
-            size="sm"
-            onClick={handleSave}
-            disabled={isSaving || hasErrors}
+          <TooltipWrapper
+            content={
+              !hasChanges ? "Make changes to save a new version" : undefined
+            }
           >
-            {isSaving ? "Saving…" : "Save as new version"}
-          </Button>
+            <span className="inline-flex">
+              <Button
+                size="sm"
+                onClick={handleSave}
+                disabled={isSaving || hasErrors || !hasChanges}
+              >
+                {isSaving ? "Saving…" : "Save as new version"}
+              </Button>
+            </span>
+          </TooltipWrapper>
         </div>
       </div>
 
@@ -212,6 +240,11 @@ const ConfigurationEditView: React.FC<ConfigurationEditViewProps> = ({
                 <span className="comet-body-xs-accented text-foreground">
                   {v.key}
                 </span>
+                {v.type === BlueprintValueType.PROMPT && isChanged && (
+                  <TooltipWrapper content="Saving will create a new prompt version visible everywhere in the platform">
+                    <Info className="size-3.5 text-muted-slate" />
+                  </TooltipWrapper>
+                )}
                 {isChanged && (
                   <span className="size-1.5 rounded-full bg-amber-400" />
                 )}

@@ -132,11 +132,9 @@ const ConfigurationTab: React.FC<ConfigurationTabProps> = ({ projectId }) => {
 export default ConfigurationTab;
 
 // ALEX
-// DESCRIPTIONS
-// PROMPT UPDATES WITH REGULAR UPDATES
-// empty fields
-// edit value problem
+// empty fields ?
 // test metadata
 // move files that are shared
 // check bug with time
 //  long prompts to 3 lines?
+// difference show
