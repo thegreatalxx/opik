@@ -9,8 +9,60 @@ import {
   formatAsCurrency,
   formatAsPercentage,
 } from "@/lib/optimization-formatters";
-import PercentageTrend from "@/components/shared/PercentageTrend/PercentageTrend";
+import PercentageTrend, {
+  PercentageTrendType,
+} from "@/components/shared/PercentageTrend/PercentageTrend";
 import TooltipWrapper from "@/components/shared/TooltipWrapper/TooltipWrapper";
+
+const getBaselineCandidate = (candidates?: AggregatedCandidate[]) =>
+  candidates?.find((c) => c.stepIndex === 0);
+
+const calcPercentageVsBaseline = (
+  value: number | undefined,
+  baselineValue: number | undefined,
+  candidateId: string,
+  baselineCandidateId?: string,
+): number | undefined => {
+  if (
+    isNumber(value) &&
+    isNumber(baselineValue) &&
+    baselineValue !== 0 &&
+    candidateId !== baselineCandidateId
+  ) {
+    return ((value - baselineValue) / Math.abs(baselineValue)) * 100;
+  }
+  return undefined;
+};
+
+type TrialMetricCellProps = {
+  value?: number;
+  formatter: (v: number) => string;
+  percentage?: number;
+  trend?: PercentageTrendType;
+  suffix?: string;
+};
+
+const TrialMetricCellContent: React.FunctionComponent<TrialMetricCellProps> = ({
+  value,
+  formatter,
+  percentage,
+  trend = "direct",
+  suffix,
+}) => (
+  <>
+    {isNumber(value) ? (
+      <TooltipWrapper content={String(value)}>
+        <span>
+          {formatter(value)}
+          {suffix}
+        </span>
+      </TooltipWrapper>
+    ) : (
+      "-"
+    )}
+    <PercentageTrend percentage={percentage} trend={trend} />
+  </>
+);
 
 export const TrialNumberCell = (context: CellContext<unknown, unknown>) => {
   const row = context.row.original as AggregatedCandidate;
@@ -44,18 +96,13 @@ export const TrialAccuracyCell = (context: CellContext<unknown, unknown>) => {
     isEvaluationSuite?: boolean;
   };
 
-  const baselineCandidate = candidates?.find((c) => c.stepIndex === 0);
-  const baselineScore = baselineCandidate?.score;
-
-  let percentage: number | undefined;
-  if (
-    isNumber(row.score) &&
-    isNumber(baselineScore) &&
-    baselineScore !== 0 &&
-    row.candidateId !== baselineCandidate?.candidateId
-  ) {
-    percentage = ((row.score - baselineScore) / Math.abs(baselineScore)) * 100;
-  }
+  const baseline = getBaselineCandidate(candidates);
+  const percentage = calcPercentageVsBaseline(
+    row.score,
+    baseline?.score,
+    row.candidateId,
+    baseline?.candidateId,
+  );
 
   const passRateFraction =
     isEvaluationSuite && isNumber(row.score) && row.totalDatasetItemCount > 0
@@ -70,17 +117,12 @@ export const TrialAccuracyCell = (context: CellContext<unknown, unknown>) => {
       tableMetadata={context.table.options.meta}
       className="gap-2"
     >
-      {isNumber(row.score) ? (
-        <TooltipWrapper content={String(row.score)}>
-          <span>
-            {formatAsPercentage(row.score)}
-            {passRateFraction}
-          </span>
-        </TooltipWrapper>
-      ) : (
-        "-"
-      )}
-      <PercentageTrend percentage={percentage} />
+      <TrialMetricCellContent
+        value={row.score}
+        formatter={formatAsPercentage}
+        percentage={percentage}
+        suffix={passRateFraction}
+      />
     </CellWrapper>
   );
 };
@@ -94,19 +136,13 @@ export const TrialCandidateCostCell = (
     candidates: AggregatedCandidate[];
   };
 
-  const baselineCandidate = candidates?.find((c) => c.stepIndex === 0);
-  const baselineCost = baselineCandidate?.runtimeCost;
-
-  let percentage: number | undefined;
-  if (
-    isNumber(row.runtimeCost) &&
-    isNumber(baselineCost) &&
-    baselineCost !== 0 &&
-    row.candidateId !== baselineCandidate?.candidateId
-  ) {
-    percentage =
-      ((row.runtimeCost - baselineCost) / Math.abs(baselineCost)) * 100;
-  }
+  const baseline = getBaselineCandidate(candidates);
+  const percentage = calcPercentageVsBaseline(
+    row.runtimeCost,
+    baseline?.runtimeCost,
+    row.candidateId,
+    baseline?.candidateId,
+  );
 
   return (
     <CellWrapper
@@ -114,14 +150,12 @@ export const TrialCandidateCostCell = (
       tableMetadata={context.table.options.meta}
       className="gap-2"
     >
-      {isNumber(row.runtimeCost) ? (
-        <TooltipWrapper content={String(row.runtimeCost)}>
-          <span>{formatAsCurrency(row.runtimeCost)}</span>
-        </TooltipWrapper>
-      ) : (
-        "-"
-      )}
-      <PercentageTrend percentage={percentage} trend="inverted" />
+      <TrialMetricCellContent
+        value={row.runtimeCost}
+        formatter={formatAsCurrency}
+        percentage={percentage}
+        trend="inverted"
+      />
     </CellWrapper>
   );
 };
@@ -135,19 +169,13 @@ export const TrialCandidateLatencyCell = (
     candidates: AggregatedCandidate[];
   };
 
-  const baselineCandidate = candidates?.find((c) => c.stepIndex === 0);
-  const baselineLatency = baselineCandidate?.latencyP50;
-
-  let percentage: number | undefined;
-  if (
-    isNumber(row.latencyP50) &&
-    isNumber(baselineLatency) &&
-    baselineLatency !== 0 &&
-    row.candidateId !== baselineCandidate?.candidateId
-  ) {
-    percentage =
-      ((row.latencyP50 - baselineLatency) / Math.abs(baselineLatency)) * 100;
-  }
+  const baseline = getBaselineCandidate(candidates);
+  const percentage = calcPercentageVsBaseline(
+    row.latencyP50,
+    baseline?.latencyP50,
+    row.candidateId,
+    baseline?.candidateId,
+  );
 
   return (
     <CellWrapper
@@ -155,14 +183,12 @@ export const TrialCandidateLatencyCell = (
       tableMetadata={context.table.options.meta}
       className="gap-2"
     >
-      {isNumber(row.latencyP50) ? (
-        <TooltipWrapper content={String(row.latencyP50)}>
-          <span>{formatAsDuration(row.latencyP50)}</span>
-        </TooltipWrapper>
-      ) : (
-        "-"
-      )}
-      <PercentageTrend percentage={percentage} trend="inverted" />
+      <TrialMetricCellContent
+        value={row.latencyP50}
+        formatter={formatAsDuration}
+        percentage={percentage}
+        trend="inverted"
+      />
     </CellWrapper>
   );
 };

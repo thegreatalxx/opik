@@ -53,6 +53,21 @@ const MetricComparisonCell: React.FunctionComponent<
       : undefined;
 
   if (compact) {
+    const trendIcon = !isUndefined(percentage)
+      ? (() => {
+          const { Icon, variant } = getTrendConfig(percentage, trend);
+          return (
+            <Tag
+              size="sm"
+              variant={variant}
+              className="inline-flex items-center justify-center px-1"
+            >
+              <Icon className="size-3" />
+            </Tag>
+          );
+        })()
+      : null;
+
     return (
       <div className="flex items-center gap-1.5">
         {!isUndefined(baseline) && (
@@ -62,19 +77,7 @@ const MetricComparisonCell: React.FunctionComponent<
             </span>
           </TooltipWrapper>
         )}
-        {!isUndefined(percentage) &&
-          (() => {
-            const { Icon, variant } = getTrendConfig(percentage, trend);
-            return (
-              <Tag
-                size="sm"
-                variant={variant}
-                className="inline-flex items-center justify-center px-1"
-              >
-                <Icon className="size-3" />
-              </Tag>
-            );
-          })()}
+        {trendIcon}
         {!isUndefined(current) ? (
           <TooltipWrapper content={String(current)}>
             <span className="comet-body-s-accented">{formatter(current)}</span>

@@ -1,7 +1,10 @@
 import React, { useMemo } from "react";
 import { Clock, Coins, PenLine } from "lucide-react";
 
-import MetricComparisonCell from "@/components/pages-shared/experiments/MetricComparisonCell/MetricComparisonCell";
+import {
+  KPICard,
+  MetricKPICard,
+} from "@/components/pages-shared/experiments/KPICard/KPICard";
 import {
   formatAsPercentage,
   formatAsDuration,
@@ -21,15 +24,6 @@ const OptimizationKPICards: React.FunctionComponent<
   OptimizationKPICardsProps
 > = ({ experiments, baselineCandidate, bestCandidate, isEvaluationSuite }) => {
   const kpiData = useMemo(() => {
-    const baselineScore = baselineCandidate?.score;
-    const bestScore = bestCandidate?.score;
-
-    const baselineDuration = baselineCandidate?.latencyP50;
-    const bestDuration = bestCandidate?.latencyP50;
-
-    const baselineCost = baselineCandidate?.runtimeCost;
-    const bestCost = bestCandidate?.runtimeCost;
-
     const totalOptCost = experiments.reduce(
       (sum, e) => sum + (e.total_estimated_cost ?? 0),
       0,
@@ -45,67 +39,38 @@ const OptimizationKPICards: React.FunctionComponent<
       totalDuration = (last - first) / 1000;
     }
 
-    return {
-      baselineScore,
-      bestScore,
-      baselineDuration,
-      bestDuration,
-      baselineCost,
-      bestCost,
-      totalOptCost,
-      totalDuration,
-    };
-  }, [experiments, baselineCandidate, bestCandidate]);
+    return { totalOptCost, totalDuration };
+  }, [experiments]);
 
   return (
     <div className="grid grid-cols-4 gap-4">
-      <div className="rounded-lg border bg-muted/20 p-4">
-        <div className="mb-2 flex items-center gap-2">
-          <PenLine className="size-4 text-muted-slate" />
-          <span className="comet-body-s text-muted-slate">
-            {isEvaluationSuite ? "Pass rate" : "Accuracy"}
-          </span>
-        </div>
-        <MetricComparisonCell
-          baseline={kpiData.baselineScore}
-          current={kpiData.bestScore}
-          formatter={formatAsPercentage}
-        />
-      </div>
+      <MetricKPICard
+        icon={PenLine}
+        label={isEvaluationSuite ? "Pass rate" : "Accuracy"}
+        baseline={baselineCandidate?.score}
+        current={bestCandidate?.score}
+        formatter={formatAsPercentage}
+      />
 
-      <div className="rounded-lg border bg-muted/20 p-4">
-        <div className="mb-2 flex items-center gap-2">
-          <Clock className="size-4 text-muted-slate" />
-          <span className="comet-body-s text-muted-slate">Latency</span>
-        </div>
-        <MetricComparisonCell
-          baseline={kpiData.baselineDuration}
-          current={kpiData.bestDuration}
-          formatter={formatAsDuration}
-          trend="inverted"
-        />
-      </div>
+      <MetricKPICard
+        icon={Clock}
+        label="Latency"
+        baseline={baselineCandidate?.latencyP50}
+        current={bestCandidate?.latencyP50}
+        formatter={formatAsDuration}
+        trend="inverted"
+      />
 
-      <div className="rounded-lg border bg-muted/20 p-4">
-        <div className="mb-2 flex items-center gap-2">
-          <Coins className="size-4 text-muted-slate" />
-          <span className="comet-body-s text-muted-slate">Runtime cost</span>
-        </div>
-        <MetricComparisonCell
-          baseline={kpiData.baselineCost}
-          current={kpiData.bestCost}
-          formatter={formatAsCurrency}
-          trend="inverted"
-        />
-      </div>
+      <MetricKPICard
+        icon={Coins}
+        label="Runtime cost"
+        baseline={baselineCandidate?.runtimeCost}
+        current={bestCandidate?.runtimeCost}
+        formatter={formatAsCurrency}
+        trend="inverted"
+      />
 
-      <div className="rounded-lg border bg-muted/20 p-4">
-        <div className="mb-2 flex items-center gap-2">
-          <Coins className="size-4 text-muted-slate" />
-          <span className="comet-body-s text-muted-slate">
-            Optimization cost
-          </span>
-        </div>
+      <KPICard icon={Coins} label="Optimization cost">
         <div className="flex items-baseline gap-1.5">
           <span className="comet-body-s-accented">
             {kpiData.totalOptCost > 0
@@ -118,7 +83,7 @@ const OptimizationKPICards: React.FunctionComponent<
             </span>
           )}
         </div>
-      </div>
+      </KPICard>
     </div>
   );
 };

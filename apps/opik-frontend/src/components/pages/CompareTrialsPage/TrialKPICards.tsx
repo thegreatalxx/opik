@@ -1,7 +1,7 @@
 import React, { useMemo } from "react";
 import { Clock, Coins, PenLine } from "lucide-react";
 
-import MetricComparisonCell from "@/components/pages-shared/experiments/MetricComparisonCell/MetricComparisonCell";
+import { MetricKPICard } from "@/components/pages-shared/experiments/KPICard/KPICard";
 import {
   formatAsPercentage,
   formatAsDuration,
@@ -65,45 +65,31 @@ const TrialKPICards: React.FunctionComponent<TrialKPICardsProps> = ({
 
   return (
     <div className="grid grid-cols-3 gap-4">
-      <div className="rounded-lg border bg-muted/20 p-4">
-        <div className="mb-2 flex items-center gap-2">
-          <PenLine className="size-4 text-muted-slate" />
-          <span className="comet-body-s text-muted-slate">
-            {isEvaluationSuite ? "Pass rate" : objectiveName ?? "Accuracy"}
-          </span>
-        </div>
-        <MetricComparisonCell
-          baseline={baselineMetrics?.score}
-          current={currentMetrics.score}
-          formatter={formatAsPercentage}
-        />
-      </div>
+      <MetricKPICard
+        icon={PenLine}
+        label={isEvaluationSuite ? "Pass rate" : objectiveName ?? "Accuracy"}
+        baseline={baselineMetrics?.score}
+        current={currentMetrics.score}
+        formatter={formatAsPercentage}
+      />
 
-      <div className="rounded-lg border bg-muted/20 p-4">
-        <div className="mb-2 flex items-center gap-2">
-          <Clock className="size-4 text-muted-slate" />
-          <span className="comet-body-s text-muted-slate">Latency</span>
-        </div>
-        <MetricComparisonCell
-          baseline={baselineMetrics?.latency}
-          current={currentMetrics.latency}
-          formatter={formatAsDuration}
-          trend="inverted"
-        />
-      </div>
+      <MetricKPICard
+        icon={Clock}
+        label="Latency"
+        baseline={baselineMetrics?.latency}
+        current={currentMetrics.latency}
+        formatter={formatAsDuration}
+        trend="inverted"
+      />
 
-      <div className="rounded-lg border bg-muted/20 p-4">
-        <div className="mb-2 flex items-center gap-2">
-          <Coins className="size-4 text-muted-slate" />
-          <span className="comet-body-s text-muted-slate">Runtime cost</span>
-        </div>
-        <MetricComparisonCell
-          baseline={baselineMetrics?.cost}
-          current={currentMetrics.cost}
-          formatter={formatAsCurrency}
-          trend="inverted"
-        />
-      </div>
+      <MetricKPICard
+        icon={Coins}
+        label="Runtime cost"
+        baseline={baselineMetrics?.cost}
+        current={currentMetrics.cost}
+        formatter={formatAsCurrency}
+        trend="inverted"
+      />
     </div>
   );
 };
