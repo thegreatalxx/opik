@@ -5751,19 +5751,9 @@ class ExperimentsResourceTest {
                     .build();
             experimentResourceClient.createExperimentItem(Set.of(item), apiKey, workspaceName);
 
-            var ids = JsonUtils.writeValueAsString(List.of(experiment.id()));
-            try (var actualResponse = client.target(URL_TEMPLATE.formatted(baseURI))
-                    .path("feedback-scores")
-                    .path("names")
-                    .queryParam("experiment_ids", ids)
-                    .request()
-                    .header(HttpHeaders.AUTHORIZATION, apiKey)
-                    .header(WORKSPACE_HEADER, workspaceName)
-                    .get()) {
-                assertThat(actualResponse.getStatusInfo().getStatusCode()).isEqualTo(HttpStatus.SC_OK);
-                var actualEntity = actualResponse.readEntity(FeedbackScoreNames.class);
-                assertThat(actualEntity.scores()).isEmpty();
-            }
+            var actualEntity = experimentResourceClient.getFeedbackScoreNames(
+                    List.of(experiment.id()), null, apiKey, workspaceName);
+            assertThat(actualEntity.scores()).isEmpty();
         }
 
         @Test
@@ -5794,23 +5784,13 @@ class ExperimentsResourceTest {
                     .build();
             experimentResourceClient.createExperimentItem(Set.of(item), apiKey, workspaceName);
 
-            var ids = JsonUtils.writeValueAsString(List.of(experiment.id()));
-            try (var actualResponse = client.target(URL_TEMPLATE.formatted(baseURI))
-                    .path("feedback-scores")
-                    .path("names")
-                    .queryParam("experiment_ids", ids)
-                    .request()
-                    .header(HttpHeaders.AUTHORIZATION, apiKey)
-                    .header(WORKSPACE_HEADER, workspaceName)
-                    .get()) {
-                assertThat(actualResponse.getStatusInfo().getStatusCode()).isEqualTo(HttpStatus.SC_OK);
-                var actualEntity = actualResponse.readEntity(FeedbackScoreNames.class);
-                assertThat(actualEntity.scores())
-                        .allMatch(score -> "experiment_scores".equals(score.type()));
-                assertThat(actualEntity.scores())
-                        .extracting(FeedbackScoreNames.ScoreName::name)
-                        .containsExactlyInAnyOrder("accuracy", "latency");
-            }
+            var actualEntity = experimentResourceClient.getFeedbackScoreNames(
+                    List.of(experiment.id()), null, apiKey, workspaceName);
+            assertThat(actualEntity.scores())
+                    .allMatch(score -> "experiment_scores".equals(score.type()));
+            assertThat(actualEntity.scores())
+                    .extracting(FeedbackScoreNames.ScoreName::name)
+                    .containsExactlyInAnyOrder("accuracy", "latency");
         }
 
         @Test
@@ -5864,24 +5844,71 @@ class ExperimentsResourceTest {
             experimentResourceClient.createExperimentItem(Set.of(evalItem), apiKey, workspaceName);
 
             // Query both experiment IDs
-            var ids = JsonUtils.writeValueAsString(
-                    List.of(regularExperiment.id(), evalSuiteExperiment.id()));
-            try (var actualResponse = client.target(URL_TEMPLATE.formatted(baseURI))
-                    .path("feedback-scores")
-                    .path("names")
-                    .queryParam("experiment_ids", ids)
-                    .request()
-                    .header(HttpHeaders.AUTHORIZATION, apiKey)
-                    .header(WORKSPACE_HEADER, workspaceName)
-                    .get()) {
-                assertThat(actualResponse.getStatusInfo().getStatusCode()).isEqualTo(HttpStatus.SC_OK);
-                var actualEntity = actualResponse.readEntity(FeedbackScoreNames.class);
-                var feedbackScoreNames = actualEntity.scores().stream()
-                        .filter(score -> "feedback_scores".equals(score.type()))
-                        .map(FeedbackScoreNames.ScoreName::name)
-                        .toList();
-                assertThat(feedbackScoreNames).containsExactly("hallucination");
-            }
+            var actualEntity = experimentResourceClient.getFeedbackScoreNames(
+                    List.of(regularExperiment.id(), evalSuiteExperiment.id()), null, apiKey, workspaceName);
+            var feedbackScoreNames = actualEntity.scores().stream()
+                    .filter(score -> "feedback_scores".equals(score.type()))
+                    .map(FeedbackScoreNames.ScoreName::name)
+                    .toList();
+            assertThat(feedbackScoreNames).containsExactly("hallucination");
+        }
+
+        @Test
+        @DisplayName("when scores have mixed categories, then all score names returned without exclude param")
+        void getFeedbackScoreNames__mixedCategories__thenAllReturned() {
+            var apiKey = "apiKey-" + UUID.randomUUID();
+            var workspaceName = "workspace-" + UUID.randomUUID();
+            var workspaceId = UUID.randomUUID().toString();
+            mockTargetWorkspace(apiKey, workspaceName, workspaceId);
+
+            var experiment = experimentResourceClient.createPartialExperiment()
+                    .optimizationId(null)
+                    .build();
+            experimentResourceClient.create(experiment, apiKey, workspaceName);
+
+            var trace = podamFactory.manufacturePojo(Trace.class);
+            traceResourceClient.batchCreateTraces(List.of(trace), apiKey, workspaceName);
+
+            var item = podamFactory.manufacturePojo(ExperimentItem.class).toBuilder()
+                    .experimentId(experiment.id())
+                    .traceId(trace.id())
+                    .build();
+            experimentResourceClient.createExperimentItem(Set.of(item), apiKey, workspaceName);
+
+            var scores = List.of(
+                    FeedbackScoreBatchItem.builder()
+                            .id(trace.id())
+                            .projectName(trace.projectName())
+                            .name("regular_score")
+                            .value(BigDecimal.ONE)
+                            .source(ScoreSource.SDK)
+                            .build(),
+                    FeedbackScoreBatchItem.builder()
+                            .id(trace.id())
+                            .projectName(trace.projectName())
+                            .name("suite_assertion_1")
+                            .categoryName("suite_assertion")
+                            .value(BigDecimal.ONE)
+                            .source(ScoreSource.SDK)
+                            .build(),
+                    FeedbackScoreBatchItem.builder()
+                            .id(trace.id())
+                            .projectName(trace.projectName())
+                            .name("suite_assertion_2")
+                            .categoryName("suite_assertion")
+                            .value(BigDecimal.ZERO)
+                            .source(ScoreSource.SDK)
+                            .build());
+            createScoreAndAssert(FeedbackScoreBatch.builder().scores(scores).build(), apiKey, workspaceName);
+
+            var actualEntity = experimentResourceClient.getFeedbackScoreNames(
+                    List.of(experiment.id()), null, apiKey, workspaceName);
+            var feedbackNames = actualEntity.scores().stream()
+                    .filter(score -> "feedback_scores".equals(score.type()))
+                    .map(FeedbackScoreNames.ScoreName::name)
+                    .toList();
+            assertThat(feedbackNames).containsExactlyInAnyOrder(
+                    "regular_score", "suite_assertion_1", "suite_assertion_2");
         }
 
         @Test
@@ -5932,45 +5959,13 @@ class ExperimentsResourceTest {
                             .build());
             createScoreAndAssert(FeedbackScoreBatch.builder().scores(scores).build(), apiKey, workspaceName);
 
-            var ids = JsonUtils.writeValueAsString(List.of(experiment.id()));
-
-            // Without exclude: all 3 score names returned
-            try (var actualResponse = client.target(URL_TEMPLATE.formatted(baseURI))
-                    .path("feedback-scores")
-                    .path("names")
-                    .queryParam("experiment_ids", ids)
-                    .request()
-                    .header(HttpHeaders.AUTHORIZATION, apiKey)
-                    .header(WORKSPACE_HEADER, workspaceName)
-                    .get()) {
-                assertThat(actualResponse.getStatusInfo().getStatusCode()).isEqualTo(HttpStatus.SC_OK);
-                var actualEntity = actualResponse.readEntity(FeedbackScoreNames.class);
-                var feedbackNames = actualEntity.scores().stream()
-                        .filter(score -> "feedback_scores".equals(score.type()))
-                        .map(FeedbackScoreNames.ScoreName::name)
-                        .toList();
-                assertThat(feedbackNames).containsExactlyInAnyOrder(
-                        "regular_score", "suite_assertion_1", "suite_assertion_2");
-            }
-
-            // With exclude_category_name=suite_assertion: only regular_score returned
-            try (var actualResponse = client.target(URL_TEMPLATE.formatted(baseURI))
-                    .path("feedback-scores")
-                    .path("names")
-                    .queryParam("experiment_ids", ids)
-                    .queryParam("exclude_category_name", "suite_assertion")
-                    .request()
-                    .header(HttpHeaders.AUTHORIZATION, apiKey)
-                    .header(WORKSPACE_HEADER, workspaceName)
-                    .get()) {
-                assertThat(actualResponse.getStatusInfo().getStatusCode()).isEqualTo(HttpStatus.SC_OK);
-                var actualEntity = actualResponse.readEntity(FeedbackScoreNames.class);
-                var feedbackNames = actualEntity.scores().stream()
-                        .filter(score -> "feedback_scores".equals(score.type()))
-                        .map(FeedbackScoreNames.ScoreName::name)
-                        .toList();
-                assertThat(feedbackNames).containsExactly("regular_score");
-            }
+            var actualEntity = experimentResourceClient.getFeedbackScoreNames(
+                    List.of(experiment.id()), "suite_assertion", apiKey, workspaceName);
+            var feedbackNames = actualEntity.scores().stream()
+                    .filter(score -> "feedback_scores".equals(score.type()))
+                    .map(FeedbackScoreNames.ScoreName::name)
+                    .toList();
+            assertThat(feedbackNames).containsExactly("regular_score");
         }
     }
 
