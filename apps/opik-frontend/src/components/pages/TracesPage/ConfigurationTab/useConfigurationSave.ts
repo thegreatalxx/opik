@@ -114,7 +114,10 @@ export const useConfigurationSave = ({
         if (v.type === BlueprintValueType.PROMPT) {
           return newCommits.has(v.key);
         }
-        return draftValues[v.key] !== originalValues.current[v.key];
+        return (
+          originalValues.current !== null &&
+          draftValues[v.key] !== originalValues.current[v.key]
+        );
       })
       .map((v) => ({
         key: v.key,
