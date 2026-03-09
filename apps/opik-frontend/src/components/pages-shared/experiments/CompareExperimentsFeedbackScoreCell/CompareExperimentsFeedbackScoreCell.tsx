@@ -5,10 +5,8 @@ import { ExperimentItem, ExperimentsCompare } from "@/types/datasets";
 import VerticallySplitCellWrapper, {
   CustomMeta,
 } from "@/components/pages-shared/experiments/VerticallySplitCellWrapper/VerticallySplitCellWrapper";
-import { isAggregatedScore } from "@/lib/trials";
-import AvgBadge from "@/components/shared/AvgBadge/AvgBadge";
+import { isAggregatedScore, getTrialAvgTooltip } from "@/lib/trials";
 import { MessageSquareMore } from "lucide-react";
-import TooltipWrapper from "@/components/shared/TooltipWrapper/TooltipWrapper";
 import FeedbackScoreReasonTooltip from "@/components/shared/FeedbackScoreTag/FeedbackScoreReasonTooltip";
 import {
   extractReasonsFromValueByAuthor,
@@ -101,17 +99,15 @@ const CompareExperimentsFeedbackScoreCell: React.FC<
           color={color}
           isUserFeedbackColumn={isUserFeedbackColumn}
           onValueChange={handleValueChange}
+          tooltipSuffix={
+            isAggregatedScore(feedbackScore)
+              ? getTrialAvgTooltip(
+                  feedbackScore.trialValues.length,
+                  feedbackScore.stdDev,
+                )
+              : undefined
+          }
         />
-        {isAggregatedScore(feedbackScore) && (
-          <span className="flex min-w-0 items-center gap-0.5">
-            <TooltipWrapper content={`± ${feedbackScore.stdDev}`}>
-              <span className="truncate text-xs leading-none">
-                ± {feedbackScore.stdDev.toFixed(2)}
-              </span>
-            </TooltipWrapper>
-            <AvgBadge values={feedbackScore.trialValues} />
-          </span>
-        )}
         {reasons.length > 0 && (
           <FeedbackScoreReasonTooltip reasons={reasons}>
             {!isSmall ? (

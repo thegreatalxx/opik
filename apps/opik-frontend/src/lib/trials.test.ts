@@ -150,23 +150,40 @@ describe("aggregateTrialItems", () => {
   });
 
   it("should set trialCount and trialItems", () => {
-    const items = [makeItem({ id: "a" }), makeItem({ id: "b" })];
+    const items = [
+      makeItem({ id: "a", created_at: "2024-01-01T00:00:00Z" }),
+      makeItem({ id: "b", created_at: "2024-01-02T00:00:00Z" }),
+    ];
     const result = aggregateTrialItems(items);
     expect(result.trialCount).toBe(2);
     expect(result.trialItems).toHaveLength(2);
-    expect(result.trialItems[0].id).toBe("a");
-    expect(result.trialItems[1].id).toBe("b");
   });
 
-  it("should use first item as base for non-aggregated fields", () => {
+  it("should use the latest trial as base for non-aggregated fields", () => {
     const items = [
-      makeItem({ id: "first", trace_id: "trace-1", input: { text: "hello" } }),
-      makeItem({ id: "second", trace_id: "trace-2", input: { text: "world" } }),
+      makeItem({
+        id: "older",
+        trace_id: "trace-1",
+        input: { text: "hello" },
+        created_at: "2024-01-01T00:00:00Z",
+      }),
+      makeItem({
+        id: "latest",
+        trace_id: "trace-2",
+        input: { text: "world" },
+        created_at: "2024-01-03T00:00:00Z",
+      }),
+      makeItem({
+        id: "middle",
+        trace_id: "trace-3",
+        input: { text: "mid" },
+        created_at: "2024-01-02T00:00:00Z",
+      }),
     ];
     const result = aggregateTrialItems(items);
-    expect(result.id).toBe("first");
-    expect(result.trace_id).toBe("trace-1");
-    expect(result.input).toEqual({ text: "hello" });
+    expect(result.id).toBe("latest");
+    expect(result.trace_id).toBe("trace-2");
+    expect(result.input).toEqual({ text: "world" });
   });
 
   describe("feedback scores aggregation", () => {

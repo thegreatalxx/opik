@@ -1,6 +1,7 @@
 import { ExperimentItem } from "@/types/datasets";
 import { TraceFeedbackScore } from "@/types/traces";
 import { UsageData } from "@/types/shared";
+import { formatNumericData } from "@/lib/utils";
 
 export interface AggregatedFeedbackScore extends TraceFeedbackScore {
   stdDev: number;
@@ -32,18 +33,34 @@ export const isAggregatedItem = (
 export const aggregateTrialItems = (
   items: ExperimentItem[],
 ): AggregatedExperimentItem => {
+  const sorted = [...items].sort((a, b) =>
+    b.created_at.localeCompare(a.created_at),
+  );
+  const durations = items
+    .map((i) => i.duration)
+    .filter((v): v is number => v != null);
+  const costs = items
+    .map((i) => i.total_estimated_cost)
+    .filter((v): v is number => v != null);
+
   return {
-    ...items[0],
+    ...sorted[0],
     feedback_scores: aggregateFeedbackScores(items),
-    duration: averageNumber(items.map((i) => i.duration)),
-    total_estimated_cost: averageNumber(
-      items.map((i) => i.total_estimated_cost),
-    ),
+    duration: averageNumber(durations),
+    total_estimated_cost: averageNumber(costs),
     usage: averageUsage(items),
     trialCount: items.length,
     trialItems: items,
   };
 };
+
+export const getTrialAvgTooltip = (
+  trialCount: number,
+  stdDev?: number,
+): string =>
+  `Avg of ${trialCount} trials${
+    stdDev != null ? ` (σ=${formatNumericData(stdDev)})` : ""
+  }`;
 
 const aggregateFeedbackScores = (
   items: ExperimentItem[],
@@ -77,10 +94,9 @@ const aggregateFeedbackScores = (
   });
 };
 
-const averageNumber = (values: (number | undefined)[]): number | undefined => {
-  const valid = values.filter((v): v is number => v != null);
-  if (valid.length === 0) return undefined;
-  return valid.reduce((sum, v) => sum + v, 0) / valid.length;
+const averageNumber = (values: number[]): number | undefined => {
+  if (values.length === 0) return undefined;
+  return values.reduce((sum, v) => sum + v, 0) / values.length;
 };
 
 const averageUsage = (items: ExperimentItem[]): UsageData | undefined => {
