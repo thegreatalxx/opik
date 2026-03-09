@@ -56,6 +56,7 @@ interface MetricContainerChartProps {
   breakdown?: BreakdownConfig;
   getLabelAction?: (label: string) => LegendLabelAction | undefined;
   isAggregateTotal?: boolean;
+  customEmptyState?: React.ReactNode;
 }
 
 const customColorMap = {
@@ -96,6 +97,7 @@ const MetricContainerChart = ({
   breakdown,
   getLabelAction,
   isAggregateTotal = false,
+  customEmptyState,
 }: MetricContainerChartProps) => {
   const { data: response, isPending } = useProjectMetric(
     {
@@ -189,10 +191,12 @@ const MetricContainerChart = ({
   const CHART = METRIC_CHART_TYPE[chartType];
 
   const chartContent = noData ? (
-    <NoData
-      className="h-[var(--chart-height)] min-h-32 text-light-slate"
-      message="No data to show"
-    />
+    customEmptyState || (
+      <NoData
+        className="h-[var(--chart-height)] min-h-32 text-light-slate"
+        message="No data to show"
+      />
+    )
   ) : (
     <CHART
       config={config}

@@ -21,7 +21,11 @@ import {
 } from "@/store/DashboardStore";
 import { DEFAULT_DATE_PRESET } from "@/components/pages-shared/traces/MetricDateRangeSelect/constants";
 import PageBodyStickyContainer from "@/components/layout/PageBodyStickyContainer/PageBodyStickyContainer";
-import { PROJECT_TEMPLATE_LIST } from "@/lib/dashboard/templates";
+import {
+  PROJECT_TEMPLATE_LIST,
+  DEPRECATED_PROJECT_METRICS_ID,
+  DEPRECATED_PROJECT_PERFORMANCE_ID,
+} from "@/lib/dashboard/templates";
 import { Separator } from "@/components/ui/separator";
 import TooltipWrapper from "@/components/shared/TooltipWrapper/TooltipWrapper";
 import { useActiveWorkspaceName } from "@/store/AppStore";
@@ -49,6 +53,13 @@ const DashboardsTab: React.FunctionComponent<DashboardsTabProps> = ({
 
   useEffect(() => {
     if (!dashboardId) {
+      setDashboardId(PROJECT_TEMPLATE_LIST[0].id);
+      return;
+    }
+    if (
+      dashboardId === DEPRECATED_PROJECT_METRICS_ID ||
+      dashboardId === DEPRECATED_PROJECT_PERFORMANCE_ID
+    ) {
       setDashboardId(PROJECT_TEMPLATE_LIST[0].id);
     }
   }, [dashboardId, setDashboardId]);

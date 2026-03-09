@@ -29,6 +29,7 @@ import {
 import { renderScoreTooltipValue } from "@/lib/feedback-scores";
 import { calculateIntervalConfig } from "@/components/pages-shared/traces/MetricDateRangeSelect/utils";
 import { DEFAULT_DATE_PRESET } from "@/components/pages-shared/traces/MetricDateRangeSelect/constants";
+import { buildDocsUrl } from "@/lib/utils";
 import { resolveProjectIdFromConfig } from "@/lib/dashboard/utils";
 import {
   BREAKDOWN_FIELD,
@@ -338,6 +339,57 @@ const ProjectMetricsWidget: React.FunctionComponent<
 
   const effectiveInterval = isAggregateTotal ? INTERVAL_TYPE.TOTAL : interval;
 
+  const getCustomEmptyState = (
+    metric: METRIC_NAME_TYPE,
+  ): React.ReactNode | undefined => {
+    if (metric === METRIC_NAME_TYPE.FEEDBACK_SCORES) {
+      return (
+        <DashboardWidget.EmptyState
+          title="Track quality over time"
+          message="Add feedback scores to your traces to monitor quality trends. Use the SDK, the UI, or set up online scoring rules to get started."
+          action={
+            <DashboardWidget.EmptyState.DocsLink
+              label="Learn how to add scores"
+              href={buildDocsUrl("/tracing/annotate_traces")}
+            />
+          }
+        />
+      );
+    }
+    if (metric === METRIC_NAME_TYPE.THREAD_FEEDBACK_SCORES) {
+      return (
+        <DashboardWidget.EmptyState
+          title="Track thread quality over time"
+          message="Add feedback scores to your threads to monitor conversation quality trends. First, group traces into threads, then annotate them via the SDK, the UI, or online scoring rules."
+          action={
+            <DashboardWidget.EmptyState.DocsLink
+              label="Learn how to add scores"
+              href={buildDocsUrl("/tracing/annotate_traces")}
+            />
+          }
+        />
+      );
+    }
+    if (
+      metric === METRIC_NAME_TYPE.THREAD_COUNT ||
+      metric === METRIC_NAME_TYPE.THREAD_DURATION
+    ) {
+      return (
+        <DashboardWidget.EmptyState
+          title="Monitor conversations end-to-end"
+          message="Group related traces into threads by passing a thread_id to track multi-turn conversations and agent sessions."
+          action={
+            <DashboardWidget.EmptyState.DocsLink
+              label="Learn how to track threads"
+              href={buildDocsUrl("/tracing/log_chat_conversations")}
+            />
+          }
+        />
+      );
+    }
+    return undefined;
+  };
+
   const renderChartContent = () => {
     const chartType =
       (widget.config?.chartType as CHART_TYPE.line | CHART_TYPE.bar) ||
@@ -351,8 +403,14 @@ const ProjectMetricsWidget: React.FunctionComponent<
         <DashboardWidget.EmptyState
           title="Project not configured"
           message="This widget needs a project to display data. Select a default project for the dashboard or set a custom one in the widget settings."
-          onAction={!preview ? handleEdit : undefined}
-          actionLabel="Configure widget"
+          action={
+            !preview ? (
+              <DashboardWidget.EmptyState.EditAction
+                label="Configure widget"
+                onClick={handleEdit}
+              />
+            ) : undefined
+          }
         />
       );
     }
@@ -362,8 +420,14 @@ const ProjectMetricsWidget: React.FunctionComponent<
         <DashboardWidget.EmptyState
           title="No metric selected"
           message="Choose a metric to display in this widget"
-          onAction={!preview ? handleEdit : undefined}
-          actionLabel="Configure widget"
+          action={
+            !preview ? (
+              <DashboardWidget.EmptyState.EditAction
+                label="Configure widget"
+                onClick={handleEdit}
+              />
+            ) : undefined
+          }
         />
       );
     }
@@ -376,6 +440,10 @@ const ProjectMetricsWidget: React.FunctionComponent<
     const description = effectiveInterval
       ? INTERVAL_DESCRIPTIONS.TOTALS[intervalType] || ""
       : "";
+
+    const customEmptyState = metricName
+      ? getCustomEmptyState(metricName)
+      : undefined;
 
     return (
       <div
@@ -400,6 +468,7 @@ const ProjectMetricsWidget: React.FunctionComponent<
           filterLineCallback={filterLineCallback}
           breakdown={effectiveBreakdown}
           getLabelAction={effectiveBreakdown ? getLabelAction : undefined}
+          customEmptyState={customEmptyState}
           renderValue={
             isCostMetric
               ? renderCostTooltipValue

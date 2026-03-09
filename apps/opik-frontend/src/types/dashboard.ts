@@ -31,8 +31,7 @@ export enum WIDGET_CATEGORY {
 }
 
 export enum TEMPLATE_TYPE {
-  PROJECT_METRICS = "project-metrics",
-  PROJECT_PERFORMANCE = "project-performance",
+  PROJECT_OVERVIEW = "project-overview",
   EXPERIMENT_COMPARISON = "experiment-comparison",
 }
 

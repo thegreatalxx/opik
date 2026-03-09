@@ -473,8 +473,14 @@ const ExperimentsFeedbackScoresWidget: React.FunctionComponent<
         <DashboardWidget.EmptyState
           title="Experiments not configured"
           message="This widget needs experiments to display data. Select default experiments for the dashboard or set custom ones in the widget settings."
-          onAction={!preview ? handleEdit : undefined}
-          actionLabel="Configure widget"
+          action={
+            !preview ? (
+              <DashboardWidget.EmptyState.EditAction
+                label="Configure widget"
+                onClick={handleEdit}
+              />
+            ) : undefined
+          }
         />
       );
     }
@@ -501,8 +507,14 @@ const ExperimentsFeedbackScoresWidget: React.FunctionComponent<
         <DashboardWidget.EmptyState
           title="No data available"
           message={emptyMessage}
-          onAction={!preview ? handleEdit : undefined}
-          actionLabel="Configure widget"
+          action={
+            !preview ? (
+              <DashboardWidget.EmptyState.EditAction
+                label="Configure widget"
+                onClick={handleEdit}
+              />
+            ) : undefined
+          }
         />
       );
     }
