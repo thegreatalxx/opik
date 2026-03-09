@@ -22,7 +22,7 @@ const TYPE_CONFIG: Record<
 const FALLBACK_TYPE_CONFIG = { icon: Type, color: "var(--color-gray)" };
 
 type BlueprintTypeIconProps = {
-  type: string;
+  type: BlueprintValueType;
   variant?: "default" | "secondary";
 };
 
