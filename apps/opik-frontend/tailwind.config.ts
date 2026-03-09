@@ -102,7 +102,6 @@ module.exports = {
         "code-block": "var(--code-block)",
         "breadcrumb-last": "hsl(var(--breadcrumb-last))",
         "special-button": "var(--special-button)",
-        "timeline-circle": "var(--timeline-circle)",
         "thread-active": "var(--thread-active)",
 
         /* Info box colors */
