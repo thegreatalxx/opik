@@ -28,7 +28,7 @@ import {
   AggregatedCandidate,
   ExperimentOptimizationMetadata,
 } from "@/types/optimizations";
-import { getObjectiveScoreValue } from "@/lib/feedback-scores";
+import { aggregateExperimentMetrics } from "@/lib/experiment-metrics";
 
 const MAX_EXPERIMENTS_LOADED = 1000;
 
@@ -136,38 +136,7 @@ const aggregateCandidates = (
     );
     const meta = group.meta;
 
-    let totalWeightedScore = 0;
-    let totalWeightedCost = 0;
-    let totalWeightedLatency = 0;
-    let totalTraceCount = 0;
-    let totalDatasetItemCount = 0;
-    let hasScore = false;
-    let hasCost = false;
-    let hasLatency = false;
-
-    for (const exp of exps) {
-      const tc = exp.trace_count || 0;
-      totalTraceCount += tc;
-      totalDatasetItemCount += exp.dataset_item_count ?? tc;
-
-      if (objectiveName) {
-        const score = getObjectiveScoreValue(exp, objectiveName);
-        if (score != null) {
-          totalWeightedScore += score * tc;
-          hasScore = true;
-        }
-      }
-
-      if (exp.total_estimated_cost != null) {
-        totalWeightedCost += exp.total_estimated_cost;
-        hasCost = true;
-      }
-
-      if (exp.duration?.p50 != null) {
-        totalWeightedLatency += (exp.duration.p50 / 1000) * tc;
-        hasLatency = true;
-      }
-    }
+    const metrics = aggregateExperimentMetrics(exps, objectiveName);
 
     candidates.push({
       id: candidateId,
@@ -175,20 +144,11 @@ const aggregateCandidates = (
       stepIndex: meta.step_index,
       parentCandidateIds: meta.parent_candidate_ids,
       trialNumber: 0, // assigned below
-      score:
-        hasScore && totalTraceCount > 0
-          ? totalWeightedScore / totalTraceCount
-          : undefined,
-      runtimeCost:
-        hasCost && totalTraceCount > 0
-          ? totalWeightedCost / totalTraceCount
-          : undefined,
-      latencyP50:
-        hasLatency && totalTraceCount > 0
-          ? totalWeightedLatency / totalTraceCount
-          : undefined,
-      totalTraceCount,
-      totalDatasetItemCount,
+      score: metrics.score,
+      runtimeCost: metrics.cost,
+      latencyP50: metrics.latency,
+      totalTraceCount: metrics.totalTraceCount,
+      totalDatasetItemCount: metrics.totalDatasetItemCount,
       experimentIds: exps.map((e) => e.id),
       name: exps[0].name,
       created_at: exps[0].created_at,
