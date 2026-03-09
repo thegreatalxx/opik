@@ -131,7 +131,6 @@ const PlaygroundOutputActions = ({
     data: playgroundProject,
     isError: isProjectError,
     error: projectError,
-    isLoading: isLoadingProject,
   } = useProjectByName(
     {
       projectName: PLAYGROUND_PROJECT_NAME,
@@ -183,6 +182,8 @@ const PlaygroundOutputActions = ({
   const datasetName =
     datasets?.find((ds) => ds.id === plainDatasetId)?.name || null;
 
+  const canCreateRules = !!playgroundProject?.id || canCreateProjects;
+
   const { stopAll, runAll, isRunning, createdExperiments } =
     useActionButtonActions({
       workspaceName,
@@ -229,14 +230,6 @@ const PlaygroundOutputActions = ({
     try {
       let projectId: string | undefined = playgroundProject?.id;
 
-      // If project is still loading, wait a bit (shouldn't normally happen, but just in case)
-      if (isLoadingProject) {
-        // Wait a moment and try to get the project again
-        await new Promise((resolve) => setTimeout(resolve, 500));
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        projectId = (playgroundProject as any)?.id;
-      }
-
       // If project doesn't exist (404), create it
       if (!projectId && isProjectNotFound && canCreateProjects) {
         const result = await createProjectMutation.mutateAsync({
@@ -262,7 +255,6 @@ const PlaygroundOutputActions = ({
   }, [
     playgroundProject,
     isProjectNotFound,
-    isLoadingProject,
     createProjectMutation,
     queryClient,
     canCreateProjects,
@@ -508,17 +500,19 @@ const PlaygroundOutputActions = ({
                   />
                 </div>
               )}
-              <div className="mt-2.5 flex">
-                <MetricSelector
-                  rules={rules}
-                  selectedRuleIds={selectedRuleIds}
-                  onSelectionChange={setSelectedRuleIds}
-                  datasetId={datasetId}
-                  onCreateRuleClick={handleCreateRuleClick}
-                  workspaceName={workspaceName}
-                  canCreateRule={!!playgroundProject?.id || canCreateProjects}
-                />
-              </div>
+              {(canCreateRules || !!rules.length) && (
+                <div className="mt-2.5 flex">
+                  <MetricSelector
+                    rules={rules}
+                    selectedRuleIds={selectedRuleIds}
+                    onSelectionChange={setSelectedRuleIds}
+                    datasetId={datasetId}
+                    onCreateRuleClick={handleCreateRuleClick}
+                    workspaceName={workspaceName}
+                    canCreateRules={canCreateRules}
+                  />
+                </div>
+              )}
               {datasetId && (
                 <div className="mt-2.5 flex h-8 items-center justify-center">
                   <Separator orientation="vertical" className="mr-2 h-4" />
