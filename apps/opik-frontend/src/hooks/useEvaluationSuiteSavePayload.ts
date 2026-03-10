@@ -64,7 +64,7 @@ export function useEvaluationSuiteSavePayload({
       const isEvaluationSuite = suite.type === DATASET_TYPE.EVALUATION_SUITE;
 
       // Serialize items from store
-      const addedItems = Array.from(state.addedItems.values());
+      const addedItemsList = Array.from(state.addedItems.values());
       const editedItemsMap = new Map(state.editedItems);
       const deletedIds = Array.from(state.deletedIds);
 
@@ -82,6 +82,18 @@ export function useEvaluationSuiteSavePayload({
 
         // Item-level: iterate assertion overrides
         for (const [itemId, assertions] of state.itemAssertions) {
+          if (state.addedItems.has(itemId)) {
+            // Bake evaluators into the added item instead of creating an edit
+            const idx = addedItemsList.findIndex((i) => i.id === itemId);
+            if (idx !== -1) {
+              addedItemsList[idx] = {
+                ...addedItemsList[idx],
+                evaluators: [packAssertions(assertions, undefined)],
+              };
+            }
+            continue;
+          }
+
           const cachedItem = findItemInCache(queryClient, suiteId, itemId);
           const originalEvaluator = cachedItem?.evaluators?.[0];
           const existingChanges = editedItemsMap.get(itemId) || {};
@@ -113,7 +125,7 @@ export function useEvaluationSuiteSavePayload({
       return {
         datasetId: suiteId,
         payload: {
-          added_items: addedItems,
+          added_items: addedItemsList,
           edited_items: editedItems,
           deleted_ids: deletedIds,
           base_version: baseVersion,

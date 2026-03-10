@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo } from "react";
+import React, { useCallback, useRef } from "react";
 import { Copy, MoreHorizontal, Share, Trash } from "lucide-react";
 import copy from "clipboard-copy";
 import {
@@ -12,6 +12,7 @@ import {
   DatasetItemEditorAutosaveProvider,
   useDatasetItemEditorAutosaveContext,
 } from "@/components/pages-shared/datasets/DatasetItemEditor/DatasetItemEditorAutosaveContext";
+import { prepareFormDataForSave } from "@/components/pages-shared/datasets/DatasetItemEditor/hooks/useDatasetItemFormHelpers";
 import ResizableSidePanel from "@/components/shared/ResizableSidePanel/ResizableSidePanel";
 import { Button } from "@/components/ui/button";
 import {
@@ -25,10 +26,22 @@ import { useToast } from "@/components/ui/use-toast";
 import Loader from "@/components/shared/Loader/Loader";
 import TooltipWrapper from "@/components/shared/TooltipWrapper/TooltipWrapper";
 import TagListRenderer from "@/components/shared/TagListRenderer/TagListRenderer";
-import { Separator } from "@/components/ui/separator";
-import ItemDescriptionSection from "./ItemDescriptionSection";
-import ItemEvaluationCriteriaSection from "./ItemEvaluationCriteriaSection";
-import ItemContextSection from "./ItemContextSection";
+import EvaluationSuiteItemFormContainer from "./EvaluationSuiteItemFormContainer";
+import {
+  useEditItem,
+  useUpdateItemAssertions,
+} from "@/store/EvaluationSuiteDraftStore";
+import { extractAssertions } from "@/lib/assertion-converters";
+import { useEffectiveSuiteAssertions } from "@/hooks/useEffectiveSuiteAssertions";
+import { useEffectiveExecutionPolicy } from "@/hooks/useEffectiveExecutionPolicy";
+import { useEffectiveItemAssertions } from "@/hooks/useEffectiveItemAssertions";
+import { useEffectiveItemExecutionPolicy } from "@/hooks/useEffectiveItemExecutionPolicy";
+import { useSuiteIdFromURL } from "@/hooks/useSuiteIdFromURL";
+import {
+  EvaluationSuiteItemFormValues,
+  toFormValues,
+  fromFormValues,
+} from "./evaluationSuiteItemFormSchema";
 
 interface EvaluationSuiteItemPanelProps {
   datasetItemId: string;
@@ -54,6 +67,7 @@ interface EvaluationSuiteItemPanelLayoutProps {
   serverEvaluators: Evaluator[];
   onOpenSettings: () => void;
   isNewItem: boolean;
+  columns: DatasetItemColumn[];
 }
 
 const EvaluationSuiteItemPanelLayout: React.FC<
@@ -66,6 +80,7 @@ const EvaluationSuiteItemPanelLayout: React.FC<
   serverEvaluators,
   onOpenSettings,
   isNewItem,
+  columns,
 }) => {
   const {
     isPending,
@@ -74,62 +89,110 @@ const EvaluationSuiteItemPanelLayout: React.FC<
     tags,
     handleAddTag,
     handleDeleteTag,
+    datasetItem,
   } = useDatasetItemEditorAutosaveContext();
 
   const { toast } = useToast();
+  const editItem = useEditItem();
+  const updateItemAssertions = useUpdateItemAssertions();
+  const suiteId = useSuiteIdFromURL();
+  const serverAssertionsRef = useRef(extractAssertions(serverEvaluators));
 
-  const handleShare = useCallback(() => {
-    toast({ description: "URL successfully copied to clipboard" });
-    copy(window.location.href);
-  }, [toast]);
+  const description = datasetItem?.description ?? "";
+  const data = (datasetItem?.data as Record<string, unknown>) ?? {};
 
-  const handleCopyId = useCallback(() => {
-    toast({ description: "Item ID successfully copied to clipboard" });
-    copy(datasetItemId);
-  }, [datasetItemId, toast]);
+  const suitePolicy = useEffectiveExecutionPolicy(suiteId);
+  const itemPolicy = useEffectiveItemExecutionPolicy(
+    datasetItemId,
+    savedItemPolicy,
+  );
+  const currentPolicy = itemPolicy ?? suitePolicy;
 
-  const handleDeleteItemConfirm = useCallback(() => {
-    handleDelete(onClose);
-  }, [handleDelete, onClose]);
+  const suiteAssertions = useEffectiveSuiteAssertions(suiteId);
+  const itemAssertions = useEffectiveItemAssertions(
+    datasetItemId,
+    serverEvaluators,
+  );
 
-  const headerContent = useMemo(
-    () =>
-      isNewItem ? null : (
-        <div className="flex flex-auto items-center justify-end pl-6">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="icon-sm">
-                <span className="sr-only">Actions menu</span>
-                <MoreHorizontal />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-52">
-              <DropdownMenuItem onClick={handleShare}>
-                <Share className="mr-2 size-4" />
-                Share item
-              </DropdownMenuItem>
-              <TooltipWrapper content={datasetItemId} side="left">
-                <DropdownMenuItem onClick={handleCopyId}>
-                  <Copy className="mr-2 size-4" />
-                  Copy item ID
-                </DropdownMenuItem>
-              </TooltipWrapper>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={handleDeleteItemConfirm}>
-                <Trash className="mr-2 size-4" />
-                Delete item
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-      ),
-    [
-      isNewItem,
-      datasetItemId,
-      handleShare,
-      handleCopyId,
-      handleDeleteItemConfirm,
-    ],
+  const initialValues = toFormValues(
+    description,
+    data,
+    itemAssertions,
+    currentPolicy,
+  );
+
+  const handleFormChange = useCallback(
+    (values: EvaluationSuiteItemFormValues, changedField?: string) => {
+      const { description, data, assertions, policy } = fromFormValues(values);
+
+      const isAssertionChange = changedField?.startsWith("assertions");
+      const isItemChange = !changedField || !isAssertionChange;
+      const isAssertionOrNoField = !changedField || isAssertionChange;
+
+      if (isItemChange) {
+        const patch: Record<string, unknown> = {
+          description,
+          execution_policy: policy,
+        };
+
+        if (data !== null) {
+          patch.data = prepareFormDataForSave(data, columns);
+        }
+
+        editItem(datasetItemId, patch);
+      }
+
+      if (isAssertionOrNoField) {
+        updateItemAssertions(
+          datasetItemId,
+          assertions,
+          serverAssertionsRef.current,
+        );
+      }
+    },
+    [datasetItemId, columns, editItem, updateItemAssertions],
+  );
+
+  const headerContent = isNewItem ? null : (
+    <div className="flex flex-auto items-center justify-end pl-6">
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="outline" size="icon-sm">
+            <span className="sr-only">Actions menu</span>
+            <MoreHorizontal />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-52">
+          <DropdownMenuItem
+            onClick={() => {
+              toast({ description: "URL successfully copied to clipboard" });
+              copy(window.location.href);
+            }}
+          >
+            <Share className="mr-2 size-4" />
+            Share item
+          </DropdownMenuItem>
+          <TooltipWrapper content={datasetItemId} side="left">
+            <DropdownMenuItem
+              onClick={() => {
+                toast({
+                  description: "Item ID successfully copied to clipboard",
+                });
+                copy(datasetItemId);
+              }}
+            >
+              <Copy className="mr-2 size-4" />
+              Copy item ID
+            </DropdownMenuItem>
+          </TooltipWrapper>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onClick={() => handleDelete(onClose)}>
+            <Trash className="mr-2 size-4" />
+            Delete item
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
   );
 
   return (
@@ -150,10 +213,10 @@ const EvaluationSuiteItemPanelLayout: React.FC<
           <div className="sticky top-0 z-10 border-b bg-background p-6 pb-4">
             <div className="comet-body-accented">
               {isNewItem ? (
-                "New evaluation suite item"
+                "New suite item"
               ) : (
                 <>
-                  Evaluation suite item{" "}
+                  Suite item{" "}
                   <TooltipWrapper content={datasetItemId}>
                     <span className="comet-body-s text-muted-slate">
                       {truncateId(datasetItemId)}
@@ -171,17 +234,14 @@ const EvaluationSuiteItemPanelLayout: React.FC<
             />
           </div>
 
-          <div className="flex flex-col gap-6 p-6 pt-4">
-            <ItemDescriptionSection itemId={datasetItemId} />
-            <ItemContextSection />
-            <Separator />
-            <ItemEvaluationCriteriaSection
-              itemId={datasetItemId}
-              savedItemPolicy={savedItemPolicy}
-              serverEvaluators={serverEvaluators}
-              onOpenSettings={onOpenSettings}
-            />
-          </div>
+          <EvaluationSuiteItemFormContainer
+            key={datasetItemId}
+            initialValues={initialValues}
+            suiteAssertions={suiteAssertions}
+            suitePolicy={suitePolicy}
+            onOpenSettings={onOpenSettings}
+            onFormChange={handleFormChange}
+          />
         </div>
       )}
     </ResizableSidePanel>
@@ -198,10 +258,7 @@ const EvaluationSuiteItemPanel: React.FC<EvaluationSuiteItemPanelProps> = ({
   setActiveRowId,
   onOpenSettings,
 }) => {
-  const activeRow = useMemo(
-    () => rows.find((r) => r.id === datasetItemId),
-    [rows, datasetItemId],
-  );
+  const activeRow = rows.find((r) => r.id === datasetItemId);
 
   const isNewItem = activeRow?.draftStatus === DATASET_ITEM_DRAFT_STATUS.added;
   const itemExecutionPolicy = activeRow?.execution_policy;
@@ -223,6 +280,7 @@ const EvaluationSuiteItemPanel: React.FC<EvaluationSuiteItemPanelProps> = ({
         serverEvaluators={serverEvaluators}
         onOpenSettings={onOpenSettings}
         isNewItem={isNewItem}
+        columns={columns}
       />
     </DatasetItemEditorAutosaveProvider>
   );

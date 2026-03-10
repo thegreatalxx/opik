@@ -24,9 +24,9 @@ const RemoveDatasetItemsDialog = ({
   open,
   setOpen,
   onConfirm,
-  title = "Remove evaluation suite items",
-  description = "The items will be deleted from your current evaluation suite view. The changes won't take effect until you save and create a new version.",
-  confirmText = "Remove evaluation suite items",
+  title = "Remove suite items",
+  description = "The items will be deleted from your current suite view. The changes won't take effect until you save and create a new version.",
+  confirmText = "Remove suite items",
 }: RemoveDatasetItemsDialogProps) => {
   const [dontAskAgain, setDontAskAgain] = useDatasetItemDeletePreference();
 

@@ -270,14 +270,20 @@ export const EditEvaluationSuiteSettingsDialog: React.FC<
 
   const handleSubmit = useCallback(
     (data: SettingsFormType) => {
-      updateSuite({
-        dataset: {
-          ...suite,
-          id: suiteId,
-          name: data.name,
-          description: data.description,
-        },
-      });
+      const nameChanged = data.name !== (suite?.name ?? "");
+      const descriptionChanged =
+        data.description !== (suite?.description ?? "");
+
+      if (nameChanged || descriptionChanged) {
+        updateSuite({
+          dataset: {
+            ...suite,
+            id: suiteId,
+            name: data.name,
+            description: data.description,
+          },
+        });
+      }
 
       updateSuiteAssertions(
         data.assertions.map((a) => a.value.trim()).filter(Boolean),

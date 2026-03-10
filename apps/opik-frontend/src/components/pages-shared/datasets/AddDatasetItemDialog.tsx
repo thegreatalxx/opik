@@ -14,7 +14,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { DATASET_ITEM_SOURCE, DatasetItem } from "@/types/datasets";
+import { DATASET_ITEM_SOURCE } from "@/types/datasets";
 import useAppStore from "@/store/AppStore";
 import useDatasetItemBatchMutation from "@/api/datasets/useDatasetItemBatchMutation";
 import { isValidJsonObject, safelyParseJSON } from "@/lib/utils";
@@ -30,35 +30,25 @@ const DATA_PREFILLED_CONTENT = `{
 }`;
 
 type AddDatasetItemDialogProps = {
-  datasetItem?: DatasetItem;
   datasetId: string;
   open: boolean;
   setOpen: (open: boolean) => void;
 };
 
-const AddEditDatasetItemDialog: React.FunctionComponent<
-  AddDatasetItemDialogProps
-> = ({ datasetItem, datasetId, open, setOpen }) => {
+const AddDatasetItemDialog: React.FC<AddDatasetItemDialogProps> = ({
+  datasetId,
+  open,
+  setOpen,
+}) => {
   const workspaceName = useAppStore((state) => state.activeWorkspaceName);
   const theme = useCodemirrorTheme({
     editable: true,
   });
   const datasetItemBatchMutation = useDatasetItemBatchMutation();
-  const [data, setData] = useState<string>(
-    datasetItem?.data
-      ? JSON.stringify(datasetItem.data, null, 2)
-      : DATA_PREFILLED_CONTENT,
-  );
+  const [data, setData] = useState<string>(DATA_PREFILLED_CONTENT);
   const [showInvalidJSON, setShowInvalidJSON] = useBooleanTimeoutState({});
 
   const isValid = Boolean(data.length);
-  const isEdit = Boolean(datasetItem);
-  const title = isEdit
-    ? "Edit evaluation suite item"
-    : "Create a new evaluation suite item";
-  const submitText = isEdit
-    ? "Update evaluation suite item"
-    : "Create evaluation suite item";
 
   const submitHandler = useCallback(() => {
     const valid = isValidJsonObject(data);
@@ -68,9 +58,8 @@ const AddEditDatasetItemDialog: React.FunctionComponent<
         datasetId,
         datasetItems: [
           {
-            ...datasetItem,
             data: safelyParseJSON(data),
-            source: datasetItem?.source ?? DATASET_ITEM_SOURCE.manual,
+            source: DATASET_ITEM_SOURCE.manual,
           },
         ],
         workspaceName,
@@ -80,13 +69,13 @@ const AddEditDatasetItemDialog: React.FunctionComponent<
       setShowInvalidJSON(true);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data, datasetId, datasetItem, workspaceName, setOpen]);
+  }, [data, datasetId, workspaceName, setOpen]);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogContent className="max-w-lg sm:max-w-[560px]">
         <DialogHeader>
-          <DialogTitle>{title}</DialogTitle>
+          <DialogTitle>Create a new suite item</DialogTitle>
         </DialogHeader>
         <div className="max-h-[70vh] overflow-y-auto">
           <div className="flex flex-col gap-2 pb-4">
@@ -119,7 +108,7 @@ const AddEditDatasetItemDialog: React.FunctionComponent<
             <Button variant="outline">Cancel</Button>
           </DialogClose>
           <Button type="submit" disabled={!isValid} onClick={submitHandler}>
-            {submitText}
+            Create suite item
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -127,4 +116,4 @@ const AddEditDatasetItemDialog: React.FunctionComponent<
   );
 };
 
-export default AddEditDatasetItemDialog;
+export default AddDatasetItemDialog;

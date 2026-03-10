@@ -24,7 +24,6 @@ import {
   DatasetItem,
   DatasetItemWithDraft,
   DATASET_ITEM_DRAFT_STATUS,
-  DATASET_ITEM_SOURCE,
   DATASET_STATUS,
   DATASET_TYPE,
 } from "@/types/datasets";
@@ -38,12 +37,13 @@ import {
   ROW_HEIGHT,
 } from "@/types/shared";
 import EvaluationSuiteItemPanel from "@/components/pages/EvaluationSuiteItemsPage/EvaluationSuiteItemPanel/EvaluationSuiteItemPanel";
+import AddEvaluationSuiteItemPanel from "@/components/pages/EvaluationSuiteItemsPage/EvaluationSuiteItemPanel/AddEvaluationSuiteItemPanel";
 import DatasetItemEditor from "@/components/pages-shared/datasets/DatasetItemEditor/DatasetItemEditor";
 import DatasetItemsActionsPanel from "@/components/pages-shared/datasets/DatasetItemsActionsPanel";
 import { DatasetItemRowActionsCell } from "@/components/pages-shared/datasets/DatasetItemRowActionsCell";
 import DataTableRowHeightSelector from "@/components/shared/DataTableRowHeightSelector/DataTableRowHeightSelector";
 import SelectAllBanner from "@/components/shared/SelectAllBanner/SelectAllBanner";
-import AddEditDatasetItemDialog from "@/components/pages-shared/datasets/AddEditDatasetItemDialog";
+import AddDatasetItemDialog from "@/components/pages-shared/datasets/AddDatasetItemDialog";
 import AddDatasetItemSidebar from "@/components/pages-shared/datasets/AddDatasetItemSidebar";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -70,7 +70,6 @@ import {
   useIsAllItemsSelected,
   useSetIsAllItemsSelected,
   useDeletedIds,
-  useAddItem,
 } from "@/store/EvaluationSuiteDraftStore";
 
 const getRowId = (d: DatasetItem) => d.id;
@@ -202,6 +201,7 @@ function EvaluationSuiteItemsTab({
   const resetDialogKeyRef = useRef(0);
   const [openDialog, setOpenDialog] = useState<boolean>(false);
   const [openAddSidebar, setOpenAddSidebar] = useState<boolean>(false);
+  const [openCreatePanel, setOpenCreatePanel] = useState<boolean>(false);
 
   const transformedFilters = useMemo(
     () => (filters ? transformDataColumnFilters(filters) : filters),
@@ -210,7 +210,6 @@ function EvaluationSuiteItemsTab({
 
   const isDraftMode = useIsDraftMode();
   const deletedIds = useDeletedIds();
-  const addItem = useAddItem();
 
   const { data, isPending, isPlaceholderData, isFetching } =
     useEvaluationSuiteItemsWithDraft(
@@ -291,9 +290,7 @@ function EvaluationSuiteItemsTab({
     defaultValue: {},
   });
 
-  const itemLabel = isEvaluationSuite
-    ? "evaluation suite items"
-    : "dataset items";
+  const itemLabel = "suite items";
 
   const noDataText = useMemo(() => {
     if (isDraftMode && deletedIds.size > 0 && totalCount !== deletedIds.size) {
@@ -486,14 +483,7 @@ function EvaluationSuiteItemsTab({
 
   const handleNewDatasetItemClick = useCallback(() => {
     if (isEvaluationSuite) {
-      const now = new Date().toISOString();
-      const tempId = addItem({
-        data: {},
-        source: DATASET_ITEM_SOURCE.manual,
-        created_at: now,
-        last_updated_at: now,
-      });
-      setActiveRowId(tempId);
+      setOpenCreatePanel(true);
       return;
     }
 
@@ -503,7 +493,7 @@ function EvaluationSuiteItemsTab({
       setOpenDialog(true);
       resetDialogKeyRef.current += 1;
     }
-  }, [isEvaluationSuite, addItem, setActiveRowId, data?.total]);
+  }, [isEvaluationSuite, data?.total]);
 
   const handleClose = useCallback(() => setActiveRowId(""), [setActiveRowId]);
 
@@ -599,9 +589,7 @@ function EvaluationSuiteItemsTab({
             size="sm"
             onClick={handleNewDatasetItemClick}
           >
-            {isEvaluationSuite
-              ? "Create evaluation suite item"
-              : "Create dataset item"}
+            Create suite item
           </Button>
         </div>
       </div>
@@ -609,27 +597,15 @@ function EvaluationSuiteItemsTab({
         <StatusMessage
           icon={Loader2}
           iconClassName="animate-spin"
-          title={
-            isEvaluationSuite
-              ? "Your evaluation suite is still loading"
-              : "Your dataset is still loading"
-          }
-          description={
-            isEvaluationSuite
-              ? "Some results or counts may update as more data becomes available. You can continue exploring while the full evaluation suite loads."
-              : "Some results or counts may update as more data becomes available. You can continue exploring while the full dataset loads."
-          }
+          title="Your suite is still loading"
+          description="Some results or counts may update as more data becomes available. You can continue exploring while the full suite loads."
           className="mb-4"
         />
       )}
       {showSuccessMessage && (
         <StatusMessage
           icon={Check}
-          title={
-            isEvaluationSuite
-              ? "Your evaluation suite fully loaded"
-              : "Your dataset fully loaded"
-          }
+          title="Your suite fully loaded"
           description="All items are now available."
           className="mb-4"
         />
@@ -713,7 +689,7 @@ function EvaluationSuiteItemsTab({
         />
       )}
 
-      <AddEditDatasetItemDialog
+      <AddDatasetItemDialog
         key={resetDialogKeyRef.current}
         datasetId={datasetId}
         open={openDialog}
@@ -724,6 +700,13 @@ function EvaluationSuiteItemsTab({
         open={openAddSidebar}
         setOpen={setOpenAddSidebar}
         columns={datasetColumns}
+      />
+
+      <AddEvaluationSuiteItemPanel
+        open={openCreatePanel}
+        onClose={() => setOpenCreatePanel(false)}
+        columns={datasetColumns}
+        onOpenSettings={onOpenSettings}
       />
     </>
   );

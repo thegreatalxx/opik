@@ -52,13 +52,13 @@ function UseEvaluationSuiteDropdown({
   return (
     <>
       <AddExperimentDialog
-        key={resetDialogKeyRef.current}
+        key={`experiment-dialog-${resetDialogKeyRef.current}`}
         open={openExperimentDialog}
         setOpen={setOpenExperimentDialog}
         datasetName={datasetName}
       />
       <ConfirmDialog
-        key={resetKeyRef.current}
+        key={`confirm-dialog-${resetKeyRef.current}`}
         open={openConfirmDialog}
         setOpen={setOpenConfirmDialog}
         onConfirm={handleLoadPlayground}

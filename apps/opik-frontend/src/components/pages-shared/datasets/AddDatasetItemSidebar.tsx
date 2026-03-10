@@ -109,9 +109,7 @@ const AddDatasetItemSidebar: React.FC<AddDatasetItemSidebarProps> = ({
           <div className="relative size-full overflow-y-auto p-6 pt-4">
             <div className="border-b pb-4">
               <div className="flex items-center justify-between gap-2">
-                <div className="comet-title-accented">
-                  Add evaluation suite item
-                </div>
+                <div className="comet-title-accented">Add suite item</div>
                 <div className="flex items-center gap-2">
                   <Button
                     type="submit"

@@ -23,12 +23,12 @@ interface EvaluationSuiteDraftState {
   bulkEditItems: (ids: string[], changes: Partial<DatasetItem>) => void;
   setIsAllItemsSelected: (value: boolean) => void;
 
-  setSuiteAssertions: (assertions: string[]) => void;
-  clearSuiteAssertions: () => void;
   setItemAssertions: (itemId: string, assertions: string[]) => void;
-  clearItemAssertions: (itemId: string) => void;
-  setExecutionPolicy: (policy: ExecutionPolicy) => void;
-  clearExecutionPolicy: () => void;
+  updateItemAssertions: (
+    itemId: string,
+    newAssertions: string[],
+    serverAssertions: string[],
+  ) => void;
 
   updateSuiteAssertions: (
     newAssertions: string[],
@@ -38,19 +38,6 @@ interface EvaluationSuiteDraftState {
     newPolicy: ExecutionPolicy,
     serverPolicy: ExecutionPolicy,
   ) => void;
-
-  updateItemAssertion: (
-    itemId: string,
-    index: number,
-    value: string,
-    serverAssertions: string[],
-  ) => void;
-  removeItemAssertion: (
-    itemId: string,
-    index: number,
-    serverAssertions: string[],
-  ) => void;
-  addItemAssertion: (itemId: string, serverAssertions: string[]) => void;
 
   clearDraft: () => void;
 }
@@ -173,12 +160,6 @@ const useEvaluationSuiteDraftStore = create<EvaluationSuiteDraftState>(
       set({ isAllItemsSelected: value });
     },
 
-    setSuiteAssertions: (assertions) => {
-      set({ suiteAssertions: assertions });
-    },
-
-    clearSuiteAssertions: () => set({ suiteAssertions: null }),
-
     setItemAssertions: (itemId, assertions) => {
       set((state) => {
         const next = new Map(state.itemAssertions);
@@ -187,17 +168,19 @@ const useEvaluationSuiteDraftStore = create<EvaluationSuiteDraftState>(
       });
     },
 
-    clearItemAssertions: (itemId) => {
+    updateItemAssertions: (itemId, newAssertions, serverAssertions) => {
       set((state) => {
+        if (isEqual(newAssertions, serverAssertions)) {
+          if (!state.itemAssertions.has(itemId)) return state;
+          const next = new Map(state.itemAssertions);
+          next.delete(itemId);
+          return { itemAssertions: next };
+        }
         const next = new Map(state.itemAssertions);
-        next.delete(itemId);
+        next.set(itemId, newAssertions);
         return { itemAssertions: next };
       });
     },
-
-    setExecutionPolicy: (policy) => set({ executionPolicy: policy }),
-
-    clearExecutionPolicy: () => set({ executionPolicy: null }),
 
     updateSuiteAssertions: (newAssertions, serverAssertions) => {
       set({
@@ -211,26 +194,6 @@ const useEvaluationSuiteDraftStore = create<EvaluationSuiteDraftState>(
       set({
         executionPolicy: isEqual(newPolicy, serverPolicy) ? null : newPolicy,
       });
-    },
-
-    updateItemAssertion: (itemId, index, value, serverAssertions) => {
-      const current = get().itemAssertions.get(itemId) ?? serverAssertions;
-      const updated = [...current];
-      updated[index] = value;
-      get().setItemAssertions(itemId, updated);
-    },
-
-    removeItemAssertion: (itemId, index, serverAssertions) => {
-      const current = get().itemAssertions.get(itemId) ?? serverAssertions;
-      get().setItemAssertions(
-        itemId,
-        current.filter((_, i) => i !== index),
-      );
-    },
-
-    addItemAssertion: (itemId, serverAssertions) => {
-      const current = get().itemAssertions.get(itemId) ?? serverAssertions;
-      get().setItemAssertions(itemId, [...current, ""]);
     },
 
     clearDraft: () => {
@@ -300,6 +263,9 @@ export const useItemAssertions = (itemId: string) =>
   useEvaluationSuiteDraftStore((state) => state.itemAssertions.get(itemId));
 export const useItemAssertionsMap = () =>
   useEvaluationSuiteDraftStore((state) => state.itemAssertions);
+export const useUpdateItemAssertions = () =>
+  useEvaluationSuiteDraftStore((state) => state.updateItemAssertions);
+
 // Execution policy hooks
 
 export const useDraftExecutionPolicy = () =>
@@ -309,28 +275,11 @@ export const useDraftExecutionPolicy = () =>
 // Actions are stable references in Zustand, so grouping them doesn't cause
 // extra re-renders when used with useShallow.
 
-export const useDraftItemActions = () =>
-  useEvaluationSuiteDraftStore(
-    useShallow((state) => ({
-      addItem: state.addItem,
-      bulkAddItems: state.bulkAddItems,
-      editItem: state.editItem,
-      deleteItem: state.deleteItem,
-      bulkDeleteItems: state.bulkDeleteItems,
-      bulkEditItems: state.bulkEditItems,
-      clearDraft: state.clearDraft,
-      setIsAllItemsSelected: state.setIsAllItemsSelected,
-    })),
-  );
-
 export const useDraftAssertionActions = () =>
   useEvaluationSuiteDraftStore(
     useShallow((state) => ({
       updateSuiteAssertions: state.updateSuiteAssertions,
       updateExecutionPolicy: state.updateExecutionPolicy,
-      updateItemAssertion: state.updateItemAssertion,
-      removeItemAssertion: state.removeItemAssertion,
-      addItemAssertion: state.addItemAssertion,
     })),
   );
 
