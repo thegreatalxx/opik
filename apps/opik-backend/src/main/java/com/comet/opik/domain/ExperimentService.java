@@ -25,6 +25,7 @@ import com.comet.opik.api.events.webhooks.AlertEvent;
 import com.comet.opik.api.grouping.GroupBy;
 import com.comet.opik.api.sorting.ExperimentSortingFactory;
 import com.comet.opik.infrastructure.FeatureFlags;
+import com.comet.opik.infrastructure.OpikConfiguration;
 import com.comet.opik.infrastructure.auth.RequestContext;
 import com.google.common.base.Preconditions;
 import com.google.common.eventbus.EventBus;
@@ -77,6 +78,7 @@ public class ExperimentService {
     private final @NonNull ExperimentSortingFactory sortingFactory;
     private final @NonNull ExperimentResponseBuilder responseBuilder;
     private final @NonNull FeatureFlags featureFlags;
+    private final @NonNull OpikConfiguration config;
     private final @NonNull ExperimentGroupEnricher experimentGroupEnricher;
 
     @WithSpan
@@ -131,7 +133,8 @@ public class ExperimentService {
 
     private Mono<ExperimentPage> fetchExperimentPage(
             int page, int size, ExperimentSearchCriteria experimentSearchCriteria) {
-        return experimentDAO.find(page, size, experimentSearchCriteria)
+        return getSuiteThresholds()
+                .flatMap(thresholds -> experimentDAO.find(page, size, experimentSearchCriteria, thresholds))
                 .flatMap(experimentPage -> enrichExperiments(experimentPage.content())
                         .map(experiments -> experimentPage.toBuilder().content(experiments).build()));
     }
@@ -292,11 +295,38 @@ public class ExperimentService {
         });
     }
 
+    private Mono<Map<String, Integer>> getSuiteThresholds() {
+        if (!config.getExperimentAggregates().isEvaluationSuiteStatsEnabled()) {
+            return Mono.just(Map.of());
+        }
+        return fetchSuiteLevelThresholds();
+    }
+
+    private Mono<Map<String, Integer>> fetchSuiteLevelThresholds() {
+        return experimentDAO.getDatasetVersionIds()
+                .flatMap(versionIds -> {
+                    if (versionIds.isEmpty()) {
+                        return Mono.just(Map.of());
+                    }
+                    return Mono.deferContextual(ctx -> {
+                        String workspaceId = ctx.get(RequestContext.WORKSPACE_ID);
+                        return Mono.fromCallable(() -> datasetVersionService.findByIds(versionIds, workspaceId))
+                                .subscribeOn(Schedulers.boundedElastic())
+                                .map(versions -> versions.stream()
+                                        .filter(v -> v.executionPolicy() != null)
+                                        .collect(Collectors.toMap(
+                                                v -> v.id().toString(),
+                                                v -> v.executionPolicy().passThreshold())));
+                    });
+                });
+    }
+
     @WithSpan
     public Mono<ExperimentGroupAggregationsResponse> findGroupsAggregations(@NonNull ExperimentGroupCriteria criteria) {
         log.info("Finding experiment groups aggregations by criteria '{}'", criteria);
 
-        return experimentDAO.findGroupsAggregations(criteria)
+        return getSuiteThresholds()
+                .flatMapMany(thresholds -> experimentDAO.findGroupsAggregations(criteria, thresholds))
                 .collectList()
                 .flatMap(groupItems -> Mono.deferContextual(ctx -> {
                     String workspaceId = ctx.get(RequestContext.WORKSPACE_ID);
@@ -317,13 +347,17 @@ public class ExperimentService {
     @WithSpan
     public Mono<Experiment> getById(@NonNull UUID id) {
         log.info("Getting experiment by id '{}'", id);
-        return enrichExperiment(experimentDAO.getById(id), "Not found experiment with id '%s'".formatted(id));
+        return enrichExperiment(
+                getSuiteThresholds()
+                        .flatMap(thresholds -> experimentDAO.getById(id, thresholds)),
+                "Not found experiment with id '%s'".formatted(id));
     }
 
     @WithSpan
     public Flux<Experiment> get(@NonNull ExperimentStreamRequest request) {
         log.info("Getting experiments by '{}'", request);
-        return experimentDAO.get(request)
+        return getSuiteThresholds()
+                .flatMapMany(thresholds -> experimentDAO.get(request, thresholds))
                 .collectList()
                 .flatMap(this::enrichExperiments)
                 .flatMapMany(Flux::fromIterable);
@@ -655,7 +689,8 @@ public class ExperimentService {
 
             log.info("Finishing experiments, count '{}', workspaceId '{}'", ids.size(), workspaceId);
 
-            return experimentDAO.getByIds(ids)
+            return getSuiteThresholds()
+                    .flatMapMany(thresholds -> experimentDAO.getByIds(ids, thresholds))
                     .collectList()
                     .doOnNext(experiments -> {
                         if (CollectionUtils.isNotEmpty(experiments)) {
