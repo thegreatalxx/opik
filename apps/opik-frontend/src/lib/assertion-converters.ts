@@ -1,7 +1,4 @@
-import {
-  LLMJudgeConfig,
-  MetricType,
-} from "@/types/evaluation-suites";
+import { LLMJudgeConfig, MetricType } from "@/types/evaluation-suites";
 import { Evaluator } from "@/types/datasets";
 
 const ASSERTION_SCHEMA_TYPE = "BOOLEAN";
@@ -68,9 +65,7 @@ export function buildLLMJudgeBEConfig(
 
 // --- Assertion-centric API ---
 
-export function extractAssertions(
-  evaluators: Evaluator[],
-): string[] {
+export function extractAssertions(evaluators: Evaluator[]): string[] {
   const first = evaluators[0];
   if (!first || first.type !== MetricType.LLM_AS_JUDGE) return [];
   return parseLLMJudgeBEConfig(first.config).assertions;
@@ -88,4 +83,3 @@ export function packAssertions(
     config,
   };
 }
-
