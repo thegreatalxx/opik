@@ -15,6 +15,7 @@ import lombok.extern.slf4j.Slf4j;
 import reactor.core.publisher.Mono;
 import ru.vyarus.guicey.jdbi3.tx.TransactionTemplate;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -374,10 +375,12 @@ class AgentConfigServiceImpl implements AgentConfigService {
                         newEnvs.stream().map(AgentConfigEnv::envName).toList());
                 dao.batchInsertEnvs(workspaceId, projectId, config.id(), userName, userName, newEnvs);
 
+                Instant now = Instant.now();
                 List<AgentConfigEnv> newEnvHistoryRecords = newEnvs.stream()
                         .map(env -> env.toBuilder().id(idGenerator.generateId()).build())
                         .toList();
-                dao.batchInsertEnvHistory(workspaceId, projectId, config.id(), userName, newEnvHistoryRecords);
+                dao.batchInsertEnvHistory(workspaceId, projectId, config.id(), userName, now,
+                        newEnvHistoryRecords);
             }
 
             if (!envsToUpdate.isEmpty()) {
@@ -396,13 +399,15 @@ class AgentConfigServiceImpl implements AgentConfigService {
                     log.info("Updating {} existing environments for project '{}' in workspace '{}': {}",
                             actuallyChanged.size(), projectId, workspaceId, changedEnvNames);
 
-                    dao.closeActiveEnvHistory(workspaceId, projectId, changedEnvNames);
+                    Instant now = Instant.now();
+                    dao.closeActiveEnvHistory(workspaceId, projectId, now, changedEnvNames);
                     dao.batchUpdateEnvs(workspaceId, projectId, userName, actuallyChanged);
 
                     List<AgentConfigEnv> updateHistoryRecords = actuallyChanged.stream()
                             .map(env -> env.toBuilder().id(idGenerator.generateId()).build())
                             .toList();
-                    dao.batchInsertEnvHistory(workspaceId, projectId, config.id(), userName, updateHistoryRecords);
+                    dao.batchInsertEnvHistory(workspaceId, projectId, config.id(), userName, now,
+                            updateHistoryRecords);
                 }
             }
 

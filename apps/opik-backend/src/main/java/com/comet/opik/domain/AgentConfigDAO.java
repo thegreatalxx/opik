@@ -27,6 +27,7 @@ import org.jdbi.v3.sqlobject.statement.SqlUpdate;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
@@ -399,7 +400,7 @@ interface AgentConfigDAO {
             )
             VALUES (
                 :bean.id, :workspace_id, :project_id, :config_id,
-                :bean.envName, :bean.blueprintId, CURRENT_TIMESTAMP(6), :created_by
+                :bean.envName, :bean.blueprintId, :timestamp, :created_by
             )
             """)
     void batchInsertEnvHistory(
@@ -407,11 +408,12 @@ interface AgentConfigDAO {
             @Bind("project_id") UUID projectId,
             @Bind("config_id") UUID configId,
             @Bind("created_by") String createdBy,
+            @Bind("timestamp") Instant timestamp,
             @BindMethods("bean") List<AgentConfigEnv> envs);
 
     @SqlUpdate("""
             UPDATE agent_config_env_history
-            SET ended_at = CURRENT_TIMESTAMP(6)
+            SET ended_at = :timestamp
             WHERE workspace_id = :workspace_id
                 AND project_id = :project_id
                 AND env_name IN (<env_names>)
@@ -420,6 +422,7 @@ interface AgentConfigDAO {
     void closeActiveEnvHistory(
             @Bind("workspace_id") String workspaceId,
             @Bind("project_id") UUID projectId,
+            @Bind("timestamp") Instant timestamp,
             @BindList("env_names") List<String> envNames);
 
     @SqlBatch("""
