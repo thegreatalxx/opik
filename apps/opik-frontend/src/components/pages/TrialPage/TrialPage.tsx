@@ -119,14 +119,15 @@ const TrialPage: React.FunctionComponent = () => {
       | string[]
       | undefined;
     if (parentCandidateIds?.length) {
-      return allExperiments.find((exp) => {
+      const match = allExperiments.find((exp) => {
         const expMeta = exp.metadata as Record<string, unknown> | undefined;
         const candidateId = expMeta?.candidate_id as string | undefined;
         return candidateId && parentCandidateIds.includes(candidateId);
       });
+      if (match) return match;
     }
 
-    // Old optimizations: parent is the previous trial in chronological order
+    // Fallback: parent is the previous trial in chronological order
     const sorted = allExperiments
       .slice()
       .sort((a, b) => a.created_at.localeCompare(b.created_at));

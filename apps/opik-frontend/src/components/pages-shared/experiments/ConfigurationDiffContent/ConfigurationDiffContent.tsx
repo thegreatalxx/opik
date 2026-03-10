@@ -8,8 +8,7 @@ import { Experiment } from "@/types/datasets";
 import {
   detectConfigValueType,
   flattenConfig,
-  EXCLUDED_CONFIG_KEYS,
-  shouldSkipRedundantKey,
+  makeSkipKey,
 } from "@/lib/configuration-renderer";
 import DiffSection from "./DiffSection";
 
@@ -46,9 +45,7 @@ const ConfigurationDiffContent: React.FunctionComponent<
     const currPrompt = get(currConfig, "prompt", null);
     const hasStructuredPrompt = !!(basePrompt || currPrompt);
 
-    const skipKey = (key: string) =>
-      EXCLUDED_CONFIG_KEYS.includes(key) ||
-      shouldSkipRedundantKey(key, hasStructuredPrompt);
+    const skipKey = makeSkipKey(hasStructuredPrompt);
     const baseFlat = flattenConfig(baseConfig, skipKey);
     const currFlat = flattenConfig(currConfig, skipKey);
 
@@ -75,9 +72,7 @@ const ConfigurationDiffContent: React.FunctionComponent<
       const allKeys = uniq([...Object.keys(base), ...Object.keys(curr)]);
 
       for (const key of allKeys) {
-        if (!prefix && EXCLUDED_CONFIG_KEYS.includes(key)) continue;
-        if (!prefix && shouldSkipRedundantKey(key, hasStructuredPrompt))
-          continue;
+        if (!prefix && skipKey(key)) continue;
         const path = prefix ? `${prefix}.${key}` : key;
         const bVal = base[key];
         const cVal = curr[key];

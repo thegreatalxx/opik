@@ -3,6 +3,7 @@ import {
   detectConfigValueType,
   flattenConfig,
   shouldSkipRedundantKey,
+  makeSkipKey,
   EXCLUDED_CONFIG_KEYS,
 } from "./configuration-renderer";
 
@@ -101,10 +102,6 @@ describe("EXCLUDED_CONFIG_KEYS", () => {
 });
 
 describe("flattenConfig", () => {
-  const makeSkipKey = (hasStructuredPrompt: boolean) => (key: string) =>
-    EXCLUDED_CONFIG_KEYS.includes(key) ||
-    shouldSkipRedundantKey(key, hasStructuredPrompt);
-
   it("flattens simple primitive config without skipKey", () => {
     const config = {
       temperature: 0.7,

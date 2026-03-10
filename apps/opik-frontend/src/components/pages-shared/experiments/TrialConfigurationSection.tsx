@@ -13,8 +13,7 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
   detectConfigValueType,
   flattenConfig,
-  EXCLUDED_CONFIG_KEYS,
-  shouldSkipRedundantKey,
+  makeSkipKey,
 } from "@/lib/configuration-renderer";
 import { getOptimizerLabel } from "@/lib/optimizations";
 import { OPTIMIZATION_METRIC_OPTIONS } from "@/constants/optimizations";
@@ -243,10 +242,10 @@ const TrialConfigurationSection: React.FC<TrialConfigurationSectionProps> = ({
     if (!configuration) return [];
 
     const hasStructuredPrompt = "prompt" in configuration;
-    const skipKey = (key: string) =>
-      EXCLUDED_CONFIG_KEYS.includes(key) ||
-      shouldSkipRedundantKey(key, hasStructuredPrompt);
-    const result = flattenConfig(configuration, skipKey);
+    const result = flattenConfig(
+      configuration,
+      makeSkipKey(hasStructuredPrompt),
+    );
 
     // If no prompt was found (old format without structured "prompt" key),
     // try the top-level "prompt" as a fallback.
@@ -297,13 +296,13 @@ const TrialConfigurationSection: React.FC<TrialConfigurationSectionProps> = ({
             {hasDiffBaseline && (
               <ToggleGroupItem value={CONFIG_VIEW_MODE.DIFF_BASELINE}>
                 <GitCompareArrows className="mr-1 size-3.5" />
-                Diff vs. baseline
+                Diff vs baseline
               </ToggleGroupItem>
             )}
             {hasDiffParent && (
               <ToggleGroupItem value={CONFIG_VIEW_MODE.DIFF_PARENT}>
                 <GitCompareArrows className="mr-1 size-3.5" />
-                Diff vs. parent
+                Diff vs parent
               </ToggleGroupItem>
             )}
           </ToggleGroup>

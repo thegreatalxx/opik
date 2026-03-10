@@ -46,6 +46,12 @@ export const shouldSkipRedundantKey = (
   hasStructuredPrompt: boolean,
 ): boolean => hasStructuredPrompt && REDUNDANT_WHEN_STRUCTURED.includes(key);
 
+export const makeSkipKey =
+  (hasStructuredPrompt: boolean) =>
+  (key: string): boolean =>
+    EXCLUDED_CONFIG_KEYS.includes(key) ||
+    shouldSkipRedundantKey(key, hasStructuredPrompt);
+
 export type FlatConfigEntry = {
   key: string;
   value: unknown;
