@@ -373,13 +373,37 @@ class AgentConfigServiceImpl implements AgentConfigService {
                         newEnvs.size(), projectId, workspaceId,
                         newEnvs.stream().map(AgentConfigEnv::envName).toList());
                 dao.batchInsertEnvs(workspaceId, projectId, config.id(), userName, userName, newEnvs);
+
+                List<AgentConfigEnv> newEnvHistoryRecords = newEnvs.stream()
+                        .map(env -> env.toBuilder().id(idGenerator.generateId()).build())
+                        .toList();
+                dao.batchInsertEnvHistory(workspaceId, projectId, config.id(), userName, newEnvHistoryRecords);
             }
 
             if (!envsToUpdate.isEmpty()) {
-                log.info("Updating {} existing environments for project '{}' in workspace '{}': {}",
-                        envsToUpdate.size(), projectId, workspaceId,
-                        envsToUpdate.stream().map(AgentConfigEnv::envName).toList());
-                dao.batchUpdateEnvs(workspaceId, projectId, userName, envsToUpdate);
+                Map<String, UUID> currentMappings = existingEnvs.stream()
+                        .collect(Collectors.toMap(AgentConfigEnv::envName, AgentConfigEnv::blueprintId));
+
+                List<AgentConfigEnv> actuallyChanged = envsToUpdate.stream()
+                        .filter(env -> !env.blueprintId().equals(currentMappings.get(env.envName())))
+                        .toList();
+
+                if (!actuallyChanged.isEmpty()) {
+                    List<String> changedEnvNames = actuallyChanged.stream()
+                            .map(AgentConfigEnv::envName)
+                            .toList();
+
+                    log.info("Updating {} existing environments for project '{}' in workspace '{}': {}",
+                            actuallyChanged.size(), projectId, workspaceId, changedEnvNames);
+
+                    dao.closeActiveEnvHistory(workspaceId, projectId, changedEnvNames);
+                    dao.batchUpdateEnvs(workspaceId, projectId, userName, actuallyChanged);
+
+                    List<AgentConfigEnv> updateHistoryRecords = actuallyChanged.stream()
+                            .map(env -> env.toBuilder().id(idGenerator.generateId()).build())
+                            .toList();
+                    dao.batchInsertEnvHistory(workspaceId, projectId, config.id(), userName, updateHistoryRecords);
+                }
             }
 
             return null;

@@ -393,6 +393,36 @@ interface AgentConfigDAO {
             @BindList("env_names") List<String> envNames);
 
     @SqlBatch("""
+            INSERT INTO agent_config_env_history (
+                id, workspace_id, project_id, config_id,
+                env_name, blueprint_id, started_at, created_by
+            )
+            VALUES (
+                :bean.id, :workspace_id, :project_id, :config_id,
+                :bean.envName, :bean.blueprintId, CURRENT_TIMESTAMP(6), :created_by
+            )
+            """)
+    void batchInsertEnvHistory(
+            @Bind("workspace_id") String workspaceId,
+            @Bind("project_id") UUID projectId,
+            @Bind("config_id") UUID configId,
+            @Bind("created_by") String createdBy,
+            @BindMethods("bean") List<AgentConfigEnv> envs);
+
+    @SqlUpdate("""
+            UPDATE agent_config_env_history
+            SET ended_at = CURRENT_TIMESTAMP(6)
+            WHERE workspace_id = :workspace_id
+                AND project_id = :project_id
+                AND env_name IN (<env_names>)
+                AND ended_at IS NULL
+            """)
+    void closeActiveEnvHistory(
+            @Bind("workspace_id") String workspaceId,
+            @Bind("project_id") UUID projectId,
+            @BindList("env_names") List<String> envNames);
+
+    @SqlBatch("""
             INSERT INTO agent_config_envs (
                 id,
                 workspace_id,
