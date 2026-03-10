@@ -3,7 +3,7 @@ import { useShallow } from "zustand/react/shallow";
 
 import DashboardWidget from "@/components/shared/Dashboard/DashboardWidget/DashboardWidget";
 import TooltipWrapper from "@/components/shared/TooltipWrapper/TooltipWrapper";
-import { useDashboardStore, selectMixedConfig } from "@/store/DashboardStore";
+import { useDashboardStore, selectRuntimeConfig } from "@/store/DashboardStore";
 import { DashboardWidgetComponentProps } from "@/types/dashboard";
 import { Filter } from "@/types/filters";
 import { isFilterValid } from "@/lib/filters";
@@ -22,7 +22,6 @@ import {
   extractFeedbackScoreName,
 } from "./metrics";
 import { formatScoreDisplay } from "@/lib/feedback-scores";
-import { resolveProjectIdFromConfig } from "@/lib/dashboard/utils";
 
 const renderMetricDisplay = (
   label: string,
@@ -44,12 +43,12 @@ const renderMetricDisplay = (
 const ProjectStatsCardWidget: React.FunctionComponent<
   DashboardWidgetComponentProps
 > = ({ sectionId, widgetId, preview = false }) => {
-  const globalConfig = useDashboardStore(
+  const runtimeContext = useDashboardStore(
     useShallow((state) => {
-      const config = selectMixedConfig(state);
+      const rc = selectRuntimeConfig(state);
       return {
-        projectId: config?.projectIds?.[0],
-        dateRange: config?.dateRange ?? DEFAULT_DATE_PRESET,
+        projectId: rc?.projectIds?.[0],
+        dateRange: rc?.dateRange ?? DEFAULT_DATE_PRESET,
       };
     }),
   );
@@ -76,34 +75,21 @@ const ProjectStatsCardWidget: React.FunctionComponent<
   }, [sectionId, widgetId, onAddEditWidgetCallback]);
 
   const widgetProjectId = widget?.config?.projectId as string | undefined;
-  const overrideDefaults = widget?.config?.overrideDefaults as
-    | boolean
-    | undefined;
 
-  const { projectId, infoMessage, intervalStart, intervalEnd } = useMemo(() => {
-    const { projectId: resolvedProjectId, infoMessage } =
-      resolveProjectIdFromConfig(
-        widgetProjectId,
-        globalConfig.projectId,
-        overrideDefaults,
-      );
+  const { projectId, intervalStart, intervalEnd } = useMemo(() => {
+    const resolvedProjectId =
+      runtimeContext.projectId || widgetProjectId || undefined;
 
     const { intervalStart, intervalEnd } = calculateIntervalConfig(
-      globalConfig.dateRange,
+      runtimeContext.dateRange,
     );
 
     return {
       projectId: resolvedProjectId,
-      infoMessage,
       intervalStart,
       intervalEnd,
     };
-  }, [
-    widgetProjectId,
-    globalConfig.projectId,
-    globalConfig.dateRange,
-    overrideDefaults,
-  ]);
+  }, [widgetProjectId, runtimeContext.projectId, runtimeContext.dateRange]);
 
   const source = widget?.config?.source as TRACE_DATA_TYPE | undefined;
   const metric = widget?.config?.metric as string | undefined;
@@ -258,12 +244,11 @@ const ProjectStatsCardWidget: React.FunctionComponent<
   return (
     <DashboardWidget>
       {preview ? (
-        <DashboardWidget.PreviewHeader infoMessage={infoMessage} />
+        <DashboardWidget.PreviewHeader />
       ) : (
         <DashboardWidget.Header
           title={widget.title || widget.generatedTitle || ""}
           subtitle={widget.subtitle}
-          infoMessage={infoMessage}
           actions={
             <DashboardWidget.ActionsMenu
               sectionId={sectionId!}

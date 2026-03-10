@@ -23,29 +23,24 @@ import { Input } from "@/components/ui/input";
 
 import SelectBox from "@/components/shared/SelectBox/SelectBox";
 import ExperimentWidgetDataSection from "@/components/shared/Dashboard/widgets/shared/ExperimentWidgetDataSection/ExperimentWidgetDataSection";
-import ExperimentsSelectBox from "@/components/pages-shared/experiments/ExperimentsSelectBox/ExperimentsSelectBox";
 import FeedbackDefinitionsAndScoresSelectBox, {
   ScoreSource,
 } from "@/components/pages-shared/experiments/FeedbackDefinitionsAndScoresSelectBox/FeedbackDefinitionsAndScoresSelectBox";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { Filter, ListChecks } from "lucide-react";
-import WidgetOverrideDefaultsSection from "@/components/shared/Dashboard/widgets/shared/WidgetOverrideDefaultsSection/WidgetOverrideDefaultsSection";
-
 import { cn } from "@/lib/utils";
 import { Filters } from "@/types/filters";
 import { Groups } from "@/types/groups";
 import { CHART_TYPE } from "@/constants/chart";
+import { extractExperimentIdsFilter } from "@/lib/filters";
 
 import {
   DashboardWidget,
-  EXPERIMENT_DATA_SOURCE,
   ExperimentsFeedbackScoresWidgetType,
   WidgetEditorHandle,
 } from "@/types/dashboard";
 import {
   useDashboardStore,
   selectUpdatePreviewWidget,
-  selectConfig,
+  selectRuntimeConfig,
 } from "@/store/DashboardStore";
 import {
   ExperimentsFeedbackScoresWidgetSchema,
@@ -69,23 +64,13 @@ const ExperimentsFeedbackScoresWidgetEditor = forwardRef<WidgetEditorHandle>(
       (state) => state.previewWidget!,
     ) as DashboardWidget & ExperimentsFeedbackScoresWidgetType;
     const updatePreviewWidget = useDashboardStore(selectUpdatePreviewWidget);
-    const globalConfig = useDashboardStore(selectConfig);
+    const runtimeConfig = useDashboardStore(selectRuntimeConfig);
 
     const { config } = widgetData;
-
-    const overrideDefaults = config.overrideDefaults || false;
-
-    const widgetDataSource =
-      config.dataSource || EXPERIMENT_DATA_SOURCE.FILTER_AND_GROUP;
 
     const widgetFilters = useMemo(() => config.filters || [], [config.filters]);
 
     const widgetGroups = useMemo(() => config.groups || [], [config.groups]);
-
-    const widgetExperimentIds = useMemo(
-      () => config.experimentIds || [],
-      [config.experimentIds],
-    );
 
     const widgetMaxExperimentsCount =
       config.maxExperimentsCount ?? MAX_MAX_EXPERIMENTS;
@@ -97,24 +82,25 @@ const ExperimentsFeedbackScoresWidgetEditor = forwardRef<WidgetEditorHandle>(
       [config.feedbackScores],
     );
 
+    const hasRuntimeExperiments =
+      (runtimeConfig?.experimentIds?.length ?? 0) > 0;
+
     const computedExperimentIds = useMemo(() => {
-      if (overrideDefaults) {
-        return widgetExperimentIds;
+      if (hasRuntimeExperiments) {
+        return runtimeConfig?.experimentIds || [];
       }
-      return globalConfig?.experimentIds || [];
-    }, [overrideDefaults, widgetExperimentIds, globalConfig?.experimentIds]);
+      const { experimentIds } = extractExperimentIdsFilter(widgetFilters);
+      return experimentIds;
+    }, [hasRuntimeExperiments, runtimeConfig?.experimentIds, widgetFilters]);
 
     const form = useForm<ExperimentsFeedbackScoresWidgetFormData>({
       resolver: zodResolver(ExperimentsFeedbackScoresWidgetSchema),
       mode: "onTouched",
       defaultValues: {
-        dataSource: widgetDataSource,
         filters: widgetFilters,
         groups: widgetGroups,
-        experimentIds: widgetExperimentIds,
         chartType,
         feedbackScores,
-        overrideDefaults,
         maxExperimentsCount:
           widgetMaxExperimentsCount !== undefined
             ? String(widgetMaxExperimentsCount)
@@ -136,17 +122,6 @@ const ExperimentsFeedbackScoresWidgetEditor = forwardRef<WidgetEditorHandle>(
       },
       isValid: form.formState.isValid,
     }));
-
-    const handleDataSourceChange = (value: string) => {
-      const newDataSource = value as EXPERIMENT_DATA_SOURCE;
-      form.setValue("dataSource", newDataSource);
-      updatePreviewWidget({
-        config: {
-          ...config,
-          dataSource: newDataSource,
-        },
-      });
-    };
 
     const handleChartTypeChange = (value: string) => {
       form.setValue("chartType", value as CHART_TYPE);
@@ -172,16 +147,6 @@ const ExperimentsFeedbackScoresWidgetEditor = forwardRef<WidgetEditorHandle>(
         config: {
           ...config,
           groups: newGroups,
-        },
-      });
-    };
-
-    const handleExperimentIdsChange = (newExperimentIds: string[]) => {
-      form.setValue("experimentIds", newExperimentIds);
-      updatePreviewWidget({
-        config: {
-          ...config,
-          experimentIds: newExperimentIds,
         },
       });
     };
@@ -282,155 +247,62 @@ const ExperimentsFeedbackScoresWidgetEditor = forwardRef<WidgetEditorHandle>(
               }}
             />
 
-            <WidgetOverrideDefaultsSection
-              value={form.watch("overrideDefaults") || false}
-              onChange={(value) => {
-                form.setValue("overrideDefaults", value);
-                updatePreviewWidget({
-                  config: {
-                    ...config,
-                    overrideDefaults: value,
-                  },
-                });
-              }}
-              description="Turn this on to override the dashboard's default experiments for this widget."
-            >
-              <div className="space-y-4">
+            {hasRuntimeExperiments ? (
+              <FormItem>
+                <FormLabel>Data source</FormLabel>
+                <Description>
+                  Experiments are provided by the page context.
+                </Description>
+              </FormItem>
+            ) : (
+              <>
+                <ExperimentWidgetDataSection
+                  control={form.control}
+                  filtersFieldName="filters"
+                  groupsFieldName="groups"
+                  filters={widgetFilters}
+                  groups={widgetGroups}
+                  onFiltersChange={handleFiltersChange}
+                  onGroupsChange={handleGroupsChange}
+                />
                 <FormField
                   control={form.control}
-                  name="dataSource"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Experiment override</FormLabel>
-                      <FormControl>
-                        <ToggleGroup
-                          type="single"
-                          variant="ghost"
-                          value={
-                            field.value ||
-                            EXPERIMENT_DATA_SOURCE.SELECT_EXPERIMENTS
-                          }
-                          onValueChange={(value) => {
-                            if (value) {
-                              field.onChange(value);
-                              handleDataSourceChange(value);
-                            }
-                          }}
-                          className="w-fit justify-start"
-                        >
-                          <ToggleGroupItem
-                            value={EXPERIMENT_DATA_SOURCE.FILTER_AND_GROUP}
-                            aria-label="Filter experiments"
-                            className="gap-1.5"
-                          >
-                            <Filter className="size-3.5" />
-                            <span>Filter experiments</span>
-                          </ToggleGroupItem>
-                          <ToggleGroupItem
-                            value={EXPERIMENT_DATA_SOURCE.SELECT_EXPERIMENTS}
-                            aria-label="Manual selection"
-                            className="gap-1.5"
-                          >
-                            <ListChecks className="size-3.5" />
-                            <span>Manual selection</span>
-                          </ToggleGroupItem>
-                        </ToggleGroup>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
+                  name="maxExperimentsCount"
+                  render={({ field, formState }) => {
+                    const validationErrors = get(formState.errors, [
+                      "maxExperimentsCount",
+                    ]);
+                    return (
+                      <FormItem>
+                        <FormLabel>Max experiments</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            min={MIN_MAX_EXPERIMENTS}
+                            max={MAX_MAX_EXPERIMENTS}
+                            value={field.value ?? ""}
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              handleMaxExperimentsCountChange(value);
+                            }}
+                            className={cn({
+                              "border-destructive": Boolean(
+                                validationErrors?.message,
+                              ),
+                            })}
+                          />
+                        </FormControl>
+                        <Description>
+                          Limit how many experiments are loaded (max{" "}
+                          {MAX_MAX_EXPERIMENTS}).
+                        </Description>
+                        <FormMessage />
+                      </FormItem>
+                    );
+                  }}
                 />
-
-                {form.watch("dataSource") ===
-                  EXPERIMENT_DATA_SOURCE.FILTER_AND_GROUP && (
-                  <>
-                    <ExperimentWidgetDataSection
-                      control={form.control}
-                      filtersFieldName="filters"
-                      groupsFieldName="groups"
-                      filters={widgetFilters}
-                      groups={widgetGroups}
-                      onFiltersChange={handleFiltersChange}
-                      onGroupsChange={handleGroupsChange}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="maxExperimentsCount"
-                      render={({ field, formState }) => {
-                        const validationErrors = get(formState.errors, [
-                          "maxExperimentsCount",
-                        ]);
-                        return (
-                          <FormItem>
-                            <FormLabel>Max experiments to load</FormLabel>
-                            <FormControl>
-                              <Input
-                                type="number"
-                                min={MIN_MAX_EXPERIMENTS}
-                                max={MAX_MAX_EXPERIMENTS}
-                                value={field.value ?? ""}
-                                onChange={(e) => {
-                                  const value = e.target.value;
-                                  handleMaxExperimentsCountChange(value);
-                                }}
-                                className={cn({
-                                  "border-destructive": Boolean(
-                                    validationErrors?.message,
-                                  ),
-                                })}
-                              />
-                            </FormControl>
-                            <Description>
-                              Limit how many experiments are loaded (max{" "}
-                              {MAX_MAX_EXPERIMENTS}).
-                            </Description>
-                            <FormMessage />
-                          </FormItem>
-                        );
-                      }}
-                    />
-                  </>
-                )}
-
-                {form.watch("dataSource") ===
-                  EXPERIMENT_DATA_SOURCE.SELECT_EXPERIMENTS && (
-                  <FormField
-                    control={form.control}
-                    name="experimentIds"
-                    render={({ field, formState }) => {
-                      const validationErrors = get(formState.errors, [
-                        "experimentIds",
-                      ]);
-                      return (
-                        <FormItem>
-                          <FormLabel>Select experiments</FormLabel>
-                          <FormControl>
-                            <ExperimentsSelectBox
-                              value={field.value || []}
-                              onValueChange={(value) => {
-                                field.onChange(value);
-                                handleExperimentIdsChange(value);
-                              }}
-                              multiselect
-                              showClearButton
-                              className={cn("flex-1", {
-                                "border-destructive": Boolean(
-                                  validationErrors?.message,
-                                ),
-                              })}
-                            />
-                          </FormControl>
-                          <Description>
-                            Choose specific experiments to show in this widget.
-                          </Description>
-                          <FormMessage />
-                        </FormItem>
-                      );
-                    }}
-                  />
-                )}
-              </div>
-            </WidgetOverrideDefaultsSection>
+              </>
+            )}
           </div>
         </WidgetEditorBaseLayout>
       </Form>

@@ -2,27 +2,24 @@ import React, { useCallback, useEffect } from "react";
 import { StringParam } from "use-query-params";
 
 import Loader from "@/components/shared/Loader/Loader";
-import { DateRangeSerializedValue } from "@/components/shared/DateRangeSelect";
-import MetricDateRangeSelect from "@/components/pages-shared/traces/MetricDateRangeSelect/MetricDateRangeSelect";
+import {
+  useMetricDateRangeWithQueryAndStorage,
+  MetricDateRangeSelect,
+} from "@/components/pages-shared/traces/MetricDateRangeSelect";
 import DashboardSaveActions from "@/components/pages-shared/dashboards/DashboardSaveActions/DashboardSaveActions";
 import DashboardContent from "@/components/pages-shared/dashboards/DashboardContent/DashboardContent";
 import DashboardSelectBox from "@/components/pages-shared/dashboards/DashboardSelectBox/DashboardSelectBox";
 import ShareDashboardButton from "@/components/pages-shared/dashboards/ShareDashboardButton/ShareDashboardButton";
-import DashboardConfigButton from "@/components/pages-shared/dashboards/DashboardConfigButton/DashboardConfigButton";
-import { useMetricDateRangeCore } from "@/components/pages-shared/traces/MetricDateRangeSelect/useMetricDateRangeCore";
 import useQueryParamAndLocalStorageState from "@/hooks/useQueryParamAndLocalStorageState";
+import { DASHBOARD_SCOPE, DASHBOARD_TYPE } from "@/types/dashboard";
 import { useDashboardLifecycle } from "@/components/pages-shared/dashboards/hooks/useDashboardLifecycle";
 import {
   useDashboardStore,
-  selectSetConfig,
-  selectConfig,
   selectSetRuntimeConfig,
   selectHasUnsavedChanges,
 } from "@/store/DashboardStore";
-import { DEFAULT_DATE_PRESET } from "@/components/pages-shared/traces/MetricDateRangeSelect/constants";
 import PageBodyStickyContainer from "@/components/layout/PageBodyStickyContainer/PageBodyStickyContainer";
 import { EXPERIMENTS_TEMPLATE_LIST } from "@/lib/dashboard/templates";
-import { EXPERIMENT_DATA_SOURCE } from "@/types/dashboard";
 import TooltipWrapper from "@/components/shared/TooltipWrapper/TooltipWrapper";
 import CompareExperimentsButton from "@/components/pages/CompareExperimentsPage/CompareExperimentsButton/CompareExperimentsButton";
 import { Separator } from "@/components/ui/separator";
@@ -62,37 +59,24 @@ const ExperimentsDashboardsTab: React.FunctionComponent<
     });
 
   const hasUnsavedChanges = useDashboardStore(selectHasUnsavedChanges);
-
-  const config = useDashboardStore(selectConfig);
-  const setConfig = useDashboardStore(selectSetConfig);
   const setRuntimeConfig = useDashboardStore(selectSetRuntimeConfig);
+
+  const { dateRange, handleDateRangeChange, minDate, maxDate, dateRangeValue } =
+    useMetricDateRangeWithQueryAndStorage({
+      key: "dashboard_time_range",
+      localStorageKey: "opik-experiments-insights-daterange",
+    });
 
   useEffect(() => {
     setRuntimeConfig({
       experimentIds: experimentsIds,
-      experimentDataSource: EXPERIMENT_DATA_SOURCE.SELECT_EXPERIMENTS,
+      dateRange: dateRangeValue,
     });
 
     return () => {
       setRuntimeConfig({});
     };
-  }, [experimentsIds, setRuntimeConfig]);
-
-  const dateRangeValue = config?.dateRange || DEFAULT_DATE_PRESET;
-
-  const handleDateRangeValueChange = useCallback(
-    (value: DateRangeSerializedValue) => {
-      if (!config) return;
-      setConfig({ ...config, dateRange: value });
-    },
-    [config, setConfig],
-  );
-
-  const { dateRange, handleDateRangeChange, minDate, maxDate } =
-    useMetricDateRangeCore({
-      value: dateRangeValue,
-      setValue: handleDateRangeValueChange,
-    });
+  }, [experimentsIds, dateRangeValue, setRuntimeConfig]);
 
   const handleDashboardCreated = useCallback(
     (newDashboardId: string) => {
@@ -117,9 +101,10 @@ const ExperimentsDashboardsTab: React.FunctionComponent<
       buttonClassName="w-[300px]"
       onDashboardCreated={handleDashboardCreated}
       onDashboardDeleted={handleDashboardDeleted}
-      defaultExperimentIds={experimentsIds}
       disabled={hasUnsavedChanges}
       templates={EXPERIMENTS_TEMPLATE_LIST}
+      dashboardType={DASHBOARD_TYPE.EXPERIMENTS}
+      dashboardScope={DASHBOARD_SCOPE.INSIGHTS}
     />
   );
 
@@ -163,7 +148,6 @@ const ExperimentsDashboardsTab: React.FunctionComponent<
           />
           <Separator orientation="vertical" className="mx-2 h-4" />
           <ShareDashboardButton />
-          <DashboardConfigButton disableExperimentsSelector />
         </div>
       </PageBodyStickyContainer>
 

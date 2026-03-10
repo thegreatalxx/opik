@@ -3,14 +3,8 @@ import {
   WIDGET_TYPE,
   TEMPLATE_TYPE,
   TEMPLATE_SCOPE,
-  EXPERIMENT_DATA_SOURCE,
 } from "@/types/dashboard";
-import {
-  DASHBOARD_VERSION,
-  createTemplateId,
-  DEFAULT_MAX_EXPERIMENTS,
-} from "@/lib/dashboard/utils";
-import { DEFAULT_DATE_PRESET } from "@/components/pages-shared/traces/MetricDateRangeSelect/constants";
+import { DASHBOARD_VERSION, createTemplateId } from "@/lib/dashboard/utils";
 import { METRIC_NAME_TYPE } from "@/api/projects/useProjectMetric";
 import { CHART_TYPE } from "@/constants/chart";
 import { TRACE_DATA_TYPE } from "@/constants/traces";
@@ -39,13 +33,10 @@ const EXPERIMENT_COMPARISON_TEMPLATE: DashboardTemplate = {
             title: "Feedback scores",
             type: WIDGET_TYPE.EXPERIMENTS_FEEDBACK_SCORES,
             config: {
-              dataSource: EXPERIMENT_DATA_SOURCE.SELECT_EXPERIMENTS,
               chartType: CHART_TYPE.radar,
-              experimentIds: [],
               filters: [],
               groups: [],
               feedbackScores: [],
-              overrideDefaults: false,
             },
           },
           {
@@ -53,13 +44,10 @@ const EXPERIMENT_COMPARISON_TEMPLATE: DashboardTemplate = {
             title: "Feedback scores distribution",
             type: WIDGET_TYPE.EXPERIMENTS_FEEDBACK_SCORES,
             config: {
-              dataSource: EXPERIMENT_DATA_SOURCE.SELECT_EXPERIMENTS,
               chartType: CHART_TYPE.bar,
-              experimentIds: [],
               filters: [],
               groups: [],
               feedbackScores: [],
-              overrideDefaults: false,
             },
           },
         ],
@@ -82,14 +70,6 @@ const EXPERIMENT_COMPARISON_TEMPLATE: DashboardTemplate = {
       },
     ],
     lastModified: Date.now(),
-    config: {
-      dateRange: DEFAULT_DATE_PRESET,
-      projectIds: [],
-      experimentIds: [],
-      experimentDataSource: EXPERIMENT_DATA_SOURCE.FILTER_AND_GROUP,
-      experimentFilters: [],
-      maxExperimentsCount: DEFAULT_MAX_EXPERIMENTS,
-    },
   },
 };
 
@@ -119,7 +99,6 @@ const PROJECT_OVERVIEW_TEMPLATE: DashboardTemplate = {
               projectId: "",
               metric: "trace_count",
               traceFilters: [],
-              overrideDefaults: false,
             },
           },
           {
@@ -131,7 +110,6 @@ const PROJECT_OVERVIEW_TEMPLATE: DashboardTemplate = {
               projectId: "",
               metric: "error_count",
               traceFilters: [],
-              overrideDefaults: false,
             },
           },
           {
@@ -143,7 +121,6 @@ const PROJECT_OVERVIEW_TEMPLATE: DashboardTemplate = {
               projectId: "",
               metric: "duration.p50",
               traceFilters: [],
-              overrideDefaults: false,
             },
           },
           {
@@ -155,7 +132,6 @@ const PROJECT_OVERVIEW_TEMPLATE: DashboardTemplate = {
               projectId: "",
               metric: "duration.p99",
               traceFilters: [],
-              overrideDefaults: false,
             },
           },
           {
@@ -167,7 +143,6 @@ const PROJECT_OVERVIEW_TEMPLATE: DashboardTemplate = {
               projectId: "",
               metric: "total_estimated_cost_sum",
               traceFilters: [],
-              overrideDefaults: false,
             },
           },
         ],
@@ -243,7 +218,6 @@ const PROJECT_OVERVIEW_TEMPLATE: DashboardTemplate = {
               chartType: CHART_TYPE.bar,
               traceFilters: [],
               breakdown: { field: BREAKDOWN_FIELD.NAME },
-              overrideDefaults: false,
             },
           },
           {
@@ -255,7 +229,6 @@ const PROJECT_OVERVIEW_TEMPLATE: DashboardTemplate = {
               chartType: CHART_TYPE.line,
               traceFilters: [],
               breakdown: { field: BREAKDOWN_FIELD.NAME },
-              overrideDefaults: false,
             },
           },
           {
@@ -266,7 +239,6 @@ const PROJECT_OVERVIEW_TEMPLATE: DashboardTemplate = {
               metricType: METRIC_NAME_TYPE.COST,
               chartType: CHART_TYPE.line,
               traceFilters: [],
-              overrideDefaults: false,
             },
           },
         ],
@@ -320,7 +292,6 @@ const PROJECT_OVERVIEW_TEMPLATE: DashboardTemplate = {
               chartType: CHART_TYPE.line,
               traceFilters: [],
               feedbackScores: [],
-              overrideDefaults: false,
             },
           },
           {
@@ -331,7 +302,6 @@ const PROJECT_OVERVIEW_TEMPLATE: DashboardTemplate = {
               metricType: METRIC_NAME_TYPE.THREAD_COUNT,
               chartType: CHART_TYPE.bar,
               threadFilters: [],
-              overrideDefaults: false,
             },
           },
           {
@@ -342,7 +312,6 @@ const PROJECT_OVERVIEW_TEMPLATE: DashboardTemplate = {
               metricType: METRIC_NAME_TYPE.THREAD_DURATION,
               chartType: CHART_TYPE.line,
               threadFilters: [],
-              overrideDefaults: false,
             },
           },
           {
@@ -354,7 +323,6 @@ const PROJECT_OVERVIEW_TEMPLATE: DashboardTemplate = {
               chartType: CHART_TYPE.line,
               threadFilters: [],
               feedbackScores: [],
-              overrideDefaults: false,
             },
           },
         ],
@@ -407,14 +375,6 @@ const PROJECT_OVERVIEW_TEMPLATE: DashboardTemplate = {
       },
     ],
     lastModified: Date.now(),
-    config: {
-      dateRange: DEFAULT_DATE_PRESET,
-      projectIds: [],
-      experimentIds: [],
-      experimentDataSource: EXPERIMENT_DATA_SOURCE.FILTER_AND_GROUP,
-      experimentFilters: [],
-      maxExperimentsCount: DEFAULT_MAX_EXPERIMENTS,
-    },
   },
 };
 

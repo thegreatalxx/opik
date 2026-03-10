@@ -6,6 +6,27 @@ import { CHART_TYPE } from "@/constants/chart";
 import { Sorting } from "@/types/sorting";
 import { BREAKDOWN_FIELD } from "@/components/shared/Dashboard/widgets/ProjectMetricsWidget/breakdown";
 
+export interface DashboardRuntimeConfig {
+  dateRange?: DateRangeSerializedValue;
+  projectIds?: string[];
+  experimentIds?: string[];
+}
+
+export enum DASHBOARD_TYPE {
+  MULTI_PROJECT = "multi_project",
+  EXPERIMENTS = "experiments",
+}
+
+export const DASHBOARD_TYPE_LABELS: Record<DASHBOARD_TYPE, string> = {
+  [DASHBOARD_TYPE.MULTI_PROJECT]: "Multi-project",
+  [DASHBOARD_TYPE.EXPERIMENTS]: "Experiments",
+};
+
+export enum DASHBOARD_SCOPE {
+  WORKSPACE = "workspace",
+  INSIGHTS = "insights",
+}
+
 export enum VIEW_TYPE {
   DETAILS = "details",
   DASHBOARDS = "dashboards",
@@ -17,11 +38,6 @@ export enum WIDGET_TYPE {
   TEXT_MARKDOWN = "text_markdown",
   EXPERIMENTS_FEEDBACK_SCORES = "experiments_feedback_scores",
   EXPERIMENT_LEADERBOARD = "experiment_leaderboard",
-}
-
-export enum EXPERIMENT_DATA_SOURCE {
-  FILTER_AND_GROUP = "filter_and_group",
-  SELECT_EXPERIMENTS = "select_experiments",
 }
 
 export enum WIDGET_CATEGORY {
@@ -60,7 +76,6 @@ export interface ProjectMetricsWidget {
     durationMetrics?: string[];
     usageMetrics?: string[];
     breakdown?: BreakdownConfig;
-    overrideDefaults?: boolean;
   } & Record<string, unknown>;
 }
 
@@ -79,20 +94,16 @@ export interface ProjectStatsCardWidget {
     metric: string;
     traceFilters?: Filters;
     spanFilters?: Filters;
-    overrideDefaults?: boolean;
   } & Record<string, unknown>;
 }
 
 export interface ExperimentsFeedbackScoresWidgetType {
   type: WIDGET_TYPE.EXPERIMENTS_FEEDBACK_SCORES;
   config: {
-    dataSource?: EXPERIMENT_DATA_SOURCE;
     filters?: Filters;
     groups?: Groups;
-    experimentIds?: string[];
     chartType?: CHART_TYPE;
     feedbackScores?: string[];
-    overrideDefaults?: boolean;
     maxExperimentsCount?: number;
   } & Record<string, unknown>;
 }
@@ -100,9 +111,6 @@ export interface ExperimentsFeedbackScoresWidgetType {
 export interface ExperimentsLeaderboardWidgetType {
   type: WIDGET_TYPE.EXPERIMENT_LEADERBOARD;
   config: {
-    overrideDefaults?: boolean;
-    dataSource?: EXPERIMENT_DATA_SOURCE;
-    experimentIds?: string[];
     filters?: Filters;
     selectedColumns?: string[];
     enableRanking?: boolean;
@@ -173,7 +181,6 @@ export interface DashboardState {
   version: number;
   sections: DashboardSections;
   lastModified: number;
-  config: BaseDashboardConfig;
 }
 
 export interface Dashboard {
@@ -182,18 +189,11 @@ export interface Dashboard {
   description?: string;
   workspace_id: string;
   config: DashboardState;
+  type: DASHBOARD_TYPE;
+  scope: DASHBOARD_SCOPE;
   created_at: string;
   last_updated_at: string;
   created_by?: string;
-}
-
-export interface BaseDashboardConfig {
-  dateRange: DateRangeSerializedValue;
-  projectIds: string[];
-  experimentIds: string[];
-  experimentDataSource: EXPERIMENT_DATA_SOURCE;
-  experimentFilters: Filters;
-  maxExperimentsCount: number;
 }
 
 export interface DashboardWidgetComponentProps {

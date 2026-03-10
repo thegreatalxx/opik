@@ -24,13 +24,12 @@ import ProjectWidgetFiltersSection from "@/components/shared/Dashboard/widgets/s
 import FeedbackDefinitionsAndScoresSelectBox, {
   ScoreSource,
 } from "@/components/pages-shared/experiments/FeedbackDefinitionsAndScoresSelectBox/FeedbackDefinitionsAndScoresSelectBox";
-import WidgetOverrideDefaultsSection from "@/components/shared/Dashboard/widgets/shared/WidgetOverrideDefaultsSection/WidgetOverrideDefaultsSection";
 import ProjectMetricsBreakdownSection from "./ProjectMetricsBreakdownSection";
 
 import { cn } from "@/lib/utils";
 import {
   useDashboardStore,
-  selectMixedConfig,
+  selectRuntimeConfig,
   selectUpdatePreviewWidget,
 } from "@/store/DashboardStore";
 
@@ -143,7 +142,6 @@ const ProjectMetricsEditor = forwardRef<WidgetEditorHandle>((_, ref) => {
   const metricType = config.metricType || "";
   const chartType = config.chartType || CHART_TYPE.line;
   const localProjectId = config.projectId;
-  const overrideDefaults = config.overrideDefaults || false;
 
   const traceFilters = useMemo<Filter[]>(
     () => (config.traceFilters as Filter[] | undefined) || [],
@@ -179,14 +177,15 @@ const ProjectMetricsEditor = forwardRef<WidgetEditorHandle>((_, ref) => {
     [config.breakdown],
   );
 
-  const globalConfig = useDashboardStore((state) => {
-    const config = selectMixedConfig(state);
+  const runtimeContext = useDashboardStore((state) => {
+    const rc = selectRuntimeConfig(state);
     return {
-      projectId: config?.projectIds?.[0],
-      dateRange: config?.dateRange ?? DEFAULT_DATE_PRESET,
+      projectId: rc?.projectIds?.[0],
+      dateRange: rc?.dateRange ?? DEFAULT_DATE_PRESET,
     };
   });
-  const projectId = localProjectId || globalConfig.projectId || "";
+  const hasRuntimeProjectId = !!runtimeContext.projectId;
+  const projectId = runtimeContext.projectId || localProjectId || "";
 
   const selectedMetric = METRIC_OPTIONS.find((m) => m.value === metricType);
   const isTraceMetric = !metricType || selectedMetric?.filterType === "trace";
@@ -257,7 +256,6 @@ const ProjectMetricsEditor = forwardRef<WidgetEditorHandle>((_, ref) => {
       durationMetrics,
       usageMetrics,
       breakdown,
-      overrideDefaults,
     },
   });
 
@@ -652,48 +650,35 @@ const ProjectMetricsEditor = forwardRef<WidgetEditorHandle>((_, ref) => {
             }}
           />
 
-          <WidgetOverrideDefaultsSection
-            value={form.watch("overrideDefaults") || false}
-            onChange={(value) => {
-              form.setValue("overrideDefaults", value);
-              updatePreviewWidget({
-                config: {
-                  ...config,
-                  overrideDefaults: value,
-                },
-              });
+          <FormField
+            control={form.control}
+            name="projectId"
+            render={({ field, formState }) => {
+              const validationErrors = get(formState.errors, ["projectId"]);
+              return (
+                <FormItem>
+                  <FormLabel>Project</FormLabel>
+                  <FormControl>
+                    <ProjectsSelectBox
+                      className={cn("flex-1", {
+                        "border-destructive": Boolean(
+                          validationErrors?.message,
+                        ),
+                      })}
+                      value={field.value || ""}
+                      onValueChange={(value) => {
+                        field.onChange(value);
+                        handleProjectChange(value);
+                      }}
+                      showClearButton
+                      disabled={hasRuntimeProjectId}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              );
             }}
-            description="Turn this on to override the dashboard's default project for this widget."
-          >
-            <FormField
-              control={form.control}
-              name="projectId"
-              render={({ field, formState }) => {
-                const validationErrors = get(formState.errors, ["projectId"]);
-                return (
-                  <FormItem>
-                    <FormLabel>Project override</FormLabel>
-                    <FormControl>
-                      <ProjectsSelectBox
-                        className={cn("flex-1", {
-                          "border-destructive": Boolean(
-                            validationErrors?.message,
-                          ),
-                        })}
-                        value={field.value || ""}
-                        onValueChange={(value) => {
-                          field.onChange(value);
-                          handleProjectChange(value);
-                        }}
-                        showClearButton
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                );
-              }}
-            />
-          </WidgetOverrideDefaultsSection>
+          />
         </div>
       </WidgetEditorBaseLayout>
     </Form>

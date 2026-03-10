@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo } from "react";
+import React, { useCallback, useEffect, useMemo } from "react";
 import {
   Control,
   FieldPath,
@@ -18,13 +18,14 @@ import {
   COLUMN_TYPE,
   ColumnData,
 } from "@/types/shared";
-import FiltersAccordionSection from "@/components/shared/FiltersAccordionSection/FiltersAccordionSection";
+import FiltersSection from "@/components/shared/FiltersSection/FiltersSection";
 import GroupsAccordionSection, {
   GroupValidationError,
 } from "@/components/shared/GroupsAccordionSection/GroupsAccordionSection";
 import DatasetSelectBox from "@/components/pages-shared/experiments/DatasetSelectBox/DatasetSelectBox";
 import ExperimentsPathsAutocomplete from "@/components/pages-shared/experiments/ExperimentsPathsAutocomplete/ExperimentsPathsAutocomplete";
-import { Description } from "@/components/ui/description";
+import ExperimentFilterSelectBox from "./ExperimentFilterSelectBox";
+import { EXPERIMENT_IDS_FILTER_FIELD } from "@/lib/filters";
 
 type ExperimentColumnData = {
   id: string;
@@ -32,6 +33,12 @@ type ExperimentColumnData = {
 };
 
 const EXPERIMENT_DATA_COLUMNS: ColumnData<ExperimentColumnData>[] = [
+  {
+    id: EXPERIMENT_IDS_FILTER_FIELD,
+    label: "Experiments",
+    type: COLUMN_TYPE.string,
+    disposable: true,
+  },
   {
     id: COLUMN_DATASET_ID,
     label: "Dataset",
@@ -85,6 +92,19 @@ const ExperimentWidgetDataSection = <T extends FieldValues>({
   const dataConfig = useMemo(
     () => ({
       rowsMap: {
+        [EXPERIMENT_IDS_FILTER_FIELD]: {
+          keyComponent:
+            ExperimentFilterSelectBox as React.FunctionComponent<unknown> & {
+              placeholder: string;
+              value: string;
+              onValueChange: (value: string) => void;
+            },
+          keyComponentProps: {
+            className: "w-full min-w-72",
+          },
+          defaultOperator: "=" as FilterOperator,
+          operators: [{ label: "=", value: "=" as FilterOperator }],
+        },
         [COLUMN_DATASET_ID]: {
           keyComponent: DatasetSelectBox as React.FunctionComponent<unknown> & {
             placeholder: string;
@@ -175,20 +195,26 @@ const ExperimentWidgetDataSection = <T extends FieldValues>({
         )
       : undefined;
 
+  const hasExperimentIdsFilter = filters.some(
+    (f) => f.field === EXPERIMENT_IDS_FILTER_FIELD && f.value,
+  );
+
+  useEffect(() => {
+    if (hasExperimentIdsFilter && groups && groups.length > 0) {
+      setGroups([]);
+    }
+  }, [hasExperimentIdsFilter, groups, setGroups]);
+
   return (
     <div className={cn("flex flex-col", className)}>
-      <Description className="mb-4">
-        {groupsFieldName
-          ? "Add filters to focus on specific experiments and group them by configuration to aggregate feedback scores."
-          : "Add filters to focus on specific experiments."}
-      </Description>
-
-      <FiltersAccordionSection
+      <FiltersSection
         columns={EXPERIMENT_DATA_COLUMNS as ColumnData<unknown>[]}
         config={dataConfig}
         filters={filters}
         onChange={setFilters}
-        label="Filters"
+        className="mb-5"
+        label="Filter experiments"
+        description="Use filters to target specific experiments, or leave empty to apply to all."
         errors={parsedFilterErrors}
       />
 
@@ -202,7 +228,8 @@ const ExperimentWidgetDataSection = <T extends FieldValues>({
           errors={parsedGroupErrors}
           className="w-full"
           hideSorting
-          hideBorder
+          disabled={hasExperimentIdsFilter}
+          disabledTooltip="Groups are not available when filtering by specific experiments"
         />
       )}
     </div>

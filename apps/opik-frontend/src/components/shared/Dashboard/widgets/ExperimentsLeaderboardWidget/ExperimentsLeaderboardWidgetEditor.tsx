@@ -10,7 +10,6 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import get from "lodash/get";
 import isEmpty from "lodash/isEmpty";
 import isNumber from "lodash/isNumber";
-import { Filter, ListChecks } from "lucide-react";
 
 import {
   Form,
@@ -23,27 +22,24 @@ import {
 import { Description } from "@/components/ui/description";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
 import ExperimentWidgetDataSection from "@/components/shared/Dashboard/widgets/shared/ExperimentWidgetDataSection/ExperimentWidgetDataSection";
-import ExperimentsSelectBox from "@/components/pages-shared/experiments/ExperimentsSelectBox/ExperimentsSelectBox";
-import WidgetOverrideDefaultsSection from "@/components/shared/Dashboard/widgets/shared/WidgetOverrideDefaultsSection/WidgetOverrideDefaultsSection";
 import WidgetRankingSettingsSection from "@/components/shared/Dashboard/widgets/ExperimentsLeaderboardWidget/WidgetRankingSettingsSection";
 import ColumnsButton from "@/components/shared/ColumnsButton/ColumnsButton";
 
 import { cn } from "@/lib/utils";
 import { Filters } from "@/types/filters";
+import { extractExperimentIdsFilter } from "@/lib/filters";
 
 import {
   DashboardWidget,
-  EXPERIMENT_DATA_SOURCE,
   ExperimentsLeaderboardWidgetType,
   WidgetEditorHandle,
 } from "@/types/dashboard";
 import {
   useDashboardStore,
   selectUpdatePreviewWidget,
-  selectConfig,
+  selectRuntimeConfig,
 } from "@/store/DashboardStore";
 import {
   ExperimentsLeaderboardWidgetSchema,
@@ -73,42 +69,31 @@ const ExperimentsLeaderboardWidgetEditor = forwardRef<WidgetEditorHandle>(
       (state) => state.previewWidget!,
     ) as DashboardWidget & ExperimentsLeaderboardWidgetType;
     const updatePreviewWidget = useDashboardStore(selectUpdatePreviewWidget);
-    const globalConfig = useDashboardStore(selectConfig);
+    const runtimeConfig = useDashboardStore(selectRuntimeConfig);
 
     const { config } = widgetData;
 
-    const overrideDefaults = config.overrideDefaults || false;
     const selectedColumns = config.selectedColumns || [];
-
-    const widgetDataSource =
-      config.dataSource ?? EXPERIMENT_DATA_SOURCE.FILTER_AND_GROUP;
 
     const widgetFilters = useMemo(() => config.filters || [], [config.filters]);
 
-    const widgetExperimentIds = useMemo(
-      () => config.experimentIds || [],
-      [config.experimentIds],
+    const hasRuntimeExperiments =
+      (runtimeConfig?.experimentIds?.length ?? 0) > 0;
+
+    const { experimentIds: filterExperimentIds, remainingFilters } = useMemo(
+      () => extractExperimentIdsFilter(widgetFilters),
+      [widgetFilters],
     );
 
-    const computedDataSource =
-      (overrideDefaults
-        ? widgetDataSource
-        : globalConfig?.experimentDataSource) ??
-      EXPERIMENT_DATA_SOURCE.FILTER_AND_GROUP;
-
-    const computedFilters = useMemo(() => {
-      if (overrideDefaults) {
-        return widgetFilters;
-      }
-      return globalConfig?.experimentFilters || [];
-    }, [overrideDefaults, widgetFilters, globalConfig?.experimentFilters]);
-
     const computedExperimentIds = useMemo(() => {
-      if (overrideDefaults) {
-        return widgetExperimentIds;
-      }
-      return globalConfig?.experimentIds || [];
-    }, [overrideDefaults, widgetExperimentIds, globalConfig?.experimentIds]);
+      return hasRuntimeExperiments
+        ? runtimeConfig?.experimentIds || []
+        : filterExperimentIds;
+    }, [
+      hasRuntimeExperiments,
+      runtimeConfig?.experimentIds,
+      filterExperimentIds,
+    ]);
 
     const enableRanking = config.enableRanking ?? true;
     const rankingMetric = config.rankingMetric;
@@ -131,11 +116,8 @@ const ExperimentsLeaderboardWidgetEditor = forwardRef<WidgetEditorHandle>(
       resolver: zodResolver(ExperimentsLeaderboardWidgetSchema),
       mode: "onTouched",
       defaultValues: {
-        dataSource: widgetDataSource,
         filters: widgetFilters,
-        experimentIds: widgetExperimentIds,
         selectedColumns,
-        overrideDefaults,
         enableRanking,
         rankingMetric,
         rankingDirection,
@@ -147,7 +129,6 @@ const ExperimentsLeaderboardWidgetEditor = forwardRef<WidgetEditorHandle>(
     });
 
     const currentFilters = form.watch("filters") || [];
-    const watchedDataSource = form.watch("dataSource");
 
     useEffect(() => {
       if (form.formState.errors.filters) {
@@ -157,16 +138,13 @@ const ExperimentsLeaderboardWidgetEditor = forwardRef<WidgetEditorHandle>(
 
     const { dynamicScoresColumns } = useExperimentsFeedbackScores({
       experimentIds:
-        computedDataSource === EXPERIMENT_DATA_SOURCE.SELECT_EXPERIMENTS
-          ? computedExperimentIds
-          : undefined,
+        computedExperimentIds.length > 0 ? computedExperimentIds : undefined,
       refetchInterval: 0,
     });
 
     const experimentListParams = getExperimentListParams({
-      dataSource: computedDataSource,
       experimentIds: computedExperimentIds,
-      filters: computedFilters,
+      filters: remainingFilters,
     });
 
     const { data: experimentsData } = useExperimentsList(
@@ -206,19 +184,8 @@ const ExperimentsLeaderboardWidgetEditor = forwardRef<WidgetEditorHandle>(
       [config, updatePreviewWidget],
     );
 
-    const handleDataSourceChange = (value: string) => {
-      const newDataSource = value as EXPERIMENT_DATA_SOURCE;
-      form.setValue("dataSource", newDataSource, { shouldValidate: true });
-      updateWidgetConfig({ dataSource: newDataSource });
-    };
-
     const handleFiltersChange = (newFilters: Filters) => {
       updateWidgetConfig({ filters: newFilters });
-    };
-
-    const handleExperimentIdsChange = (newExperimentIds: string[]) => {
-      form.setValue("experimentIds", newExperimentIds);
-      updateWidgetConfig({ experimentIds: newExperimentIds });
     };
 
     const handleSelectedColumnsChange = (newSelectedColumns: string[]) => {
@@ -336,149 +303,57 @@ const ExperimentsLeaderboardWidgetEditor = forwardRef<WidgetEditorHandle>(
               onRankingHigherIsBetterChange={handleRankingHigherIsBetterChange}
             />
 
-            <WidgetOverrideDefaultsSection
-              value={form.watch("overrideDefaults") || false}
-              onChange={(value) => {
-                form.setValue("overrideDefaults", value, {
-                  shouldValidate: true,
-                });
-                updateWidgetConfig({ overrideDefaults: value });
-              }}
-              description="Turn this on to override the dashboard's default experiments for this widget."
-            >
-              <div className="space-y-4">
+            {hasRuntimeExperiments ? (
+              <FormItem>
+                <FormLabel>Data source</FormLabel>
+                <Description>
+                  Experiments are provided by the page context.
+                </Description>
+              </FormItem>
+            ) : (
+              <>
+                <ExperimentWidgetDataSection
+                  control={form.control}
+                  filtersFieldName="filters"
+                  filters={widgetFilters}
+                  onFiltersChange={handleFiltersChange}
+                />
                 <FormField
                   control={form.control}
-                  name="dataSource"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Experiment override</FormLabel>
-                      <FormControl>
-                        <ToggleGroup
-                          type="single"
-                          variant="ghost"
-                          value={
-                            field.value ||
-                            EXPERIMENT_DATA_SOURCE.SELECT_EXPERIMENTS
-                          }
-                          onValueChange={(value) => {
-                            if (value) {
-                              field.onChange(value);
-                              handleDataSourceChange(value);
-                            }
-                          }}
-                          className="w-fit justify-start"
-                        >
-                          <ToggleGroupItem
-                            value={EXPERIMENT_DATA_SOURCE.FILTER_AND_GROUP}
-                            aria-label="Filter experiments"
-                            className="gap-1.5"
-                          >
-                            <Filter className="size-3.5" />
-                            <span>Filter experiments</span>
-                          </ToggleGroupItem>
-                          <ToggleGroupItem
-                            value={EXPERIMENT_DATA_SOURCE.SELECT_EXPERIMENTS}
-                            aria-label="Manual selection"
-                            className="gap-1.5"
-                          >
-                            <ListChecks className="size-3.5" />
-                            <span>Manual selection</span>
-                          </ToggleGroupItem>
-                        </ToggleGroup>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
+                  name="maxRows"
+                  render={({ field, formState }) => {
+                    const validationErrors = get(formState.errors, ["maxRows"]);
+                    return (
+                      <FormItem>
+                        <FormLabel>Maximum rows</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            min={MIN_MAX_EXPERIMENTS}
+                            max={MAX_MAX_EXPERIMENTS}
+                            value={field.value ?? ""}
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              handleMaxRowsChange(value);
+                            }}
+                            className={cn({
+                              "border-destructive": Boolean(
+                                validationErrors?.message,
+                              ),
+                            })}
+                          />
+                        </FormControl>
+                        <Description>
+                          Limit how many experiments are loaded (max{" "}
+                          {MAX_MAX_EXPERIMENTS}).
+                        </Description>
+                        <FormMessage />
+                      </FormItem>
+                    );
+                  }}
                 />
-
-                {watchedDataSource ===
-                  EXPERIMENT_DATA_SOURCE.FILTER_AND_GROUP && (
-                  <>
-                    <ExperimentWidgetDataSection
-                      control={form.control}
-                      filtersFieldName="filters"
-                      filters={widgetFilters}
-                      onFiltersChange={handleFiltersChange}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="maxRows"
-                      render={({ field, formState }) => {
-                        const validationErrors = get(formState.errors, [
-                          "maxRows",
-                        ]);
-                        return (
-                          <FormItem>
-                            <FormLabel>Maximum rows</FormLabel>
-                            <FormControl>
-                              <Input
-                                type="number"
-                                min={MIN_MAX_EXPERIMENTS}
-                                max={MAX_MAX_EXPERIMENTS}
-                                value={field.value ?? ""}
-                                onChange={(e) => {
-                                  const value = e.target.value;
-                                  handleMaxRowsChange(value);
-                                }}
-                                className={cn({
-                                  "border-destructive": Boolean(
-                                    validationErrors?.message,
-                                  ),
-                                })}
-                              />
-                            </FormControl>
-                            <Description>
-                              Limit how many experiments are loaded (max{" "}
-                              {MAX_MAX_EXPERIMENTS}).
-                            </Description>
-                            <FormMessage />
-                          </FormItem>
-                        );
-                      }}
-                    />
-                  </>
-                )}
-
-                {watchedDataSource ===
-                  EXPERIMENT_DATA_SOURCE.SELECT_EXPERIMENTS && (
-                  <FormField
-                    control={form.control}
-                    name="experimentIds"
-                    render={({ field, formState }) => {
-                      const validationErrors = get(formState.errors, [
-                        "experimentIds",
-                      ]);
-                      return (
-                        <FormItem>
-                          <FormLabel>Select experiments</FormLabel>
-                          <FormControl>
-                            <ExperimentsSelectBox
-                              value={field.value || []}
-                              onValueChange={(value) => {
-                                field.onChange(value);
-                                handleExperimentIdsChange(value);
-                              }}
-                              multiselect
-                              showClearButton
-                              className={cn("flex-1", {
-                                "border-destructive": Boolean(
-                                  validationErrors?.message,
-                                ),
-                              })}
-                            />
-                          </FormControl>
-                          <Description>
-                            Choose specific experiments to show in this widget.
-                          </Description>
-                          <FormMessage />
-                        </FormItem>
-                      );
-                    }}
-                  />
-                )}
-              </div>
-            </WidgetOverrideDefaultsSection>
+              </>
+            )}
           </div>
         </WidgetEditorBaseLayout>
       </Form>

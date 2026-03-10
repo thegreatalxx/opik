@@ -1,7 +1,6 @@
 import uniq from "lodash/uniq";
 import get from "lodash/get";
 
-import { EXPERIMENT_DATA_SOURCE } from "@/types/dashboard";
 import { Experiment } from "@/types/datasets";
 import {
   COLUMN_TYPE,
@@ -30,26 +29,21 @@ export {
   buildScoreLabel,
 } from "@/lib/feedback-scores";
 
-export const isSelectExperimentsMode = (dataSource: EXPERIMENT_DATA_SOURCE) =>
-  dataSource === EXPERIMENT_DATA_SOURCE.SELECT_EXPERIMENTS;
-
 interface ExperimentListParamsInput {
-  dataSource: EXPERIMENT_DATA_SOURCE;
   experimentIds: string[];
   filters: Filters;
 }
 
 export const getExperimentListParams = ({
-  dataSource,
   experimentIds,
   filters,
 }: ExperimentListParamsInput) => {
-  const isSelectMode = isSelectExperimentsMode(dataSource);
+  const hasExperimentIds = experimentIds.length > 0;
   const validFilters = filters.filter(isFilterValid);
   return {
-    experimentIds: isSelectMode ? experimentIds : undefined,
-    filters: !isSelectMode ? validFilters : undefined,
-    isEnabled: isSelectMode ? experimentIds.length > 0 : true,
+    experimentIds: hasExperimentIds ? experimentIds : undefined,
+    filters: validFilters.length > 0 ? validFilters : undefined,
+    isEnabled: hasExperimentIds || validFilters.length > 0,
   };
 };
 
@@ -156,9 +150,7 @@ export const DEFAULT_SELECTED_COLUMNS: string[] = [
 ];
 
 export const getDefaultConfig = () => ({
-  overrideDefaults: false,
-  dataSource: EXPERIMENT_DATA_SOURCE.SELECT_EXPERIMENTS,
-  experimentIds: [],
+  filters: [],
   selectedColumns: DEFAULT_SELECTED_COLUMNS,
   enableRanking: true,
   columnsOrder: DEFAULT_SELECTED_COLUMNS,

@@ -4,19 +4,17 @@ import isEmpty from "lodash/isEmpty";
 import uniq from "lodash/uniq";
 
 import DashboardWidget from "@/components/shared/Dashboard/DashboardWidget/DashboardWidget";
-import { useDashboardStore, selectMixedConfig } from "@/store/DashboardStore";
+import { useDashboardStore, selectRuntimeConfig } from "@/store/DashboardStore";
 import {
   DashboardWidgetComponentProps,
-  EXPERIMENT_DATA_SOURCE,
   ExperimentsFeedbackScoresWidgetType,
 } from "@/types/dashboard";
 import { Filters } from "@/types/filters";
 import { Groups } from "@/types/groups";
-import { isFilterValid } from "@/lib/filters";
+import { isFilterValid, extractExperimentIdsFilter } from "@/lib/filters";
 import { isGroupValid, calculateGroupLabel } from "@/lib/groups";
 import useExperimentsList from "@/api/datasets/useExperimentsList";
 import useExperimentsGroupsAggregations from "@/api/datasets/useExperimentsGroupsAggregations";
-import useExperimentsByIds from "@/api/datasets/useExperimenstByIds";
 import useAppStore from "@/store/AppStore";
 import useChartConfig from "@/hooks/useChartConfig";
 import { formatDate } from "@/lib/date";
@@ -38,7 +36,6 @@ import {
 import { SCORE_TYPE_FEEDBACK, SCORE_TYPE_EXPERIMENT } from "@/types/shared";
 
 const MAX_EXPERIMENTS_LIMIT = 100;
-const MAX_SELECTED_EXPERIMENTS = 10;
 
 type DataRecord = {
   entityId: string;
@@ -224,14 +221,11 @@ const ExperimentsFeedbackScoresWidget: React.FunctionComponent<
     }),
   );
 
-  const globalConfig = useDashboardStore(
+  const runtimeConfig = useDashboardStore(
     useShallow((state) => {
-      const config = selectMixedConfig(state);
+      const rc = selectRuntimeConfig(state);
       return {
-        experimentIds: config?.experimentIds || [],
-        experimentDataSource: config?.experimentDataSource,
-        experimentFilters: config?.experimentFilters || [],
-        maxExperimentsCount: config?.maxExperimentsCount,
+        experimentIds: rc?.experimentIds || [],
       };
     }),
   );
@@ -252,64 +246,34 @@ const ExperimentsFeedbackScoresWidget: React.FunctionComponent<
 
   const chartType = widgetConfig?.chartType || CHART_TYPE.line;
   const feedbackScores = widgetConfig?.feedbackScores;
-  const overrideDefaults = widgetConfig?.overrideDefaults;
 
-  const dataSource =
-    (overrideDefaults
-      ? widgetConfig?.dataSource
-      : globalConfig.experimentDataSource) ??
-    EXPERIMENT_DATA_SOURCE.FILTER_AND_GROUP;
+  const hasRuntimeExperiments = (runtimeConfig.experimentIds?.length ?? 0) > 0;
 
-  const validFilters = useMemo(() => {
-    if (overrideDefaults) {
-      const filters = (widgetConfig?.filters || []) as Filters;
-      return filters.filter(isFilterValid);
-    }
-    return (globalConfig.experimentFilters || []).filter(isFilterValid);
-  }, [overrideDefaults, widgetConfig?.filters, globalConfig.experimentFilters]);
-
-  const maxExperimentsCount =
-    (overrideDefaults
-      ? widgetConfig?.maxExperimentsCount
-      : globalConfig.maxExperimentsCount) ?? MAX_MAX_EXPERIMENTS;
-
-  const validGroups = useMemo(() => {
-    const groups = (widgetConfig?.groups || []) as Groups;
-    return groups.filter(isGroupValid);
-  }, [widgetConfig?.groups]);
-
-  const experimentIds = useMemo(() => {
-    if (overrideDefaults) {
-      return widgetConfig?.experimentIds || [];
-    }
-    return globalConfig.experimentIds || [];
-  }, [
-    globalConfig.experimentIds,
-    widgetConfig?.experimentIds,
-    overrideDefaults,
-  ]);
-
-  const hasGroups = validGroups.length > 0;
-
-  const isSelectExperimentsMode =
-    dataSource === EXPERIMENT_DATA_SOURCE.SELECT_EXPERIMENTS;
-
-  const infoMessage = overrideDefaults
-    ? "This widget uses custom experiments instead of the dashboard default."
-    : undefined;
-
-  // Limit to first 10 experiments
-  const limitedExperimentIds = useMemo(
-    () => experimentIds.slice(0, MAX_SELECTED_EXPERIMENTS),
-    [experimentIds],
+  const { experimentIds: filterExperimentIds, remainingFilters } = useMemo(
+    () => extractExperimentIdsFilter((widgetConfig?.filters || []) as Filters),
+    [widgetConfig?.filters],
   );
 
-  const hasMoreThanMaxSelected =
-    experimentIds.length > MAX_SELECTED_EXPERIMENTS;
+  const experimentIds = hasRuntimeExperiments
+    ? runtimeConfig.experimentIds
+    : filterExperimentIds;
 
-  const experimentsByIdsResults = useExperimentsByIds({
-    experimentsIds: isSelectExperimentsMode ? limitedExperimentIds : [],
-  });
+  const validFilters = useMemo(() => {
+    if (hasRuntimeExperiments) return [];
+    return remainingFilters.filter(isFilterValid);
+  }, [hasRuntimeExperiments, remainingFilters]);
+
+  const maxExperimentsCount =
+    widgetConfig?.maxExperimentsCount ?? MAX_MAX_EXPERIMENTS;
+
+  const validGroups = useMemo(() => {
+    if (hasRuntimeExperiments) return [];
+    const groups = (widgetConfig?.groups || []) as Groups;
+    return groups.filter(isGroupValid);
+  }, [hasRuntimeExperiments, widgetConfig?.groups]);
+
+  const hasGroups = validGroups.length > 0;
+  const hasExperimentIds = experimentIds.length > 0;
 
   const experimentsListSize = useMemo(() => {
     if (maxExperimentsCount && maxExperimentsCount > 0) {
@@ -323,11 +287,12 @@ const ExperimentsFeedbackScoresWidget: React.FunctionComponent<
       {
         workspaceName,
         filters: validFilters,
+        experimentIds: hasExperimentIds ? experimentIds : undefined,
         page: 1,
         size: experimentsListSize,
       },
       {
-        enabled: !hasGroups && !isSelectExperimentsMode,
+        enabled: !hasGroups,
       },
     );
 
@@ -354,16 +319,6 @@ const ExperimentsFeedbackScoresWidget: React.FunctionComponent<
       );
     }
 
-    if (isSelectExperimentsMode) {
-      const experiments = experimentsByIdsResults
-        .map((result) => result.data)
-        .filter((exp): exp is Experiment => exp !== undefined);
-      return transformUngroupedExperimentsToChartData(
-        experiments,
-        feedbackScores,
-      );
-    }
-
     if (experimentsData?.content) {
       return transformUngroupedExperimentsToChartData(
         experimentsData.content,
@@ -376,36 +331,23 @@ const ExperimentsFeedbackScoresWidget: React.FunctionComponent<
     hasGroups,
     groupsAggregationsData,
     validGroups,
-    isSelectExperimentsMode,
-    experimentsByIdsResults,
     experimentsData?.content,
     feedbackScores,
   ]);
 
-  const isExperimentsByIdsPending =
-    isSelectExperimentsMode &&
-    experimentsByIdsResults.some((result) => result.isPending);
-
   const isPending = hasGroups
     ? isGroupsAggregationsPending
-    : isSelectExperimentsMode
-      ? isExperimentsByIdsPending
-      : isExperimentsPending;
+    : isExperimentsPending;
 
   const noData =
     !isPending && chartData.data.every((record) => isEmpty(record.scores));
 
   const totalExperiments = experimentsData?.total ?? 0;
-  const hasMoreThanLimit =
-    !hasGroups &&
-    !isSelectExperimentsMode &&
-    totalExperiments > experimentsListSize;
+  const hasMoreThanLimit = !hasGroups && totalExperiments > experimentsListSize;
 
   const warningMessage = hasMoreThanLimit
     ? `Showing first ${experimentsListSize} of ${totalExperiments} experiments`
-    : isSelectExperimentsMode && hasMoreThanMaxSelected
-      ? `Showing first ${MAX_SELECTED_EXPERIMENTS} of ${experimentIds.length} selected experiments`
-      : undefined;
+    : undefined;
 
   const isRadarOrBar =
     chartType === CHART_TYPE.radar || chartType === CHART_TYPE.bar;
@@ -468,23 +410,6 @@ const ExperimentsFeedbackScoresWidget: React.FunctionComponent<
   }
 
   const renderChartContent = () => {
-    if (isSelectExperimentsMode && experimentIds.length === 0) {
-      return (
-        <DashboardWidget.EmptyState
-          title="Experiments not configured"
-          message="This widget needs experiments to display data. Select default experiments for the dashboard or set custom ones in the widget settings."
-          action={
-            !preview ? (
-              <DashboardWidget.EmptyState.EditAction
-                label="Configure widget"
-                onClick={handleEdit}
-              />
-            ) : undefined
-          }
-        />
-      );
-    }
-
     if (isPending) {
       return (
         <div className="flex size-full min-h-32 items-center justify-center">
@@ -499,9 +424,7 @@ const ExperimentsFeedbackScoresWidget: React.FunctionComponent<
 
       const emptyMessage = hasFeedbackScoresFilter
         ? "No data available for selected metrics"
-        : isSelectExperimentsMode
-          ? "Selected experiments have no feedback scores"
-          : "Configure filters to display experiment metrics";
+        : "Configure filters to display experiment metrics";
 
       return (
         <DashboardWidget.EmptyState
@@ -564,13 +487,12 @@ const ExperimentsFeedbackScoresWidget: React.FunctionComponent<
   return (
     <DashboardWidget>
       {preview ? (
-        <DashboardWidget.PreviewHeader infoMessage={infoMessage} />
+        <DashboardWidget.PreviewHeader />
       ) : (
         <DashboardWidget.Header
           title={widget.title || widget.generatedTitle || ""}
           subtitle={widget.subtitle}
           warningMessage={warningMessage}
-          infoMessage={infoMessage}
           actions={
             <DashboardWidget.ActionsMenu
               sectionId={sectionId!}
