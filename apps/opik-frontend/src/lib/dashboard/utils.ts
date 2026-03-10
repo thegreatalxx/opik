@@ -5,7 +5,6 @@ import get from "lodash/get";
 import isEmpty from "lodash/isEmpty";
 import isString from "lodash/isString";
 import {
-  BaseDashboardConfig,
   DashboardSection,
   DashboardSections,
   DashboardState,
@@ -13,13 +12,11 @@ import {
   WIDGET_TYPE,
   WidgetResolver,
   TEMPLATE_TYPE,
-  EXPERIMENT_DATA_SOURCE,
 } from "@/types/dashboard";
 import { areLayoutsEqual } from "@/lib/dashboard/layout";
 import { isLooseEqual } from "@/lib/utils";
-import { DEFAULT_DATE_PRESET } from "@/components/pages-shared/traces/MetricDateRangeSelect/constants";
 
-export const DASHBOARD_VERSION = 3;
+export const DASHBOARD_VERSION = 4;
 export const MIN_MAX_EXPERIMENTS = 1;
 export const MAX_MAX_EXPERIMENTS = 100;
 export const DEFAULT_MAX_EXPERIMENTS = 10;
@@ -27,31 +24,6 @@ export const DEFAULT_MAX_EXPERIMENTS = 10;
 const DEFAULT_SECTION_NAME = "New section";
 
 const TEMPLATE_ID_PREFIX = "template:";
-
-export const CUSTOM_PROJECT_CONFIG_MESSAGE =
-  "This widget uses a custom project instead of the dashboard default.";
-
-export const resolveProjectIdFromConfig = (
-  widgetProjectId: string | undefined,
-  globalProjectId: string | undefined,
-  overrideDefaults?: boolean,
-): {
-  projectId: string | undefined;
-  infoMessage: string | undefined;
-} => {
-  // If overrideDefaults is true, use widget's own projectId
-  // Otherwise, always use global projectId
-  const projectId = overrideDefaults ? widgetProjectId : globalProjectId;
-
-  const infoMessage = overrideDefaults
-    ? CUSTOM_PROJECT_CONFIG_MESSAGE
-    : undefined;
-
-  return {
-    projectId,
-    infoMessage,
-  };
-};
 
 export const createTemplateId = (templateId: TEMPLATE_TYPE): string => {
   return `${TEMPLATE_ID_PREFIX}${templateId}`;
@@ -74,15 +46,6 @@ export const generateEmptySection = (
   };
 };
 
-export const generateEmptyConfig = (): BaseDashboardConfig => ({
-  dateRange: DEFAULT_DATE_PRESET,
-  projectIds: [],
-  experimentIds: [],
-  experimentDataSource: EXPERIMENT_DATA_SOURCE.FILTER_AND_GROUP,
-  experimentFilters: [],
-  maxExperimentsCount: DEFAULT_MAX_EXPERIMENTS,
-});
-
 export const generateEmptyDashboard = (): DashboardState => {
   const defaultSection = generateEmptySection("Overview");
 
@@ -90,7 +53,6 @@ export const generateEmptyDashboard = (): DashboardState => {
     version: DASHBOARD_VERSION,
     sections: [defaultSection],
     lastModified: Date.now(),
-    config: generateEmptyConfig(),
   };
 };
 
@@ -158,9 +120,7 @@ export const isDashboardChanged = (
 
   if (current.version !== previous.version) return true;
 
-  if (!areSectionArraysEqual(current.sections, previous.sections)) return true;
-
-  return !isLooseEqual(current.config, previous.config);
+  return !areSectionArraysEqual(current.sections, previous.sections);
 };
 
 export const createDefaultWidgetConfig = (
@@ -193,10 +153,6 @@ export const createDefaultWidgetConfig = (
 export const regenerateAllIds = (
   dashboardState: DashboardState,
 ): DashboardState => {
-  const clonedConfig: BaseDashboardConfig = cloneDeep(
-    get(dashboardState, "config"),
-  );
-
   const newSections: DashboardSections = map(
     get(dashboardState, "sections", []),
     (section) => {
@@ -242,7 +198,6 @@ export const regenerateAllIds = (
     version: get(dashboardState, "version", DASHBOARD_VERSION),
     sections: newSections,
     lastModified: Date.now(),
-    config: clonedConfig,
   };
 };
 

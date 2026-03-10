@@ -7,7 +7,7 @@ import {
   INTERVAL_TYPE,
   METRIC_NAME_TYPE,
 } from "@/api/projects/useProjectMetric";
-import { useDashboardStore, selectMixedConfig } from "@/store/DashboardStore";
+import { useDashboardStore, selectRuntimeConfig } from "@/store/DashboardStore";
 import {
   DashboardWidgetComponentProps,
   BreakdownConfig,
@@ -30,7 +30,6 @@ import { renderScoreTooltipValue } from "@/lib/feedback-scores";
 import { calculateIntervalConfig } from "@/components/pages-shared/traces/MetricDateRangeSelect/utils";
 import { DEFAULT_DATE_PRESET } from "@/components/pages-shared/traces/MetricDateRangeSelect/constants";
 import { buildDocsUrl } from "@/lib/utils";
-import { resolveProjectIdFromConfig } from "@/lib/dashboard/utils";
 import {
   BREAKDOWN_FIELD,
   BREAKDOWN_GROUP_NAMES,
@@ -44,12 +43,12 @@ const ProjectMetricsWidget: React.FunctionComponent<
   const navigate = useNavigate();
   const workspaceName = useAppStore((state) => state.activeWorkspaceName);
 
-  const globalConfig = useDashboardStore(
+  const runtimeContext = useDashboardStore(
     useShallow((state) => {
-      const config = selectMixedConfig(state);
+      const rc = selectRuntimeConfig(state);
       return {
-        projectId: config?.projectIds?.[0],
-        dateRange: config?.dateRange ?? DEFAULT_DATE_PRESET,
+        projectId: rc?.projectIds?.[0],
+        dateRange: rc?.dateRange ?? DEFAULT_DATE_PRESET,
       };
     }),
   );
@@ -76,36 +75,22 @@ const ProjectMetricsWidget: React.FunctionComponent<
   }, [sectionId, widgetId, onAddEditWidgetCallback]);
 
   const widgetProjectId = widget?.config?.projectId as string | undefined;
-  const overrideDefaults = widget?.config?.overrideDefaults as
-    | boolean
-    | undefined;
 
-  const { projectId, infoMessage, interval, intervalStart, intervalEnd } =
-    useMemo(() => {
-      const { projectId: resolvedProjectId, infoMessage } =
-        resolveProjectIdFromConfig(
-          widgetProjectId,
-          globalConfig.projectId,
-          overrideDefaults,
-        );
+  const { projectId, interval, intervalStart, intervalEnd } = useMemo(() => {
+    const resolvedProjectId =
+      runtimeContext.projectId || widgetProjectId || undefined;
 
-      const { interval, intervalStart, intervalEnd } = calculateIntervalConfig(
-        globalConfig.dateRange,
-      );
+    const { interval, intervalStart, intervalEnd } = calculateIntervalConfig(
+      runtimeContext.dateRange,
+    );
 
-      return {
-        projectId: resolvedProjectId,
-        infoMessage,
-        interval,
-        intervalStart,
-        intervalEnd,
-      };
-    }, [
-      widgetProjectId,
-      globalConfig.projectId,
-      globalConfig.dateRange,
-      overrideDefaults,
-    ]);
+    return {
+      projectId: resolvedProjectId,
+      interval,
+      intervalStart,
+      intervalEnd,
+    };
+  }, [widgetProjectId, runtimeContext.projectId, runtimeContext.dateRange]);
 
   const metricType = widget?.config?.metricType as string | undefined;
   const metricName = metricType as METRIC_NAME_TYPE | undefined;
@@ -311,7 +296,7 @@ const ProjectMetricsWidget: React.FunctionComponent<
               tab: PROJECT_TAB.logs,
               logsType,
               [filtersKey]: [...widgetFilters, filter],
-              time_range: globalConfig.dateRange,
+              time_range: runtimeContext.dateRange,
             },
           });
         },
@@ -327,7 +312,7 @@ const ProjectMetricsWidget: React.FunctionComponent<
       widget?.config?.spanFilters,
       widget?.config?.traceFilters,
       widget?.config?.threadFilters,
-      globalConfig.dateRange,
+      runtimeContext.dateRange,
     ],
   );
 
@@ -496,12 +481,11 @@ const ProjectMetricsWidget: React.FunctionComponent<
   return (
     <DashboardWidget>
       {preview ? (
-        <DashboardWidget.PreviewHeader infoMessage={infoMessage} />
+        <DashboardWidget.PreviewHeader />
       ) : (
         <DashboardWidget.Header
           title={widget.title || widget.generatedTitle || ""}
           subtitle={widget.subtitle}
-          infoMessage={infoMessage}
           actions={
             <DashboardWidget.ActionsMenu
               sectionId={sectionId!}

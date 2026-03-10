@@ -38,7 +38,6 @@ export const ProjectMetricsWidgetSchema = z.object({
   durationMetrics: z.array(z.string()).optional(),
   usageMetrics: z.array(z.string()).optional(),
   breakdown: BreakdownConfigSchema.optional(),
-  overrideDefaults: z.boolean().optional(),
 });
 
 export type BreakdownConfigFormData = z.infer<typeof BreakdownConfigSchema>;

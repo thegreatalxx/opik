@@ -17,16 +17,16 @@ import TooltipWrapper from "@/components/shared/TooltipWrapper/TooltipWrapper";
 import {
   DashboardWidgetComponentProps,
   ExperimentsLeaderboardWidgetType,
-  EXPERIMENT_DATA_SOURCE,
 } from "@/types/dashboard";
 import {
   useDashboardStore,
   selectUpdateWidget,
-  selectMixedConfig,
+  selectRuntimeConfig,
 } from "@/store/DashboardStore";
 import useAppStore from "@/store/AppStore";
 import useExperimentsList from "@/api/datasets/useExperimentsList";
 import { Experiment } from "@/types/datasets";
+import { Filters } from "@/types/filters";
 import { Sorting } from "@/types/sorting";
 import { getRowId } from "@/components/shared/DataTable/utils";
 import {
@@ -45,7 +45,6 @@ import {
   formatConfigColumnName,
   PREDEFINED_COLUMNS,
   getExperimentListParams,
-  isSelectExperimentsMode,
   parseScoreColumnId,
   getExperimentScore,
   buildScoreLabel,
@@ -60,6 +59,7 @@ import {
 import { convertColumnDataToColumn, mapColumnDataFields } from "@/lib/table";
 import FeedbackScoreHeader from "@/components/shared/DataTableHeaders/FeedbackScoreHeader";
 import FeedbackScoreCell from "@/components/shared/DataTableCells/FeedbackScoreCell";
+import { extractExperimentIdsFilter, isFilterValid } from "@/lib/filters";
 
 const RANK_COLUMN_ID = "rank";
 const NAME_COLUMN_ID = "name";
@@ -80,14 +80,11 @@ const ExperimentsLeaderboardWidget: React.FunctionComponent<
     }),
   );
 
-  const globalConfig = useDashboardStore(
+  const runtimeConfig = useDashboardStore(
     useShallow((state) => {
-      const config = selectMixedConfig(state);
+      const rc = selectRuntimeConfig(state);
       return {
-        experimentIds: config?.experimentIds || [],
-        experimentDataSource: config?.experimentDataSource,
-        experimentFilters: config?.experimentFilters || [],
-        maxExperimentsCount: config?.maxExperimentsCount,
+        experimentIds: rc?.experimentIds || [],
       };
     }),
   );
@@ -119,45 +116,33 @@ const ExperimentsLeaderboardWidget: React.FunctionComponent<
     scoresColumnsOrder = [],
     metadataColumnsOrder = [],
     sorting: savedSorting = [],
-    overrideDefaults = false,
   } = config;
 
-  const dataSource =
-    (overrideDefaults
-      ? widgetConfig?.dataSource
-      : globalConfig.experimentDataSource) ??
-    EXPERIMENT_DATA_SOURCE.FILTER_AND_GROUP;
+  const hasRuntimeExperiments = (runtimeConfig.experimentIds?.length ?? 0) > 0;
 
-  const filters = useMemo(() => {
-    if (overrideDefaults) {
-      return config.filters || [];
-    }
-    return globalConfig?.experimentFilters || [];
-  }, [overrideDefaults, config.filters, globalConfig?.experimentFilters]);
+  const { experimentIds: filterExperimentIds, remainingFilters } = useMemo(
+    () => extractExperimentIdsFilter((config.filters || []) as Filters),
+    [config.filters],
+  );
 
-  const maxRows =
-    (overrideDefaults ? config.maxRows : globalConfig.maxExperimentsCount) ??
-    MAX_MAX_EXPERIMENTS;
+  const experimentIds = hasRuntimeExperiments
+    ? runtimeConfig.experimentIds
+    : filterExperimentIds;
+
+  const validFilters = useMemo(() => {
+    if (hasRuntimeExperiments) return [];
+    return remainingFilters.filter(isFilterValid);
+  }, [hasRuntimeExperiments, remainingFilters]);
+
+  const maxRows = config.maxRows ?? MAX_MAX_EXPERIMENTS;
 
   const maxRowsValue = !isNumber(maxRows)
     ? DEFAULT_MAX_EXPERIMENTS
     : Math.max(MIN_MAX_EXPERIMENTS, Math.min(MAX_MAX_EXPERIMENTS, maxRows));
 
-  const experimentIds = useMemo(() => {
-    if (overrideDefaults) {
-      return widgetConfig?.experimentIds || [];
-    }
-    return globalConfig?.experimentIds || [];
-  }, [
-    globalConfig?.experimentIds,
-    widgetConfig?.experimentIds,
-    overrideDefaults,
-  ]);
-
   const experimentListParams = getExperimentListParams({
-    dataSource,
     experimentIds,
-    filters,
+    filters: validFilters,
   });
 
   const rankingSorting = useMemo(
@@ -182,9 +167,7 @@ const ExperimentsLeaderboardWidget: React.FunctionComponent<
       experimentIds: experimentListParams.experimentIds,
       sorting: apiSorting,
       page: 1,
-      size: isSelectExperimentsMode(dataSource)
-        ? MAX_MAX_EXPERIMENTS
-        : maxRowsValue,
+      size: maxRowsValue,
       forceSorting: true,
     },
     {
@@ -222,7 +205,6 @@ const ExperimentsLeaderboardWidget: React.FunctionComponent<
     [experimentsData?.sortable_by],
   );
 
-  // Build ranking map: experimentId -> rank position
   const rankingMap = useMemo(() => {
     if (!enableRanking || !rankingData?.content) {
       return undefined;
@@ -259,7 +241,6 @@ const ExperimentsLeaderboardWidget: React.FunctionComponent<
       .filter((col): col is DynamicColumn => col !== null);
   }, [selectedColumns, enableRanking, rankingMetric]);
 
-  // Build metadata columns data
   const metadataColumnsData = useMemo<ColumnData<Experiment>[]>(() => {
     return selectedColumns
       .filter((colId) => colId.startsWith(`${COLUMN_METADATA_ID}.`))
@@ -309,11 +290,9 @@ const ExperimentsLeaderboardWidget: React.FunctionComponent<
     });
   }, [selectedScoreColumns, enableRanking, rankingMetric, rankingDirection]);
 
-  // Build table columns
   const tableColumns = useMemo(() => {
     const allColumns: ColumnDef<Experiment>[] = [];
 
-    // 1. Rank column (if enabled)
     if (enableRanking) {
       allColumns.push(
         mapColumnDataFields<Experiment, Experiment>({
@@ -331,7 +310,6 @@ const ExperimentsLeaderboardWidget: React.FunctionComponent<
       );
     }
 
-    // 2. Name column (always shown)
     allColumns.push(
       mapColumnDataFields<Experiment, Experiment>({
         id: NAME_COLUMN_ID,
@@ -350,7 +328,6 @@ const ExperimentsLeaderboardWidget: React.FunctionComponent<
       }),
     );
 
-    // 3. Predefined columns (using helper)
     allColumns.push(
       ...convertColumnDataToColumn<Experiment, Experiment>(PREDEFINED_COLUMNS, {
         columnsOrder,
@@ -359,7 +336,6 @@ const ExperimentsLeaderboardWidget: React.FunctionComponent<
       }),
     );
 
-    // 4. Metadata columns (using helper)
     allColumns.push(
       ...convertColumnDataToColumn<Experiment, Experiment>(
         metadataColumnsData,
@@ -370,7 +346,6 @@ const ExperimentsLeaderboardWidget: React.FunctionComponent<
       ),
     );
 
-    // 5. Feedback score columns (using helper)
     allColumns.push(
       ...convertColumnDataToColumn<Experiment, Experiment>(scoresColumnsData, {
         columnsOrder: scoresColumnsOrder,
@@ -445,23 +420,6 @@ const ExperimentsLeaderboardWidget: React.FunctionComponent<
   const noData = experiments.length === 0;
 
   const renderContent = () => {
-    if (isSelectExperimentsMode(dataSource) && experimentIds.length === 0) {
-      return (
-        <DashboardWidget.EmptyState
-          title="Experiments not configured"
-          message="This widget needs experiments to display data. Select default experiments for the dashboard or set custom ones in the widget settings."
-          action={
-            !preview ? (
-              <DashboardWidget.EmptyState.EditAction
-                label="Configure widget"
-                onClick={handleEdit}
-              />
-            ) : undefined
-          }
-        />
-      );
-    }
-
     if (isPending && experimentListParams.isEnabled) {
       return (
         <div className="flex size-full min-h-32 items-center justify-center">

@@ -495,25 +495,7 @@
   {
     "type": "dependency",
     "from": "src/components/shared/Dashboard/widgets/ExperimentsFeedbackScoresWidget/ExperimentsFeedbackScoresWidgetEditor.tsx",
-    "to": "src/components/pages-shared/experiments/ExperimentsSelectBox/ExperimentsSelectBox.tsx",
-    "rule": {
-      "severity": "error",
-      "name": "no-shared-importing-pages"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/components/shared/Dashboard/widgets/ExperimentsFeedbackScoresWidget/ExperimentsFeedbackScoresWidgetEditor.tsx",
     "to": "src/components/pages-shared/experiments/FeedbackDefinitionsAndScoresSelectBox/FeedbackDefinitionsAndScoresSelectBox.tsx",
-    "rule": {
-      "severity": "error",
-      "name": "no-shared-importing-pages"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/components/shared/Dashboard/widgets/ExperimentsLeaderboardWidget/ExperimentsLeaderboardWidgetEditor.tsx",
-    "to": "src/components/pages-shared/experiments/ExperimentsSelectBox/ExperimentsSelectBox.tsx",
     "rule": {
       "severity": "error",
       "name": "no-shared-importing-pages"
@@ -622,6 +604,15 @@
     "type": "dependency",
     "from": "src/components/shared/Dashboard/widgets/ProjectStatsCardWidget/ProjectStatsCardWidget.tsx",
     "to": "src/components/pages-shared/traces/MetricDateRangeSelect/utils.ts",
+    "rule": {
+      "severity": "error",
+      "name": "no-shared-importing-pages"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "src/components/shared/Dashboard/widgets/shared/ExperimentWidgetDataSection/ExperimentFilterSelectBox.tsx",
+    "to": "src/components/pages-shared/experiments/ExperimentsSelectBox/ExperimentsSelectBox.tsx",
     "rule": {
       "severity": "error",
       "name": "no-shared-importing-pages"

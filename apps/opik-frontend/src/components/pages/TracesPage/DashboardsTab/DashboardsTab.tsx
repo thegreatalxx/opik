@@ -2,24 +2,22 @@ import React, { useCallback, useEffect } from "react";
 import { StringParam } from "use-query-params";
 
 import Loader from "@/components/shared/Loader/Loader";
-import { DateRangeSerializedValue } from "@/components/shared/DateRangeSelect";
-import MetricDateRangeSelect from "@/components/pages-shared/traces/MetricDateRangeSelect/MetricDateRangeSelect";
+import {
+  useMetricDateRangeWithQueryAndStorage,
+  MetricDateRangeSelect,
+} from "@/components/pages-shared/traces/MetricDateRangeSelect";
 import DashboardSaveActions from "@/components/pages-shared/dashboards/DashboardSaveActions/DashboardSaveActions";
 import DashboardContent from "@/components/pages-shared/dashboards/DashboardContent/DashboardContent";
 import DashboardSelectBox from "@/components/pages-shared/dashboards/DashboardSelectBox/DashboardSelectBox";
 import ShareDashboardButton from "@/components/pages-shared/dashboards/ShareDashboardButton/ShareDashboardButton";
-import DashboardConfigButton from "@/components/pages-shared/dashboards/DashboardConfigButton/DashboardConfigButton";
-import { useMetricDateRangeCore } from "@/components/pages-shared/traces/MetricDateRangeSelect/useMetricDateRangeCore";
 import useQueryParamAndLocalStorageState from "@/hooks/useQueryParamAndLocalStorageState";
+import { DASHBOARD_SCOPE, DASHBOARD_TYPE } from "@/types/dashboard";
 import { useDashboardLifecycle } from "@/components/pages-shared/dashboards/hooks/useDashboardLifecycle";
 import {
   useDashboardStore,
-  selectSetConfig,
-  selectConfig,
   selectSetRuntimeConfig,
   selectHasUnsavedChanges,
 } from "@/store/DashboardStore";
-import { DEFAULT_DATE_PRESET } from "@/components/pages-shared/traces/MetricDateRangeSelect/constants";
 import PageBodyStickyContainer from "@/components/layout/PageBodyStickyContainer/PageBodyStickyContainer";
 import {
   PROJECT_TEMPLATE_LIST,
@@ -71,34 +69,24 @@ const DashboardsTab: React.FunctionComponent<DashboardsTabProps> = ({
     });
 
   const hasUnsavedChanges = useDashboardStore(selectHasUnsavedChanges);
-
-  const config = useDashboardStore(selectConfig);
-  const setConfig = useDashboardStore(selectSetConfig);
   const setRuntimeConfig = useDashboardStore(selectSetRuntimeConfig);
 
+  const { dateRange, handleDateRangeChange, minDate, maxDate, dateRangeValue } =
+    useMetricDateRangeWithQueryAndStorage({
+      key: "dashboard_time_range",
+      localStorageKey: "opik-project-insights-daterange",
+    });
+
   useEffect(() => {
-    setRuntimeConfig({ projectIds: [projectId] });
+    setRuntimeConfig({
+      projectIds: [projectId],
+      dateRange: dateRangeValue,
+    });
 
     return () => {
       setRuntimeConfig({});
     };
-  }, [projectId, setRuntimeConfig]);
-
-  const dateRangeValue = config?.dateRange || DEFAULT_DATE_PRESET;
-
-  const handleDateRangeValueChange = useCallback(
-    (value: DateRangeSerializedValue) => {
-      if (!config) return;
-      setConfig({ ...config, dateRange: value });
-    },
-    [config, setConfig],
-  );
-
-  const { dateRange, handleDateRangeChange, minDate, maxDate } =
-    useMetricDateRangeCore({
-      value: dateRangeValue,
-      setValue: handleDateRangeValueChange,
-    });
+  }, [projectId, dateRangeValue, setRuntimeConfig]);
 
   const handleDashboardCreated = useCallback(
     (newDashboardId: string) => {
@@ -123,9 +111,10 @@ const DashboardsTab: React.FunctionComponent<DashboardsTabProps> = ({
       buttonClassName="w-[300px]"
       onDashboardCreated={handleDashboardCreated}
       onDashboardDeleted={handleDashboardDeleted}
-      defaultProjectId={projectId}
       disabled={hasUnsavedChanges}
       templates={PROJECT_TEMPLATE_LIST}
+      dashboardType={DASHBOARD_TYPE.MULTI_PROJECT}
+      dashboardScope={DASHBOARD_SCOPE.INSIGHTS}
     />
   );
 
@@ -164,7 +153,6 @@ const DashboardsTab: React.FunctionComponent<DashboardsTabProps> = ({
           />
           <Separator orientation="vertical" className="mx-2 h-4" />
           <ShareDashboardButton />
-          <DashboardConfigButton disableProjectSelector />
         </div>
       </PageBodyStickyContainer>
 

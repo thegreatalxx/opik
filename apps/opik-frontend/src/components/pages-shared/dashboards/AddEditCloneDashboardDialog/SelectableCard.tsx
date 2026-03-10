@@ -2,25 +2,25 @@ import React from "react";
 import { cn } from "@/lib/utils";
 import TooltipWrapper from "@/components/shared/TooltipWrapper/TooltipWrapper";
 
-interface DashboardTemplateCardProps {
+interface SelectableCardProps {
   name: string;
   description: string;
   icon: React.ComponentType<{ className?: string }>;
   iconColor: string;
   interactive?: boolean;
+  selected?: boolean;
   disabled?: boolean;
   disabledTooltip?: string;
   onClick?: () => void;
 }
 
-const DashboardTemplateCard: React.FunctionComponent<
-  DashboardTemplateCardProps
-> = ({
+const SelectableCard: React.FunctionComponent<SelectableCardProps> = ({
   name,
   description,
   icon: Icon,
   iconColor,
   interactive = false,
+  selected = false,
   disabled = false,
   disabledTooltip,
   onClick,
@@ -63,6 +63,7 @@ const DashboardTemplateCard: React.FunctionComponent<
         className={cn(
           className,
           "cursor-pointer transition-colors hover:border-primary hover:bg-muted",
+          interactive && selected && "border-primary bg-muted",
         )}
       >
         {content}
@@ -73,4 +74,4 @@ const DashboardTemplateCard: React.FunctionComponent<
   return <div className={className}>{content}</div>;
 };
 
-export default DashboardTemplateCard;
+export default SelectableCard;

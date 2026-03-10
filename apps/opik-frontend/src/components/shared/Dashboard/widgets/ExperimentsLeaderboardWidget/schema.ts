@@ -1,7 +1,6 @@
 import { z } from "zod";
 import isString from "lodash/isString";
 import isEmpty from "lodash/isEmpty";
-import { EXPERIMENT_DATA_SOURCE } from "@/types/dashboard";
 import { FiltersArraySchema } from "@/components/shared/FiltersAccordionSection/schema";
 import {
   MIN_MAX_EXPERIMENTS,
@@ -16,9 +15,6 @@ const ColumnSortSchema = z.object({
 
 export const ExperimentsLeaderboardWidgetSchema = z
   .object({
-    overrideDefaults: z.boolean(),
-    dataSource: z.nativeEnum(EXPERIMENT_DATA_SOURCE),
-    experimentIds: z.array(z.string()).optional(),
     filters: FiltersArraySchema.optional(),
     selectedColumns: z.array(z.string()),
     enableRanking: z.boolean(),
@@ -45,17 +41,11 @@ export const ExperimentsLeaderboardWidgetSchema = z
   )
   .refine(
     (data) => {
-      if (
-        data.dataSource === EXPERIMENT_DATA_SOURCE.FILTER_AND_GROUP &&
-        data.overrideDefaults
-      ) {
-        return isValidIntegerInRange(
-          data.maxRows || "",
-          MIN_MAX_EXPERIMENTS,
-          MAX_MAX_EXPERIMENTS,
-        );
-      }
-      return true;
+      return isValidIntegerInRange(
+        data.maxRows || "",
+        MIN_MAX_EXPERIMENTS,
+        MAX_MAX_EXPERIMENTS,
+      );
     },
     {
       message: `Maximum rows is required and must be between ${MIN_MAX_EXPERIMENTS} and ${MAX_MAX_EXPERIMENTS}`,
