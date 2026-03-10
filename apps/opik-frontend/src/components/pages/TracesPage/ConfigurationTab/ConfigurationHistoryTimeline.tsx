@@ -107,12 +107,12 @@ const ConfigurationHistoryTimeline: React.FC<
                 const desc =
                   item.description || generateBlueprintDescription(item.values);
                 return (
-                  <TooltipWrapper content={desc}>
-                    <p className="comet-body-xs mt-1.5 flex min-w-0 items-center gap-1 text-light-slate">
-                      <FilePen className="size-3 shrink-0" />
-                      <span className="truncate">{desc}</span>
-                    </p>
-                  </TooltipWrapper>
+                  <p className="comet-body-xs mt-1.5 flex min-w-0 items-center gap-1 text-light-slate">
+                    <FilePen className="size-3 shrink-0" />
+                    <TooltipWrapper content={desc}>
+                      <span className="w-fit max-w-full truncate">{desc}</span>
+                    </TooltipWrapper>
+                  </p>
                 );
               })()}
               <div className="comet-body-xs mt-1.5 flex items-center gap-3 text-light-slate">

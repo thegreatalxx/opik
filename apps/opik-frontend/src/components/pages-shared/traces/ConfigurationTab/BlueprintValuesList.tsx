@@ -2,6 +2,7 @@ import React from "react";
 
 import { BlueprintValue, BlueprintValueType } from "@/types/agent-configs";
 import { formatBlueprintValue } from "@/utils/agent-configurations";
+import TooltipWrapper from "@/components/shared/TooltipWrapper/TooltipWrapper";
 import BlueprintTypeIcon from "./BlueprintTypeIcon";
 import BlueprintValuePrompt from "./BlueprintValuePrompt";
 
@@ -26,7 +27,7 @@ const BlueprintValuesList: React.FC<BlueprintValuesListProps> = ({
 }) => (
   <div className="flex flex-col divide-y">
     {values.map((v) => (
-      <div key={v.key} className="flex flex-col gap-2 py-3">
+      <div key={v.key} className="flex flex-col gap-2 py-4">
         <div className="flex items-center gap-2">
           <BlueprintTypeIcon type={v.type} />
           <span className="comet-body-xs-accented text-foreground">
@@ -34,9 +35,11 @@ const BlueprintValuesList: React.FC<BlueprintValuesListProps> = ({
           </span>
         </div>
         {v.description && (
-          <span className="comet-body-xs text-light-slate">
-            {v.description}
-          </span>
+          <TooltipWrapper content={v.description}>
+            <span className="comet-body-xs w-fit max-w-full text-light-slate truncate">
+              {v.description}
+            </span>
+          </TooltipWrapper>
         )}
         <div className="overflow-hidden">{renderValue(v)}</div>
       </div>

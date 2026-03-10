@@ -15,7 +15,10 @@ import { AGENT_CONFIGURATION_METADATA_KEY } from "@/utils/agent-configurations";
 
 type AgentConfigurationMetadata = {
   blueprint_id: string;
-  values?: Record<string, { type: BlueprintValueType; value: unknown }>;
+  values?: Record<
+    string,
+    { type: BlueprintValueType; value: unknown; description?: string }
+  >;
 };
 
 export const isAgentConfigurationMetadata = (
@@ -46,7 +49,7 @@ const AgentConfigurationTab: React.FC<AgentConfigurationTabProps> = ({
   const values = useMemo<BlueprintValue[]>(() => {
     if (!configMeta?.values) return [];
     return Object.entries(configMeta.values)
-      .map(([key, { type, value }]) => ({
+      .map(([key, { type, value, description }]) => ({
         key,
         type,
         value:
@@ -55,6 +58,7 @@ const AgentConfigurationTab: React.FC<AgentConfigurationTabProps> = ({
             : typeof value === "object"
               ? JSON.stringify(value)
               : String(value),
+        ...(description ? { description } : {}),
       }))
       .sort((a, b) => a.key.localeCompare(b.key));
   }, [configMeta?.values]);

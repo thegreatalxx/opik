@@ -142,10 +142,10 @@ const ConfigurationEditView: React.FC<ConfigurationEditViewProps> = ({
               : draftValues[v.key] !== undefined &&
                 draftValues[v.key] !== originalValues.current[v.key];
           return (
-            <div key={v.key} className="flex flex-col gap-2 py-3">
+            <div key={v.key} className="flex flex-col gap-2 py-4">
               <div className="flex items-center gap-2">
                 <BlueprintTypeIcon type={v.type} variant="secondary" />
-                <span className="comet-body-xs-accented text-foreground">
+                <span className="comet-body-s-accented text-foreground">
                   {v.key}
                 </span>
                 {v.type === BlueprintValueType.PROMPT && isChanged && (
@@ -158,9 +158,11 @@ const ConfigurationEditView: React.FC<ConfigurationEditViewProps> = ({
                 )}
               </div>
               {v.description && (
-                <span className="comet-body-xs text-light-slate">
-                  {v.description}
-                </span>
+                <TooltipWrapper content={v.description}>
+                  <span className="comet-body-xs w-fit max-w-full text-light-slate truncate">
+                    {v.description}
+                  </span>
+                </TooltipWrapper>
               )}
               {v.type === BlueprintValueType.PROMPT ? (
                 <div className="flex flex-col gap-1">

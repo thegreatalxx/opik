@@ -30,5 +30,7 @@ export const generateBlueprintDescription = (
 ): string => {
   if (!values.length) return "";
   const changes = values.map(({ key, value }) => `${key} to ${value}`);
-  return `Changed ${changes.join(", ")}.`;
+  return `Changed ${changes.join(", ")}`;
 };
+
+// ALEX rename file

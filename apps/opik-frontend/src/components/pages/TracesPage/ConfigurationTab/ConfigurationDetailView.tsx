@@ -31,11 +31,13 @@ import { Button } from "@/components/ui/button";
 import useAgentConfigById from "@/api/agent-configs/useAgentConfigById";
 import useAgentConfigCreateMutation from "@/api/agent-configs/useAgentConfigCreateMutation";
 import useAgentConfigEnvsMutation from "@/api/agent-configs/useAgentConfigEnvsMutation";
+import useTracesList from "@/api/traces/useTracesList";
 import ConfirmDialog from "@/components/shared/ConfirmDialog/ConfirmDialog";
 import TooltipWrapper from "@/components/shared/TooltipWrapper/TooltipWrapper";
 import NavigationTag from "@/components/shared/NavigationTag/NavigationTag";
 import { RESOURCE_TYPE } from "@/components/shared/ResourceLink/ResourceLink";
 import { COLUMN_TYPE } from "@/types/shared";
+import { Separator } from "@/components/ui/separator";
 
 type ConfigurationDetailViewProps = {
   item: ConfigHistoryItem;
@@ -62,6 +64,24 @@ const ConfigurationDetailView: React.FC<ConfigurationDetailViewProps> = ({
   const { data: agentConfig, isPending } = useAgentConfigById({
     blueprintId: item.id,
   });
+
+  const { data: tracesData } = useTracesList({
+    projectId,
+    filters: [
+      {
+        id: "agent_configuration_blueprint_id",
+        field: "metadata",
+        type: COLUMN_TYPE.dictionary,
+        operator: "=",
+        key: "agent_configuration.blueprint_id",
+        value: item.id,
+      },
+    ],
+    page: 1,
+    size: 1,
+  });
+
+  const hasTraces = (tracesData?.total ?? 0) > 0;
 
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [duplicateConfirmOpen, setDuplicateConfirmOpen] = useState(false);
@@ -150,26 +170,28 @@ const ConfigurationDetailView: React.FC<ConfigurationDetailViewProps> = ({
                 </Button>
               </TooltipWrapper>
             )}
-            <NavigationTag
-              id={projectId}
-              name="Go to traces"
-              resource={RESOURCE_TYPE.traces}
-              iconSize={3.5}
-              className="[&>div]:text-foreground"
-              size="lg"
-              search={{
-                traces_filters: [
-                  {
-                    id: "agent_configuration_blueprint_id",
-                    field: "metadata",
-                    type: COLUMN_TYPE.dictionary,
-                    operator: "=",
-                    key: "agent_configuration.blueprint_id",
-                    value: item.id,
-                  },
-                ],
-              }}
-            />
+            {hasTraces && (
+              <NavigationTag
+                id={projectId}
+                name="Go to traces"
+                resource={RESOURCE_TYPE.traces}
+                iconSize={3.5}
+                className="[&>div]:text-foreground"
+                size="lg"
+                search={{
+                  traces_filters: [
+                    {
+                      id: "agent_configuration_blueprint_id",
+                      field: "metadata",
+                      type: COLUMN_TYPE.dictionary,
+                      operator: "=",
+                      key: "agent_configuration.blueprint_id",
+                      value: item.id,
+                    },
+                  ],
+                }}
+              />
+            )}
             <Button
               size="xs"
               variant="outline"
@@ -181,12 +203,12 @@ const ConfigurationDetailView: React.FC<ConfigurationDetailViewProps> = ({
             </Button>
           </div>
         </div>
-        <TooltipWrapper content={description}>
-          <p className="comet-body-s flex w-full min-w-0 items-start gap-1 overflow-hidden text-light-slate">
-            <FilePen className="mt-1 size-3 shrink-0" />
-            <span className="truncate">{description}</span>
-          </p>
-        </TooltipWrapper>
+        <p className="comet-body-s flex w-full min-w-0 items-start gap-1 overflow-hidden text-light-slate">
+          <FilePen className="mt-1 size-3 shrink-0" />
+          <TooltipWrapper content={description}>
+            <span className="w-fit max-w-full truncate">{description}</span>
+          </TooltipWrapper>
+        </p>
         <div className="comet-body-s mt-1 flex items-center gap-1 text-light-slate">
           <Clock className="size-3 shrink-0" />
           <TooltipWrapper
@@ -200,6 +222,8 @@ const ConfigurationDetailView: React.FC<ConfigurationDetailViewProps> = ({
           <User className="ml-1.5 size-3.5 shrink-0" />
           <span>{item.created_by}</span>
         </div>
+
+        <Separator className="mt-4 mb-2" />
 
         {isPending ? (
           <Loader />

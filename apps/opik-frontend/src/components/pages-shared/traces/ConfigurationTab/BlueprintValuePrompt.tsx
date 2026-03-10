@@ -165,6 +165,7 @@ const BlueprintValuePrompt = forwardRef<
             onChange={setDraftTemplate}
             label="Template"
             showDescription={false}
+            labelClassName="comet-body-xs-accented mt-auto"
           />
         )}
       </div>
