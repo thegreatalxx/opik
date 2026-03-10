@@ -102,7 +102,7 @@ const CommentAndScoreViewer: React.FC = () => {
           </div>
           <UserCommentForm.StandaloneTextareaField
             ref={textareaRef}
-            placeholder="2 Add a comment..."
+            placeholder="Add a comment..."
             value={currentAnnotationState.comment?.text || ""}
             onValueChange={updateComment}
           />
