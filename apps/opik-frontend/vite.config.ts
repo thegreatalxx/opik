@@ -59,11 +59,6 @@ export default defineConfig(({ mode }) => {
           target: `http://localhost:${opikAiBackendPort}`,
           changeOrigin: true,
         },
-        "/demo-api": {
-          target: `http://localhost:8000`,
-          changeOrigin: true,
-          rewrite: (requestPath) => requestPath.replace(/^\/demo-api/, ""),
-        },
       },
     },
   } satisfies UserConfig;

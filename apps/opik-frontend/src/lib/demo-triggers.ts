@@ -8,8 +8,7 @@
 
 import useAppStore from "@/store/AppStore";
 
-const PYTHON_BACKEND_BASE =
-  import.meta.env.VITE_PYTHON_BACKEND_URL ?? "/demo-api";
+const PYTHON_BACKEND_BASE = import.meta.env.VITE_PYTHON_BACKEND_URL ?? "/api";
 
 async function call(path: string, method = "POST") {
   const workspace = useAppStore.getState().activeWorkspaceName || "default";
