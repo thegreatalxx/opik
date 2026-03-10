@@ -107,6 +107,23 @@ const TrialPage: React.FunctionComponent = () => {
     return allExperiments.find((exp) => exp.id === baselineExperimentId);
   }, [baselineExperimentId, optimizationExperimentsData?.content]);
 
+  const parentExperiment = useMemo(() => {
+    const experiment = memorizedExperiments[0];
+    if (!experiment?.metadata) return undefined;
+    const meta = experiment.metadata as Record<string, unknown>;
+    const parentCandidateIds = meta.parent_candidate_ids as
+      | string[]
+      | undefined;
+    if (!parentCandidateIds?.length) return undefined;
+
+    const allExperiments = optimizationExperimentsData?.content ?? [];
+    return allExperiments.find((exp) => {
+      const expMeta = exp.metadata as Record<string, unknown> | undefined;
+      const candidateId = expMeta?.candidate_id as string | undefined;
+      return candidateId && parentCandidateIds.includes(candidateId);
+    });
+  }, [memorizedExperiments, optimizationExperimentsData?.content]);
+
   const [tab, setTab] = useState<string>("results");
 
   return (
@@ -179,6 +196,7 @@ const TrialPage: React.FunctionComponent = () => {
               <TrialConfigurationSection
                 experiments={memorizedExperiments}
                 referenceExperiment={baselineExperiment}
+                parentExperiment={parentExperiment}
                 studioConfig={optimization?.studio_config}
               />
             </PageBodyStickyContainer>

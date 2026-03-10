@@ -25,12 +25,13 @@ const REDUNDANT_WHEN_STRUCTURED = [
   "user_message",
 ];
 
-type ConfigViewMode = "config" | "diff";
+type ConfigViewMode = "config" | "diff-baseline" | "diff-parent";
 
 type TrialConfigurationSectionProps = {
   experiments: Experiment[];
   title?: string;
   referenceExperiment?: Experiment | null;
+  parentExperiment?: Experiment | null;
   studioConfig?: OptimizationStudioConfig;
 };
 
@@ -209,6 +210,7 @@ const TrialConfigurationSection: React.FC<TrialConfigurationSectionProps> = ({
   experiments,
   title = "Configuration",
   referenceExperiment,
+  parentExperiment,
   studioConfig,
 }) => {
   const [viewMode, setViewMode] = useState<ConfigViewMode>("config");
@@ -286,7 +288,12 @@ const TrialConfigurationSection: React.FC<TrialConfigurationSectionProps> = ({
 
   if (!configuration) return null;
 
-  const hasDiffSupport = !!referenceExperiment;
+  const hasDiffBaseline = !!referenceExperiment;
+  const hasDiffParent = !!parentExperiment;
+  const hasDiffSupport = hasDiffBaseline || hasDiffParent;
+
+  const diffExperiment =
+    viewMode === "diff-parent" ? parentExperiment : referenceExperiment;
 
   return (
     <div className="rounded-lg border bg-muted/20 p-6">
@@ -306,17 +313,26 @@ const TrialConfigurationSection: React.FC<TrialConfigurationSectionProps> = ({
               <List className="mr-1 size-3.5" />
               Config
             </ToggleGroupItem>
-            <ToggleGroupItem value="diff">
-              <GitCompareArrows className="mr-1 size-3.5" />
-              Diff
-            </ToggleGroupItem>
+            {hasDiffBaseline && (
+              <ToggleGroupItem value="diff-baseline">
+                <GitCompareArrows className="mr-1 size-3.5" />
+                Diff vs. baseline
+              </ToggleGroupItem>
+            )}
+            {hasDiffParent && (
+              <ToggleGroupItem value="diff-parent">
+                <GitCompareArrows className="mr-1 size-3.5" />
+                Diff vs. parent
+              </ToggleGroupItem>
+            )}
           </ToggleGroup>
         )}
       </div>
 
-      {viewMode === "diff" && hasDiffSupport ? (
+      {(viewMode === "diff-baseline" || viewMode === "diff-parent") &&
+      diffExperiment ? (
         <ConfigurationDiffContent
-          baselineExperiment={referenceExperiment}
+          baselineExperiment={diffExperiment}
           currentExperiment={experiment}
         />
       ) : (

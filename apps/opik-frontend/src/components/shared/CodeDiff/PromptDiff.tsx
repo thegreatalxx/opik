@@ -93,7 +93,11 @@ const MessagesDiff: React.FC<{
             </div>
             <div className="comet-code whitespace-pre-wrap break-words text-sm">
               {hasChanged ? (
-                <TextDiff content1={baseContent} content2={currContent} />
+                <TextDiff
+                  content1={baseContent}
+                  content2={currContent}
+                  mode="words"
+                />
               ) : (
                 <span className="text-muted-foreground">{currContent}</span>
               )}
