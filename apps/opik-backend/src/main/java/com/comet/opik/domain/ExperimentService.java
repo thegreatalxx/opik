@@ -5,6 +5,7 @@ import com.comet.opik.api.BiInformationResponse;
 import com.comet.opik.api.Dataset;
 import com.comet.opik.api.DatasetLastExperimentCreated;
 import com.comet.opik.api.DatasetVersion;
+import com.comet.opik.api.ExecutionPolicy;
 import com.comet.opik.api.Experiment;
 import com.comet.opik.api.ExperimentBatchUpdate;
 import com.comet.opik.api.ExperimentGroupAggregationItem;
@@ -27,6 +28,7 @@ import com.comet.opik.api.sorting.ExperimentSortingFactory;
 import com.comet.opik.infrastructure.FeatureFlags;
 import com.comet.opik.infrastructure.OpikConfiguration;
 import com.comet.opik.infrastructure.auth.RequestContext;
+import com.comet.opik.utils.JsonUtils;
 import com.google.common.base.Preconditions;
 import com.google.common.eventbus.EventBus;
 import io.opentelemetry.instrumentation.annotations.WithSpan;
@@ -65,6 +67,9 @@ import static com.comet.opik.utils.AsyncUtils.makeMonoContextAware;
 @RequiredArgsConstructor(onConstructor = @__(@Inject))
 @Slf4j
 public class ExperimentService {
+
+    private record ResolvedVersion(UUID versionId, String executionPolicyJson) {
+    }
 
     private final @NonNull ExperimentDAO experimentDAO;
     private final @NonNull ExperimentItemDAO experimentItemDAO;
@@ -133,8 +138,7 @@ public class ExperimentService {
 
     private Mono<ExperimentPage> fetchExperimentPage(
             int page, int size, ExperimentSearchCriteria experimentSearchCriteria) {
-        return getSuiteThresholds()
-                .flatMap(thresholds -> experimentDAO.find(page, size, experimentSearchCriteria, thresholds))
+        return experimentDAO.find(page, size, experimentSearchCriteria)
                 .flatMap(experimentPage -> enrichExperiments(experimentPage.content())
                         .map(experiments -> experimentPage.toBuilder().content(experiments).build()));
     }
@@ -295,38 +299,11 @@ public class ExperimentService {
         });
     }
 
-    private Mono<Map<String, Integer>> getSuiteThresholds() {
-        if (!config.getExperimentAggregates().isEvaluationSuiteStatsEnabled()) {
-            return Mono.just(Map.of());
-        }
-        return fetchSuiteLevelThresholds();
-    }
-
-    private Mono<Map<String, Integer>> fetchSuiteLevelThresholds() {
-        return experimentDAO.getDatasetVersionIds()
-                .flatMap(versionIds -> {
-                    if (versionIds.isEmpty()) {
-                        return Mono.just(Map.of());
-                    }
-                    return Mono.deferContextual(ctx -> {
-                        String workspaceId = ctx.get(RequestContext.WORKSPACE_ID);
-                        return Mono.fromCallable(() -> datasetVersionService.findByIds(versionIds, workspaceId))
-                                .subscribeOn(Schedulers.boundedElastic())
-                                .map(versions -> versions.stream()
-                                        .filter(v -> v.executionPolicy() != null)
-                                        .collect(Collectors.toMap(
-                                                v -> v.id().toString(),
-                                                v -> v.executionPolicy().passThreshold())));
-                    });
-                });
-    }
-
     @WithSpan
     public Mono<ExperimentGroupAggregationsResponse> findGroupsAggregations(@NonNull ExperimentGroupCriteria criteria) {
         log.info("Finding experiment groups aggregations by criteria '{}'", criteria);
 
-        return getSuiteThresholds()
-                .flatMapMany(thresholds -> experimentDAO.findGroupsAggregations(criteria, thresholds))
+        return experimentDAO.findGroupsAggregations(criteria)
                 .collectList()
                 .flatMap(groupItems -> Mono.deferContextual(ctx -> {
                     String workspaceId = ctx.get(RequestContext.WORKSPACE_ID);
@@ -348,16 +325,14 @@ public class ExperimentService {
     public Mono<Experiment> getById(@NonNull UUID id) {
         log.info("Getting experiment by id '{}'", id);
         return enrichExperiment(
-                getSuiteThresholds()
-                        .flatMap(thresholds -> experimentDAO.getById(id, thresholds)),
+                experimentDAO.getById(id),
                 "Not found experiment with id '%s'".formatted(id));
     }
 
     @WithSpan
     public Flux<Experiment> get(@NonNull ExperimentStreamRequest request) {
         log.info("Getting experiments by '{}'", request);
-        return getSuiteThresholds()
-                .flatMapMany(thresholds -> experimentDAO.get(request, thresholds))
+        return experimentDAO.get(request)
                 .collectList()
                 .flatMap(this::enrichExperiments)
                 .flatMapMany(Flux::fromIterable);
@@ -440,16 +415,17 @@ public class ExperimentService {
                 .flatMap(datasetId -> {
                     // Case 1: Feature toggle OFF - skip version resolution (legacy behavior)
                     if (!featureFlags.isDatasetVersioningEnabled()) {
-                        return processExperimentCreation(experiment, id, name, datasetId);
+                        return processExperimentCreation(experiment, id, name, datasetId, "");
                     }
 
                     // Case 2: Feature toggle ON - resolve version and link experiment
                     return resolveDatasetVersion(experiment, datasetId)
-                            .flatMap(resolvedVersionId -> {
+                            .flatMap(resolved -> {
                                 var experimentWithVersion = experiment.toBuilder()
-                                        .datasetVersionId(resolvedVersionId)
+                                        .datasetVersionId(resolved.versionId())
                                         .build();
-                                return processExperimentCreation(experimentWithVersion, id, name, datasetId);
+                                return processExperimentCreation(experimentWithVersion, id, name, datasetId,
+                                        resolved.executionPolicyJson());
                             })
                             .switchIfEmpty(Mono.defer(() -> {
                                 // No version found - proceed with null dataset_version_id
@@ -459,7 +435,7 @@ public class ExperimentService {
                                 var experimentWithNullVersion = experiment.toBuilder()
                                         .datasetVersionId(null)
                                         .build();
-                                return processExperimentCreation(experimentWithNullVersion, id, name, datasetId);
+                                return processExperimentCreation(experimentWithNullVersion, id, name, datasetId, "");
                             }));
                 })
                 // If a conflict occurs, we just return the id of the existing experiment.
@@ -477,11 +453,11 @@ public class ExperimentService {
      * @param datasetId the dataset ID
      * @return Mono emitting the created experiment ID
      */
-    private Mono<UUID> processExperimentCreation(Experiment experiment, UUID id, String name, UUID datasetId) {
+    private Mono<UUID> processExperimentCreation(Experiment experiment, UUID id, String name, UUID datasetId,
+            String executionPolicyJson) {
         if (hasPromptVersionLinks(experiment)) {
             return validatePromptVersion(experiment).flatMap(promptVersionMap -> {
                 var builder = experiment.toBuilder();
-                // add prompt versions to new prompt version map field
                 builder.promptVersions(promptVersionMap.values().stream()
                         .map(promptVersion -> PromptVersionLink.builder()
                                 .id(promptVersion.id())
@@ -489,7 +465,6 @@ public class ExperimentService {
                                 .promptId(promptVersion.promptId())
                                 .build())
                         .toList());
-                // add prompt version to old prompt version field (to be deprecated soon)
                 if (experiment.promptVersion() != null) {
                     var promptVersion = promptVersionMap
                             .get(experiment.promptVersion().id());
@@ -499,10 +474,10 @@ public class ExperimentService {
                             .promptId(promptVersion.promptId())
                             .build());
                 }
-                return create(builder.build(), id, name, datasetId);
+                return create(builder.build(), id, name, datasetId, executionPolicyJson);
             });
         }
-        return create(experiment, id, name, datasetId);
+        return create(experiment, id, name, datasetId, executionPolicyJson);
     }
 
     /**
@@ -517,7 +492,7 @@ public class ExperimentService {
      * @param datasetId the dataset ID
      * @return Mono emitting the resolved version ID
      */
-    private Mono<UUID> resolveDatasetVersion(Experiment experiment, UUID datasetId) {
+    private Mono<ResolvedVersion> resolveDatasetVersion(Experiment experiment, UUID datasetId) {
         return Mono.deferContextual(ctx -> {
             String workspaceId = ctx.get(RequestContext.WORKSPACE_ID);
 
@@ -526,11 +501,9 @@ public class ExperimentService {
                 log.info("Validating explicitly provided dataset version ID '{}' for experiment on dataset '{}'",
                         experiment.datasetVersionId(), datasetId);
                 return Mono.fromCallable(() -> {
-                    // Validate the version exists and belongs to this dataset
                     var version = datasetVersionService.getVersionById(workspaceId, datasetId,
                             experiment.datasetVersionId());
 
-                    // Verify the version actually belongs to the specified dataset
                     if (!version.datasetId().equals(datasetId)) {
                         throw new NotFoundException(
                                 "Version '%s' does not belong to dataset '%s'"
@@ -539,7 +512,7 @@ public class ExperimentService {
 
                     log.info("Using validated dataset version ID '{}' for experiment on dataset '{}'",
                             version.id(), datasetId);
-                    return version.id();
+                    return new ResolvedVersion(version.id(), serializeExecutionPolicy(version.executionPolicy()));
                 }).subscribeOn(Schedulers.boundedElastic())
                         .onErrorResume(e -> {
                             if (e instanceof NotFoundException) {
@@ -555,16 +528,23 @@ public class ExperimentService {
             return Mono.fromCallable(() -> {
                 var latestVersion = datasetVersionService.getLatestVersion(datasetId, workspaceId);
                 if (latestVersion.isPresent()) {
+                    var v = latestVersion.get();
                     log.info("No version specified, using latest version '{}' for experiment on dataset '{}'",
-                            latestVersion.get().id(), datasetId);
-                    return latestVersion.get().id();
+                            v.id(), datasetId);
+                    return new ResolvedVersion(v.id(), serializeExecutionPolicy(v.executionPolicy()));
                 }
-                // This should not happen after migration, but handle gracefully
                 log.warn("No latest version found for dataset '{}', experiment will have null dataset_version_id",
                         datasetId);
                 return null;
             }).subscribeOn(Schedulers.boundedElastic());
         });
+    }
+
+    private String serializeExecutionPolicy(ExecutionPolicy executionPolicy) {
+        if (executionPolicy == null) {
+            return "";
+        }
+        return JsonUtils.writeValueAsString(executionPolicy);
     }
 
     private boolean hasPromptVersionLinks(Experiment experiment) {
@@ -586,21 +566,21 @@ public class ExperimentService {
                 });
     }
 
-    private Mono<UUID> create(Experiment experiment, UUID id, String name, UUID datasetId) {
+    private Mono<UUID> create(Experiment experiment, UUID id, String name, UUID datasetId,
+            String executionPolicyJson) {
         var newExperiment = experiment.toBuilder()
                 .id(id)
                 .name(name)
                 .datasetId(datasetId)
-                // The createdAt field is set to later post the ExperimentCreated event, but it is not persisted in the
-                // database as the default now64(9) is used instead.
                 .createdAt(Instant.now())
                 .build();
         log.info("Inserting experiment with id '{}', name '{}', datasetId '{}', datasetName '{}'",
                 newExperiment.id(), newExperiment.name(), newExperiment.datasetId(), newExperiment.datasetName());
-        return makeMonoContextAware((userName, workspaceId) -> experimentDAO.insert(newExperiment)
-                .thenReturn(newExperiment.id())
-                // The event is posted only when the experiment is successfully created.
-                .doOnSuccess(experimentId -> postExperimentCreatedEvent(newExperiment, workspaceId, userName)))
+        return makeMonoContextAware(
+                (userName, workspaceId) -> experimentDAO.insert(newExperiment, executionPolicyJson)
+                        .thenReturn(newExperiment.id())
+                        .doOnSuccess(
+                                experimentId -> postExperimentCreatedEvent(newExperiment, workspaceId, userName)))
                 .subscribeOn(Schedulers.boundedElastic());
     }
 
@@ -689,8 +669,7 @@ public class ExperimentService {
 
             log.info("Finishing experiments, count '{}', workspaceId '{}'", ids.size(), workspaceId);
 
-            return getSuiteThresholds()
-                    .flatMapMany(thresholds -> experimentDAO.getByIds(ids, thresholds))
+            return experimentDAO.getByIds(ids)
                     .collectList()
                     .doOnNext(experiments -> {
                         if (CollectionUtils.isNotEmpty(experiments)) {

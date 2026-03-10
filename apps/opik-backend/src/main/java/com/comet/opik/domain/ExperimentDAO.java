@@ -50,7 +50,6 @@ import reactor.core.publisher.SignalType;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
@@ -166,7 +165,8 @@ class ExperimentDAO {
                 optimization_id,
                 status,
                 experiment_scores,
-                dataset_version_id
+                dataset_version_id,
+                execution_policy
             )
             SELECT
                 if(
@@ -189,7 +189,8 @@ class ExperimentDAO {
                 new.optimization_id,
                 new.status,
                 new.experiment_scores,
-                new.dataset_version_id
+                new.dataset_version_id,
+                new.execution_policy
             FROM (
                 SELECT
                 :id AS id,
@@ -208,7 +209,8 @@ class ExperimentDAO {
                 :optimization_id AS optimization_id,
                 :status AS status,
                 :experiment_scores AS experiment_scores,
-                :dataset_version_id AS dataset_version_id
+                :dataset_version_id AS dataset_version_id,
+                :execution_policy AS execution_policy
             ) AS new
             LEFT JOIN (
                 SELECT
@@ -473,7 +475,7 @@ class ExperimentDAO {
                 GROUP BY ei.experiment_id
             ),
             experiments_eval_suite AS (
-                SELECT id, dataset_id, dataset_version_id
+                SELECT id, dataset_id, dataset_version_id, execution_policy
                 FROM experiments_final
                 WHERE evaluation_method = 'evaluation_suite'
             ),
@@ -483,7 +485,7 @@ class ExperimentDAO {
                     eif.dataset_item_id AS dataset_item_id,
                     ei.trace_id AS trace_id,
                     JSONExtractUInt(div.execution_policy, 'pass_threshold') AS item_pass_threshold,
-                    arrayElement(:suite_thresholds, indexOf(:suite_version_ids, ef.dataset_version_id)) AS suite_pass_threshold,
+                    JSONExtractUInt(ef.execution_policy, 'pass_threshold') AS suite_pass_threshold,
                     if(
                         countIf(fs.name != '') = 0,
                         1,
@@ -1087,7 +1089,7 @@ class ExperimentDAO {
                 GROUP BY experiment_id
             ),
             experiments_eval_suite AS (
-                SELECT id, dataset_id, dataset_version_id
+                SELECT id, dataset_id, dataset_version_id, execution_policy
                 FROM experiments_final
                 WHERE evaluation_method = 'evaluation_suite'
             ),
@@ -1097,7 +1099,7 @@ class ExperimentDAO {
                     eif.dataset_item_id AS dataset_item_id,
                     ei.trace_id AS trace_id,
                     JSONExtractUInt(div.execution_policy, 'pass_threshold') AS item_pass_threshold,
-                    arrayElement(:suite_thresholds, indexOf(:suite_version_ids, ef.dataset_version_id)) AS suite_pass_threshold,
+                    JSONExtractUInt(ef.execution_policy, 'pass_threshold') AS suite_pass_threshold,
                     if(
                         countIf(fs.name != '') = 0,
                         1,
@@ -1270,16 +1272,6 @@ class ExperimentDAO {
             ;
             """;
 
-    private static final String GET_DATASET_VERSION_IDS = """
-            SELECT DISTINCT dataset_version_id
-            FROM experiments FINAL
-            WHERE workspace_id = :workspace_id
-            AND evaluation_method = 'evaluation_suite'
-            AND length(dataset_version_id) > 0
-            SETTINGS log_comment = '<log_comment>'
-            ;
-            """;
-
     private static final String UPDATE = """
             INSERT INTO experiments (
                 id,
@@ -1338,13 +1330,14 @@ class ExperimentDAO {
     private final @NonNull GroupingQueryBuilder groupingQueryBuilder;
 
     @WithSpan
-    Mono<Void> insert(@NonNull Experiment experiment) {
+    Mono<Void> insert(@NonNull Experiment experiment, @NonNull String executionPolicyJson) {
         return Mono.from(connectionFactory.create())
-                .flatMapMany(connection -> insert(experiment, connection))
+                .flatMapMany(connection -> insert(experiment, executionPolicyJson, connection))
                 .then();
     }
 
-    private Publisher<? extends Result> insert(Experiment experiment, Connection connection) {
+    private Publisher<? extends Result> insert(Experiment experiment, String executionPolicyJson,
+            Connection connection) {
         var statement = connection.createStatement(INSERT)
                 .bind("id", experiment.id())
                 .bind("dataset_id", experiment.datasetId())
@@ -1363,7 +1356,8 @@ class ExperimentDAO {
                         .orElse(""))
                 .bind("dataset_version_id", Optional.ofNullable(experiment.datasetVersionId())
                         .map(UUID::toString)
-                        .orElse(""));
+                        .orElse(""))
+                .bind("execution_policy", executionPolicyJson);
 
         if (CollectionUtils.isNotEmpty(experiment.tags())) {
             statement.bind("tags", experiment.tags().toArray(String[]::new));
@@ -1409,10 +1403,6 @@ class ExperimentDAO {
 
     @WithSpan
     Mono<Experiment> getById(@NonNull UUID id) {
-        return getById(id, Map.of());
-    }
-
-    Mono<Experiment> getById(@NonNull UUID id, @NonNull Map<String, Integer> suiteThresholds) {
         log.info("Getting experiment by id '{}'", id);
         var limit = 1;
         return Mono.from(connectionFactory.create())
@@ -1421,11 +1411,8 @@ class ExperimentDAO {
                     template.add("id", id.toString());
                     template.add("limit", limit);
                     return Flux.from(get(template.render(), connection,
-                            statement -> {
-                                bindSuiteThresholds(statement, suiteThresholds);
-                                return statement.bind("id", id).bind("limit", limit).bind("workspace_id",
-                                        workspaceId);
-                            }));
+                            statement -> statement.bind("id", id).bind("limit", limit).bind("workspace_id",
+                                    workspaceId)));
                 }))
                 .flatMap(this::mapToDto)
                 .singleOrEmpty();
@@ -1433,31 +1420,20 @@ class ExperimentDAO {
 
     @WithSpan
     Flux<Experiment> getByIds(@NonNull Set<UUID> ids) {
-        return getByIds(ids, Map.of());
-    }
-
-    Flux<Experiment> getByIds(@NonNull Set<UUID> ids, @NonNull Map<String, Integer> suiteThresholds) {
         log.info("Getting experiment by ids '{}'", ids);
         return Mono.from(connectionFactory.create())
                 .flatMapMany(connection -> makeFluxContextAware((userName, workspaceId) -> {
                     var template = getSTWithLogComment(FIND, "get_experiments_by_ids", workspaceId, ids.size());
                     template.add("ids_list", ids);
                     return Flux.from(get(template.render(), connection,
-                            statement -> {
-                                bindSuiteThresholds(statement, suiteThresholds);
-                                return statement.bind("ids_list", ids.toArray(UUID[]::new)).bind("workspace_id",
-                                        workspaceId);
-                            }));
+                            statement -> statement.bind("ids_list", ids.toArray(UUID[]::new)).bind("workspace_id",
+                                    workspaceId)));
                 }))
                 .flatMap(this::mapToDto);
     }
 
     @WithSpan
     Flux<Experiment> get(@NonNull ExperimentStreamRequest request) {
-        return get(request, Map.of());
-    }
-
-    Flux<Experiment> get(@NonNull ExperimentStreamRequest request, @NonNull Map<String, Integer> suiteThresholds) {
         log.info("Getting experiment by '{}'", request);
         return Mono.from(connectionFactory.create())
                 .flatMapMany(connection -> makeFluxContextAware((userName, workspaceId) -> {
@@ -1469,7 +1445,6 @@ class ExperimentDAO {
                     template.add("limit", request.limit());
                     return Flux.from(get(template.render(), connection,
                             statement -> {
-                                bindSuiteThresholds(statement, suiteThresholds);
                                 statement.bind("name", request.name());
                                 if (request.lastRetrievedId() != null) {
                                     statement = statement.bind("lastRetrievedId", request.lastRetrievedId());
@@ -1599,23 +1574,19 @@ class ExperimentDAO {
 
     @WithSpan
     Mono<ExperimentPage> find(
-            int page, int size, @NonNull ExperimentSearchCriteria experimentSearchCriteria,
-            @NonNull Map<String, Integer> suiteThresholds) {
+            int page, int size, @NonNull ExperimentSearchCriteria experimentSearchCriteria) {
         return Mono.deferContextual(ctx -> {
-            // First, get the target project IDs to reduce traces, spans, and feedback_scores table scans
             return getTargetProjectIdsForExperiments(TargetProjectsCriteria.from(experimentSearchCriteria))
                     .flatMap(targetProjectIds -> countTotal(experimentSearchCriteria, targetProjectIds)
-                            .flatMap(total -> find(page, size, experimentSearchCriteria, total, targetProjectIds,
-                                    suiteThresholds)));
+                            .flatMap(total -> find(page, size, experimentSearchCriteria, total, targetProjectIds)));
         });
     }
 
     private Mono<ExperimentPage> find(
             int page, int size, ExperimentSearchCriteria experimentSearchCriteria, Long total,
-            Set<UUID> targetProjectIds, Map<String, Integer> suiteThresholds) {
+            Set<UUID> targetProjectIds) {
         return Mono.from(connectionFactory.create())
-                .flatMapMany(connection -> find(page, size, experimentSearchCriteria, connection, targetProjectIds,
-                        suiteThresholds))
+                .flatMapMany(connection -> find(page, size, experimentSearchCriteria, connection, targetProjectIds))
                 .flatMap(this::mapToDto)
                 .collectList()
                 .map(experiments -> new ExperimentPage(page, experiments.size(), total, experiments,
@@ -1624,7 +1595,7 @@ class ExperimentDAO {
 
     private Publisher<? extends Result> find(
             int page, int size, ExperimentSearchCriteria experimentSearchCriteria, Connection connection,
-            Set<UUID> targetProjectIds, Map<String, Integer> suiteThresholds) {
+            Set<UUID> targetProjectIds) {
         log.info("Finding experiments by '{}', page '{}', size '{}'", experimentSearchCriteria, page, size);
 
         return makeFluxContextAware((userName, workspaceId) -> {
@@ -1636,7 +1607,6 @@ class ExperimentDAO {
 
             var template = newFindTemplate(FIND, experimentSearchCriteria, "find_experiments", workspaceId);
 
-            // Add target project IDs flag to template (from separate query to reduce table scans)
             if (CollectionUtils.isNotEmpty(targetProjectIds)) {
                 template.add("has_target_projects", true);
             }
@@ -1650,12 +1620,9 @@ class ExperimentDAO {
                     .bind("offset", offset)
                     .bind("workspace_id", workspaceId);
 
-            // Bind target project IDs (from separate query to reduce table scans)
             if (CollectionUtils.isNotEmpty(targetProjectIds)) {
                 statement.bind("target_project_ids", targetProjectIds.toArray(UUID[]::new));
             }
-
-            bindSuiteThresholds(statement, suiteThresholds);
 
             if (hasDynamicKeys) {
                 statement = sortingQueryBuilder.bindDynamicKeys(statement, experimentSearchCriteria.sortingFields());
@@ -1753,22 +1720,6 @@ class ExperimentDAO {
                 FILTER_STRATEGIES,
                 !isCount // Bind entity_type when not a count query
         );
-    }
-
-    private void bindSuiteThresholds(Statement statement, Map<String, Integer> suiteThresholds) {
-        if (suiteThresholds.isEmpty()) {
-            statement.bind("suite_version_ids", new String[]{""});
-            statement.bind("suite_thresholds", new Integer[]{0});
-        } else {
-            var keys = new ArrayList<String>(suiteThresholds.size());
-            var values = new ArrayList<Integer>(suiteThresholds.size());
-            suiteThresholds.forEach((k, v) -> {
-                keys.add(k);
-                values.add(v);
-            });
-            statement.bind("suite_version_ids", keys.toArray(String[]::new));
-            statement.bind("suite_thresholds", values.toArray(Integer[]::new));
-        }
     }
 
     @WithSpan
@@ -1935,14 +1886,13 @@ class ExperimentDAO {
 
     @WithSpan
     public Flux<ExperimentGroupAggregationItem> findGroupsAggregations(
-            @NonNull ExperimentGroupCriteria criteria, @NonNull Map<String, Integer> suiteThresholds) {
+            @NonNull ExperimentGroupCriteria criteria) {
         log.info("Finding experiment groups aggregations by criteria '{}'", criteria);
 
         return executeQueryWithTargetProjects(
                 FIND_GROUPS_AGGREGATIONS,
                 "find_experiment_groups_aggregations",
                 criteria,
-                suiteThresholds,
                 this::mapExperimentGroupAggregationItem);
     }
 
@@ -1950,15 +1900,6 @@ class ExperimentDAO {
             String queryTemplate,
             String queryName,
             ExperimentGroupCriteria criteria,
-            BiFunction<Result, Integer, Publisher<T>> resultMapper) {
-        return executeQueryWithTargetProjects(queryTemplate, queryName, criteria, null, resultMapper);
-    }
-
-    private <T> Flux<T> executeQueryWithTargetProjects(
-            String queryTemplate,
-            String queryName,
-            ExperimentGroupCriteria criteria,
-            Map<String, Integer> suiteThresholds,
             BiFunction<Result, Integer, Publisher<T>> resultMapper) {
 
         return Flux.deferContextual(ctx -> {
@@ -1974,7 +1915,6 @@ class ExperimentDAO {
                                 .flatMapMany(connection -> {
                                     var template = newGroupTemplate(queryTemplate, criteria, queryName, workspaceId);
 
-                                    // Add target project IDs flag to template (from separate query to reduce table scans)
                                     if (hasTargetProjects) {
                                         template.add("has_target_projects", true);
                                     }
@@ -1983,13 +1923,8 @@ class ExperimentDAO {
 
                                     bindGroupCriteria(statement, criteria);
 
-                                    // Bind target project IDs (from separate query to reduce table scans)
                                     if (hasTargetProjects) {
                                         statement.bind("target_project_ids", targetProjectIds.toArray(UUID[]::new));
-                                    }
-
-                                    if (suiteThresholds != null) {
-                                        bindSuiteThresholds(statement, suiteThresholds);
                                     }
 
                                     return makeFluxContextAware(bindWorkspaceIdToFlux(statement));
@@ -2092,24 +2027,6 @@ class ExperimentDAO {
                                     "Target project IDs query returned '{}' project IDs: '{}', criteria='{}'",
                                     projectIds.size(), projectIds, criteria));
                 });
-    }
-
-    @WithSpan
-    Mono<Set<UUID>> getDatasetVersionIds() {
-        return Mono.from(connectionFactory.create())
-                .flatMap(connection -> makeFluxContextAware((userName, workspaceId) -> {
-                    var template = getSTWithLogComment(GET_DATASET_VERSION_IDS,
-                            "get_dataset_version_ids", workspaceId, "");
-                    var statement = connection.createStatement(template.render())
-                            .bind("workspace_id", workspaceId);
-                    return Flux.from(statement.execute());
-                })
-                        .flatMap(result -> result.map((row, metadata) -> {
-                            var versionId = row.get("dataset_version_id", String.class);
-                            return versionId != null && !versionId.isEmpty() ? UUID.fromString(versionId) : null;
-                        }))
-                        .filter(Objects::nonNull)
-                        .collect(Collectors.toSet()));
     }
 
     private Publisher<ExperimentGroupItem> mapExperimentGroupItem(Result result, int groupsCount) {
