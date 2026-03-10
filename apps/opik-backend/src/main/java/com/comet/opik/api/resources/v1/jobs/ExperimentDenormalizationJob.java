@@ -129,7 +129,8 @@ public class ExperimentDenormalizationJob extends Job {
 
         var bucket = redisClient.<String, String>getMap(ExperimentDenormalizationConfig.EXPERIMENT_KEY_PREFIX + member);
         var index = redisClient.getScoredSortedSet(ExperimentDenormalizationConfig.PENDING_SET_KEY);
-        var stream = redisClient.getStream(config.getStreamName(), config.getCodec());
+        var stream = redisClient.<String, ExperimentAggregationMessage>getStream(
+                config.getStreamName(), config.getCodec());
 
         return bucket.get(ExperimentDenormalizationConfig.USER_NAME_FIELD)
                 .flatMap(userName -> {
@@ -139,7 +140,12 @@ public class ExperimentDenormalizationJob extends Job {
                             .userName(userName)
                             .build();
 
-                    return stream.add(StreamAddArgs.entry(ExperimentDenormalizationConfig.PAYLOAD_FIELD, message))
+                    return stream.add(StreamAddArgs
+                            .<String, ExperimentAggregationMessage>entry(
+                                    ExperimentDenormalizationConfig.PAYLOAD_FIELD, message)
+                            .trimNonStrict()
+                            .maxLen(config.getStreamMaxLen())
+                            .limit(config.getStreamTrimLimit()))
                             .doOnNext(id -> log.debug(
                                     "Enqueued aggregation message for experiment '{}' with stream id '{}'",
                                     experimentIdStr, id))
