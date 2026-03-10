@@ -740,7 +740,7 @@ public class ExperimentService {
                                     .build());
                         }
                     })
-                    .then();
+                    .then(experimentAggregationPublisher.publish(ids, workspaceId, userName));
         });
     }
 
