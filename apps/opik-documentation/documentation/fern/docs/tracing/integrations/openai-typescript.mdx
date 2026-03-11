@@ -1,8 +1,10 @@
 ---
-description: Start here to integrate Opik into your OpenAI-based genai application
+description:
+  Start here to integrate Opik into your OpenAI-based genai application
   for end-to-end LLM observability, unit testing, and optimization.
 headline: OpenAI | Opik Documentation
-og:description: Monitor and debug OpenAI API calls effortlessly using Opik's tracing
+og:description:
+  Monitor and debug OpenAI API calls effortlessly using Opik's tracing
   features and the official OpenAI Node.js SDK.
 og:site_name: Opik Documentation
 og:title: Seamless OpenAI Integration - Opik
@@ -10,6 +12,24 @@ title: Observability for OpenAI (TypeScript) with Opik
 ---
 
 Opik provides seamless integration with the official [OpenAI Node.js SDK](https://github.com/openai/openai-node) through the `opik-openai` package, allowing you to trace, monitor, and debug your OpenAI API calls.
+
+<Info>
+  Looking for the OpenAI Node.js or JavaScript integration? This page covers the
+  official `openai` SDK together with `opik` and `opik-openai` for TypeScript
+  and Node.js applications.
+</Info>
+
+## Quickstart
+
+The fastest way to set up Opik in an existing OpenAI Node.js project is:
+
+```bash
+npx opik-ts configure
+```
+
+On Opik Cloud, the wizard validates your API key, suggests your default
+workspace automatically, and writes the required Opik environment variables for
+you.
 
 ## Features
 
@@ -20,18 +40,30 @@ Opik provides seamless integration with the official [OpenAI Node.js SDK](https:
 - **Custom Tagging**: Add custom tags to organize and filter your traces
 - **Streaming Support**: Full support for streamed responses with token-by-token tracing
 
-## Installation
+## Manual Installation
+
+These packages are used together:
+
+- `openai` for the official OpenAI Node.js SDK
+- `opik` for the core Opik client and configuration
+- `opik-openai` for the `trackOpenAI` wrapper
 
 ### Option 1: Using npm
 
 ```bash
-npm install opik-openai openai
+npm install opik openai opik-openai
 ```
 
 ### Option 2: Using yarn
 
 ```bash
-yarn add opik-openai openai
+yarn add opik openai opik-openai
+```
+
+### Option 3: Using pnpm
+
+```bash
+pnpm add opik openai opik-openai
 ```
 
 ### Requirements
@@ -39,6 +71,24 @@ yarn add opik-openai openai
 - Node.js ≥ 18
 - OpenAI SDK (`openai` ≥ 6.0.1)
 - Opik SDK (`opik` peer dependency)
+
+## Configuration
+
+If you are configuring Opik Cloud manually, set the following environment variables:
+
+```bash
+OPENAI_API_KEY="your-openai-api-key"
+OPIK_API_KEY="your-opik-api-key"
+OPIK_URL_OVERRIDE="https://www.comet.com/opik/api"
+OPIK_WORKSPACE="your-workspace-name"
+OPIK_PROJECT_NAME="your-project-name"
+```
+
+<Tip>
+  `OPIK_WORKSPACE` is required for Opik Cloud. If you use `npx opik-ts
+  configure`, the CLI can validate your API key and prefill your default
+  workspace for you.
+</Tip>
 
 ## Basic Usage
 
@@ -176,6 +226,8 @@ await trackedOpenAI.flush();
 ```
 
 ## Troubleshooting
+
+**Module Resolution Errors**: Install all three packages together: `opik`, `openai`, and `opik-openai`.
 
 **Missing Traces**: Ensure your OpenAI and Opik API keys are correct and that you're calling `await trackedOpenAI.flush()` before your application exits.
 
