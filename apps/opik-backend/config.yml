@@ -764,7 +764,7 @@ serviceToggles:
   # Default: false
   # Description: Whether or not Collaborators tab feature is enabled
   collaboratorsTabEnabled: ${TOGGLE_COLLABORATORS_TAB_ENABLED:-"false"}
-  # Default: true
+  # Default: false
   # Description: Whether or not Agent Configuration feature is enabled
   agentConfigurationEnabled: ${TOGGLE_AGENT_CONFIGURATION_ENABLED:-"false"}
 

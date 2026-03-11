@@ -26,7 +26,7 @@
 <Button variant="default" size="icon"><Icon /></Button>
 <Button variant="ghost" size="icon-sm"><Icon /></Button>
 
-// Sizes: "3xs" | "2xs" | "sm" | "default" | "lg"
+// Sizes: "3xs" | "2xs" | "xs" | "sm" | "default" | "lg"
 // Icon sizes: "icon-3xs" | "icon-2xs" | "icon-xs" | "icon-sm" | "icon" | "icon-lg"
 ```
 
