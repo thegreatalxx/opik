@@ -156,7 +156,9 @@ const OptimizationProgressChartContainer: React.FC<
               <span className="comet-body-xs font-normal text-muted-slate">
                 {inProgressInfo
                   ? "Evaluating new candidate..."
-                  : "Reflecting on results..."}
+                  : candidates.length <= 1
+                    ? "Running initial calculations..."
+                    : "Reflecting on results..."}
               </span>
             </>
           )}
