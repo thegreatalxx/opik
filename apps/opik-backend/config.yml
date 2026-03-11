@@ -767,6 +767,9 @@ serviceToggles:
   # Default: false
   # Description: Whether or not Agent Configuration feature is enabled
   agentConfigurationEnabled: ${TOGGLE_AGENT_CONFIGURATION_ENABLED:-"false"}
+  # Default: false
+  # Description: Whether or not Runners feature is enabled
+  runnersEnabled: ${TOGGLE_RUNNERS_ENABLED:-"false"}
 
 # Local Runner configuration
 localRunner:

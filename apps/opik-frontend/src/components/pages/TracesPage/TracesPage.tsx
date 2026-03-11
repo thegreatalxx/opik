@@ -8,6 +8,7 @@ import MetricsTab from "@/components/pages/TracesPage/MetricsTab/MetricsTab";
 import RulesTab from "@/components/pages/TracesPage/RulesTab/RulesTab";
 import AnnotationQueuesTab from "@/components/pages/TracesPage/AnnotationQueuesTab/AnnotationQueuesTab";
 import ConfigurationTab from "@/components/pages/TracesPage/ConfigurationTab/ConfigurationTab";
+import InvocationsTab from "@/components/pages/TracesPage/InvocationsTab/InvocationsTab";
 import DashboardsTab from "@/components/pages/TracesPage/DashboardsTab/DashboardsTab";
 import Loader from "@/components/shared/Loader/Loader";
 import { Button } from "@/components/ui/button";
@@ -32,6 +33,9 @@ const TracesPage = () => {
   );
   const isAgentConfigurationEnabled = useIsFeatureEnabled(
     FeatureToggleKeys.AGENT_CONFIGURATION_ENABLED,
+  );
+  const isRunnersEnabled = useIsFeatureEnabled(
+    FeatureToggleKeys.RUNNERS_ENABLED,
   );
 
   const { data: project } = useProjectById(
@@ -84,6 +88,14 @@ const TracesPage = () => {
                   Configuration
                 </TabsTrigger>
               )}
+              {isRunnersEnabled && (
+                <TabsTrigger
+                  variant="underline"
+                  value={PROJECT_TAB.invocations}
+                >
+                  Invocations
+                </TabsTrigger>
+              )}
               <TabsTrigger variant="underline" value={PROJECT_TAB.evaluators}>
                 Online evaluation
               </TabsTrigger>
@@ -109,6 +121,14 @@ const TracesPage = () => {
           {isAgentConfigurationEnabled && (
             <TabsContent value={PROJECT_TAB.configuration}>
               <ConfigurationTab projectId={projectId} />
+            </TabsContent>
+          )}
+          {isRunnersEnabled && (
+            <TabsContent value={PROJECT_TAB.invocations}>
+              <InvocationsTab
+                projectId={projectId}
+                projectName={projectName}
+              />
             </TabsContent>
           )}
           <TabsContent value={PROJECT_TAB.evaluators}>
