@@ -30,6 +30,7 @@ import {
 } from "@/types/automations";
 import Loader from "@/components/shared/Loader/Loader";
 import AddEditRuleDialog from "@/components/pages-shared/automations/AddEditRuleDialog/AddEditRuleDialog";
+import { usePermissions } from "@/contexts/PermissionsContext";
 
 type ManualEvaluationEntityType = "trace" | "thread" | "span";
 
@@ -47,6 +48,11 @@ const RunEvaluationDialog: React.FunctionComponent<
   RunEvaluationDialogProps
 > = ({ open, setOpen, projectId, entityIds, entityType }) => {
   const workspaceName = useAppStore((state) => state.activeWorkspaceName);
+
+  const {
+    permissions: { canUpdateOnlineEvaluationRules },
+  } = usePermissions();
+
   const [selectedRuleIds, setSelectedRuleIds] = useState<Set<string>>(
     new Set(),
   );
@@ -333,7 +339,7 @@ const RunEvaluationDialog: React.FunctionComponent<
               selected {entityLabel}. Each rule will generate new scores based
               on its configuration.
             </p>
-            {rules.length > 0 && (
+            {canUpdateOnlineEvaluationRules && rules.length > 0 && (
               <div className="mb-4 flex justify-end">
                 <Button variant="ghost" size="sm" onClick={handleCreateRule}>
                   <Plus className="mr-1 size-4" />
