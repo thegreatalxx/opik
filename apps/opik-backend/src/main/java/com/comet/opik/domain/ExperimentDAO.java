@@ -475,29 +475,6 @@ class ExperimentDAO {
                 ) AS tc ON ei.trace_id = tc.entity_id
                 GROUP BY ei.experiment_id
             ),
-            experiments_eval_suite AS (
-                SELECT id, dataset_id, dataset_version_id, execution_policy
-                FROM experiments_final
-                WHERE evaluation_method = 'evaluation_suite'
-            ),
-            pass_rate_runs AS (
-                SELECT
-                    ei.experiment_id AS experiment_id,
-                    ei.dataset_item_id AS dataset_item_id,
-                    ei.trace_id AS trace_id,
-                    JSONExtractUInt(ei.execution_policy, 'pass_threshold') AS item_pass_threshold,
-                    JSONExtractUInt(ef.execution_policy, 'pass_threshold') AS suite_pass_threshold,
-                    if(
-                        countIf(fs.name != '') = 0,
-                        1,
-                        if(minIf(fs.value, fs.name != '') >= 1.0, 1, 0)
-                    ) AS run_passed
-                FROM experiment_items_final ei
-                INNER JOIN experiments_eval_suite ef ON ei.experiment_id = ef.id
-                LEFT JOIN feedback_scores_final fs ON fs.entity_id = ei.trace_id
-                GROUP BY ei.experiment_id, ei.dataset_item_id, ei.trace_id,
-                         item_pass_threshold, suite_pass_threshold
-            ),
             pass_rate_agg AS (
                 SELECT
                     experiment_id,
@@ -512,7 +489,26 @@ class ExperimentDAO {
                            if(item_pass_threshold > 0, item_pass_threshold,
                               if(suite_pass_threshold > 0, suite_pass_threshold, 1)),
                            1, 0) AS item_passed
-                    FROM pass_rate_runs
+                    FROM (
+                        SELECT
+                            ei.experiment_id AS experiment_id,
+                            ei.dataset_item_id AS dataset_item_id,
+                            ei.trace_id AS trace_id,
+                            JSONExtractUInt(ei.execution_policy, 'pass_threshold') AS item_pass_threshold,
+                            JSONExtractUInt(ef.execution_policy, 'pass_threshold') AS suite_pass_threshold,
+                            if(
+                                countIf(fs.name != '') = 0,
+                                1,
+                                if(minIf(fs.value, fs.name != '') >= 1.0, 1, 0)
+                            ) AS run_passed
+                        FROM experiment_items_final ei
+                        INNER JOIN experiments_final ef
+                            ON ei.experiment_id = ef.id
+                            AND ef.evaluation_method = 'evaluation_suite'
+                        LEFT JOIN feedback_scores_final fs ON fs.entity_id = ei.trace_id
+                        GROUP BY ei.experiment_id, ei.dataset_item_id, ei.trace_id,
+                                 item_pass_threshold, suite_pass_threshold
+                    )
                     GROUP BY experiment_id, dataset_item_id, item_pass_threshold, suite_pass_threshold
                 )
                 GROUP BY experiment_id
@@ -1072,29 +1068,6 @@ class ExperimentDAO {
                 ) AS es
                 GROUP BY experiment_id
             ),
-            experiments_eval_suite AS (
-                SELECT id, dataset_id, dataset_version_id, execution_policy
-                FROM experiments_final
-                WHERE evaluation_method = 'evaluation_suite'
-            ),
-            pass_rate_runs AS (
-                SELECT
-                    ei.experiment_id AS experiment_id,
-                    ei.dataset_item_id AS dataset_item_id,
-                    ei.trace_id AS trace_id,
-                    JSONExtractUInt(ei.execution_policy, 'pass_threshold') AS item_pass_threshold,
-                    JSONExtractUInt(ef.execution_policy, 'pass_threshold') AS suite_pass_threshold,
-                    if(
-                        countIf(fs.name != '') = 0,
-                        1,
-                        if(minIf(fs.value, fs.name != '') >= 1.0, 1, 0)
-                    ) AS run_passed
-                FROM experiment_items_final ei
-                INNER JOIN experiments_eval_suite ef ON ei.experiment_id = ef.id
-                LEFT JOIN feedback_scores_final fs ON fs.entity_id = ei.trace_id
-                GROUP BY ei.experiment_id, ei.dataset_item_id, ei.trace_id,
-                         item_pass_threshold, suite_pass_threshold
-            ),
             pass_rate_agg AS (
                 SELECT
                     experiment_id,
@@ -1109,7 +1082,26 @@ class ExperimentDAO {
                            if(item_pass_threshold > 0, item_pass_threshold,
                               if(suite_pass_threshold > 0, suite_pass_threshold, 1)),
                            1, 0) AS item_passed
-                    FROM pass_rate_runs
+                    FROM (
+                        SELECT
+                            ei.experiment_id AS experiment_id,
+                            ei.dataset_item_id AS dataset_item_id,
+                            ei.trace_id AS trace_id,
+                            JSONExtractUInt(ei.execution_policy, 'pass_threshold') AS item_pass_threshold,
+                            JSONExtractUInt(ef.execution_policy, 'pass_threshold') AS suite_pass_threshold,
+                            if(
+                                countIf(fs.name != '') = 0,
+                                1,
+                                if(minIf(fs.value, fs.name != '') >= 1.0, 1, 0)
+                            ) AS run_passed
+                        FROM experiment_items_final ei
+                        INNER JOIN experiments_final ef
+                            ON ei.experiment_id = ef.id
+                            AND ef.evaluation_method = 'evaluation_suite'
+                        LEFT JOIN feedback_scores_final fs ON fs.entity_id = ei.trace_id
+                        GROUP BY ei.experiment_id, ei.dataset_item_id, ei.trace_id,
+                                 item_pass_threshold, suite_pass_threshold
+                    )
                     GROUP BY experiment_id, dataset_item_id, item_pass_threshold, suite_pass_threshold
                 )
                 GROUP BY experiment_id

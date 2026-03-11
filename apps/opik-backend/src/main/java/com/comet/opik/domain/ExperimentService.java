@@ -5,6 +5,7 @@ import com.comet.opik.api.BiInformationResponse;
 import com.comet.opik.api.Dataset;
 import com.comet.opik.api.DatasetLastExperimentCreated;
 import com.comet.opik.api.DatasetVersion;
+import com.comet.opik.api.ExecutionPolicy;
 import com.comet.opik.api.Experiment;
 import com.comet.opik.api.ExperimentBatchUpdate;
 import com.comet.opik.api.ExperimentGroupAggregationItem;
@@ -67,7 +68,7 @@ import static com.comet.opik.utils.AsyncUtils.makeMonoContextAware;
 @Slf4j
 public class ExperimentService {
 
-    private record ResolvedVersion(UUID versionId, String executionPolicyJson) {
+    private record ResolvedVersion(UUID versionId, ExecutionPolicy executionPolicy) {
     }
 
     private final @NonNull ExperimentDAO experimentDAO;
@@ -414,7 +415,7 @@ public class ExperimentService {
                 .flatMap(datasetId -> {
                     // Case 1: Feature toggle OFF - skip version resolution (legacy behavior)
                     if (!featureFlags.isDatasetVersioningEnabled()) {
-                        return processExperimentCreation(experiment, id, name, datasetId, "");
+                        return processExperimentCreation(experiment, id, name, datasetId, null);
                     }
 
                     // Case 2: Feature toggle ON - resolve version and link experiment
@@ -424,7 +425,7 @@ public class ExperimentService {
                                         .datasetVersionId(resolved.versionId())
                                         .build();
                                 return processExperimentCreation(experimentWithVersion, id, name, datasetId,
-                                        resolved.executionPolicyJson());
+                                        resolved.executionPolicy());
                             })
                             .switchIfEmpty(Mono.defer(() -> {
                                 // No version found - proceed with null dataset_version_id
@@ -434,7 +435,7 @@ public class ExperimentService {
                                 var experimentWithNullVersion = experiment.toBuilder()
                                         .datasetVersionId(null)
                                         .build();
-                                return processExperimentCreation(experimentWithNullVersion, id, name, datasetId, "");
+                                return processExperimentCreation(experimentWithNullVersion, id, name, datasetId, null);
                             }));
                 })
                 // If a conflict occurs, we just return the id of the existing experiment.
@@ -453,7 +454,7 @@ public class ExperimentService {
      * @return Mono emitting the created experiment ID
      */
     private Mono<UUID> processExperimentCreation(Experiment experiment, UUID id, String name, UUID datasetId,
-            String executionPolicyJson) {
+            ExecutionPolicy executionPolicy) {
         if (hasPromptVersionLinks(experiment)) {
             return validatePromptVersion(experiment).flatMap(promptVersionMap -> {
                 var builder = experiment.toBuilder();
@@ -473,10 +474,10 @@ public class ExperimentService {
                             .promptId(promptVersion.promptId())
                             .build());
                 }
-                return create(builder.build(), id, name, datasetId, executionPolicyJson);
+                return create(builder.build(), id, name, datasetId, executionPolicy);
             });
         }
-        return create(experiment, id, name, datasetId, executionPolicyJson);
+        return create(experiment, id, name, datasetId, executionPolicy);
     }
 
     /**
@@ -511,8 +512,7 @@ public class ExperimentService {
 
                     log.info("Using validated dataset version ID '{}' for experiment on dataset '{}'",
                             version.id(), datasetId);
-                    return new ResolvedVersion(version.id(),
-                            ExecutionPolicyMapper.serialize(version.executionPolicy()));
+                    return new ResolvedVersion(version.id(), version.executionPolicy());
                 }).subscribeOn(Schedulers.boundedElastic())
                         .onErrorResume(e -> {
                             if (e instanceof NotFoundException) {
@@ -531,7 +531,7 @@ public class ExperimentService {
                     var v = latestVersion.get();
                     log.info("No version specified, using latest version '{}' for experiment on dataset '{}'",
                             v.id(), datasetId);
-                    return new ResolvedVersion(v.id(), ExecutionPolicyMapper.serialize(v.executionPolicy()));
+                    return new ResolvedVersion(v.id(), v.executionPolicy());
                 }
                 log.warn("No latest version found for dataset '{}', experiment will have null dataset_version_id",
                         datasetId);
@@ -560,7 +560,7 @@ public class ExperimentService {
     }
 
     private Mono<UUID> create(Experiment experiment, UUID id, String name, UUID datasetId,
-            String executionPolicyJson) {
+            ExecutionPolicy executionPolicy) {
         var newExperiment = experiment.toBuilder()
                 .id(id)
                 .name(name)
@@ -569,6 +569,7 @@ public class ExperimentService {
                 .build();
         log.info("Inserting experiment with id '{}', name '{}', datasetId '{}', datasetName '{}'",
                 newExperiment.id(), newExperiment.name(), newExperiment.datasetId(), newExperiment.datasetName());
+        var executionPolicyJson = ExecutionPolicyMapper.serialize(executionPolicy);
         return makeMonoContextAware(
                 (userName, workspaceId) -> experimentDAO.insert(newExperiment, executionPolicyJson)
                         .thenReturn(newExperiment.id())

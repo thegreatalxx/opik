@@ -175,22 +175,24 @@ public class ExperimentItemService {
                             .filter(Objects::nonNull)
                             .collect(toSet());
 
-                    Mono<Map<UUID, Map<UUID, ExecutionPolicy>>> itemPoliciesMono = featureFlags
-                            .isDatasetVersioningEnabled() && !datasetVersionIds.isEmpty()
-                                    ? datasetItemVersionDAO
-                                            .getExecutionPoliciesByDatasetItemIds(datasetItemIds, datasetVersionIds)
-                                            .<Map<UUID, Map<UUID, ExecutionPolicy>>>collect(
-                                                    HashMap::new, (map, entry) -> map
-                                                            .computeIfAbsent(entry.datasetVersionId(),
-                                                                    k -> new HashMap<>())
-                                                            .put(entry.datasetItemId(), entry.policy()))
-                                    : Mono.just(Map.of());
-
-                    return itemPoliciesMono.map(policiesByVersion -> experimentItems.stream()
-                            .map(item -> ExecutionPolicyMapper.resolvePolicy(
-                                    item, experimentInfoMap, policiesByVersion))
-                            .collect(toSet()));
+                    return fetchItemPolicies(datasetItemIds, datasetVersionIds)
+                            .map(policiesByVersion -> experimentItems.stream()
+                                    .map(item -> ExecutionPolicyMapper.resolvePolicy(
+                                            item, experimentInfoMap, policiesByVersion))
+                                    .collect(toSet()));
                 });
+    }
+
+    private Mono<Map<UUID, Map<UUID, ExecutionPolicy>>> fetchItemPolicies(
+            Set<UUID> datasetItemIds, Set<UUID> datasetVersionIds) {
+        if (!featureFlags.isDatasetVersioningEnabled() || datasetVersionIds.isEmpty()) {
+            return Mono.just(Map.of());
+        }
+        return datasetItemVersionDAO
+                .getExecutionPoliciesByDatasetItemIds(datasetItemIds, datasetVersionIds)
+                .collect(HashMap::new, (map, entry) -> map
+                        .computeIfAbsent(entry.datasetVersionId(), k -> new HashMap<>())
+                        .put(entry.datasetItemId(), entry.policy()));
     }
 
     private boolean isProjectResolved(Map<UUID, UUID> traceToProjectMap, ExperimentItem item) {

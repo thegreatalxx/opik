@@ -2,6 +2,7 @@ package com.comet.opik.domain;
 
 import com.comet.opik.api.AggregationData;
 import com.comet.opik.api.GroupContentWithAggregations;
+import com.comet.opik.api.resources.utils.StatsUtils;
 import com.comet.opik.podam.PodamFactoryUtils;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -15,7 +16,6 @@ import java.util.Map;
 import java.util.concurrent.ThreadLocalRandom;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.within;
 
 class ExperimentResponseBuilderTest {
 
@@ -83,14 +83,29 @@ class ExperimentResponseBuilderTest {
 
         var expectedPassRate = passRate1.multiply(BigDecimal.valueOf(expCount1))
                 .add(passRate2.multiply(BigDecimal.valueOf(expCount2)))
-                .divide(BigDecimal.valueOf(expCount1 + expCount2), 9, RoundingMode.HALF_EVEN);
+                .divide(BigDecimal.valueOf(expCount1 + expCount2), 9, RoundingMode.HALF_UP);
 
-        assertThat(result.aggregations().passRateAvg()).isNotNull();
-        assertThat(result.aggregations().passRateAvg().doubleValue())
-                .isCloseTo(expectedPassRate.doubleValue(), within(0.001));
-        assertThat(result.aggregations().passedCountSum()).isEqualTo(passed1 + passed2);
-        assertThat(result.aggregations().totalCountSum()).isEqualTo(total1 + total2);
-        assertThat(result.aggregations().experimentCount()).isEqualTo(expCount1 + expCount2);
+        var weightedCostAvg = child1Agg.totalEstimatedCostAvg().multiply(BigDecimal.valueOf(expCount1))
+                .add(child2Agg.totalEstimatedCostAvg().multiply(BigDecimal.valueOf(expCount2)))
+                .divide(BigDecimal.valueOf(expCount1 + expCount2), 9, RoundingMode.HALF_UP);
+
+        var expectedAggregation = AggregationData.builder()
+                .experimentCount(expCount1 + expCount2)
+                .traceCount(child1Agg.traceCount() + child2Agg.traceCount())
+                .totalEstimatedCost(child1Agg.totalEstimatedCost().add(child2Agg.totalEstimatedCost()))
+                .totalEstimatedCostAvg(weightedCostAvg)
+                .duration(null)
+                .feedbackScores(List.of())
+                .experimentScores(List.of())
+                .passRateAvg(expectedPassRate)
+                .passedCountSum(passed1 + passed2)
+                .totalCountSum(total1 + total2)
+                .build();
+
+        assertThat(result.aggregations())
+                .usingRecursiveComparison()
+                .withComparatorForType(StatsUtils::bigDecimalComparator, BigDecimal.class)
+                .isEqualTo(expectedAggregation);
     }
 
     @Test
@@ -114,9 +129,23 @@ class ExperimentResponseBuilderTest {
 
         var result = builder.calculateRecursiveAggregations(parent);
 
-        assertThat(result.aggregations().passRateAvg()).isNull();
-        assertThat(result.aggregations().passedCountSum()).isNull();
-        assertThat(result.aggregations().totalCountSum()).isNull();
+        var expectedAggregation = AggregationData.builder()
+                .experimentCount(child.aggregations().experimentCount())
+                .traceCount(child.aggregations().traceCount())
+                .totalEstimatedCost(child.aggregations().totalEstimatedCost())
+                .totalEstimatedCostAvg(child.aggregations().totalEstimatedCostAvg())
+                .duration(null)
+                .feedbackScores(List.of())
+                .experimentScores(List.of())
+                .passRateAvg(null)
+                .passedCountSum(null)
+                .totalCountSum(null)
+                .build();
+
+        assertThat(result.aggregations())
+                .usingRecursiveComparison()
+                .withComparatorForType(StatsUtils::bigDecimalComparator, BigDecimal.class)
+                .isEqualTo(expectedAggregation);
     }
 
     @Test
@@ -134,8 +163,9 @@ class ExperimentResponseBuilderTest {
 
         var result = builder.calculateRecursiveAggregations(leaf);
 
-        assertThat(result.aggregations().passRateAvg()).isEqualByComparingTo(passRate);
-        assertThat(result.aggregations().passedCountSum()).isEqualTo(passed);
-        assertThat(result.aggregations().totalCountSum()).isEqualTo(total);
+        assertThat(result.aggregations())
+                .usingRecursiveComparison()
+                .withComparatorForType(StatsUtils::bigDecimalComparator, BigDecimal.class)
+                .isEqualTo(leaf.aggregations());
     }
 }

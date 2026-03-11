@@ -7462,6 +7462,16 @@ class ExperimentsResourceTest {
             Mockito.reset(defaultEventBus);
         }
 
+        private FeedbackScoreBatchItem score(Trace trace, String name, BigDecimal value) {
+            return FeedbackScoreBatchItem.builder()
+                    .id(trace.id())
+                    .projectName(trace.projectName())
+                    .name(name)
+                    .value(value)
+                    .source(ScoreSource.SDK)
+                    .build();
+        }
+
         @Test
         @DisplayName("when experiment is evaluation_suite with assertion scores, then return pass rate")
         void findEvaluationSuiteExperiment__thenReturnPassRate() {
@@ -7497,28 +7507,11 @@ class ExperimentsResourceTest {
             createAndAssert(new ExperimentItemsBatch(Set.of(item1, item2, item3)), apiKey, workspaceName);
 
             // trace1: assertion passes (1.0), trace2: assertion fails (0.0), trace3: assertion passes (1.0)
+            var scoreName = UUID.randomUUID().toString();
             var scores = List.of(
-                    FeedbackScoreBatchItem.builder()
-                            .id(trace1.id())
-                            .projectName(trace1.projectName())
-                            .name("assertion_check")
-                            .value(BigDecimal.ONE)
-                            .source(ScoreSource.SDK)
-                            .build(),
-                    FeedbackScoreBatchItem.builder()
-                            .id(trace2.id())
-                            .projectName(trace2.projectName())
-                            .name("assertion_check")
-                            .value(BigDecimal.ZERO)
-                            .source(ScoreSource.SDK)
-                            .build(),
-                    FeedbackScoreBatchItem.builder()
-                            .id(trace3.id())
-                            .projectName(trace3.projectName())
-                            .name("assertion_check")
-                            .value(BigDecimal.ONE)
-                            .source(ScoreSource.SDK)
-                            .build());
+                    score(trace1, scoreName, BigDecimal.ONE),
+                    score(trace2, scoreName, BigDecimal.ZERO),
+                    score(trace3, scoreName, BigDecimal.ONE));
             createScoreAndAssert(FeedbackScoreBatch.builder().scores(scores).build(), apiKey, workspaceName);
 
             var actual = experimentResourceClient.getExperiment(experiment.id(), apiKey, workspaceName);
@@ -7554,14 +7547,9 @@ class ExperimentsResourceTest {
                     .build();
             createAndAssert(new ExperimentItemsBatch(Set.of(item)), apiKey, workspaceName);
 
-            var score = FeedbackScoreBatchItem.builder()
-                    .id(trace.id())
-                    .projectName(trace.projectName())
-                    .name("some_score")
-                    .value(BigDecimal.ONE)
-                    .source(ScoreSource.SDK)
-                    .build();
-            createScoreAndAssert(FeedbackScoreBatch.builder().scores(List.of(score)).build(), apiKey, workspaceName);
+            var scoreName = UUID.randomUUID().toString();
+            createScoreAndAssert(FeedbackScoreBatch.builder()
+                    .scores(List.of(score(trace, scoreName, BigDecimal.ONE))).build(), apiKey, workspaceName);
 
             var actual = experimentResourceClient.getExperiment(experiment.id(), apiKey, workspaceName);
             var expectedExperiment = experiment.toBuilder()
@@ -7601,35 +7589,13 @@ class ExperimentsResourceTest {
 
             // trace1: both assertions pass → run passes → item passes
             // trace2: one assertion passes, one fails → run fails → item fails
+            var scoreName1 = UUID.randomUUID().toString();
+            var scoreName2 = UUID.randomUUID().toString();
             var scores = List.of(
-                    FeedbackScoreBatchItem.builder()
-                            .id(trace1.id())
-                            .projectName(trace1.projectName())
-                            .name("assertion_1")
-                            .value(BigDecimal.ONE)
-                            .source(ScoreSource.SDK)
-                            .build(),
-                    FeedbackScoreBatchItem.builder()
-                            .id(trace1.id())
-                            .projectName(trace1.projectName())
-                            .name("assertion_2")
-                            .value(BigDecimal.ONE)
-                            .source(ScoreSource.SDK)
-                            .build(),
-                    FeedbackScoreBatchItem.builder()
-                            .id(trace2.id())
-                            .projectName(trace2.projectName())
-                            .name("assertion_1")
-                            .value(BigDecimal.ONE)
-                            .source(ScoreSource.SDK)
-                            .build(),
-                    FeedbackScoreBatchItem.builder()
-                            .id(trace2.id())
-                            .projectName(trace2.projectName())
-                            .name("assertion_2")
-                            .value(BigDecimal.ZERO)
-                            .source(ScoreSource.SDK)
-                            .build());
+                    score(trace1, scoreName1, BigDecimal.ONE),
+                    score(trace1, scoreName2, BigDecimal.ONE),
+                    score(trace2, scoreName1, BigDecimal.ONE),
+                    score(trace2, scoreName2, BigDecimal.ZERO));
             createScoreAndAssert(FeedbackScoreBatch.builder().scores(scores).build(), apiKey, workspaceName);
 
             var actual = experimentResourceClient.getExperiment(experiment.id(), apiKey, workspaceName);
@@ -7730,28 +7696,11 @@ class ExperimentsResourceTest {
             experimentResourceClient.createExperimentItem(Set.of(item1, item2, item3), apiKey, workspaceName);
 
             // Score: 2 runs pass, 1 fails → runs_passed=2 >= pass_threshold=2 → item passes
+            var scoreName = UUID.randomUUID().toString();
             var scores = List.of(
-                    FeedbackScoreBatchItem.builder()
-                            .id(trace1.id())
-                            .projectName(trace1.projectName())
-                            .name("assertion_check")
-                            .value(BigDecimal.ONE)
-                            .source(ScoreSource.SDK)
-                            .build(),
-                    FeedbackScoreBatchItem.builder()
-                            .id(trace2.id())
-                            .projectName(trace2.projectName())
-                            .name("assertion_check")
-                            .value(BigDecimal.ONE)
-                            .source(ScoreSource.SDK)
-                            .build(),
-                    FeedbackScoreBatchItem.builder()
-                            .id(trace3.id())
-                            .projectName(trace3.projectName())
-                            .name("assertion_check")
-                            .value(BigDecimal.ZERO)
-                            .source(ScoreSource.SDK)
-                            .build());
+                    score(trace1, scoreName, BigDecimal.ONE),
+                    score(trace2, scoreName, BigDecimal.ONE),
+                    score(trace3, scoreName, BigDecimal.ZERO));
             createScoreAndAssert(FeedbackScoreBatch.builder().scores(scores).build(), apiKey, workspaceName);
 
             var actual = experimentResourceClient.getExperiment(experimentId, apiKey, workspaceName);
@@ -7836,28 +7785,11 @@ class ExperimentsResourceTest {
             experimentResourceClient.createExperimentItem(Set.of(item1, item2, item3), apiKey, workspaceName);
 
             // Score: only 1 run passes, 2 fail → runs_passed=1 < pass_threshold=2 → item fails
+            var scoreName = UUID.randomUUID().toString();
             var scores = List.of(
-                    FeedbackScoreBatchItem.builder()
-                            .id(trace1.id())
-                            .projectName(trace1.projectName())
-                            .name("assertion_check")
-                            .value(BigDecimal.ONE)
-                            .source(ScoreSource.SDK)
-                            .build(),
-                    FeedbackScoreBatchItem.builder()
-                            .id(trace2.id())
-                            .projectName(trace2.projectName())
-                            .name("assertion_check")
-                            .value(BigDecimal.ZERO)
-                            .source(ScoreSource.SDK)
-                            .build(),
-                    FeedbackScoreBatchItem.builder()
-                            .id(trace3.id())
-                            .projectName(trace3.projectName())
-                            .name("assertion_check")
-                            .value(BigDecimal.ZERO)
-                            .source(ScoreSource.SDK)
-                            .build());
+                    score(trace1, scoreName, BigDecimal.ONE),
+                    score(trace2, scoreName, BigDecimal.ZERO),
+                    score(trace3, scoreName, BigDecimal.ZERO));
             createScoreAndAssert(FeedbackScoreBatch.builder().scores(scores).build(), apiKey, workspaceName);
 
             var actual = experimentResourceClient.getExperiment(experimentId, apiKey, workspaceName);
@@ -7952,25 +7884,14 @@ class ExperimentsResourceTest {
             // Score: 2 of 3 runs pass for each item
             // ItemA: 2 pass < pass_threshold=3 → item FAILS
             // ItemB: 2 pass >= default threshold=1 → item PASSES
+            var scoreName = UUID.randomUUID().toString();
             var scores = List.of(
-                    FeedbackScoreBatchItem.builder().id(traceA1.id())
-                            .projectName(traceA1.projectName()).name("check")
-                            .value(BigDecimal.ONE).source(ScoreSource.SDK).build(),
-                    FeedbackScoreBatchItem.builder().id(traceA2.id())
-                            .projectName(traceA2.projectName()).name("check")
-                            .value(BigDecimal.ONE).source(ScoreSource.SDK).build(),
-                    FeedbackScoreBatchItem.builder().id(traceA3.id())
-                            .projectName(traceA3.projectName()).name("check")
-                            .value(BigDecimal.ZERO).source(ScoreSource.SDK).build(),
-                    FeedbackScoreBatchItem.builder().id(traceB1.id())
-                            .projectName(traceB1.projectName()).name("check")
-                            .value(BigDecimal.ONE).source(ScoreSource.SDK).build(),
-                    FeedbackScoreBatchItem.builder().id(traceB2.id())
-                            .projectName(traceB2.projectName()).name("check")
-                            .value(BigDecimal.ONE).source(ScoreSource.SDK).build(),
-                    FeedbackScoreBatchItem.builder().id(traceB3.id())
-                            .projectName(traceB3.projectName()).name("check")
-                            .value(BigDecimal.ZERO).source(ScoreSource.SDK).build());
+                    score(traceA1, scoreName, BigDecimal.ONE),
+                    score(traceA2, scoreName, BigDecimal.ONE),
+                    score(traceA3, scoreName, BigDecimal.ZERO),
+                    score(traceB1, scoreName, BigDecimal.ONE),
+                    score(traceB2, scoreName, BigDecimal.ONE),
+                    score(traceB3, scoreName, BigDecimal.ZERO));
             createScoreAndAssert(FeedbackScoreBatch.builder().scores(scores).build(), apiKey, workspaceName);
 
             // ItemA fails (2 < 3), ItemB passes (2 >= 1) → passedCount=1, totalCount=2, passRate=0.5
