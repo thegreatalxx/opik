@@ -12,7 +12,15 @@ module.exports = [
       'eslint.config.cjs',
     ],
   },
-  { files: ['src/**/*.{js,mjs,cjs,ts,d.ts}', 'bin.ts'] },
+  {
+    files: [
+      'src/**/*.{js,mjs,cjs,ts,d.ts}',
+      'tests/**/*.ts',
+      'bin.ts',
+      'tsup.config.ts',
+      'vitest.config.ts',
+    ],
+  },
   {
     languageOptions: {
       globals: globals.node,
