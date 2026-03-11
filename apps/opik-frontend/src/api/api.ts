@@ -3,11 +3,18 @@ import axios from "axios";
 
 export const BASE_API_URL = import.meta.env.VITE_BASE_API_URL || "/api";
 export const BASE_OPIK_AI_URL = import.meta.env.VITE_BASE_OPIK_AI_URL || "";
+export const OLLIE_ASSIST_BASE_URL =
+  import.meta.env.VITE_OLLIE_ASSIST_URL || "http://localhost:8081";
+
 const axiosInstance = axios.create({
   baseURL: BASE_API_URL,
 });
 
 axiosInstance.defaults.withCredentials = true;
+
+export const ollieAssistApi = axios.create({
+  baseURL: OLLIE_ASSIST_BASE_URL,
+});
 
 export const CODE_EXECUTOR_SERVICE_URL = import.meta.env
   .VITE_GET_STARTED_API_URL;
@@ -33,7 +40,7 @@ export const ANNOTATION_QUEUES_REST_ENDPOINT = "/v1/private/annotation-queues/";
 export const WORKSPACES_REST_ENDPOINT = "/v1/private/workspaces/";
 export const WORKSPACE_CONFIG_REST_ENDPOINT =
   "/v1/private/workspaces/configurations/";
-export const TRACE_ANALYZER_REST_ENDPOINT = "/trace-analyzer/session/";
+
 export const PLAYGROUND_EVALUATION_REST_ENDPOINT =
   "/v1/private/playground/evaluations/";
 export const DASHBOARDS_REST_ENDPOINT = "/v1/private/dashboards/";
@@ -53,9 +60,12 @@ export const OPTIMIZATION_KEY = "optimization";
 export const ANNOTATION_QUEUES_KEY = "annotation-queues";
 export const ANNOTATION_QUEUE_KEY = "annotation-queue";
 export const WORKSPACE_CONFIG_KEY = "workspace-config";
-export const TRACE_AI_ASSISTANT_KEY = "trace-analyzer-history";
+
 export const DASHBOARDS_KEY = "dashboards";
 export const DASHBOARD_KEY = "dashboard";
+
+export const SCHEDULES_KEY = "schedules";
+export const SCHEDULES_REST_ENDPOINT = "/schedules/";
 
 // stats for feedback
 export const STATS_COMET_ENDPOINT = "https://stats.comet.com/notify/event/";

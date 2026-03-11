@@ -25,6 +25,7 @@ import Loader from "@/components/shared/Loader/Loader";
 import AddEditProjectDialog from "@/components/pages/ProjectsPage/AddEditProjectDialog";
 import ProjectsActionsPanel from "@/components/pages/ProjectsPage/ProjectsActionsPanel";
 import { ProjectRowActionsCell } from "@/components/pages/ProjectsPage/ProjectRowActionsCell";
+import ProjectNameCell from "@/components/pages/ProjectsPage/ProjectNameCell";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import useAppStore from "@/store/AppStore";
@@ -128,7 +129,7 @@ const ProjectsPage: React.FunctionComponent = () => {
         id: COLUMN_NAME_ID,
         label: "Name",
         type: COLUMN_TYPE.string,
-        cell: TextCell as never,
+        cell: ProjectNameCell as never,
         sortable: true,
       },
       {
@@ -343,7 +344,18 @@ const ProjectsPage: React.FunctionComponent = () => {
       },
     );
 
-  const projects = useMemo(() => data?.content ?? [], [data?.content]);
+  const OLLIE_ASSIST_PROJECT_NAME = "Ollie Assist";
+
+  const projects = useMemo(() => {
+    const items = data?.content ?? [];
+    const pinned = items.filter(
+      (p) => p.name === OLLIE_ASSIST_PROJECT_NAME,
+    );
+    const rest = items.filter(
+      (p) => p.name !== OLLIE_ASSIST_PROJECT_NAME,
+    );
+    return [...pinned, ...rest];
+  }, [data?.content]);
   const total = data?.total ?? 0;
   const noData = !search;
   const noDataText = noData ? "There are no projects yet" : "No search results";
@@ -401,6 +413,14 @@ const ProjectsPage: React.FunctionComponent = () => {
       onColumnResize: setColumnsWidth,
     }),
     [columnsWidth, setColumnsWidth],
+  );
+
+  const getRowClassName = useCallback(
+    (row: { original: ProjectWithStatistic }) =>
+      row.original.name === OLLIE_ASSIST_PROJECT_NAME
+        ? "bg-primary/[0.06] hover:!bg-primary/[0.10]"
+        : "",
+    [],
   );
 
   const handleRowClick = useCallback(
@@ -465,6 +485,7 @@ const ProjectsPage: React.FunctionComponent = () => {
         columns={columns}
         data={projects}
         onRowClick={handleRowClick}
+        getRowClassName={getRowClassName}
         sortConfig={{
           enabled: true,
           sorting: sortedColumns,

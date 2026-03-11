@@ -135,15 +135,6 @@ export const AlertFormSchema = z
   })
   .refine(
     (data) => {
-      return data.triggers.length > 0;
-    },
-    {
-      message: "At least one trigger must be selected",
-      path: ["triggers"],
-    },
-  )
-  .refine(
-    (data) => {
       // If alert type is PagerDuty, routing_key is required
       if (data.alertType === ALERT_TYPE.pagerduty) {
         return data.routingKey && data.routingKey.trim().length > 0;

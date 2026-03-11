@@ -243,7 +243,7 @@ const AlertsPage: React.FunctionComponent = () => {
   );
   const total = data?.total ?? 0;
   const noData = !search && filters.length === 0;
-  const noDataText = noData ? "There are no alerts yet" : "No search results";
+  const noDataText = noData ? "There are no channels yet" : "No search results";
 
   const [selectedColumns, setSelectedColumns] = useLocalStorageState<string[]>(
     SELECTED_COLUMNS_KEY_V2,
@@ -307,7 +307,7 @@ const AlertsPage: React.FunctionComponent = () => {
 
   const handleNewAlertClick = useCallback(() => {
     navigate({
-      to: "/$workspaceName/alerts/new",
+      to: "/$workspaceName/channels/new",
       params: { workspaceName },
       search: (prev) => prev,
     });
@@ -320,7 +320,7 @@ const AlertsPage: React.FunctionComponent = () => {
   return (
     <div className="pt-6">
       <div className="mb-1 flex items-center justify-between">
-        <h1 className="comet-title-l">Alerts</h1>
+        <h1 className="comet-title-l">Channels</h1>
       </div>
       <ExplainerDescription
         className="mb-4"
@@ -357,7 +357,7 @@ const AlertsPage: React.FunctionComponent = () => {
               onOrderChange={setColumnsOrder}
             ></ColumnsButton>
             <Button variant="default" size="sm" onClick={handleNewAlertClick}>
-              Create new alert
+              Create new channel
             </Button>
           </div>
         </div>
@@ -376,7 +376,7 @@ const AlertsPage: React.FunctionComponent = () => {
             <DataTableNoData title={noDataText}>
               {noData && (
                 <Button variant="link" onClick={handleNewAlertClick}>
-                  Create new alert
+                  Create new channel
                 </Button>
               )}
             </DataTableNoData>

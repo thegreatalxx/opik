@@ -25,7 +25,7 @@ import {
   OPTIMIZATION_ACTIVE_REFETCH_INTERVAL,
 } from "@/lib/optimizations";
 import { convertTerminalOutputToHtml } from "@/lib/terminalOutput";
-import { useChatScroll } from "@/components/pages-shared/traces/TraceDetailsPanel/TraceAIViewer/useChatScroll";
+import { useChatScroll } from "@/hooks/useChatScroll";
 import { formatDate } from "@/lib/date";
 import OptimizationLogsFullscreenDialog from "./OptimizationLogsFullscreenDialog";
 

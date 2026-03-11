@@ -7,9 +7,12 @@ import {
   ToastViewport,
 } from "@/components/ui/toast";
 import { useToast } from "@/components/ui/use-toast";
+import useOllieAssistStore from "@/components/layout/OllieAssist/OllieAssistStore";
+import { PANEL_WIDTH } from "@/components/layout/OllieAssist/OllieAssistSidebar";
 
 export function Toaster() {
   const { toasts } = useToast();
+  const ollieOpen = useOllieAssistStore((s) => s.open);
 
   return (
     <ToastProvider>
@@ -31,7 +34,7 @@ export function Toaster() {
           </Toast>
         );
       })}
-      <ToastViewport />
+      <ToastViewport style={{ right: ollieOpen ? PANEL_WIDTH : undefined }} />
     </ToastProvider>
   );
 }

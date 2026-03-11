@@ -7,6 +7,7 @@ import SidebarMenuItem, {
 } from "@/components/layout/SideBar/MenuItem/SidebarMenuItem";
 import useDashboardsList from "@/api/dashboards/useDashboardsList";
 import useAlertsList from "@/api/alerts/useAlertsList";
+import useSchedulesList from "@/api/scheduled-agents/useSchedulesList";
 import useAnnotationQueuesList from "@/api/annotation-queues/useAnnotationQueuesList";
 import useOptimizationsList from "@/api/optimizations/useOptimizationsList";
 import useExperimentsList from "@/api/datasets/useExperimentsList";
@@ -158,6 +159,17 @@ const SideBarMenuItems: React.FC<SideBarMenuItemsProps> = ({ expanded }) => {
     },
   );
 
+  const { data: schedulesData } = useSchedulesList(
+    {
+      page: 1,
+      size: 1,
+    },
+    {
+      placeholderData: keepPreviousData,
+      enabled: expanded,
+    },
+  );
+
   const countDataMap: Record<string, number | undefined> = {
     projects: projectData?.total,
     datasets: datasetsData?.total,
@@ -167,6 +179,7 @@ const SideBarMenuItems: React.FC<SideBarMenuItemsProps> = ({ expanded }) => {
     optimizations: optimizationsData?.total,
     annotation_queues: annotationQueuesData?.total,
     alerts: alertsData?.total,
+    schedules: schedulesData?.total,
     dashboards: dashboardsData?.total,
   };
 

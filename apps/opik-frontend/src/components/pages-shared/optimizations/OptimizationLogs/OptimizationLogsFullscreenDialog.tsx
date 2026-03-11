@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/dialog";
 import TooltipWrapper from "@/components/shared/TooltipWrapper/TooltipWrapper";
 import { formatDate } from "@/lib/date";
-import { useChatScroll } from "@/components/pages-shared/traces/TraceDetailsPanel/TraceAIViewer/useChatScroll";
+import { useChatScroll } from "@/hooks/useChatScroll";
 
 type OptimizationLogsFullscreenDialogProps = {
   open: boolean;

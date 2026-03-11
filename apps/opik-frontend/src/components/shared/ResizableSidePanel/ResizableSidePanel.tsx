@@ -41,14 +41,22 @@ const LEFT_HOTKEYS = ["←"];
 const RIGHT_HOTKEYS = ["→"];
 const ESC_HOTKEYS = ["Esc"];
 
+const getAvailableWidth = () => {
+  const ollie = parseInt(
+    getComputedStyle(document.documentElement).getPropertyValue(
+      "--ollie-panel-width",
+    ),
+    10,
+  );
+  return window.innerWidth - (isNaN(ollie) ? 0 : ollie);
+};
+
 const calculateLeftPosition = (percentage: number, minWidth?: number) => {
+  const available = getAvailableWidth();
   if (minWidth) {
-    return Math.min(
-      window.innerWidth * percentage,
-      window.innerWidth - minWidth,
-    );
+    return Math.min(available * percentage, available - minWidth);
   } else {
-    return window.innerWidth * percentage;
+    return available * percentage;
   }
 };
 
@@ -125,7 +133,7 @@ const ResizableSidePanel: React.FunctionComponent<ResizableSidePanelProps> = ({
   useEffect(() => {
     const handleMouseMove = (event: MouseEvent) => {
       if (resizeHandleRef.current) {
-        leftRef.current = event.pageX / window.innerWidth;
+        leftRef.current = event.pageX / getAvailableWidth();
         const left = Math.max(
           MIN_LEFT_POSITION,
           Math.min(MAX_LEFT_POSITION, leftRef.current),
@@ -246,12 +254,17 @@ const ResizableSidePanel: React.FunctionComponent<ResizableSidePanelProps> = ({
   return createPortal(
     <div className="relative z-10">
       {open && closeOnClickOutside && (
-        <div className="fixed inset-0 bg-black/10" onClick={onClose} />
+        <div
+          className="fixed top-0 bottom-0 left-0 bg-black/10"
+          style={{ right: "var(--ollie-panel-width, 0px)" }}
+          onClick={onClose}
+        />
       )}
       <div
-        className="fixed inset-0 bg-background shadow-xl transition-transform duration-150 will-change-transform"
+        className="fixed top-0 bottom-0 bg-background transition-transform duration-150 will-change-transform"
         style={{
           left: left + "px",
+          right: "var(--ollie-panel-width, 0px)",
           transform: open ? "translateX(0)" : "translateX(100%)",
         }}
         data-testid={panelId}

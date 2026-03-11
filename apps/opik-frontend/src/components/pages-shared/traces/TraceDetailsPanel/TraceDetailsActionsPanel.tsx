@@ -9,7 +9,7 @@ import {
   MoreHorizontal,
   Network,
   Share,
-  Sparkles,
+
   Trash,
   Download,
 } from "lucide-react";
@@ -112,9 +112,7 @@ const TraceDetailsActionsPanel: React.FunctionComponent<
   const isGuardrailsEnabled = useIsFeatureEnabled(
     FeatureToggleKeys.GUARDRAILS_ENABLED,
   );
-  const isAIInspectorEnabled = useIsFeatureEnabled(
-    FeatureToggleKeys.TOGGLE_OPIK_AI_ENABLED,
-  );
+
   const isExportEnabled = useIsFeatureEnabled(FeatureToggleKeys.EXPORT_ENABLED);
 
   const {
@@ -137,18 +135,17 @@ const TraceDetailsActionsPanel: React.FunctionComponent<
       { name: "PADDING", size: 24, visible: true },
       { name: "FILTER", size: 60, visible: true },
       { name: "SEPARATOR", size: 25, visible: true },
-      { name: "INSPECT_TRACE", size: 166, visible: isAIInspectorEnabled },
       { name: "AGENT_GRAPH", size: 166, visible: hasAgentGraph },
       {
         name: "SEPARATOR",
         size: 25,
-        visible: isAIInspectorEnabled || hasAgentGraph,
+        visible: hasAgentGraph,
       },
       { name: "MORE", size: 32, visible: true },
     ];
 
     return elements.reduce((acc, e) => acc + (e.visible ? e.size : 0), 0);
-  }, [hasAgentGraph, hasThread, isAIInspectorEnabled, experiment]);
+  }, [hasAgentGraph, hasThread, experiment]);
 
   const { ref } = useObserveResizeNode<HTMLDivElement>((node) => {
     setIsSmall(node.clientWidth < minPanelWidth + SEARCH_SPACE_RESERVATION);
@@ -435,22 +432,8 @@ const TraceDetailsActionsPanel: React.FunctionComponent<
           disabled={isSpansLazyLoading}
           align="end"
         />
-        {(isAIInspectorEnabled || hasAgentGraph) && (
+        {hasAgentGraph && (
           <Separator orientation="vertical" className="mx-1 h-4" />
-        )}
-        {isAIInspectorEnabled && (
-          <TooltipWrapper content="Debug your trace with AI assistance (OpikAssist)">
-            <Button
-              variant="default"
-              size={isSmall ? "icon-sm" : "sm"}
-              onClick={() =>
-                setActiveSection(DetailsActionSection.AIAssistants)
-              }
-            >
-              <Sparkles className="size-3.5 shrink-0" />
-              {isSmall ? null : <span className="ml-1.5">Debug with AI</span>}
-            </Button>
-          </TooltipWrapper>
         )}
         {hasAgentGraph && (
           <TooltipWrapper

@@ -589,7 +589,7 @@ export const EXPLAINERS_MAP: Record<EXPLAINER_ID, Explainer> = {
   [EXPLAINER_ID.whats_an_alert]: {
     id: EXPLAINER_ID.whats_an_alert,
     description:
-      "Monitor important events in your project and get notified when something needs your attention.",
+      "Set up channels to monitor important events in your project and get notified when something needs your attention.",
     docLink: "/production/alerts",
   },
   [EXPLAINER_ID.what_are_dashboards]: {

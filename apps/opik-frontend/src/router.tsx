@@ -47,6 +47,8 @@ import AlertsRouteWrapper from "@/components/pages/AlertsPage/AlertsRouteWrapper
 import AddEditAlertPage from "./components/pages/AlertsPage/AddEditAlertPage/AddEditAlertPage";
 import DashboardPage from "@/components/pages/DashboardPage/DashboardPage";
 import DashboardsPage from "@/components/pages/DashboardsPage/DashboardsPage";
+import ScheduledAgentsRouteWrapper from "@/components/pages/ScheduledAgentsPage/ScheduledAgentsRouteWrapper";
+import AddEditSchedulePage from "@/components/pages/ScheduledAgentsPage/AddEditSchedulePage";
 
 declare module "@tanstack/react-router" {
   interface StaticDataRouteOption {
@@ -413,10 +415,10 @@ const configurationRoute = createRoute({
 });
 
 const alertsRoute = createRoute({
-  path: "/alerts",
+  path: "/channels",
   getParentRoute: () => workspaceRoute,
   staticData: {
-    title: "Alerts",
+    title: "Channels",
   },
   component: AlertsRouteWrapper,
 });
@@ -437,6 +439,35 @@ const alertEditRoute = createRoute({
     param: "alertId",
   },
   component: AddEditAlertPage,
+});
+
+// --------- scheduled agents
+
+const scheduledAgentsRoute = createRoute({
+  path: "/scheduled-agents",
+  getParentRoute: () => workspaceRoute,
+  staticData: {
+    title: "Scheduled Agents",
+  },
+  component: ScheduledAgentsRouteWrapper,
+});
+
+const scheduleNewRoute = createRoute({
+  path: "/new",
+  getParentRoute: () => scheduledAgentsRoute,
+  staticData: {
+    title: "New schedule",
+  },
+  component: AddEditSchedulePage,
+});
+
+const scheduleEditRoute = createRoute({
+  path: "/$scheduleId",
+  getParentRoute: () => scheduledAgentsRoute,
+  staticData: {
+    param: "scheduleId",
+  },
+  component: AddEditSchedulePage,
 });
 
 // --------- production
@@ -524,6 +555,7 @@ const routeTree = rootRoute.addChildren([
       playgroundRoute,
       configurationRoute,
       alertsRoute.addChildren([alertNewRoute, alertEditRoute]),
+      scheduledAgentsRoute.addChildren([scheduleNewRoute, scheduleEditRoute]),
       onlineEvaluationRoute,
       annotationQueuesRoute.addChildren([
         annotationQueuesListRoute,

@@ -38,7 +38,7 @@ const AlertsRowActionsCell: React.FunctionComponent<
     if (!alert.id) return;
 
     navigate({
-      to: "/$workspaceName/alerts/$alertId",
+      to: "/$workspaceName/channels/$alertId",
       params: { workspaceName, alertId: alert.id },
       search: (prev) => prev, // Preserve existing search params
     });
