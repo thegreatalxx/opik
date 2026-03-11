@@ -30,7 +30,7 @@ ENV_RQ_QUEUE_NAMES = "RQ_QUEUE_NAMES"
 ENV_MAX_CONCURRENT_JOBS = "OPTSTUDIO_MAX_CONCURRENT_JOBS"
 
 # Default values
-DEFAULT_QUEUE_NAMES = "opik:optimizer-cloud"
+DEFAULT_QUEUE_NAME = "opik:optimizer-cloud"
 DEFAULT_MAX_CONCURRENT_JOBS = 5
 
 # Redis key constants
@@ -97,7 +97,7 @@ class RqWorkerManager:
         self.should_stop: threading.Event = threading.Event()
 
         # Queue names to listen to (comma-separated)
-        queue_names_str: str = os.getenv(ENV_RQ_QUEUE_NAMES, DEFAULT_QUEUE_NAMES)
+        queue_names_str: str = os.getenv(ENV_RQ_QUEUE_NAMES, DEFAULT_QUEUE_NAME)
         self.queue_names: List[str] = [
             name.strip() for name in queue_names_str.split(",") if name.strip()
         ]
