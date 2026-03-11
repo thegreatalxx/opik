@@ -5,6 +5,16 @@
 
 Seamlessly integrate [Opik](https://www.comet.com/docs/opik/) observability with your [OpenAI](https://platform.openai.com/docs) applications to trace, monitor, and debug your LLM API calls.
 
+## Quick Start
+
+The fastest way to configure Opik in an existing OpenAI Node.js project is:
+
+```bash
+npx opik-ts configure
+```
+
+On Opik Cloud, the CLI validates your API key and suggests your default workspace automatically.
+
 ## Features
 
 - 🔍 **Comprehensive Tracing**: Automatically trace OpenAI API calls and completions
@@ -18,13 +28,13 @@ Seamlessly integrate [Opik](https://www.comet.com/docs/opik/) observability with
 
 ```bash
 # npm
-npm install opik-openai
+npm install opik openai opik-openai
 
 # yarn
-yarn add opik-openai
+yarn add opik openai opik-openai
 
 # pnpm
-pnpm add opik-openai
+pnpm add opik openai opik-openai
 ```
 
 ### Requirements
@@ -32,6 +42,19 @@ pnpm add opik-openai
 - Node.js ≥ 18
 - OpenAI SDK (`openai` ≥ 6.0.1)
 - Opik SDK (`opik` peer dependency)
+
+## Configuration
+
+If you are configuring Opik Cloud manually, set:
+
+```bash
+OPENAI_API_KEY="your-openai-api-key"
+OPIK_API_KEY="your-opik-api-key"
+OPIK_URL_OVERRIDE="https://www.comet.com/opik/api"
+OPIK_WORKSPACE="your-workspace-name"
+```
+
+`OPIK_WORKSPACE` is required for Opik Cloud deployments.
 
 ## Usage
 
