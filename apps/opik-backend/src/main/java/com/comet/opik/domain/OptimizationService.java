@@ -404,17 +404,7 @@ class OptimizationServiceImpl implements OptimizationService {
                 .subscribe();
     }
 
-    private static final java.util.Set<String> LEGACY_OPTIMIZER_TYPES = java.util.Set.of(
-            "gepa", "evolutionary", "hierarchical_reflective");
-
     private Queue resolveQueue(Optimization optimization) {
-        if (optimization.studioConfig() != null
-                && optimization.studioConfig().optimizer() != null) {
-            var optimizerType = optimization.studioConfig().optimizer().type();
-            if (optimizerType != null && !LEGACY_OPTIMIZER_TYPES.contains(optimizerType.toLowerCase())) {
-                return Queue.OPTIMIZER_FRAMEWORK;
-            }
-        }
         return Queue.OPTIMIZER_CLOUD;
     }
 

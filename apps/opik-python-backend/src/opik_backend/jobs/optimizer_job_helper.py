@@ -1,8 +1,7 @@
 """
 Shared helper for optimizer job processors.
 
-Provides the common execution logic used by both the legacy optimizer
-(optimizer.py) and the new framework optimizer (framework_optimizer.py).
+Provides the common execution logic used by the optimizer (optimizer.py).
 """
 
 import logging
