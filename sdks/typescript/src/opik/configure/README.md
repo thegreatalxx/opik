@@ -13,7 +13,8 @@ observability and tracing.
 npx opik-ts configure
 ```
 
-This will guide you through the setup process interactively.
+This will guide you through the setup process interactively. On Opik Cloud, the
+CLI validates your API key and suggests your default workspace automatically.
 
 ## Quick Local Setup
 
