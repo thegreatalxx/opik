@@ -525,18 +525,21 @@ public class ExperimentService {
             }
 
             // Case 2: No version specified - use latest version
-            return Mono.fromCallable(() -> {
-                var latestVersion = datasetVersionService.getLatestVersion(datasetId, workspaceId);
-                if (latestVersion.isPresent()) {
-                    var v = latestVersion.get();
-                    log.info("No version specified, using latest version '{}' for experiment on dataset '{}'",
-                            v.id(), datasetId);
-                    return new ResolvedVersion(v.id(), v.executionPolicy());
-                }
-                log.warn("No latest version found for dataset '{}', experiment will have null dataset_version_id",
-                        datasetId);
-                return null;
-            }).subscribeOn(Schedulers.boundedElastic());
+            return Mono.fromCallable(() -> datasetVersionService.getLatestVersion(datasetId, workspaceId))
+                    .subscribeOn(Schedulers.boundedElastic())
+                    .flatMap(latestVersion -> {
+                        if (latestVersion.isPresent()) {
+                            var v = latestVersion.get();
+                            log.info(
+                                    "No version specified, using latest version '{}' for experiment on dataset '{}'",
+                                    v.id(), datasetId);
+                            return Mono.just(new ResolvedVersion(v.id(), v.executionPolicy()));
+                        }
+                        log.warn(
+                                "No latest version found for dataset '{}', experiment will have null dataset_version_id",
+                                datasetId);
+                        return Mono.empty();
+                    });
         });
     }
 

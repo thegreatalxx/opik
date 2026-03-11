@@ -196,6 +196,7 @@ public class ExperimentResponseBuilder {
         BigDecimal p50Sum = BigDecimal.ZERO;
         BigDecimal p90Sum = BigDecimal.ZERO;
         BigDecimal p99Sum = BigDecimal.ZERO;
+        boolean hasDuration = false;
 
         // For feedback scores - group by name and calculate weighted averages
         Map<String, BigDecimal> feedbackScoreSums = new HashMap<>();
@@ -223,6 +224,7 @@ public class ExperimentResponseBuilder {
 
             // For duration percentiles (weighted average)
             if (childAgg.duration() != null) {
+                hasDuration = true;
                 if (childAgg.duration().p50() != null) {
                     p50Sum = p50Sum.add(childAgg.duration().p50().multiply(BigDecimal.valueOf(expCount)));
                 }
@@ -246,7 +248,7 @@ public class ExperimentResponseBuilder {
                 ? weightedCostSum.divide(BigDecimal.valueOf(totalExperimentCount), 9, RoundingMode.HALF_UP)
                 : BigDecimal.ZERO;
 
-        PercentageValues avgDuration = totalExperimentCount > 0
+        PercentageValues avgDuration = hasDuration && totalExperimentCount > 0
                 ? new PercentageValues(
                         p50Sum.divide(BigDecimal.valueOf(totalExperimentCount), 9, RoundingMode.HALF_UP),
                         p90Sum.divide(BigDecimal.valueOf(totalExperimentCount), 9, RoundingMode.HALF_UP),

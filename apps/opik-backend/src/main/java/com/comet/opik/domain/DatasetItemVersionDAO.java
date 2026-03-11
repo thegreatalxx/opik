@@ -3120,30 +3120,24 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
             return Flux.empty();
         }
 
-        return Mono.deferContextual(ctx -> {
-            String workspaceId = ctx.get(RequestContext.WORKSPACE_ID);
+        return asyncTemplate.stream(connection -> {
+            var statement = connection.createStatement(SELECT_EXECUTION_POLICIES_BY_DATASET_ITEM_IDS)
+                    .bind("datasetItemIds", datasetItemIds.toArray(UUID[]::new))
+                    .bind("datasetVersionIds", datasetVersionIds.toArray(UUID[]::new));
 
-            return asyncTemplate.nonTransaction(connection -> {
-                var statement = connection.createStatement(SELECT_EXECUTION_POLICIES_BY_DATASET_ITEM_IDS)
-                        .bind("datasetItemIds", datasetItemIds.toArray(UUID[]::new))
-                        .bind("datasetVersionIds", datasetVersionIds.toArray(UUID[]::new))
-                        .bind("workspace_id", workspaceId);
+            Segment segment = startSegment(DATASET_ITEM_VERSIONS, CLICKHOUSE,
+                    "get_execution_policies_by_dataset_item_ids");
 
-                Segment segment = startSegment(DATASET_ITEM_VERSIONS, CLICKHOUSE,
-                        "get_execution_policies_by_dataset_item_ids");
-
-                return Flux.from(statement.execute())
-                        .flatMap(result -> result.map((row, rowMetadata) -> {
-                            var datasetItemId = UUID.fromString(row.get("dataset_item_id", String.class));
-                            var versionId = UUID.fromString(row.get("dataset_version_id", String.class));
-                            var policy = ExecutionPolicyMapper.fromJson(row.get("execution_policy", String.class));
-                            return new DatasetItemPolicyEntry(versionId, datasetItemId, policy);
-                        }))
-                        .filter(entry -> entry.policy() != null)
-                        .collectList()
-                        .doFinally(signalType -> endSegment(segment));
-            });
-        }).flatMapMany(Flux::fromIterable);
+            return makeFluxContextAware(bindWorkspaceIdToFlux(statement))
+                    .doFinally(signalType -> endSegment(segment))
+                    .flatMap(result -> result.map((row, rowMetadata) -> {
+                        var datasetItemId = UUID.fromString(row.get("dataset_item_id", String.class));
+                        var versionId = UUID.fromString(row.get("dataset_version_id", String.class));
+                        var policy = ExecutionPolicyMapper.fromJson(row.get("execution_policy", String.class));
+                        return new DatasetItemPolicyEntry(versionId, datasetItemId, policy);
+                    }))
+                    .filter(entry -> entry.policy() != null);
+        });
     }
 
     @Override
