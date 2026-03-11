@@ -59,7 +59,15 @@ public record ExperimentItem(
         @JsonView({
                 ExperimentItem.View.Compare.class}) @Schema(accessMode = Schema.AccessMode.READ_ONLY) String description,
         @JsonView({
-                ExperimentItem.View.Public.class}) @Schema(accessMode = Schema.AccessMode.READ_ONLY, description = "Execution policy captured from dataset item version at creation time.") ExecutionPolicy executionPolicy){
+                ExperimentItem.View.Public.class}) @Schema(accessMode = Schema.AccessMode.READ_ONLY, description = "Execution policy captured from dataset item version at creation time.") ExecutionPolicy executionPolicy,
+        @JsonView({
+                ExperimentItem.View.Compare.class}) @Schema(accessMode = Schema.AccessMode.READ_ONLY) List<AssertionResult> assertionResults,
+        @JsonView({
+                ExperimentItem.View.Compare.class}) @Schema(accessMode = Schema.AccessMode.READ_ONLY) String status,
+        @JsonView({
+                ExperimentItem.View.Compare.class}) @Schema(accessMode = Schema.AccessMode.READ_ONLY) Integer passedRuns,
+        @JsonView({
+                ExperimentItem.View.Compare.class}) @Schema(accessMode = Schema.AccessMode.READ_ONLY) Integer totalRuns){
 
     public static class View {
         public static class Write {

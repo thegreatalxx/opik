@@ -1057,7 +1057,8 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
                            eia.usage,
                            eia.visibility_mode,
                            eia.metadata,
-                           di.description
+                           di.description,
+                           eia.execution_policy
                 )) AS experiment_items_array
             FROM experiment_item_aggregates eia FINAL
             INNER JOIN experiment_aggregates ea FINAL ON ea.id = eia.experiment_id

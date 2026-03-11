@@ -78,8 +78,14 @@ public class DatasetItemResultMapper {
                                 .map(Object::toString)
                                 .filter(StringUtils::isNotBlank)
                                 .orElse(null))
+                        .executionPolicy(experimentItem.size() > 18
+                                ? AssertionResultMapper.parseExecutionPolicy(experimentItem.get(18))
+                                : null)
                         .build())
+                .map(AssertionResultMapper::enrichWithAssertions)
                 .toList();
+
+        experimentItems = AssertionResultMapper.enrichWithMultiRunStatus(experimentItems);
 
         return experimentItems.isEmpty() ? null : experimentItems;
     }

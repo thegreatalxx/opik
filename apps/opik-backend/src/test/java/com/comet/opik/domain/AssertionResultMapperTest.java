@@ -1,0 +1,170 @@
+package com.comet.opik.domain;
+
+import com.comet.opik.api.AssertionResult;
+import com.comet.opik.api.ExperimentItem;
+import com.comet.opik.api.FeedbackScore;
+import com.comet.opik.api.ScoreSource;
+import org.junit.jupiter.api.Test;
+
+import java.math.BigDecimal;
+import java.util.List;
+import java.util.UUID;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+class AssertionResultMapperTest {
+
+    @Test
+    void enrichWithAssertions_noFeedbackScores_returnsUnchanged() {
+        var item = baseItem().build();
+
+        var result = AssertionResultMapper.enrichWithAssertions(item);
+
+        assertThat(result.assertionResults()).isNull();
+        assertThat(result.status()).isNull();
+        assertThat(result.feedbackScores()).isNull();
+    }
+
+    @Test
+    void enrichWithAssertions_onlyRegularScores_returnsUnchanged() {
+        var item = baseItem()
+                .feedbackScores(List.of(regularScore("accuracy", BigDecimal.valueOf(0.85))))
+                .build();
+
+        var result = AssertionResultMapper.enrichWithAssertions(item);
+
+        assertThat(result.assertionResults()).isNull();
+        assertThat(result.status()).isNull();
+        assertThat(result.feedbackScores()).hasSize(1);
+        assertThat(result.feedbackScores().getFirst().name()).isEqualTo("accuracy");
+    }
+
+    @Test
+    void enrichWithAssertions_allAssertionsPass_statusPassed() {
+        var item = baseItem()
+                .feedbackScores(List.of(
+                        assertionScore("Should link to docs", BigDecimal.ONE, "Links found"),
+                        assertionScore("Should be concise", BigDecimal.valueOf(1.0), "Under 200 words")))
+                .build();
+
+        var result = AssertionResultMapper.enrichWithAssertions(item);
+
+        assertThat(result.assertionResults()).hasSize(2);
+        assertThat(result.assertionResults()).allMatch(AssertionResult::passed);
+        assertThat(result.status()).isEqualTo("passed");
+        assertThat(result.feedbackScores()).isNull();
+    }
+
+    @Test
+    void enrichWithAssertions_someAssertionsFail_statusFailed() {
+        var item = baseItem()
+                .feedbackScores(List.of(
+                        assertionScore("Should link to docs", BigDecimal.ONE, "Links found"),
+                        assertionScore("Should be concise", BigDecimal.ZERO, "Too long")))
+                .build();
+
+        var result = AssertionResultMapper.enrichWithAssertions(item);
+
+        assertThat(result.assertionResults()).hasSize(2);
+        assertThat(result.status()).isEqualTo("failed");
+        assertThat(result.assertionResults().get(0).passed()).isTrue();
+        assertThat(result.assertionResults().get(1).passed()).isFalse();
+    }
+
+    @Test
+    void enrichWithAssertions_mixedScoreTypes_splitsCorrectly() {
+        var item = baseItem()
+                .feedbackScores(List.of(
+                        regularScore("accuracy", BigDecimal.valueOf(0.85)),
+                        assertionScore("Should link to docs", BigDecimal.ONE, "Links found"),
+                        regularScore("relevance", BigDecimal.valueOf(0.9))))
+                .build();
+
+        var result = AssertionResultMapper.enrichWithAssertions(item);
+
+        assertThat(result.feedbackScores()).hasSize(2);
+        assertThat(result.feedbackScores()).extracting(FeedbackScore::name)
+                .containsExactly("accuracy", "relevance");
+        assertThat(result.assertionResults()).hasSize(1);
+        assertThat(result.assertionResults().getFirst().value()).isEqualTo("Should link to docs");
+        assertThat(result.status()).isEqualTo("passed");
+    }
+
+    @Test
+    void enrichWithMultiRunStatus_singleRun_noPassedRunsSet() {
+        var item = baseItem()
+                .assertionResults(List.of(AssertionResult.builder().value("a").passed(true).build()))
+                .status("passed")
+                .build();
+
+        var result = AssertionResultMapper.enrichWithMultiRunStatus(List.of(item));
+
+        assertThat(result).hasSize(1);
+        assertThat(result.getFirst().passedRuns()).isNull();
+        assertThat(result.getFirst().totalRuns()).isNull();
+    }
+
+    @Test
+    void enrichWithMultiRunStatus_multipleRuns_setsPassedAndTotal() {
+        var experimentId = UUID.randomUUID();
+        var items = List.of(
+                baseItem().experimentId(experimentId)
+                        .assertionResults(List.of(AssertionResult.builder().value("a").passed(true).build()))
+                        .status("passed").build(),
+                baseItem().experimentId(experimentId)
+                        .assertionResults(List.of(AssertionResult.builder().value("a").passed(false).build()))
+                        .status("failed").build(),
+                baseItem().experimentId(experimentId)
+                        .assertionResults(List.of(AssertionResult.builder().value("a").passed(true).build()))
+                        .status("passed").build());
+
+        var result = AssertionResultMapper.enrichWithMultiRunStatus(items);
+
+        assertThat(result).hasSize(3);
+        assertThat(result).allSatisfy(i -> {
+            assertThat(i.passedRuns()).isEqualTo(2);
+            assertThat(i.totalRuns()).isEqualTo(3);
+        });
+    }
+
+    @Test
+    void enrichWithMultiRunStatus_regularExperimentItems_noChange() {
+        var items = List.of(
+                baseItem().build(),
+                baseItem().build());
+
+        var result = AssertionResultMapper.enrichWithMultiRunStatus(items);
+
+        assertThat(result).hasSize(2);
+        assertThat(result).allSatisfy(i -> {
+            assertThat(i.passedRuns()).isNull();
+            assertThat(i.totalRuns()).isNull();
+        });
+    }
+
+    private static ExperimentItem.ExperimentItemBuilder baseItem() {
+        return ExperimentItem.builder()
+                .id(UUID.randomUUID())
+                .experimentId(UUID.randomUUID())
+                .datasetItemId(UUID.randomUUID())
+                .traceId(UUID.randomUUID());
+    }
+
+    private static FeedbackScore regularScore(String name, BigDecimal value) {
+        return FeedbackScore.builder()
+                .name(name)
+                .value(value)
+                .source(ScoreSource.SDK)
+                .build();
+    }
+
+    private static FeedbackScore assertionScore(String name, BigDecimal value, String reason) {
+        return FeedbackScore.builder()
+                .name(name)
+                .categoryName(AssertionResultMapper.SUITE_ASSERTION_CATEGORY)
+                .value(value)
+                .reason(reason)
+                .source(ScoreSource.SDK)
+                .build();
+    }
+}
