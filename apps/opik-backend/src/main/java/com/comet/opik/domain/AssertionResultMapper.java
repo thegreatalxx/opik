@@ -61,22 +61,32 @@ class AssertionResultMapper {
 
         return byExperiment.values().stream()
                 .flatMap(group -> {
+                    boolean hasAssertions = group.stream()
+                            .anyMatch(i -> i.assertionResults() != null);
+
+                    if (!hasAssertions || group.size() <= 1) {
+                        return group.stream();
+                    }
+
                     long passedRuns = group.stream()
                             .filter(i -> "passed".equals(i.status()))
                             .count();
                     int totalRuns = group.size();
 
-                    boolean hasAssertions = group.stream()
-                            .anyMatch(i -> i.assertionResults() != null);
+                    int passThreshold = group.stream()
+                            .map(ExperimentItem::executionPolicy)
+                            .filter(ep -> ep != null)
+                            .findFirst()
+                            .map(ExecutionPolicy::passThreshold)
+                            .orElse(1);
 
-                    if (!hasAssertions || totalRuns <= 1) {
-                        return group.stream();
-                    }
+                    String itemStatus = passedRuns >= passThreshold ? "passed" : "failed";
 
                     return group.stream()
                             .map(i -> i.toBuilder()
                                     .passedRuns((int) passedRuns)
                                     .totalRuns(totalRuns)
+                                    .status(itemStatus)
                                     .build());
                 })
                 .toList();

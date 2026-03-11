@@ -1,6 +1,7 @@
 package com.comet.opik.domain;
 
 import com.comet.opik.api.AssertionResult;
+import com.comet.opik.api.ExecutionPolicy;
 import com.comet.opik.api.ExperimentItem;
 import com.comet.opik.api.FeedbackScore;
 import com.comet.opik.api.ScoreSource;
@@ -124,6 +125,57 @@ class AssertionResultMapperTest {
         assertThat(result).allSatisfy(i -> {
             assertThat(i.passedRuns()).isEqualTo(2);
             assertThat(i.totalRuns()).isEqualTo(3);
+            assertThat(i.status()).isEqualTo("passed");
+        });
+    }
+
+    @Test
+    void enrichWithMultiRunStatus_passThresholdNotMet_statusFailed() {
+        var experimentId = UUID.randomUUID();
+        var policy = ExecutionPolicy.builder().runsPerItem(3).passThreshold(3).build();
+        var items = List.of(
+                baseItem().experimentId(experimentId).executionPolicy(policy)
+                        .assertionResults(List.of(AssertionResult.builder().value("a").passed(true).build()))
+                        .status("passed").build(),
+                baseItem().experimentId(experimentId).executionPolicy(policy)
+                        .assertionResults(List.of(AssertionResult.builder().value("a").passed(false).build()))
+                        .status("failed").build(),
+                baseItem().experimentId(experimentId).executionPolicy(policy)
+                        .assertionResults(List.of(AssertionResult.builder().value("a").passed(true).build()))
+                        .status("passed").build());
+
+        var result = AssertionResultMapper.enrichWithMultiRunStatus(items);
+
+        assertThat(result).hasSize(3);
+        assertThat(result).allSatisfy(i -> {
+            assertThat(i.passedRuns()).isEqualTo(2);
+            assertThat(i.totalRuns()).isEqualTo(3);
+            assertThat(i.status()).isEqualTo("failed");
+        });
+    }
+
+    @Test
+    void enrichWithMultiRunStatus_passThresholdMet_statusPassed() {
+        var experimentId = UUID.randomUUID();
+        var policy = ExecutionPolicy.builder().runsPerItem(3).passThreshold(2).build();
+        var items = List.of(
+                baseItem().experimentId(experimentId).executionPolicy(policy)
+                        .assertionResults(List.of(AssertionResult.builder().value("a").passed(true).build()))
+                        .status("passed").build(),
+                baseItem().experimentId(experimentId).executionPolicy(policy)
+                        .assertionResults(List.of(AssertionResult.builder().value("a").passed(false).build()))
+                        .status("failed").build(),
+                baseItem().experimentId(experimentId).executionPolicy(policy)
+                        .assertionResults(List.of(AssertionResult.builder().value("a").passed(true).build()))
+                        .status("passed").build());
+
+        var result = AssertionResultMapper.enrichWithMultiRunStatus(items);
+
+        assertThat(result).hasSize(3);
+        assertThat(result).allSatisfy(i -> {
+            assertThat(i.passedRuns()).isEqualTo(2);
+            assertThat(i.totalRuns()).isEqualTo(3);
+            assertThat(i.status()).isEqualTo("passed");
         });
     }
 
