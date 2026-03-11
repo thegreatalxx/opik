@@ -9,6 +9,7 @@ import {
   type PackageManager,
   detectAllPackageManagers,
   packageManagers,
+  resolvePackageManagerByName,
 } from './package-manager';
 import { fulfillsVersionRange } from './semver';
 import type { WizardOptions } from './types';
@@ -17,6 +18,7 @@ import { OPIK_ENV_VARS } from '../lib/env-constants';
 import clack from './clack';
 import { getCloudUrl } from './urls';
 import { INTEGRATION_CONFIG } from '../lib/config';
+import { isNonInteractiveEnvironment } from './environment';
 import {
   getDefaultWorkspace,
   isOpikAccessible,
@@ -113,7 +115,16 @@ export function printWelcome(options: {
 export async function confirmContinueIfNoOrDirtyGitRepo(
   options: Pick<WizardOptions, 'default'>,
 ): Promise<void> {
+  const nonInteractive = isNonInteractiveEnvironment();
+
   if (!isInGitRepo()) {
+    if (nonInteractive) {
+      clack.log.warn(
+        'You are not inside a git repository. Continuing in non-interactive mode.',
+      );
+      return;
+    }
+
     const continueWithoutGit = options.default
       ? true
       : await abortIfCancelled(
@@ -139,6 +150,14 @@ ${uncommittedOrUntrackedFiles.join('\n')}
 
 The CLI will create and update files.`,
     );
+
+    if (nonInteractive) {
+      clack.log.info(
+        'Continuing with a dirty git repo in non-interactive mode.',
+      );
+      return;
+    }
+
     const continueWithDirtyRepo = await abortIfCancelled(
       clack.confirm({
         message: 'Do you want to continue anyway?',
@@ -408,6 +427,12 @@ export async function ensureNodejsIsInstalled(): Promise<void> {
       errorType: 'missing_nodejs',
     });
 
+    if (isNonInteractiveEnvironment()) {
+      throw new Error(
+        'Node.js does not seem to be installed. Install Node.js and rerun `opik-ts configure`.',
+      );
+    }
+
     const continueWithoutNodejs = await abortIfCancelled(
       clack.confirm({
         message:
@@ -491,8 +516,16 @@ export async function updatePackageDotJson(
 
 export async function getPackageManager({
   installDir,
-}: Pick<WizardOptions, 'installDir'>): Promise<PackageManager> {
+  packageManager,
+}: Pick<
+  WizardOptions,
+  'installDir' | 'packageManager'
+>): Promise<PackageManager> {
   const detectedPackageManagers = detectAllPackageManagers({ installDir });
+
+  if (packageManager) {
+    return resolvePackageManagerByName(packageManager, detectedPackageManagers);
+  }
 
   // If exactly one package manager detected, use it automatically
   if (detectedPackageManagers.length === 1) {
@@ -510,6 +543,12 @@ export async function getPackageManager({
     detectedPackageManagers.length > 1
       ? 'Multiple package managers detected. Please select one:'
       : 'Please select your package manager.';
+
+  if (isNonInteractiveEnvironment()) {
+    throw new Error(
+      'Unable to determine a package manager in non-interactive mode. Pass `--package-manager` or set `OPIK_TS_PACKAGE_MANAGER`.',
+    );
+  }
 
   const selectedPackageManager: PackageManager = await abortIfCancelled(
     clack.select({
@@ -616,6 +655,22 @@ async function handleLocalDeploymentConfig(): Promise<string> {
   throw new Error('unreachable'); // This line is unreachable but needed for TypeScript
 }
 
+async function validateProvidedOpikUrl(
+  providedUrl: string,
+  deploymentType: DeploymentType,
+): Promise<string> {
+  const normalizedUrl = normalizeOpikUrl(providedUrl);
+  const isAccessible = await isOpikAccessible(normalizedUrl, 5000);
+
+  if (!isAccessible) {
+    throw new Error(
+      `Opik is not accessible at ${normalizedUrl}. This ${deploymentType} URL must be reachable during setup.`,
+    );
+  }
+
+  return normalizedUrl;
+}
+
 /**
  * Handles URL configuration for self-hosted deployment with validation and retries
  * @returns The validated and normalized Opik URL
@@ -674,6 +729,46 @@ async function handleSelfHostedDeploymentConfig(): Promise<string> {
   throw new Error('unreachable'); // This line is unreachable but needed for TypeScript
 }
 
+function inferDeploymentTypeFromUrl(url: string): DeploymentType {
+  const normalizedUrl = normalizeOpikUrl(url);
+  const hostname = new URL(normalizedUrl).hostname.toLowerCase();
+
+  if (
+    hostname === 'localhost' ||
+    hostname === '127.0.0.1' ||
+    hostname === '0.0.0.0'
+  ) {
+    return DeploymentType.LOCAL;
+  }
+
+  if (hostname.endsWith('comet.com')) {
+    return DeploymentType.CLOUD;
+  }
+
+  return DeploymentType.SELF_HOSTED;
+}
+
+async function resolveProjectName(projectName?: string): Promise<string> {
+  if (projectName?.trim()) {
+    return projectName.trim();
+  }
+
+  if (isNonInteractiveEnvironment()) {
+    return 'Default Project';
+  }
+
+  const resolvedProjectName = await abortIfCancelled(
+    clack.text({
+      message: 'Enter your project name (optional)',
+      placeholder: 'Default Project',
+      defaultValue: 'Default Project',
+    }),
+    'nodejs' as Integration,
+  );
+
+  return resolvedProjectName || 'Default Project';
+}
+
 /**
  *
  * Use this function to get project data for the CLI.
@@ -684,6 +779,11 @@ async function handleSelfHostedDeploymentConfig(): Promise<string> {
  */
 export async function getOrAskForProjectData(options?: {
   useLocal?: boolean;
+  deploymentType?: WizardOptions['deploymentType'];
+  url?: string;
+  apiKey?: string;
+  workspace?: string;
+  projectName?: string;
 }): Promise<{
   wizardHash: string;
   host: string;
@@ -693,17 +793,14 @@ export async function getOrAskForProjectData(options?: {
   deploymentType: DeploymentType;
 }> {
   const cloudUrl = getCloudUrl();
+  const nonInteractive = isNonInteractiveEnvironment();
 
   // If --use-local flag is set, skip prompts and use local defaults
   if (options?.useLocal) {
-    const projectName = await abortIfCancelled(
-      clack.text({
-        message: 'Enter your project name (optional)',
-        placeholder: 'Default Project',
-        defaultValue: 'Default Project',
-      }),
-      'nodejs' as Integration,
-    );
+    const host = options.url
+      ? await validateProvidedOpikUrl(options.url, DeploymentType.LOCAL)
+      : DEFAULT_LOCAL_URL;
+    const projectName = await resolveProjectName(options.projectName);
 
     const wizardHash = 'terminal-input-' + Date.now();
 
@@ -717,10 +814,10 @@ export async function getOrAskForProjectData(options?: {
 
     return {
       wizardHash,
-      host: DEFAULT_LOCAL_URL,
+      host,
       projectApiKey: '',
       workspaceName: 'default',
-      projectName: projectName || 'Default Project',
+      projectName,
       deploymentType: DeploymentType.LOCAL,
     };
   }
@@ -749,16 +846,30 @@ export async function getOrAskForProjectData(options?: {
     },
   ];
 
-  const deploymentType = (await abortIfCancelled(
-    clack.select({
-      message: 'Which Opik deployment do you want to log your traces to?',
-      options: deploymentChoices,
-      initialValue: isLocalRunning
-        ? deploymentChoices[2].value
-        : deploymentChoices[0].value,
-    }),
-    'nodejs' as Integration,
-  )) as DeploymentType;
+  let deploymentType: DeploymentType;
+
+  if (options?.deploymentType) {
+    deploymentType = options.deploymentType as DeploymentType;
+  } else if (options?.url) {
+    deploymentType = inferDeploymentTypeFromUrl(options.url);
+  } else if (options?.apiKey || options?.workspace) {
+    deploymentType = DeploymentType.CLOUD;
+  } else if (nonInteractive) {
+    throw new Error(
+      'Unable to determine the deployment type in non-interactive mode. Pass `--deployment-type`, `--url`, or `--use-local`.',
+    );
+  } else {
+    deploymentType = (await abortIfCancelled(
+      clack.select({
+        message: 'Which Opik deployment do you want to log your traces to?',
+        options: deploymentChoices,
+        initialValue: isLocalRunning
+          ? deploymentChoices[2].value
+          : deploymentChoices[0].value,
+      }),
+      'nodejs' as Integration,
+    )) as DeploymentType;
+  }
 
   analytics.capture('deployment type selected', {
     deploymentType,
@@ -771,13 +882,23 @@ export async function getOrAskForProjectData(options?: {
 
   if (deploymentType === DeploymentType.LOCAL) {
     // Local deployment configuration
-    host = await handleLocalDeploymentConfig();
+    host = options?.url
+      ? await validateProvidedOpikUrl(options.url, deploymentType)
+      : await handleLocalDeploymentConfig();
   } else if (deploymentType === DeploymentType.SELF_HOSTED) {
     // Self-hosted deployment configuration
-    host = await handleSelfHostedDeploymentConfig();
+    if (options?.url) {
+      host = await validateProvidedOpikUrl(options.url, deploymentType);
+    } else if (nonInteractive) {
+      throw new Error(
+        'Self-hosted setup requires `--url` or `OPIK_TS_URL` in non-interactive mode.',
+      );
+    } else {
+      host = await handleSelfHostedDeploymentConfig();
+    }
   } else {
     // Cloud deployment configuration
-    host = cloudUrl;
+    host = options?.url ? normalizeOpikUrl(options.url) : cloudUrl;
   }
 
   // Step 4 & 5: API Key and Workspace Name validation (only for cloud and self-hosted)
@@ -787,79 +908,105 @@ export async function getOrAskForProjectData(options?: {
     // Local deployment uses default workspace
     workspaceName = 'default';
   } else {
-    // Loop until we get a valid API key that returns a workspace name
-    let apiKeyValidated = false;
     let defaultWorkspaceName: string | undefined;
 
-    while (!apiKeyValidated) {
-      clack.log.info(
-        `${chalk.bold('You can find your Opik API key here:')}\n${chalk.cyan(
-          `${host}account-settings/apiKeys`,
-        )}`,
-      );
+    if (options?.apiKey?.trim()) {
+      projectApiKey = options.apiKey.trim();
 
-      projectApiKey = await abortIfCancelled(
-        clack.password({
-          message: 'Enter your Opik API key',
+      try {
+        defaultWorkspaceName = await getDefaultWorkspace(projectApiKey, host);
+      } catch (error) {
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
+        debug(`Failed to fetch default workspace: ${errorMessage}`);
+
+        throw new Error(
+          'Invalid API key. Please check your Opik API key and try again.',
+        );
+      }
+    } else {
+      // Loop until we get a valid API key that returns a workspace name
+      let apiKeyValidated = false;
+
+      while (!apiKeyValidated) {
+        if (nonInteractive) {
+          throw new Error(
+            'API key is required for cloud or self-hosted setup in non-interactive mode. Pass `--api-key` or set `OPIK_TS_API_KEY`.',
+          );
+        }
+
+        clack.log.info(
+          `${chalk.bold('You can find your Opik API key here:')}\n${chalk.cyan(
+            `${host}account-settings/apiKeys`,
+          )}`,
+        );
+
+        projectApiKey = await abortIfCancelled(
+          clack.password({
+            message: 'Enter your Opik API key',
+            validate: (value: string | undefined) => {
+              if (!value || value.trim() === '') {
+                return 'API key is required';
+              }
+              return undefined;
+            },
+          }),
+          'nodejs' as Integration,
+        );
+
+        try {
+          defaultWorkspaceName = await getDefaultWorkspace(projectApiKey, host);
+          apiKeyValidated = true;
+        } catch (error) {
+          const errorMessage =
+            error instanceof Error ? error.message : String(error);
+          debug(`Failed to fetch default workspace: ${errorMessage}`);
+
+          clack.log.error(
+            `${chalk.red('Invalid API key')}\n${chalk.dim(
+              'Please check your API key and try again.',
+            )}`,
+          );
+        }
+      }
+    }
+
+    if (options?.workspace?.trim()) {
+      workspaceName = options.workspace.trim();
+    } else if (nonInteractive) {
+      if (!defaultWorkspaceName) {
+        throw new Error(
+          'Unable to determine your default workspace from the API key. Pass `--workspace` or set `OPIK_TS_WORKSPACE`.',
+        );
+      }
+
+      workspaceName = defaultWorkspaceName;
+      clack.log.info(
+        `Using default workspace ${chalk.cyan(workspaceName)} from your Opik account.`,
+      );
+    } else {
+      workspaceName = await abortIfCancelled(
+        clack.text({
+          message: defaultWorkspaceName
+            ? `Enter your workspace name (press Enter to use: ${chalk.cyan(
+                defaultWorkspaceName,
+              )})`
+            : 'Enter your workspace name',
+          placeholder: defaultWorkspaceName || 'your-workspace-name',
+          defaultValue: defaultWorkspaceName,
           validate: (value: string | undefined) => {
-            if (!value || value.trim() === '') {
-              return 'API key is required';
+            if ((!value || value.trim() === '') && !defaultWorkspaceName) {
+              return 'Workspace name is required';
             }
             return undefined;
           },
         }),
         'nodejs' as Integration,
       );
-
-      // Try to fetch the default workspace to validate the API key
-      try {
-        defaultWorkspaceName = await getDefaultWorkspace(projectApiKey, host);
-        apiKeyValidated = true; // API key is valid, we got the workspace name
-      } catch (error) {
-        const errorMessage =
-          error instanceof Error ? error.message : String(error);
-        debug(`Failed to fetch default workspace: ${errorMessage}`);
-
-        clack.log.error(
-          `${chalk.red('Invalid API key')}\n${chalk.dim(
-            'Please check your API key and try again.',
-          )}`,
-        );
-
-        // Loop will continue, asking for API key again
-      }
     }
-
-    // Ask for workspace name with default if available
-    workspaceName = await abortIfCancelled(
-      clack.text({
-        message: defaultWorkspaceName
-          ? `Enter your workspace name (press Enter to use: ${chalk.cyan(
-              defaultWorkspaceName,
-            )})`
-          : 'Enter your workspace name',
-        placeholder: defaultWorkspaceName || 'your-workspace-name',
-        defaultValue: defaultWorkspaceName,
-        validate: (value: string | undefined) => {
-          // Allow empty input if defaultValue is set (Enter key will use default)
-          if ((!value || value.trim() === '') && !defaultWorkspaceName) {
-            return 'Workspace name is required';
-          }
-          return undefined;
-        },
-      }),
-      'nodejs' as Integration,
-    );
   }
 
-  const projectName = await abortIfCancelled(
-    clack.text({
-      message: 'Enter your project name (optional)',
-      placeholder: 'Default Project',
-      defaultValue: 'Default Project',
-    }),
-    'nodejs' as Integration,
-  );
+  const projectName = await resolveProjectName(options?.projectName);
 
   const wizardHash = 'terminal-input-' + Date.now(); // Simple hash for tracking
 
@@ -875,7 +1022,7 @@ export async function getOrAskForProjectData(options?: {
     host,
     projectApiKey,
     workspaceName,
-    projectName: projectName || 'Default Project',
+    projectName,
     deploymentType,
   };
 
@@ -1302,6 +1449,13 @@ export async function checkAndAskToUpdateConfig(
       );
     });
     clack.log.message('');
+  }
+
+  if (isNonInteractiveEnvironment()) {
+    clack.log.info(
+      'Updating existing Opik configuration in non-interactive mode.',
+    );
+    return true;
   }
 
   const shouldUpdate = await abortIfCancelled(
