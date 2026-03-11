@@ -1,22 +1,22 @@
 import React from "react";
-import { cn } from "@/lib/utils";
+import { Tag } from "@/components/ui/tag";
 import { ExperimentItemStatus } from "@/types/evaluation-suites";
 
 const STATUS_CONFIG: Record<
   ExperimentItemStatus,
-  { label: string; className: string }
+  { label: string; variant: "green" | "red" | "gray" }
 > = {
   [ExperimentItemStatus.PASSED]: {
-    label: "PASSED",
-    className: "bg-green-100 text-green-700",
+    label: "Passed",
+    variant: "green",
   },
   [ExperimentItemStatus.FAILED]: {
-    label: "FAILED",
-    className: "bg-red-100 text-red-700",
+    label: "Failed",
+    variant: "red",
   },
   [ExperimentItemStatus.SKIPPED]: {
-    label: "SKIPPED",
-    className: "bg-gray-100 text-gray-600",
+    label: "Skipped",
+    variant: "gray",
   },
 };
 
@@ -24,23 +24,12 @@ type PassFailBadgeProps = {
   status?: ExperimentItemStatus;
 };
 
-const PassFailBadge: React.FunctionComponent<PassFailBadgeProps> = ({
-  status,
-}) => {
+const PassFailBadge: React.FC<PassFailBadgeProps> = ({ status }) => {
   if (!status) return null;
 
   const config = STATUS_CONFIG[status];
 
-  return (
-    <span
-      className={cn(
-        "inline-flex items-center rounded-md px-2 py-0.5 text-xs font-semibold uppercase",
-        config.className,
-      )}
-    >
-      {config.label}
-    </span>
-  );
+  return <Tag variant={config.variant}>{config.label}</Tag>;
 };
 
 export default PassFailBadge;

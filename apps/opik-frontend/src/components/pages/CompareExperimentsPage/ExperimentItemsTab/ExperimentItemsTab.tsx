@@ -504,10 +504,11 @@ const ExperimentItemsTab: React.FunctionComponent<ExperimentItemsTabProps> = ({
       retVal.push(
         mapColumnDataFields<ExperimentsCompare, ExperimentsCompare>({
           id: COLUMN_PASSED_ID,
-          label: "Passed",
+          label: "Result",
+          iconType: "result" as const,
           type: COLUMN_TYPE.string,
           cell: PassedCell as never,
-          size: 100,
+          size: 140,
         }),
       );
     }
@@ -622,6 +623,7 @@ const ExperimentItemsTab: React.FunctionComponent<ExperimentItemsTabProps> = ({
       experimentsCompareId: activeRowId,
       experimentsCompare: activeRow,
       experimentsIds,
+      experiments,
       hasPreviousRow: hasPrevious,
       hasNextRow: hasNext,
       openTrace: setTraceId as OnChangeFn<string>,
@@ -633,6 +635,7 @@ const ExperimentItemsTab: React.FunctionComponent<ExperimentItemsTabProps> = ({
       activeRowId,
       activeRow,
       experimentsIds,
+      experiments,
       hasPrevious,
       hasNext,
       setTraceId,

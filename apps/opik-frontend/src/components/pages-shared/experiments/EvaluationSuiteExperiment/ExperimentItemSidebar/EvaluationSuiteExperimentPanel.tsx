@@ -9,7 +9,7 @@ import ResizableSidePanel from "@/components/shared/ResizableSidePanel/Resizable
 import ShareURLButton from "@/components/shared/ShareURLButton/ShareURLButton";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
-import { ExperimentsCompare } from "@/types/datasets";
+import { Experiment, ExperimentsCompare } from "@/types/datasets";
 import { OnChangeFn, COLUMN_TYPE } from "@/types/shared";
 import useDatasetItemById from "@/api/datasets/useDatasetItemById";
 import useCompareExperimentsList from "@/api/datasets/useCompareExperimentsList";
@@ -20,6 +20,7 @@ type EvaluationSuiteExperimentPanelProps = {
   experimentsCompareId?: string | null;
   experimentsCompare?: ExperimentsCompare;
   experimentsIds: string[];
+  experiments?: Experiment[];
   datasetId: string;
   openTrace: OnChangeFn<string>;
   hasPreviousRow?: boolean;
@@ -35,6 +36,7 @@ const EvaluationSuiteExperimentPanel: React.FunctionComponent<
   experimentsCompareId,
   experimentsCompare,
   experimentsIds,
+  experiments,
   datasetId,
   openTrace,
   hasPreviousRow,
@@ -92,6 +94,7 @@ const EvaluationSuiteExperimentPanel: React.FunctionComponent<
   );
 
   const data = datasetItem?.data || activeExperimentsCompare?.data;
+  const description = datasetItem?.description;
 
   const copyClickHandler = useCallback(() => {
     if (activeExperimentsCompare?.id) {
@@ -128,11 +131,14 @@ const EvaluationSuiteExperimentPanel: React.FunctionComponent<
           } as React.CSSProperties
         }
       >
-        <div className="mt-0 h-[var(--experiment-sidebar-tab-content-height)] overflow-auto">
+        <div className="h-[var(--experiment-sidebar-tab-content-height)]">
           <ExperimentItemContent
             data={data}
             experimentItems={experimentItems}
             openTrace={openTrace}
+            description={description}
+            experiments={experiments}
+            datasetId={datasetId}
           />
         </div>
       </div>

@@ -32,7 +32,7 @@ export const AssertionsListTooltipContent: React.FC<
             <span className="comet-body-xs text-muted-slate">{assertion}</span>
           </div>
           {index < assertions.length - 1 && (
-            <Separator className="my-1 bg-[#f1f5f9]" />
+            <Separator className="my-1 bg-[var(--separator-light)]" />
           )}
         </Fragment>
       ))}

@@ -1,14 +1,7 @@
-import React from "react";
-import { Check, X } from "lucide-react";
+import React, { Fragment } from "react";
 
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Tag } from "@/components/ui/tag";
+import { Separator } from "@/components/ui/separator";
 import { AssertionResult } from "@/types/datasets";
 
 type AssertionResultsTableProps = {
@@ -21,44 +14,42 @@ export const AssertionResultsTable: React.FC<AssertionResultsTableProps> = ({
   if (assertions.length === 0) return null;
 
   return (
-    <div className="mt-4">
-      <h4 className="comet-body-s-accented mb-2">
-        Assertions ({assertions.length})
-      </h4>
-      <Table className="text-sm">
-        <TableHeader>
-          <TableRow className="text-muted-slate">
-            <TableHead className="pb-1.5 text-left font-medium">
-              Assertion
-            </TableHead>
-            <TableHead className="w-16 pb-1.5 text-center font-medium">
-              Passed
-            </TableHead>
-            <TableHead className="pb-1.5 text-left font-medium">
-              Reason
-            </TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {assertions.map((a, idx) => (
-            <TableRow key={idx}>
-              <TableCell className="max-w-48 truncate py-1.5 pr-2">
-                {a.name}
-              </TableCell>
-              <TableCell className="py-1.5 text-center">
-                {a.passed ? (
-                  <Check className="mx-auto size-4 text-green-600" />
-                ) : (
-                  <X className="mx-auto size-4 text-red-600" />
-                )}
-              </TableCell>
-              <TableCell className="max-w-64 truncate py-1.5 text-muted-slate">
-                {a.reason ?? "\u2014"}
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+    <div className="rounded-md border border-border px-2 py-1.5">
+      <div className="grid grid-cols-2 items-center p-1">
+        <span className="comet-body-xs-accented text-foreground">
+          Assertions
+        </span>
+        <span className="comet-body-xs-accented px-2 text-foreground">
+          Result
+        </span>
+      </div>
+      <Separator className="my-1" />
+      {assertions.map((a, idx) => (
+        <Fragment key={idx}>
+          <div className="grid grid-cols-2 items-start">
+            <div className="px-2 py-1">
+              <div className="pt-1">
+                <span className="comet-body-xs text-muted-slate">{a.name}</span>
+              </div>
+            </div>
+            <div className="flex flex-col gap-0.5 px-2 pb-1 pt-0.5">
+              <div>
+                <Tag variant={a.passed ? "green" : "red"}>
+                  {a.passed ? "Passed" : "Failed"}
+                </Tag>
+              </div>
+              {a.reason && (
+                <span className="comet-body-xs overflow-hidden text-ellipsis text-muted-slate">
+                  {a.reason}
+                </span>
+              )}
+            </div>
+          </div>
+          {idx < assertions.length - 1 && (
+            <Separator className="my-1 bg-[var(--separator-light)]" />
+          )}
+        </Fragment>
+      ))}
     </div>
   );
 };

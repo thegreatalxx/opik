@@ -67,6 +67,7 @@ export const COLUMNS = convertColumnDataToColumn<Experiment, Experiment>(
       id: "pass_rate",
       label: "Pass rate",
       type: COLUMN_TYPE.number,
+      iconType: "pass_rate",
       accessorFn: (row) => row.pass_rate,
       cell: PassRateCell as never,
     },

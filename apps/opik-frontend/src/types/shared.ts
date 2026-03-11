@@ -82,7 +82,9 @@ export type HeaderIconType =
   | "tags"
   | "version"
   | "assertions"
-  | "execution_policy";
+  | "execution_policy"
+  | "pass_rate"
+  | "result";
 
 export type ColumnData<T> = {
   id: string;

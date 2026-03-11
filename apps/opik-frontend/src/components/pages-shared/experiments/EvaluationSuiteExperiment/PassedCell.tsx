@@ -3,19 +3,17 @@ import { CellContext } from "@tanstack/react-table";
 
 import CellWrapper from "@/components/shared/DataTableCells/CellWrapper";
 import AssertionsBreakdownTooltip from "./AssertionsBreakdownTooltip";
+import { Tag, TagProps } from "@/components/ui/tag";
 import { AssertionResult, ExperimentsCompare } from "@/types/datasets";
 import { ExperimentItemStatus } from "@/types/evaluation-suites";
 
 const STATUS_DISPLAY: Record<
   ExperimentItemStatus,
-  { label: string; color: string }
+  { label: string; variant: TagProps["variant"] }
 > = {
-  [ExperimentItemStatus.PASSED]: { label: "Yes", color: "text-green-600" },
-  [ExperimentItemStatus.FAILED]: { label: "No", color: "text-red-600" },
-  [ExperimentItemStatus.SKIPPED]: {
-    label: "Skipped",
-    color: "text-muted-slate",
-  },
+  [ExperimentItemStatus.PASSED]: { label: "Passed", variant: "green" },
+  [ExperimentItemStatus.FAILED]: { label: "Failed", variant: "pink" },
+  [ExperimentItemStatus.SKIPPED]: { label: "Skipped", variant: "gray" },
 };
 
 type StatusInfo = {
@@ -65,12 +63,14 @@ const PassedCell: React.FC<CellContext<ExperimentsCompare, unknown>> = (
     >
       {status ? (
         <AssertionsBreakdownTooltip assertionsByRun={assertionsByRun}>
-          <span
-            className={`comet-body-s-accented cursor-default ${STATUS_DISPLAY[status].color}`}
+          <Tag
+            variant={STATUS_DISPLAY[status].variant}
+            size="md"
+            className="cursor-default"
           >
             {STATUS_DISPLAY[status].label}
             {isMultiRun && ` (${passedCount}/${totalCount})`}
-          </span>
+          </Tag>
         </AssertionsBreakdownTooltip>
       ) : (
         <span className="text-muted-slate">{"\u2014"}</span>

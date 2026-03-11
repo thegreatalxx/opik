@@ -11,7 +11,6 @@ import {
 } from "use-query-params";
 import get from "lodash/get";
 import uniq from "lodash/uniq";
-import isNumber from "lodash/isNumber";
 import isObject from "lodash/isObject";
 
 import DataTable from "@/components/shared/DataTable/DataTable";
@@ -30,6 +29,7 @@ import { RESOURCE_TYPE } from "@/components/shared/ResourceLink/ResourceLink";
 import Loader from "@/components/shared/Loader/Loader";
 import useAppStore from "@/store/AppStore";
 import { formatDate } from "@/lib/date";
+import { isEvalSuiteExperiment } from "@/lib/experiments";
 import {
   transformExperimentScores,
   getScoreDisplayName,
@@ -320,6 +320,7 @@ const GeneralDatasetsTab: React.FC = () => {
         id: "pass_rate",
         label: "Pass rate",
         type: COLUMN_TYPE.number,
+        iconType: "pass_rate",
         accessorFn: (row) => row.pass_rate,
         cell: PassRateCell as never,
         aggregatedCell: PassRateCell.Aggregation as never,
@@ -599,7 +600,7 @@ const GeneralDatasetsTab: React.FC = () => {
         (experiment.experiment_scores ?? []).forEach((s) => {
           scores[s.name] = s.value;
         });
-        if (isNumber(experiment.pass_rate)) {
+        if (isEvalSuiteExperiment(experiment)) {
           scores[PASS_RATE_LABEL] = experiment.pass_rate;
         }
 

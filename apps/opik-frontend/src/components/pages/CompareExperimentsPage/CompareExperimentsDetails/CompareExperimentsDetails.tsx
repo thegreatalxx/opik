@@ -1,12 +1,13 @@
 import React, { useEffect, useMemo } from "react";
 import sortBy from "lodash/sortBy";
-import isNumber from "lodash/isNumber";
 import { BooleanParam, useQueryParam } from "use-query-params";
-import { Maximize2, Minimize2 } from "lucide-react";
+import { CircleCheck, Maximize2, Minimize2 } from "lucide-react";
 
 import useBreadcrumbsStore from "@/store/BreadcrumbsStore";
 import { Experiment } from "@/types/datasets";
 import { Button } from "@/components/ui/button";
+import { Tag } from "@/components/ui/tag";
+import TooltipWrapper from "@/components/shared/TooltipWrapper/TooltipWrapper";
 import DateTag from "@/components/shared/DateTag/DateTag";
 import useCompareExperimentsChartsData from "@/components/pages/CompareExperimentsPage/CompareExperimentsDetails/useCompareExperimentsChartsData";
 import ExperimentsRadarChart from "@/components/pages-shared/experiments/ExperimentsRadarChart/ExperimentsRadarChart";
@@ -23,22 +24,11 @@ import {
 } from "@/types/shared";
 import { getScoreDisplayName } from "@/lib/feedback-scores";
 import { generateExperimentIdFilter } from "@/lib/filters";
+import { isEvalSuiteExperiment } from "@/lib/experiments";
 import ViewSelector from "@/components/pages-shared/dashboards/ViewSelector/ViewSelector";
 import { VIEW_TYPE } from "@/types/dashboard";
 import { Separator } from "@/components/ui/separator";
 import ExperimentTagsList from "@/components/pages/CompareExperimentsPage/ExperimentTagsList";
-
-function hasPassRate(e: Experiment | undefined): e is Experiment & {
-  pass_rate: number;
-  passed_count: number;
-  total_count: number;
-} {
-  return (
-    isNumber(e?.pass_rate) &&
-    isNumber(e?.passed_count) &&
-    isNumber(e?.total_count)
-  );
-}
 
 type CompareExperimentsDetailsProps = {
   experimentsIds: string[];
@@ -86,7 +76,7 @@ const CompareExperimentsDetails: React.FunctionComponent<
     experiments,
   });
 
-  const allHavePassRate = experiments.every(hasPassRate);
+  const allEvalSuite = experiments.every(isEvalSuiteExperiment);
 
   const experimentTracesSearch = useMemo(
     () => ({
@@ -96,7 +86,7 @@ const CompareExperimentsDetails: React.FunctionComponent<
   );
 
   const renderCompareFeedbackScoresButton = () => {
-    if (!isCompare || allHavePassRate) return null;
+    if (!isCompare || allEvalSuite) return null;
 
     const text = showCharts ? "Collapse charts" : "Expand charts";
     const Icon = showCharts ? Minimize2 : Maximize2;
@@ -153,21 +143,6 @@ const CompareExperimentsDetails: React.FunctionComponent<
       );
     }
 
-    if (hasPassRate(experiment)) {
-      return (
-        <div className="flex h-11 items-center gap-2">
-          <span className="comet-body-s-accented">
-            Pass rate:{" "}
-            {formatPassRate(
-              experiment.pass_rate,
-              experiment.passed_count,
-              experiment.total_count,
-            )}
-          </span>
-        </div>
-      );
-    }
-
     return <FeedbackScoresList scores={experimentScores} />;
   };
 
@@ -175,7 +150,7 @@ const CompareExperimentsDetails: React.FunctionComponent<
     if (!isCompare || !showCharts || isPending || view === VIEW_TYPE.DASHBOARDS)
       return null;
 
-    if (allHavePassRate) return null;
+    if (allEvalSuite) return null;
 
     return (
       <div className="mb-2 mt-4 overflow-auto">
@@ -256,6 +231,26 @@ const CompareExperimentsDetails: React.FunctionComponent<
             search={experimentTracesSearch}
             tooltipContent="View all traces for this experiment"
           />
+        )}
+        {!isCompare && isEvalSuiteExperiment(experiment) && (
+          <TooltipWrapper
+            content={formatPassRate(
+              experiment.pass_rate,
+              experiment.passed_count,
+              experiment.total_count,
+            )}
+          >
+            <Tag
+              size="md"
+              variant="transparent"
+              className="flex shrink-0 items-center gap-1"
+            >
+              <CircleCheck className={`size-3 shrink-0 ${experiment.pass_rate === 1 ? "text-[var(--color-green)]" : "text-[var(--color-red)]"}`} />
+              <div className="comet-body-s-accented truncate text-muted-slate">
+                {Math.round(experiment.pass_rate * 100)}% pass rate
+              </div>
+            </Tag>
+          </TooltipWrapper>
         )}
       </div>
       {!isCompare && experiment && (
