@@ -13,9 +13,16 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
-    "types": ["node"],
-    "typeRoots": ["./node_modules/@types", "./types"]
+    "types": ["node", "vitest/globals"]
   },
-  "include": ["src", "bin.ts", "index.ts", "types"],
+  "include": [
+    "src",
+    "tests",
+    "bin.ts",
+    "index.ts",
+    "tsup.config.ts",
+    "vitest.config.ts",
+    "types"
+  ],
   "exclude": ["node_modules", "dist"]
 }
