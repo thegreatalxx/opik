@@ -138,7 +138,7 @@ export const RESOURCE_MAP = {
   },
 };
 
-type ResourceLinkProps = {
+export type ResourceLinkProps = {
   name?: string;
   id: string;
   resource: RESOURCE_TYPE;
