@@ -1,5 +1,7 @@
 import * as childProcess from 'node:child_process';
+import * as dns from 'node:dns/promises';
 import * as fs from 'node:fs';
+import { isIP } from 'node:net';
 import * as os from 'node:os';
 import { basename, isAbsolute, join, relative } from 'node:path';
 import chalk from 'chalk';
@@ -621,21 +623,10 @@ async function handleLocalDeploymentConfig(): Promise<string> {
 
     // Validate URL format
     try {
-      const normalizedUrl = normalizeOpikUrl(customUrl);
-
-      // Check if URL is accessible
-      const isAccessible = await isOpikAccessible(normalizedUrl, 5000);
-
-      if (isAccessible) {
-        return normalizedUrl;
-      } else {
-        attemptCount++;
-        if (attemptCount < MAX_URL_VALIDATION_RETRIES) {
-          clack.log.error(
-            `⚠ Opik is not accessible at ${normalizedUrl}. Please try again. (Attempt ${attemptCount}/${MAX_URL_VALIDATION_RETRIES})`,
-          );
-        }
-      }
+      return await validateProvidedOpikUrl(customUrl, {
+        deploymentType: DeploymentType.LOCAL,
+        checkAccessibility: true,
+      });
     } catch (error) {
       attemptCount++;
       if (attemptCount < MAX_URL_VALIDATION_RETRIES) {
@@ -655,16 +646,196 @@ async function handleLocalDeploymentConfig(): Promise<string> {
   throw new Error('unreachable'); // This line is unreachable but needed for TypeScript
 }
 
+const METADATA_HOSTNAMES = new Set([
+  'metadata',
+  'metadata.google.internal',
+  'metadata.google.internal.',
+  'metadata.azure.internal',
+  'metadata.azure.internal.',
+]);
+
+function isLoopbackHostname(hostname: string): boolean {
+  return (
+    hostname === 'localhost' ||
+    hostname === '127.0.0.1' ||
+    hostname === '::1' ||
+    hostname === '0.0.0.0'
+  );
+}
+
+function isCometHostname(hostname: string): boolean {
+  return hostname === 'comet.com' || hostname.endsWith('.comet.com');
+}
+
+function ipv4ToNumber(ip: string): number {
+  return (
+    ip
+      .split('.')
+      .map((part) => Number(part))
+      .reduce((value, octet) => (value << 8) + octet, 0) >>> 0
+  );
+}
+
+function isIpv4InRange(
+  ip: string,
+  base: string,
+  prefixLength: number,
+): boolean {
+  const mask =
+    prefixLength === 0 ? 0 : (0xffffffff << (32 - prefixLength)) >>> 0;
+
+  return (ipv4ToNumber(ip) & mask) === (ipv4ToNumber(base) & mask);
+}
+
+function isPrivateOrSpecialIpv4(ip: string): boolean {
+  const privateRanges: Array<[string, number]> = [
+    ['0.0.0.0', 8],
+    ['10.0.0.0', 8],
+    ['100.64.0.0', 10],
+    ['127.0.0.0', 8],
+    ['169.254.0.0', 16],
+    ['172.16.0.0', 12],
+    ['192.168.0.0', 16],
+    ['224.0.0.0', 4],
+    ['240.0.0.0', 4],
+  ];
+
+  return privateRanges.some(([base, prefixLength]) =>
+    isIpv4InRange(ip, base, prefixLength),
+  );
+}
+
+function isPrivateOrSpecialIpv6(ip: string): boolean {
+  const normalizedIp = ip.toLowerCase();
+  return (
+    normalizedIp === '::' ||
+    normalizedIp === '::1' ||
+    normalizedIp.startsWith('fe80:') ||
+    normalizedIp.startsWith('fc') ||
+    normalizedIp.startsWith('fd') ||
+    normalizedIp.startsWith('ff')
+  );
+}
+
+function isMetadataIp(ip: string): boolean {
+  return (
+    ip === '169.254.169.254' ||
+    ip === '100.100.100.200' ||
+    ip.toLowerCase() === 'fe80::a9fe:a9fe'
+  );
+}
+
+function isPrivateOrSpecialIp(ip: string): boolean {
+  const ipVersion = isIP(ip);
+
+  if (ipVersion === 4) {
+    return isPrivateOrSpecialIpv4(ip);
+  }
+
+  if (ipVersion === 6) {
+    return isPrivateOrSpecialIpv6(ip);
+  }
+
+  return false;
+}
+
+async function resolveHostnameIps(hostname: string): Promise<string[]> {
+  if (isIP(hostname)) {
+    return [hostname];
+  }
+
+  try {
+    const records = await dns.lookup(hostname, { all: true, verbatim: true });
+    return records.map((record) => record.address);
+  } catch {
+    return [];
+  }
+}
+
+async function assertTrustedSetupUrl({
+  normalizedUrl,
+  deploymentType,
+  trustUrl = false,
+}: {
+  normalizedUrl: string;
+  deploymentType: DeploymentType;
+  trustUrl?: boolean;
+}): Promise<void> {
+  const hostname = new URL(normalizedUrl).hostname.toLowerCase();
+  const resolvedIps = await resolveHostnameIps(hostname);
+  const hasMetadataTarget =
+    METADATA_HOSTNAMES.has(hostname) || resolvedIps.some(isMetadataIp);
+
+  if (hasMetadataTarget) {
+    throw new Error(
+      `Refusing to connect to ${normalizedUrl} because it points to a metadata service.`,
+    );
+  }
+
+  const isTrustedByDefault =
+    isCometHostname(hostname) ||
+    (deploymentType === DeploymentType.LOCAL && isLoopbackHostname(hostname));
+
+  if (isTrustedByDefault || trustUrl) {
+    return;
+  }
+
+  const pointsToPrivateNetwork =
+    isLoopbackHostname(hostname) || resolvedIps.some(isPrivateOrSpecialIp);
+
+  const trustMessage = pointsToPrivateNetwork
+    ? `The URL ${chalk.cyan(
+        normalizedUrl,
+      )} resolves to a private or local network address.`
+    : `The URL ${chalk.cyan(
+        normalizedUrl,
+      )} is not an Opik Cloud host and has not been trusted yet.`;
+
+  if (isNonInteractiveEnvironment()) {
+    throw new Error(
+      `${trustMessage} Pass \`--trust-url\` or set \`OPIK_TS_TRUST_URL=true\` if you intend to use it.`,
+    );
+  }
+
+  const shouldTrustUrl = await abortIfCancelled(
+    clack.confirm({
+      message: `${trustMessage} The CLI may probe this host and send your Opik API key to it. Do you trust this URL?`,
+      initialValue: false,
+    }),
+    'nodejs' as Integration,
+  );
+
+  if (!shouldTrustUrl) {
+    throw new Error(
+      `Refusing to use untrusted URL ${normalizedUrl}. Provide a trusted Opik host or rerun with \`--trust-url\` if you intend to use it.`,
+    );
+  }
+}
+
 async function validateProvidedOpikUrl(
   providedUrl: string,
-  deploymentType: DeploymentType,
+  options: {
+    deploymentType: DeploymentType;
+    trustUrl?: boolean;
+    checkAccessibility?: boolean;
+  },
 ): Promise<string> {
   const normalizedUrl = normalizeOpikUrl(providedUrl);
+  await assertTrustedSetupUrl({
+    normalizedUrl,
+    deploymentType: options.deploymentType,
+    trustUrl: options.trustUrl,
+  });
+
+  if (!options.checkAccessibility) {
+    return normalizedUrl;
+  }
+
   const isAccessible = await isOpikAccessible(normalizedUrl, 5000);
 
   if (!isAccessible) {
     throw new Error(
-      `Opik is not accessible at ${normalizedUrl}. This ${deploymentType} URL must be reachable during setup.`,
+      `Opik is not accessible at ${normalizedUrl}. This ${options.deploymentType} URL must be reachable during setup.`,
     );
   }
 
@@ -695,21 +866,10 @@ async function handleSelfHostedDeploymentConfig(): Promise<string> {
 
     // Validate URL format
     try {
-      const normalizedUrl = normalizeOpikUrl(customUrl);
-
-      // Check if URL is accessible
-      const isAccessible = await isOpikAccessible(normalizedUrl, 5000);
-
-      if (isAccessible) {
-        return normalizedUrl;
-      } else {
-        attemptCount++;
-        if (attemptCount < MAX_URL_VALIDATION_RETRIES) {
-          clack.log.error(
-            `⚠ Opik is not accessible at ${normalizedUrl}. Please try again, the URL should follow a format similar to http://localhost:5173/. (Attempt ${attemptCount}/${MAX_URL_VALIDATION_RETRIES})`,
-          );
-        }
-      }
+      return await validateProvidedOpikUrl(customUrl, {
+        deploymentType: DeploymentType.SELF_HOSTED,
+        checkAccessibility: true,
+      });
     } catch (error) {
       attemptCount++;
       if (attemptCount < MAX_URL_VALIDATION_RETRIES) {
@@ -783,6 +943,7 @@ export async function getOrAskForProjectData(options?: {
   url?: string;
   apiKey?: string;
   workspace?: string;
+  trustUrl?: boolean;
   projectName?: string;
 }): Promise<{
   wizardHash: string;
@@ -798,7 +959,11 @@ export async function getOrAskForProjectData(options?: {
   // If --use-local flag is set, skip prompts and use local defaults
   if (options?.useLocal) {
     const host = options.url
-      ? await validateProvidedOpikUrl(options.url, DeploymentType.LOCAL)
+      ? await validateProvidedOpikUrl(options.url, {
+          deploymentType: DeploymentType.LOCAL,
+          trustUrl: options.trustUrl,
+          checkAccessibility: true,
+        })
       : DEFAULT_LOCAL_URL;
     const projectName = await resolveProjectName(options.projectName);
 
@@ -883,12 +1048,20 @@ export async function getOrAskForProjectData(options?: {
   if (deploymentType === DeploymentType.LOCAL) {
     // Local deployment configuration
     host = options?.url
-      ? await validateProvidedOpikUrl(options.url, deploymentType)
+      ? await validateProvidedOpikUrl(options.url, {
+          deploymentType,
+          trustUrl: options.trustUrl,
+          checkAccessibility: true,
+        })
       : await handleLocalDeploymentConfig();
   } else if (deploymentType === DeploymentType.SELF_HOSTED) {
     // Self-hosted deployment configuration
     if (options?.url) {
-      host = await validateProvidedOpikUrl(options.url, deploymentType);
+      host = await validateProvidedOpikUrl(options.url, {
+        deploymentType,
+        trustUrl: options.trustUrl,
+        checkAccessibility: true,
+      });
     } else if (nonInteractive) {
       throw new Error(
         'Self-hosted setup requires `--url` or `OPIK_TS_URL` in non-interactive mode.',
@@ -898,7 +1071,13 @@ export async function getOrAskForProjectData(options?: {
     }
   } else {
     // Cloud deployment configuration
-    host = options?.url ? normalizeOpikUrl(options.url) : cloudUrl;
+    host = options?.url
+      ? await validateProvidedOpikUrl(options.url, {
+          deploymentType,
+          trustUrl: options.trustUrl,
+          checkAccessibility: false,
+        })
+      : cloudUrl;
   }
 
   // Step 4 & 5: API Key and Workspace Name validation (only for cloud and self-hosted)
@@ -910,21 +1089,35 @@ export async function getOrAskForProjectData(options?: {
   } else {
     let defaultWorkspaceName: string | undefined;
 
+    let needsApiKeyPrompt = true;
+
     if (options?.apiKey?.trim()) {
       projectApiKey = options.apiKey.trim();
 
       try {
         defaultWorkspaceName = await getDefaultWorkspace(projectApiKey, host);
+        needsApiKeyPrompt = false;
       } catch (error) {
         const errorMessage =
           error instanceof Error ? error.message : String(error);
         debug(`Failed to fetch default workspace: ${errorMessage}`);
 
-        throw new Error(
-          'Invalid API key. Please check your Opik API key and try again.',
+        if (nonInteractive) {
+          throw new Error(
+            'Invalid API key. Please check your Opik API key and try again.',
+          );
+        }
+
+        clack.log.error(
+          `${chalk.red('Invalid API key')}\n${chalk.dim(
+            'The provided API key could not be validated. Please enter a different API key.',
+          )}`,
         );
+        projectApiKey = '';
       }
-    } else {
+    }
+
+    if (needsApiKeyPrompt) {
       // Loop until we get a valid API key that returns a workspace name
       let apiKeyValidated = false;
 
