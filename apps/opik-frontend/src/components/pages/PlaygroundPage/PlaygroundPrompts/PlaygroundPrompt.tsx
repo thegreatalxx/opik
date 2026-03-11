@@ -6,7 +6,6 @@ import React, {
   useState,
 } from "react";
 import { Trash, Save } from "lucide-react";
-import { Separator } from "@/components/ui/separator";
 import last from "lodash/last";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -17,6 +16,7 @@ import {
   PROVIDER_MODEL_TYPE,
 } from "@/types/providers";
 import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
 
 import { getDefaultConfigByProvider } from "@/lib/playground";
 import { updateProviderConfig } from "@/lib/modelUtils";
@@ -127,14 +127,10 @@ const PlaygroundPrompt = ({
     [datasetVariables],
   );
 
-  const hasMessageContent = useMemo(
-    () =>
-      messages.some((msg) =>
-        typeof msg.content === "string"
-          ? msg.content.trim()
-          : Array.isArray(msg.content) && msg.content.length > 0,
-      ),
-    [messages],
+  const hasMessageContent = messages.some((msg) =>
+    typeof msg.content === "string"
+      ? msg.content.trim()
+      : Array.isArray(msg.content) && msg.content.length > 0,
   );
 
   const handleAddMessage = useCallback(() => {
