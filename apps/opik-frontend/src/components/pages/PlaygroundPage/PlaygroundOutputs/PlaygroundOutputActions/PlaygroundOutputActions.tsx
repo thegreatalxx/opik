@@ -431,7 +431,7 @@ const PlaygroundOutputActions = ({
           <PlaygroundProgressIndicator />
         </div>
       )}
-      <div className="sticky flex items-center justify-between gap-2">
+      <div className="sticky flex items-center justify-between gap-2 pr-4">
         {createdExperiments.length > 0 && plainDatasetId && (
           <div className="flex gap-2">
             {canViewExperiments && (

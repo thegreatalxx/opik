@@ -36,6 +36,7 @@ interface PromptModelConfigsProps {
   provider: COMPOSED_PROVIDER_TYPE;
   model?: PROVIDER_MODEL_TYPE | "";
   size?: ButtonProps["size"];
+  variant?: ButtonProps["variant"];
   configs: Partial<LLMPromptConfigsType>;
   onChange: (configs: Partial<LLMPromptConfigsType>) => void;
   disabled?: boolean;
@@ -45,6 +46,7 @@ const PromptModelConfigs = ({
   provider: composedProviderType,
   model,
   size = "icon-sm",
+  variant = "outline",
   configs,
   onChange,
   disabled: disabledProp = false,
@@ -119,7 +121,7 @@ const PromptModelConfigs = ({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" size={size} disabled={disabled}>
+        <Button variant={variant} size={size} disabled={disabled}>
           <Settings2 />
         </Button>
       </DropdownMenuTrigger>
