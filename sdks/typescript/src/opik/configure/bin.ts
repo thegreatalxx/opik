@@ -4,7 +4,6 @@ import { red } from './src/utils/logging';
 
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
-import chalk from 'chalk';
 
 const NODE_VERSION_RANGE = '>=18.17.0';
 
@@ -19,7 +18,6 @@ if (!satisfies(process.version, NODE_VERSION_RANGE)) {
 
 import type { WizardOptions } from './src/utils/types';
 import { runWizard } from './src/run';
-import { isNonInteractiveEnvironment } from './src/utils/environment';
 import { runDoctor } from './src/doctor';
 import clack from './src/utils/clack';
 
@@ -61,26 +59,48 @@ yargs(hideBin(process.argv))
             'Configure for local deployment (skips API key/workspace setup)\nenv: OPIK_TS_USE_LOCAL',
           type: 'boolean',
         },
+        'deployment-type': {
+          choices: ['cloud', 'self-hosted', 'local'] as const,
+          describe:
+            'Configure a specific deployment type without prompting\nenv: OPIK_TS_DEPLOYMENT_TYPE',
+          type: 'string',
+        },
+        url: {
+          describe:
+            'Base URL for your Opik instance (used for local or self-hosted setup)\nenv: OPIK_TS_URL',
+          type: 'string',
+        },
+        'api-key': {
+          describe:
+            'Opik API key for cloud or self-hosted setup\nenv: OPIK_TS_API_KEY',
+          type: 'string',
+        },
+        workspace: {
+          describe:
+            'Workspace name override for cloud or self-hosted setup. If omitted, configure uses your default workspace from the API key\nenv: OPIK_TS_WORKSPACE',
+          type: 'string',
+        },
+        'project-name': {
+          describe:
+            'Project name to write into the generated configuration\nenv: OPIK_TS_PROJECT_NAME',
+          type: 'string',
+        },
+        'package-manager': {
+          choices: ['npm', 'pnpm', 'yarn', 'bun'] as const,
+          describe:
+            'Package manager to use when auto-detection is ambiguous\nenv: OPIK_TS_PACKAGE_MANAGER',
+          type: 'string',
+        },
       });
     },
     async (argv) => {
-      // Check for interactive terminal for configure command
-      if (isNonInteractiveEnvironment()) {
-        clack.intro(chalk.inverse(`Opik TS`));
-
-        clack.log.error(
-          'This installer requires an interactive terminal (TTY) to run.\n' +
-            'It appears you are running in a non-interactive environment.\n' +
-            'Please run the CLI in an interactive terminal.',
-        );
-        process.exit(1);
-      }
-
       const options = { ...argv };
       try {
         await runWizard(options as unknown as WizardOptions);
       } catch (error) {
-        clack.log.error(`Error: ${error instanceof Error ? error.message : String(error)}`);
+        clack.log.error(
+          `Error: ${error instanceof Error ? error.message : String(error)}`,
+        );
         process.exit(1);
       }
     },
@@ -93,7 +113,9 @@ yargs(hideBin(process.argv))
       try {
         await runDoctor();
       } catch (error) {
-        clack.log.error(`Error: ${error instanceof Error ? error.message : String(error)}`);
+        clack.log.error(
+          `Error: ${error instanceof Error ? error.message : String(error)}`,
+        );
         process.exit(1);
       }
     },
@@ -104,9 +126,11 @@ yargs(hideBin(process.argv))
   .alias('help', 'h')
   .version()
   .alias('version', 'v')
-  .wrap(process.stdout.isTTY ? (process.stdout.columns || 80) : 80)
+  .wrap(process.stdout.isTTY ? process.stdout.columns || 80 : 80)
   .parseAsync()
   .catch((error) => {
-    console.error(`Fatal error: ${error instanceof Error ? error.message : String(error)}`);
+    console.error(
+      `Fatal error: ${error instanceof Error ? error.message : String(error)}`,
+    );
     process.exit(1);
   });
