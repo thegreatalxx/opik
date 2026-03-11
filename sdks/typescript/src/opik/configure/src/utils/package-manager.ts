@@ -1,10 +1,10 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { getPackageDotJson, updatePackageDotJson } from './clack-utils';
-import type { WizardOptions } from './types';
+import type { PackageManagerName, WizardOptions } from './types';
 
 export interface PackageManager {
-  name: string;
+  name: PackageManagerName;
   label: string;
   installCommand: string;
   buildCommand: string;
@@ -195,6 +195,30 @@ export const NPM: PackageManager = {
 };
 
 export const packageManagers = [BUN, YARN_V1, YARN_V2, PNPM, NPM];
+
+export function resolvePackageManagerByName(
+  packageManagerName: PackageManagerName,
+  detectedManagers: PackageManager[] = [],
+): PackageManager {
+  const matchingDetectedManagers = detectedManagers.filter(
+    (manager) => manager.name === packageManagerName,
+  );
+
+  if (matchingDetectedManagers.length === 1) {
+    return matchingDetectedManagers[0];
+  }
+
+  switch (packageManagerName) {
+    case 'bun':
+      return BUN;
+    case 'pnpm':
+      return PNPM;
+    case 'npm':
+      return NPM;
+    case 'yarn':
+      return matchingDetectedManagers[0] ?? YARN_V2;
+  }
+}
 
 export function detectAllPackageManagers({
   installDir,
