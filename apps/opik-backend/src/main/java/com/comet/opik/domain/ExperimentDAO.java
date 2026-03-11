@@ -1194,7 +1194,7 @@ class ExperimentDAO {
 
     private static final String FIND_EXECUTION_POLICY_BY_EXPERIMENT_IDS = """
             SELECT
-                DISTINCT id, execution_policy
+                DISTINCT id, execution_policy, dataset_version_id
             FROM experiments
             WHERE id in :experiment_ids
             AND workspace_id = :workspace_id
@@ -1731,7 +1731,10 @@ class ExperimentDAO {
                         row.get("id", UUID.class))));
     }
 
-    public Flux<Map.Entry<UUID, ExecutionPolicy>> getExecutionPoliciesByIds(@NonNull Set<UUID> experimentIds) {
+    public record ExperimentPolicyInfo(ExecutionPolicy policy, UUID datasetVersionId) {
+    }
+
+    public Flux<Map.Entry<UUID, ExperimentPolicyInfo>> getExecutionPoliciesByIds(@NonNull Set<UUID> experimentIds) {
         if (experimentIds.isEmpty()) {
             return Flux.empty();
         }
@@ -1744,7 +1747,12 @@ class ExperimentDAO {
                 .flatMap(result -> result.map((row, rowMetadata) -> {
                     var id = row.get("id", UUID.class);
                     var policy = ExecutionPolicy.fromJson(row.get("execution_policy", String.class));
-                    return Map.entry(id, policy != null ? policy : ExecutionPolicy.DEFAULT);
+                    var versionIdStr = row.get("dataset_version_id", String.class);
+                    var versionId = (versionIdStr != null && !versionIdStr.isBlank())
+                            ? UUID.fromString(versionIdStr)
+                            : null;
+                    return Map.entry(id, new ExperimentPolicyInfo(
+                            policy != null ? policy : ExecutionPolicy.DEFAULT, versionId));
                 }));
     }
 

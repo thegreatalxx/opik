@@ -650,7 +650,7 @@ public class ExperimentService {
                 .all(experimentWorkspace -> workspaceId.equals(experimentWorkspace.workspaceId()));
     }
 
-    public Mono<Map<UUID, ExecutionPolicy>> getExecutionPolicies(@NonNull Set<UUID> experimentIds) {
+    public Mono<Map<UUID, ExperimentDAO.ExperimentPolicyInfo>> getExecutionPolicies(@NonNull Set<UUID> experimentIds) {
         return experimentDAO.getExecutionPoliciesByIds(experimentIds)
                 .collectMap(Map.Entry::getKey, Map.Entry::getValue);
     }

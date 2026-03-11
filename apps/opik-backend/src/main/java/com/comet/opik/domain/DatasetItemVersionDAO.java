@@ -274,7 +274,8 @@ public interface DatasetItemVersionDAO {
      */
     Mono<List<WorkspaceAndResourceId>> getDatasetItemWorkspace(Set<UUID> datasetItemRowIds);
 
-    Mono<Map<UUID, ExecutionPolicy>> getExecutionPoliciesByRowIds(Set<UUID> datasetItemRowIds);
+    Mono<Map<UUID, ExecutionPolicy>> getExecutionPoliciesByDatasetItemIds(Set<UUID> datasetItemIds,
+            Set<UUID> datasetVersionIds);
 
     /**
      * Mapping from row ID to dataset_item_id.
@@ -1458,9 +1459,8 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
                 execution_policy
             FROM dataset_item_versions
             WHERE dataset_item_id IN :datasetItemIds
+            AND dataset_version_id IN :datasetVersionIds
             AND workspace_id = :workspace_id
-            ORDER BY (workspace_id, dataset_id, dataset_version_id, id) DESC, last_updated_at DESC
-            LIMIT 1 BY dataset_item_id
             """;
 
     private static final String SELECT_ITEMS_BY_DATASET_ITEM_IDS = """
@@ -3109,8 +3109,9 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
 
     @Override
     @WithSpan
-    public Mono<Map<UUID, ExecutionPolicy>> getExecutionPoliciesByRowIds(@NonNull Set<UUID> datasetItemRowIds) {
-        if (datasetItemRowIds.isEmpty()) {
+    public Mono<Map<UUID, ExecutionPolicy>> getExecutionPoliciesByDatasetItemIds(@NonNull Set<UUID> datasetItemIds,
+            @NonNull Set<UUID> datasetVersionIds) {
+        if (datasetItemIds.isEmpty() || datasetVersionIds.isEmpty()) {
             return Mono.just(Map.of());
         }
 
@@ -3119,11 +3120,12 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
 
             return asyncTemplate.nonTransaction(connection -> {
                 var statement = connection.createStatement(SELECT_EXECUTION_POLICIES_BY_DATASET_ITEM_IDS)
-                        .bind("datasetItemIds", datasetItemRowIds.toArray(UUID[]::new))
+                        .bind("datasetItemIds", datasetItemIds.toArray(UUID[]::new))
+                        .bind("datasetVersionIds", datasetVersionIds.toArray(UUID[]::new))
                         .bind("workspace_id", workspaceId);
 
                 Segment segment = startSegment(DATASET_ITEM_VERSIONS, CLICKHOUSE,
-                        "get_execution_policies_by_row_ids");
+                        "get_execution_policies_by_dataset_item_ids");
 
                 return Flux.from(statement.execute())
                         .flatMap(result -> result.map((row, rowMetadata) -> {

@@ -156,23 +156,30 @@ public class ExperimentItemService {
                 .map(ExperimentItem::datasetItemId)
                 .collect(toSet());
 
-        var experimentPoliciesMono = experimentService.getExecutionPolicies(experimentIds);
-        Mono<Map<UUID, ExecutionPolicy>> itemPoliciesMono = featureFlags.isDatasetVersioningEnabled()
-                ? datasetItemVersionDAO.getExecutionPoliciesByRowIds(datasetItemIds)
-                : Mono.just(Map.of());
+        return experimentService.getExecutionPolicies(experimentIds)
+                .flatMap(experimentInfoMap -> {
+                    var datasetVersionIds = experimentInfoMap.values().stream()
+                            .map(ExperimentDAO.ExperimentPolicyInfo::datasetVersionId)
+                            .filter(Objects::nonNull)
+                            .collect(toSet());
 
-        return Mono.zip(itemPoliciesMono, experimentPoliciesMono)
-                .map(tuple -> {
-                    var itemPolicies = tuple.getT1();
-                    var experimentPolicies = tuple.getT2();
-                    return experimentItems.stream()
+                    Mono<Map<UUID, ExecutionPolicy>> itemPoliciesMono = featureFlags.isDatasetVersioningEnabled()
+                            && !datasetVersionIds.isEmpty()
+                                    ? datasetItemVersionDAO.getExecutionPoliciesByDatasetItemIds(
+                                            datasetItemIds, datasetVersionIds)
+                                    : Mono.just(Map.of());
+
+                    return itemPoliciesMono.map(itemPolicies -> experimentItems.stream()
                             .map(item -> {
                                 if (item.executionPolicy() != null) {
                                     return item;
                                 }
                                 var policy = itemPolicies.get(item.datasetItemId());
                                 if (policy == null) {
-                                    policy = experimentPolicies.get(item.experimentId());
+                                    var info = experimentInfoMap.get(item.experimentId());
+                                    if (info != null) {
+                                        policy = info.policy();
+                                    }
                                 }
                                 if (policy == null) {
                                     policy = ExecutionPolicy.DEFAULT;
@@ -181,7 +188,7 @@ public class ExperimentItemService {
                                         .executionPolicy(policy)
                                         .build();
                             })
-                            .collect(toSet());
+                            .collect(toSet()));
                 });
     }
 
