@@ -16,7 +16,7 @@ metadata:
   twitter:site: "@CometML"
 
 announcement:
-  message: "​​​Join us for our live and interactive paper reading session on March 17th! <a href=\"https://luma.com/mw7njzug\" rel=\"nofollow\" target=\"_blank\">Register</a>"
+  message: '​​​Join us for our live and interactive paper reading session on March 17th! <a href="https://luma.com/mw7njzug" rel="nofollow" target="_blank">Register</a>'
 
 title: Opik Documentation
 favicon: img/logo.svg
@@ -50,6 +50,9 @@ logo:
   href: null
   height: 28
 navbar-links:
+  - type: minimal
+    text: "LLM Index"
+    href: "https://www.comet.com/docs/opik/llms.txt"
   - type: minimal
     text: "Copy to LLM"
     href: "https://www.comet.com/docs/opik/llms-full.txt"
@@ -1090,6 +1093,33 @@ redirects:
   - source: "/docs/opik/prompt_engineering/prompt_optimization"
     destination: "/docs/opik/agent_optimization/best_practices/prompt_engineering"
   # TypeScript SDK integration redirects
+  - source: "/docs/opik/typescript-sdk"
+    destination: "/docs/opik/reference/typescript-sdk/overview"
+    permanent: true
+  - source: "/docs/opik/typescript-sdk/get-started"
+    destination: "/docs/opik/reference/typescript-sdk/overview"
+    permanent: true
+  - source: "/docs/opik/typescript-sdk/getting-started"
+    destination: "/docs/opik/reference/typescript-sdk/overview"
+    permanent: true
+  - source: "/docs/opik/ts-sdk"
+    destination: "/docs/opik/reference/typescript-sdk/overview"
+    permanent: true
+  - source: "/docs/opik/ts-sdk/get-started"
+    destination: "/docs/opik/reference/typescript-sdk/overview"
+    permanent: true
+  - source: "/docs/opik/ts-sdk/getting-started"
+    destination: "/docs/opik/reference/typescript-sdk/overview"
+    permanent: true
+  - source: "/docs/opik/reference/typescript-sdk/get-started"
+    destination: "/docs/opik/reference/typescript-sdk/overview"
+    permanent: true
+  - source: "/docs/opik/reference/typescript-sdk/getting-started"
+    destination: "/docs/opik/reference/typescript-sdk/overview"
+    permanent: true
+  - source: "/docs/opik/reference/typescript-sdk/quickstart"
+    destination: "/docs/opik/reference/typescript-sdk/opik-ts"
+    permanent: true
   - source: "/docs/opik/reference/typescript-sdk/integrations/vercel-ai-sdk"
     destination: "/docs/opik/integrations/vercel-ai-sdk"
     permanent: true
@@ -1097,6 +1127,12 @@ redirects:
     destination: "/docs/opik/integrations/langchainjs"
     permanent: true
   - source: "/docs/opik/reference/typescript-sdk/integrations/openai"
+    destination: "/docs/opik/integrations/openai-typescript"
+    permanent: true
+  - source: "/docs/opik/reference/typescript-sdk/integrations/openai/nodejs"
+    destination: "/docs/opik/integrations/openai-typescript"
+    permanent: true
+  - source: "/docs/opik/reference/typescript-sdk/integrations/openai/javascript"
     destination: "/docs/opik/integrations/openai-typescript"
     permanent: true
   - source: "/docs/opik/reference/typescript-sdk/integrations/workers-ai"
@@ -1121,6 +1157,12 @@ redirects:
     destination: "/docs/opik/agent_optimization/overview"
     permanent: true
   # Integration redirects - from /tracing/integrations/ to /integrations/ (clean URLs)
+  - source: "/docs/opik/tracing/integrations"
+    destination: "/docs/opik/integrations/overview"
+    permanent: true
+  - source: "/docs/opik/tracing/integrations/"
+    destination: "/docs/opik/integrations/overview"
+    permanent: true
   - source: "/docs/opik/tracing/integrations/overview"
     destination: "/docs/opik/integrations/overview"
     permanent: true
@@ -1232,7 +1274,25 @@ redirects:
   - source: "/docs/opik/tracing/integrations/openai"
     destination: "/docs/opik/integrations/openai"
     permanent: true
+  - source: "/docs/opik/tracing/integrations/openai/node"
+    destination: "/docs/opik/integrations/openai-typescript"
+    permanent: true
+  - source: "/docs/opik/tracing/integrations/openai/nodejs"
+    destination: "/docs/opik/integrations/openai-typescript"
+    permanent: true
+  - source: "/docs/opik/tracing/integrations/openai/javascript"
+    destination: "/docs/opik/integrations/openai-typescript"
+    permanent: true
   - source: "/docs/opik/tracing/integrations/openai-typescript"
+    destination: "/docs/opik/integrations/openai-typescript"
+    permanent: true
+  - source: "/docs/opik/integrations/openai/node"
+    destination: "/docs/opik/integrations/openai-typescript"
+    permanent: true
+  - source: "/docs/opik/integrations/openai/nodejs"
+    destination: "/docs/opik/integrations/openai-typescript"
+    permanent: true
+  - source: "/docs/opik/integrations/openai/javascript"
     destination: "/docs/opik/integrations/openai-typescript"
     permanent: true
   - source: "/docs/opik/tracing/integrations/openai_agents"
