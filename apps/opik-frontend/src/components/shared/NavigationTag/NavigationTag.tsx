@@ -3,6 +3,7 @@ import React from "react";
 import ResourceLink, {
   RESOURCE_TYPE,
   RESOURCE_MAP,
+  ResourceLinkProps,
 } from "@/components/shared/ResourceLink/ResourceLink";
 import { Filter } from "@/types/filters";
 import { TagProps } from "@/components/ui/tag";
@@ -17,7 +18,7 @@ type NavigationTagProps = {
   tooltipContent?: string;
   className?: string;
   isSmall?: boolean;
-  iconSize?: number;
+  iconSize?: ResourceLinkProps["iconSize"];
   size?: TagProps["size"];
   variant?: TagProps["variant"];
 };
