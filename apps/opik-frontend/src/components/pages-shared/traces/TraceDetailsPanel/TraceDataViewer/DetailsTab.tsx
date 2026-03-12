@@ -43,7 +43,7 @@ const DetailsTab: React.FunctionComponent<DetailsTabProps> = ({
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { source_code, ...rest } = metadataRecord as Record<string, unknown>;
     return Object.keys(rest).length > 0 ? rest : null;
-  }, [data.metadata, sourceCode]);
+  }, [data.metadata, metadataRecord, sourceCode]);
 
   const hasMetadata = Boolean(metadataWithoutSourceCode);
 
