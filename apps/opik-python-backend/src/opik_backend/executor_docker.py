@@ -85,7 +85,7 @@ executor_cpu_cores_gauge = meter.create_gauge(
 
 executor_memory_bytes_gauge = meter.create_gauge(
     name="executor_container_memory_bytes",
-    description="Memory usage of an executor container in bytes",
+    description="Total memory usage (including cache) of an executor container in bytes",
     unit="bytes",
 )
 
@@ -214,7 +214,13 @@ class DockerExecutor(CodeExecutorBase):
         return pool_size
 
     def _collect_executor_resource_metrics(self):
-        """Collect CPU and memory metrics from executor containers via Docker stats API."""
+        """Collect CPU and memory metrics from executor containers via Docker stats API.
+
+        Note: container.stats(stream=False) takes ~1-2s per container (synchronous Docker API call).
+        This runs on the same scheduler thread as _check_pool, so a long collection could delay
+        one pool health check. At the default 60s interval this is negligible. If the interval
+        is lowered significantly, consider collecting stats in parallel or on a separate thread.
+        """
         if self.stop_event.is_set():
             return schedule.CancelJob
 
@@ -314,8 +320,14 @@ class DockerExecutor(CodeExecutorBase):
                 # Record the start time
                 start_time = time.time()
 
+                short_id = container.short_id
+
                 # Remove the container
                 container.remove(force=True)
+
+                # Zero out resource metrics for the removed container
+                executor_cpu_cores_gauge.set(0, {"container_id": short_id})
+                executor_memory_bytes_gauge.set(0, {"container_id": short_id})
 
                 # Calculate and record the latency
                 latency = self._calculate_latency_ms(start_time)
