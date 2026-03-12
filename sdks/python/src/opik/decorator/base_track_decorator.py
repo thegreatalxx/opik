@@ -246,7 +246,7 @@ class BaseTrackDecorator(abc.ABC):
                 existing_metadata = start_span_arguments.metadata or {}
                 start_span_arguments.metadata = {
                     **existing_metadata,
-                    "source_code": source_code,
+                    "source_code": f"```python\n{source_code}\n```",
                 }
 
         return TrackingStartOptions(
