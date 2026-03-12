@@ -2043,7 +2043,7 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
                 promptVersions,
                 datasetVersionId,
                 null, // datasetVersionSummary - not in DB
-                hasPassRate ? getBigDecimal(row, "pass_rate") : null,
+                hasPassRate ? row.get("pass_rate", BigDecimal.class) : null,
                 hasPassRate ? row.get("passed_count", Long.class) : null,
                 hasPassRate ? totalCount : null);
     }
