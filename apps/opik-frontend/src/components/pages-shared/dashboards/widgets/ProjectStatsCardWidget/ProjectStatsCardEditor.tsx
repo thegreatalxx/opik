@@ -93,7 +93,7 @@ const ProjectStatsCardEditor = forwardRef<WidgetEditorHandle>((_, ref) => {
     defaultValues: {
       source,
       metric,
-      projectId: localProjectId,
+      projectId,
       traceFilters,
       spanFilters,
     },
@@ -165,7 +165,6 @@ const ProjectStatsCardEditor = forwardRef<WidgetEditorHandle>((_, ref) => {
                       field.onChange(value);
                       handleProjectChange(value);
                     }}
-                    showClearButton
                     disabled={hasRuntimeProjectId}
                   />
                 </FormControl>
@@ -216,7 +215,7 @@ const ProjectStatsCardEditor = forwardRef<WidgetEditorHandle>((_, ref) => {
 
             return (
               <FormItem>
-                <FormLabel>Metric</FormLabel>
+                <FormLabel>Metric type</FormLabel>
                 <FormControl>
                   <LoadableSelectBox
                     buttonClassName={cn({

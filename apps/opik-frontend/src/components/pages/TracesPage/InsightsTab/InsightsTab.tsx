@@ -8,10 +8,9 @@ import {
 } from "@/components/pages-shared/traces/MetricDateRangeSelect";
 import DashboardSaveActions from "@/components/pages-shared/dashboards/DashboardSaveActions/DashboardSaveActions";
 import DashboardContent from "@/components/pages-shared/dashboards/DashboardContent/DashboardContent";
-import DashboardSelectBox from "@/components/pages-shared/dashboards/DashboardSelectBox/DashboardSelectBox";
+import InsightsViewSelector from "@/components/pages/TracesPage/InsightsTab/InsightsViewSelector";
 import ShareDashboardButton from "@/components/pages-shared/dashboards/ShareDashboardButton/ShareDashboardButton";
 import useQueryParamAndLocalStorageState from "@/hooks/useQueryParamAndLocalStorageState";
-import { DASHBOARD_SCOPE, DASHBOARD_TYPE } from "@/types/dashboard";
 import { useDashboardLifecycle } from "@/components/pages-shared/dashboards/hooks/useDashboardLifecycle";
 import {
   useDashboardStore,
@@ -27,18 +26,23 @@ import {
 import { Separator } from "@/components/ui/separator";
 import TooltipWrapper from "@/components/shared/TooltipWrapper/TooltipWrapper";
 import { useActiveWorkspaceName } from "@/store/AppStore";
+import { usePermissions } from "@/contexts/PermissionsContext";
 
 const DASHBOARD_QUERY_PARAM_KEY = "dashboardId";
 const DASHBOARD_LOCAL_STORAGE_KEY_PREFIX = "opik-project-dashboard";
 
-interface DashboardsTabProps {
+interface InsightsTabProps {
   projectId: string;
 }
 
-const DashboardsTab: React.FunctionComponent<DashboardsTabProps> = ({
+const DEFAULT_TEMPLATE_ID = PROJECT_TEMPLATE_LIST[0].id;
+
+const InsightsTab: React.FunctionComponent<InsightsTabProps> = ({
   projectId,
 }) => {
   const workspaceName = useActiveWorkspaceName();
+  const { permissions } = usePermissions();
+  const { canViewDashboards } = permissions;
 
   const [dashboardId, setDashboardId] = useQueryParamAndLocalStorageState({
     localStorageKey: `${DASHBOARD_LOCAL_STORAGE_KEY_PREFIX}-${workspaceName}`,
@@ -49,24 +53,25 @@ const DashboardsTab: React.FunctionComponent<DashboardsTabProps> = ({
     syncLocalStorageAcrossTabs: false,
   });
 
+  // Ensure a valid dashboard is always selected:
+  // - no permission → lock to default template
+  // - no selection or deprecated ID → fall back to default template
   useEffect(() => {
-    if (!dashboardId) {
-      setDashboardId(PROJECT_TEMPLATE_LIST[0].id);
-      return;
-    }
-    if (
+    const needsDefault =
+      !canViewDashboards ||
+      !dashboardId ||
       dashboardId === DEPRECATED_PROJECT_METRICS_ID ||
-      dashboardId === DEPRECATED_PROJECT_PERFORMANCE_ID
-    ) {
-      setDashboardId(PROJECT_TEMPLATE_LIST[0].id);
-    }
-  }, [dashboardId, setDashboardId]);
+      dashboardId === DEPRECATED_PROJECT_PERFORMANCE_ID;
 
-  const { dashboard, isPending, save, discard, isTemplate } =
-    useDashboardLifecycle({
-      dashboardId: dashboardId || null,
-      enabled: Boolean(dashboardId),
-    });
+    if (needsDefault && dashboardId !== DEFAULT_TEMPLATE_ID) {
+      setDashboardId(DEFAULT_TEMPLATE_ID);
+    }
+  }, [dashboardId, setDashboardId, canViewDashboards]);
+
+  const { dashboard, isPending, save, discard } = useDashboardLifecycle({
+    dashboardId: dashboardId || null,
+    enabled: Boolean(dashboardId),
+  });
 
   const hasUnsavedChanges = useDashboardStore(selectHasUnsavedChanges);
   const setRuntimeConfig = useDashboardStore(selectSetRuntimeConfig);
@@ -105,17 +110,13 @@ const DashboardsTab: React.FunctionComponent<DashboardsTabProps> = ({
     [dashboardId, setDashboardId],
   );
 
-  const dashboardSelectBox = (
-    <DashboardSelectBox
+  const viewSelector = (
+    <InsightsViewSelector
       value={dashboardId || null}
       onChange={setDashboardId}
-      buttonClassName="w-[300px]"
-      onDashboardCreated={handleDashboardCreated}
-      onDashboardDeleted={handleDashboardDeleted}
+      onViewCreated={handleDashboardCreated}
+      onViewDeleted={handleDashboardDeleted}
       disabled={hasUnsavedChanges}
-      templates={PROJECT_TEMPLATE_LIST}
-      dashboardType={DASHBOARD_TYPE.MULTI_PROJECT}
-      dashboardScope={DASHBOARD_SCOPE.INSIGHTS}
     />
   );
 
@@ -126,13 +127,14 @@ const DashboardsTab: React.FunctionComponent<DashboardsTabProps> = ({
         direction="bidirectional"
         limitWidth
       >
-        {hasUnsavedChanges ? (
-          <TooltipWrapper content="Save or discard your changes before switching">
-            <div>{dashboardSelectBox}</div>
-          </TooltipWrapper>
-        ) : (
-          dashboardSelectBox
-        )}
+        {canViewDashboards &&
+          (hasUnsavedChanges ? (
+            <TooltipWrapper content="Save or discard your changes before switching">
+              <div>{viewSelector}</div>
+            </TooltipWrapper>
+          ) : (
+            viewSelector
+          ))}
 
         <div className="flex shrink-0 items-center gap-2">
           {dashboard && (
@@ -140,7 +142,6 @@ const DashboardsTab: React.FunctionComponent<DashboardsTabProps> = ({
               onSave={save}
               onDiscard={discard}
               dashboard={dashboard}
-              isTemplate={isTemplate}
               navigateOnCreate={false}
               onDashboardCreated={handleDashboardCreated}
             />
@@ -183,4 +184,4 @@ const DashboardsTab: React.FunctionComponent<DashboardsTabProps> = ({
   );
 };
 
-export default DashboardsTab;
+export default InsightsTab;

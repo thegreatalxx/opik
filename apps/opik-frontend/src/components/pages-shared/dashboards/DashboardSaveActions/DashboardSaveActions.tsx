@@ -23,7 +23,6 @@ interface DashboardSaveActionsProps {
   onSave: () => Promise<void>;
   onDiscard: () => void;
   dashboard: Dashboard;
-  isTemplate?: boolean;
   navigateOnCreate?: boolean;
   onDashboardCreated?: (dashboardId: string) => void;
 }
@@ -34,7 +33,6 @@ const DashboardSaveActions: React.FunctionComponent<
   onSave,
   onDiscard,
   dashboard,
-  isTemplate = false,
   navigateOnCreate = true,
   onDashboardCreated,
 }) => {
@@ -48,8 +46,6 @@ const DashboardSaveActions: React.FunctionComponent<
 
   const saveAsDialogKey = useRef(0);
   const saveAsDialogDashboard = useRef(dashboard);
-  const proceedNavigationRef = useRef<(() => void) | null>(null);
-  const cancelNavigationRef = useRef<(() => void) | null>(null);
 
   const handleSave = useCallback(async () => {
     setIsSaving(true);
@@ -86,11 +82,6 @@ const DashboardSaveActions: React.FunctionComponent<
   }, [dashboard, getDashboard]);
 
   const handleSaveAsDialogClose = useCallback((open: boolean) => {
-    if (!open) {
-      cancelNavigationRef.current?.();
-      proceedNavigationRef.current = null;
-      cancelNavigationRef.current = null;
-    }
     setSaveAsDialogOpen(open);
   }, []);
 
@@ -99,35 +90,25 @@ const DashboardSaveActions: React.FunctionComponent<
       setSaveAsDialogOpen(false);
       onDiscard();
       onDashboardCreated?.(dashboardId);
-      proceedNavigationRef.current?.();
-      proceedNavigationRef.current = null;
-      cancelNavigationRef.current = null;
     },
     [onDiscard, onDashboardCreated],
   );
 
   const handleSaveAndLeave = useCallback(
     (proceed: () => void, cancel: () => void) => {
-      if (isTemplate) {
-        proceedNavigationRef.current = proceed;
-        cancelNavigationRef.current = cancel;
-        openSaveAsDialog();
-      } else {
-        onSave().then(proceed).catch(cancel);
-      }
+      onSave().then(proceed).catch(cancel);
     },
-    [isTemplate, openSaveAsDialog, onSave],
+    [onSave],
   );
 
   const { DialogComponent: NavigationBlockerDialog } = useNavigationBlocker({
     condition: hasUnsavedChanges,
-    description: isTemplate
-      ? "You have unsaved changes in this template. Save as a new dashboard to keep them before leaving?"
-      : "You have unsaved changes in this dashboard. Save them before leaving?",
+    description:
+      "You have unsaved changes in this dashboard. Save them before leaving?",
     confirmText: "Discard changes",
     cancelText: "Cancel",
     onSaveAndLeave: handleSaveAndLeave,
-    saveAndLeaveText: isTemplate ? "Save as new dashboard" : "Save and leave",
+    saveAndLeaveText: "Save and leave",
   });
 
   if (!hasUnsavedChanges) {
@@ -145,28 +126,22 @@ const DashboardSaveActions: React.FunctionComponent<
         Discard changes
       </Button>
 
-      {isTemplate ? (
-        <Button size="sm" onClick={openSaveAsDialog} disabled={isSaving}>
-          Save as new dashboard
-        </Button>
-      ) : (
-        <ButtonWithDropdown>
-          <ButtonWithDropdownTrigger
-            variant="default"
-            size="sm"
-            onPrimaryClick={handleSave}
-            disabled={isSaving}
-          >
-            Save changes
-          </ButtonWithDropdownTrigger>
-          <ButtonWithDropdownContent align="end">
-            <ButtonWithDropdownItem onClick={openSaveAsDialog}>
-              <Copy className="mr-2 size-4" />
-              Save as new
-            </ButtonWithDropdownItem>
-          </ButtonWithDropdownContent>
-        </ButtonWithDropdown>
-      )}
+      <ButtonWithDropdown>
+        <ButtonWithDropdownTrigger
+          variant="default"
+          size="sm"
+          onPrimaryClick={handleSave}
+          disabled={isSaving}
+        >
+          Save changes
+        </ButtonWithDropdownTrigger>
+        <ButtonWithDropdownContent align="end">
+          <ButtonWithDropdownItem onClick={openSaveAsDialog}>
+            <Copy className="mr-2 size-4" />
+            Save as new
+          </ButtonWithDropdownItem>
+        </ButtonWithDropdownContent>
+      </ButtonWithDropdown>
 
       <Separator orientation="vertical" className="mx-2 h-4" />
 
@@ -175,11 +150,7 @@ const DashboardSaveActions: React.FunctionComponent<
         setOpen={setDiscardDialogOpen}
         onConfirm={handleDiscard}
         title="Discard changes?"
-        description={
-          isTemplate
-            ? "All unsaved changes will be removed. This will return the template to its original state."
-            : "All unsaved changes will be removed. This will return the dashboard to its last saved version."
-        }
+        description="All unsaved changes will be removed. This will return the dashboard to its last saved version."
         confirmText="Discard changes"
         cancelText="Cancel"
         confirmButtonVariant="destructive"

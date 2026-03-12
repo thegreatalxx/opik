@@ -20,7 +20,7 @@ const EXPERIMENT_COMPARISON_TEMPLATE: DashboardTemplate = {
   description:
     "Monitor experiment results and evaluation metrics over time to spot quality changes.",
   icon: FlaskConical,
-  iconColor: "text-template-icon-experiments",
+  iconColor: "text-chart-pink",
   config: {
     version: DASHBOARD_VERSION,
     sections: [

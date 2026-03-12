@@ -7,7 +7,11 @@ import {
   INTERVAL_TYPE,
   METRIC_NAME_TYPE,
 } from "@/api/projects/useProjectMetric";
-import { useDashboardStore, selectRuntimeConfig } from "@/store/DashboardStore";
+import {
+  useDashboardStore,
+  selectRuntimeConfig,
+  selectReadOnly,
+} from "@/store/DashboardStore";
 import {
   DashboardWidgetComponentProps,
   BreakdownConfig,
@@ -64,6 +68,7 @@ const ProjectMetricsWidget: React.FunctionComponent<
     }),
   );
 
+  const readOnly = useDashboardStore(selectReadOnly);
   const onAddEditWidgetCallback = useDashboardStore(
     (state) => state.onAddEditWidgetCallback,
   );
@@ -375,6 +380,14 @@ const ProjectMetricsWidget: React.FunctionComponent<
     return undefined;
   };
 
+  const editAction =
+    !preview && !readOnly ? (
+      <DashboardWidget.EmptyState.EditAction
+        label="Configure widget"
+        onClick={handleEdit}
+      />
+    ) : undefined;
+
   const renderChartContent = () => {
     const chartType =
       (widget.config?.chartType as CHART_TYPE.line | CHART_TYPE.bar) ||
@@ -388,14 +401,7 @@ const ProjectMetricsWidget: React.FunctionComponent<
         <DashboardWidget.EmptyState
           title="Project not configured"
           message="This widget needs a project to display data. Select a default project for the dashboard or set a custom one in the widget settings."
-          action={
-            !preview ? (
-              <DashboardWidget.EmptyState.EditAction
-                label="Configure widget"
-                onClick={handleEdit}
-              />
-            ) : undefined
-          }
+          action={editAction}
         />
       );
     }
@@ -405,14 +411,7 @@ const ProjectMetricsWidget: React.FunctionComponent<
         <DashboardWidget.EmptyState
           title="No metric selected"
           message="Choose a metric to display in this widget"
-          action={
-            !preview ? (
-              <DashboardWidget.EmptyState.EditAction
-                label="Configure widget"
-                onClick={handleEdit}
-              />
-            ) : undefined
-          }
+          action={editAction}
         />
       );
     }
@@ -486,6 +485,7 @@ const ProjectMetricsWidget: React.FunctionComponent<
         <DashboardWidget.Header
           title={widget.title || widget.generatedTitle || ""}
           subtitle={widget.subtitle}
+          readOnly={readOnly}
           actions={
             <DashboardWidget.ActionsMenu
               sectionId={sectionId!}

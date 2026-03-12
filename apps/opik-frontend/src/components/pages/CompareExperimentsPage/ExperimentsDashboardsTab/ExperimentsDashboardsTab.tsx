@@ -48,11 +48,10 @@ const ExperimentsDashboardsTab: React.FunctionComponent<
     }
   }, [dashboardId, setDashboardId]);
 
-  const { dashboard, isPending, save, discard, isTemplate } =
-    useDashboardLifecycle({
-      dashboardId: dashboardId || null,
-      enabled: Boolean(dashboardId),
-    });
+  const { dashboard, isPending, save, discard } = useDashboardLifecycle({
+    dashboardId: dashboardId || null,
+    enabled: Boolean(dashboardId),
+  });
 
   const hasUnsavedChanges = useDashboardStore(selectHasUnsavedChanges);
   const setRuntimeConfig = useDashboardStore(selectSetRuntimeConfig);
@@ -124,7 +123,6 @@ const ExperimentsDashboardsTab: React.FunctionComponent<
               onSave={save}
               onDiscard={discard}
               dashboard={dashboard}
-              isTemplate={isTemplate}
               navigateOnCreate={false}
               onDashboardCreated={handleDashboardCreated}
             />

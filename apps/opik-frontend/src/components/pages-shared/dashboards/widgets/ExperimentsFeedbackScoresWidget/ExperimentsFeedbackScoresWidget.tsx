@@ -4,7 +4,11 @@ import isEmpty from "lodash/isEmpty";
 import uniq from "lodash/uniq";
 
 import DashboardWidget from "@/components/shared/Dashboard/DashboardWidget/DashboardWidget";
-import { useDashboardStore, selectRuntimeConfig } from "@/store/DashboardStore";
+import {
+  useDashboardStore,
+  selectRuntimeConfig,
+  selectReadOnly,
+} from "@/store/DashboardStore";
 import {
   DashboardWidgetComponentProps,
   ExperimentsFeedbackScoresWidgetType,
@@ -209,6 +213,7 @@ const ExperimentsFeedbackScoresWidget: React.FunctionComponent<
   DashboardWidgetComponentProps
 > = ({ sectionId, widgetId, preview = false }) => {
   const workspaceName = useAppStore((state) => state.activeWorkspaceName);
+  const readOnly = useDashboardStore(selectReadOnly);
 
   const widget = useDashboardStore(
     useShallow((state) => {
@@ -431,7 +436,7 @@ const ExperimentsFeedbackScoresWidget: React.FunctionComponent<
           title="No data available"
           message={emptyMessage}
           action={
-            !preview ? (
+            !preview && !readOnly ? (
               <DashboardWidget.EmptyState.EditAction
                 label="Configure widget"
                 onClick={handleEdit}
@@ -493,6 +498,7 @@ const ExperimentsFeedbackScoresWidget: React.FunctionComponent<
           title={widget.title || widget.generatedTitle || ""}
           subtitle={widget.subtitle}
           warningMessage={warningMessage}
+          readOnly={readOnly}
           actions={
             <DashboardWidget.ActionsMenu
               sectionId={sectionId!}

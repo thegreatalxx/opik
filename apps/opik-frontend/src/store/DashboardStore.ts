@@ -38,6 +38,7 @@ interface DashboardStoreState {
   widgetResolver: WidgetResolver | null;
   previewWidget: DashboardWidget | null;
   hasUnsavedChanges: boolean;
+  readOnly: boolean;
 }
 
 interface DashboardActions {
@@ -84,6 +85,8 @@ interface DashboardActions {
 
   setHasUnsavedChanges: (hasChanges: boolean) => void;
 
+  setReadOnly: (readOnly: boolean) => void;
+
   clearDashboard: () => void;
 
   loadDashboardFromBackend: (dashboardState: DashboardState) => void;
@@ -129,6 +132,7 @@ export const useDashboardStore = create<DashboardStore>()(
         widgetResolver: null,
         previewWidget: null,
         hasUnsavedChanges: false,
+        readOnly: false,
 
         addSection: (title?: string) => {
           const newSection = generateEmptySection(title);
@@ -430,6 +434,10 @@ export const useDashboardStore = create<DashboardStore>()(
           set({ hasUnsavedChanges: hasChanges }, false, "setHasUnsavedChanges");
         },
 
+        setReadOnly: (readOnly) => {
+          set({ readOnly }, false, "setReadOnly");
+        },
+
         clearDashboard: () => {
           const emptyDashboard = generateEmptyDashboard();
           set(
@@ -437,6 +445,7 @@ export const useDashboardStore = create<DashboardStore>()(
               sections: emptyDashboard.sections,
               version: emptyDashboard.version,
               lastModified: Date.now(),
+              readOnly: false,
             },
             false,
             "clearDashboard",
@@ -539,3 +548,6 @@ export const selectHasUnsavedChanges = (state: DashboardStore) =>
   state.hasUnsavedChanges;
 export const selectSetHasUnsavedChanges = (state: DashboardStore) =>
   state.setHasUnsavedChanges;
+
+export const selectReadOnly = (state: DashboardStore) => state.readOnly;
+export const selectSetReadOnly = (state: DashboardStore) => state.setReadOnly;

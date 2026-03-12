@@ -3,7 +3,11 @@ import { useShallow } from "zustand/react/shallow";
 
 import DashboardWidget from "@/components/shared/Dashboard/DashboardWidget/DashboardWidget";
 import TooltipWrapper from "@/components/shared/TooltipWrapper/TooltipWrapper";
-import { useDashboardStore, selectRuntimeConfig } from "@/store/DashboardStore";
+import {
+  useDashboardStore,
+  selectRuntimeConfig,
+  selectReadOnly,
+} from "@/store/DashboardStore";
 import { DashboardWidgetComponentProps } from "@/types/dashboard";
 import { Filter } from "@/types/filters";
 import { isFilterValid } from "@/lib/filters";
@@ -43,6 +47,7 @@ const renderMetricDisplay = (
 const ProjectStatsCardWidget: React.FunctionComponent<
   DashboardWidgetComponentProps
 > = ({ sectionId, widgetId, preview = false }) => {
+  const readOnly = useDashboardStore(selectReadOnly);
   const runtimeContext = useDashboardStore(
     useShallow((state) => {
       const rc = selectRuntimeConfig(state);
@@ -135,20 +140,21 @@ const ProjectStatsCardWidget: React.FunctionComponent<
     return null;
   }
 
+  const editAction =
+    !preview && !readOnly ? (
+      <DashboardWidget.EmptyState.EditAction
+        label="Configure widget"
+        onClick={handleEdit}
+      />
+    ) : undefined;
+
   const renderCardContent = () => {
     if (!projectId) {
       return (
         <DashboardWidget.EmptyState
           title="Project not configured"
           message="This widget needs a project to display data. Select a default project for the dashboard or set a custom one in the widget settings."
-          action={
-            !preview ? (
-              <DashboardWidget.EmptyState.EditAction
-                label="Configure widget"
-                onClick={handleEdit}
-              />
-            ) : undefined
-          }
+          action={editAction}
         />
       );
     }
@@ -158,14 +164,7 @@ const ProjectStatsCardWidget: React.FunctionComponent<
         <DashboardWidget.EmptyState
           title="No metric selected"
           message="Choose a metric to display in this widget"
-          action={
-            !preview ? (
-              <DashboardWidget.EmptyState.EditAction
-                label="Configure widget"
-                onClick={handleEdit}
-              />
-            ) : undefined
-          }
+          action={editAction}
         />
       );
     }
@@ -249,6 +248,7 @@ const ProjectStatsCardWidget: React.FunctionComponent<
         <DashboardWidget.Header
           title={widget.title || widget.generatedTitle || ""}
           subtitle={widget.subtitle}
+          readOnly={readOnly}
           actions={
             <DashboardWidget.ActionsMenu
               sectionId={sectionId!}

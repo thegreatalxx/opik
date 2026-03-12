@@ -123,6 +123,7 @@ module.exports = {
         "chart-red": "var(--chart-red)",
         "chart-burgundy": "var(--chart-burgundy)",
         "chart-purple": "var(--chart-purple)",
+        "chart-pink": "var(--chart-pink)",
 
         /* Template icon colors */
         "template-icon-metrics": "var(--template-icon-metrics)",

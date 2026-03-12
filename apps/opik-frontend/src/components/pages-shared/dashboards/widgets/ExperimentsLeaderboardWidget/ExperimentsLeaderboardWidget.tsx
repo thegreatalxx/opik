@@ -22,6 +22,7 @@ import {
   useDashboardStore,
   selectUpdateWidget,
   selectRuntimeConfig,
+  selectReadOnly,
 } from "@/store/DashboardStore";
 import useAppStore from "@/store/AppStore";
 import useExperimentsList from "@/api/datasets/useExperimentsList";
@@ -68,6 +69,7 @@ const ExperimentsLeaderboardWidget: React.FunctionComponent<
   DashboardWidgetComponentProps
 > = ({ sectionId, widgetId, preview = false }) => {
   const workspaceName = useAppStore((state) => state.activeWorkspaceName);
+  const readOnly = useDashboardStore(selectReadOnly);
 
   const widget = useDashboardStore(
     useShallow((state) => {
@@ -432,7 +434,7 @@ const ExperimentsLeaderboardWidget: React.FunctionComponent<
           title="No data available"
           message="No experiments match the current filters"
           action={
-            !preview ? (
+            !preview && !readOnly ? (
               <DashboardWidget.EmptyState.EditAction
                 label="Configure widget"
                 onClick={handleEdit}
@@ -472,6 +474,7 @@ const ExperimentsLeaderboardWidget: React.FunctionComponent<
         <DashboardWidget.Header
           title={widget.title || widget.generatedTitle || ""}
           subtitle={widget.subtitle}
+          readOnly={readOnly}
           actions={
             <DashboardWidget.ActionsMenu
               sectionId={sectionId!}

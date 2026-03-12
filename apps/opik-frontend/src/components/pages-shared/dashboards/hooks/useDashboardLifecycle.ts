@@ -4,6 +4,7 @@ import {
   useDashboardStore,
   selectSetWidgetResolver,
   selectClearDashboard,
+  selectSetReadOnly,
 } from "@/store/DashboardStore";
 import useDashboardById from "@/api/dashboards/useDashboardById";
 import { widgetResolver } from "@/components/pages-shared/dashboards/widgets/widgetRegistry";
@@ -27,7 +28,6 @@ interface UseDashboardLifecycleReturn {
   isPending: boolean;
   save: () => Promise<void>;
   discard: () => void;
-  isTemplate: boolean;
 }
 
 export const useDashboardLifecycle = ({
@@ -72,13 +72,21 @@ export const useDashboardLifecycle = ({
   );
   const clearDashboard = useDashboardStore(selectClearDashboard);
   const setWidgetResolver = useDashboardStore(selectSetWidgetResolver);
+  const setReadOnly = useDashboardStore(selectSetReadOnly);
 
   useEffect(() => {
     if (dashboard?.config) {
       loadDashboardFromBackend(dashboard.config);
+      setReadOnly(isTemplate);
     }
     return () => clearDashboard();
-  }, [clearDashboard, dashboard, loadDashboardFromBackend]);
+  }, [
+    clearDashboard,
+    dashboard,
+    loadDashboardFromBackend,
+    setReadOnly,
+    isTemplate,
+  ]);
 
   useEffect(() => {
     setWidgetResolver(widgetResolver);
@@ -87,7 +95,7 @@ export const useDashboardLifecycle = ({
 
   const { save, discard } = useDashboardSave({
     dashboardId: dashboardId || "",
-    enabled: Boolean(dashboardId && dashboard) && enabled,
+    enabled: Boolean(dashboardId && dashboard) && enabled && !isTemplate,
   });
 
   return {
@@ -95,6 +103,5 @@ export const useDashboardLifecycle = ({
     isPending,
     save,
     discard,
-    isTemplate,
   };
 };

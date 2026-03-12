@@ -2,13 +2,14 @@ import React, { memo } from "react";
 import { useShallow } from "zustand/react/shallow";
 
 import DashboardWidget from "@/components/shared/Dashboard/DashboardWidget/DashboardWidget";
-import { useDashboardStore } from "@/store/DashboardStore";
+import { useDashboardStore, selectReadOnly } from "@/store/DashboardStore";
 import MarkdownPreview from "@/components/shared/MarkdownPreview/MarkdownPreview";
 import { DashboardWidgetComponentProps } from "@/types/dashboard";
 
 const TextMarkdownWidget: React.FunctionComponent<
   DashboardWidgetComponentProps
 > = ({ sectionId, widgetId, preview = false }) => {
+  const readOnly = useDashboardStore(selectReadOnly);
   const widget = useDashboardStore(
     useShallow((state) => {
       if (preview) {
@@ -51,6 +52,7 @@ const TextMarkdownWidget: React.FunctionComponent<
         <DashboardWidget.Header
           title={widget.title || widget.generatedTitle || ""}
           subtitle={widget.subtitle}
+          readOnly={readOnly}
           actions={
             <DashboardWidget.ActionsMenu
               sectionId={sectionId!}

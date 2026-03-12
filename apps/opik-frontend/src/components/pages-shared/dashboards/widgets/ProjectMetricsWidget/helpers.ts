@@ -89,6 +89,7 @@ const calculateProjectMetricsTitle = (
 export const widgetHelpers = {
   getDefaultConfig: () => ({
     chartType: CHART_TYPE.line,
+    metricType: METRIC_NAME_TYPE.TRACE_COUNT,
   }),
   calculateTitle: calculateProjectMetricsTitle,
 };

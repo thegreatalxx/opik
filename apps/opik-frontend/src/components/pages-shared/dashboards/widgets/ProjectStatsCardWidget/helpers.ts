@@ -54,6 +54,7 @@ const calculateProjectStatsCardTitle = (
 export const widgetHelpers = {
   getDefaultConfig: () => ({
     source: TRACE_DATA_TYPE.traces,
+    metric: "trace_count",
   }),
   calculateTitle: calculateProjectStatsCardTitle,
 };

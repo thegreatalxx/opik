@@ -241,7 +241,7 @@ const ProjectMetricsEditor = forwardRef<WidgetEditorHandle>((_, ref) => {
     defaultValues: {
       metricType,
       chartType,
-      projectId: localProjectId,
+      projectId,
       traceFilters,
       threadFilters,
       spanFilters,
@@ -425,7 +425,6 @@ const ProjectMetricsEditor = forwardRef<WidgetEditorHandle>((_, ref) => {
                       field.onChange(value);
                       handleProjectChange(value);
                     }}
-                    showClearButton
                     disabled={hasRuntimeProjectId}
                   />
                 </FormControl>

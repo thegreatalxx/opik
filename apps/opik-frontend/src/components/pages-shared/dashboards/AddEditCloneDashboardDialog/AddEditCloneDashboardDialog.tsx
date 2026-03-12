@@ -89,6 +89,30 @@ type DashboardFormData = z.infer<typeof DashboardFormSchema>;
 
 export type DashboardDialogMode = "create" | "edit" | "clone" | "save_as";
 
+export type DashboardDialogLabels = {
+  create?: { title: string; description?: string; buttonText: string };
+  edit?: { title: string; buttonText: string };
+  clone?: { title: string; description?: string; buttonText: string };
+  save_as?: { title: string; description?: string; buttonText: string };
+};
+
+export type DashboardDialogToastConfig = {
+  create?: {
+    title: string;
+    description: string;
+    actionLabel: string;
+  };
+  clone?: {
+    title: string;
+    description: string;
+    actionLabel: string;
+  };
+  edit?: {
+    title: string;
+    description: string;
+  };
+};
+
 type AddEditCloneDashboardDialogProps = {
   mode: DashboardDialogMode;
   dashboard?: Dashboard;
@@ -99,6 +123,8 @@ type AddEditCloneDashboardDialogProps = {
   navigateOnCreate?: boolean;
   dashboardType?: DASHBOARD_TYPE;
   dashboardScope?: DASHBOARD_SCOPE;
+  labels?: DashboardDialogLabels;
+  toastConfig?: DashboardDialogToastConfig;
 };
 
 const AddEditCloneDashboardDialog: React.FC<
@@ -113,6 +139,8 @@ const AddEditCloneDashboardDialog: React.FC<
   navigateOnCreate = true,
   dashboardType,
   dashboardScope,
+  labels,
+  toastConfig,
 }) => {
   const navigate = useNavigate();
   const workspaceName = useAppStore((state) => state.activeWorkspaceName);
@@ -153,7 +181,7 @@ const AddEditCloneDashboardDialog: React.FC<
     },
   });
 
-  const config = {
+  const defaultConfig = {
     create: {
       title: "Create dashboard",
       description:
@@ -181,6 +209,18 @@ const AddEditCloneDashboardDialog: React.FC<
     },
   }[mode];
 
+  const modeLabels = labels?.[mode];
+  const config = modeLabels
+    ? {
+        title: modeLabels.title,
+        description:
+          "description" in modeLabels ? modeLabels.description : null,
+        buttonText: modeLabels.buttonText,
+        showDescription:
+          "description" in modeLabels ? Boolean(modeLabels.description) : false,
+      }
+    : defaultConfig;
+
   const onDashboardCreated = useCallback(
     (dashboardData?: { id?: string }) => {
       const dashboardId = dashboardData?.id;
@@ -203,31 +243,44 @@ const AddEditCloneDashboardDialog: React.FC<
     [navigate, workspaceName, onCreateSuccess, navigateOnCreate],
   );
 
-  const showCreatedToast = useCallback(() => {
-    toast({
-      title: "Dashboard created",
-      description: "Start customizing it by adding widgets.",
-      actions: [
-        <ToastAction
-          variant="link"
-          size="sm"
-          className="px-0"
-          altText="Add your first widget"
-          key="add-widget"
-          onClick={() => {
-            const { onAddEditWidgetCallback, sections } =
-              useDashboardStore.getState();
-            if (onAddEditWidgetCallback && sections.length > 0) {
-              onAddEditWidgetCallback({ sectionId: sections[0].id });
-            }
-          }}
-        >
-          <ChartLine className="mr-1.5 size-3.5" />
-          Add your first widget
-        </ToastAction>,
-      ],
-    });
-  }, [toast]);
+  const showCreatedToast = useCallback(
+    (toastMode: "create" | "clone" = "create") => {
+      const customToast = toastConfig?.[toastMode];
+
+      const title = customToast?.title ?? "Dashboard created";
+      const description =
+        customToast?.description ?? "Start customizing it by adding widgets.";
+      const actionLabel =
+        customToast && "actionLabel" in customToast
+          ? customToast.actionLabel
+          : "Add your first widget";
+
+      toast({
+        title,
+        description,
+        actions: [
+          <ToastAction
+            variant="link"
+            size="sm"
+            className="px-0"
+            altText={actionLabel}
+            key="add-widget"
+            onClick={() => {
+              const { onAddEditWidgetCallback, sections } =
+                useDashboardStore.getState();
+              if (onAddEditWidgetCallback && sections.length > 0) {
+                onAddEditWidgetCallback({ sectionId: sections[0].id });
+              }
+            }}
+          >
+            <ChartLine className="mr-1.5 size-3.5" />
+            {actionLabel}
+          </ToastAction>,
+        ],
+      });
+    },
+    [toast, toastConfig],
+  );
 
   const handleMutationError = useCallback(
     (error: AxiosError, action: string) => {
@@ -269,6 +322,12 @@ const AddEditCloneDashboardDialog: React.FC<
             onSuccess: () => {
               onEditSuccess?.();
               setOpen(false);
+              if (toastConfig?.edit) {
+                toast({
+                  title: toastConfig.edit.title,
+                  description: toastConfig.edit.description,
+                });
+              }
             },
             onError: (error: AxiosError) =>
               handleMutationError(error, "update"),
@@ -300,8 +359,8 @@ const AddEditCloneDashboardDialog: React.FC<
             onSuccess: (data) => {
               onDashboardCreated(data);
               setOpen(false);
-              if (mode === "create") {
-                showCreatedToast();
+              if (mode === "create" || mode === "clone") {
+                showCreatedToast(mode);
               }
             },
             onError: (error: AxiosError) => handleMutationError(error, mode),
@@ -320,6 +379,8 @@ const AddEditCloneDashboardDialog: React.FC<
       onDashboardCreated,
       showCreatedToast,
       dashboardScope,
+      toastConfig,
+      toast,
     ],
   );
 
