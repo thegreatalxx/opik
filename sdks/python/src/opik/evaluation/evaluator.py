@@ -373,7 +373,7 @@ def _run_suite_evaluation(
     evaluator_model: Optional[str] = None,
     optimization_id: Optional[str] = None,
     experiment_type: Optional[str] = None,
-) -> evaluation_result.EvaluationResult:
+) -> "suite_types.EvaluationSuiteResult":
     _validate_dataset_is_evaluation_suite(dataset)
 
     if client is None:

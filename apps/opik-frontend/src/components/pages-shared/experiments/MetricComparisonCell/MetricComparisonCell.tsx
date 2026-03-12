@@ -1,6 +1,7 @@
 import React from "react";
 import isUndefined from "lodash/isUndefined";
 
+import { calcFormatterAwarePercentage } from "@/lib/percentage";
 import PercentageTrend, {
   PercentageTrendType,
 } from "@/components/shared/PercentageTrend/PercentageTrend";
@@ -21,15 +22,7 @@ const MetricComparisonCell: React.FunctionComponent<
     return <span className="text-muted-slate">-</span>;
   }
 
-  // When both values display identically at the formatter's precision
-  // (e.g. $0.0003 vs $0.0003), suppress the trend to avoid showing a
-  // percentage change between visually identical values.
-  const percentage =
-    !isUndefined(baseline) && !isUndefined(current) && baseline !== 0
-      ? formatter(current) === formatter(baseline)
-        ? 0
-        : ((current - baseline) / Math.abs(baseline)) * 100
-      : undefined;
+  const percentage = calcFormatterAwarePercentage(current, baseline, formatter);
 
   if (compact) {
     return (

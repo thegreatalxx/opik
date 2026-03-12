@@ -9,6 +9,7 @@ import {
   formatAsCurrency,
   formatAsPercentage,
 } from "@/lib/optimization-formatters";
+import { calcFormatterAwarePercentage } from "@/lib/percentage";
 import PercentageTrend, {
   PercentageTrendType,
 } from "@/components/shared/PercentageTrend/PercentageTrend";
@@ -24,19 +25,8 @@ const calcPercentageVsBaseline = (
   baselineCandidateId?: string,
   formatter?: (v: number) => string,
 ): number | undefined => {
-  if (
-    isNumber(value) &&
-    isNumber(baselineValue) &&
-    baselineValue !== 0 &&
-    candidateId !== baselineCandidateId
-  ) {
-    // If both values display identically at the formatter's precision,
-    // suppress the trend to avoid confusing users with a percentage
-    // change between visually identical values.
-    if (formatter && formatter(value) === formatter(baselineValue)) return 0;
-    return ((value - baselineValue) / Math.abs(baselineValue)) * 100;
-  }
-  return undefined;
+  if (candidateId === baselineCandidateId) return undefined;
+  return calcFormatterAwarePercentage(value, baselineValue, formatter);
 };
 
 type TrialMetricCellProps = {
