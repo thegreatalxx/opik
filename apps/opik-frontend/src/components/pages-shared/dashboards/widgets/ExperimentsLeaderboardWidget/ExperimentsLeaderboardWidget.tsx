@@ -172,7 +172,6 @@ const ExperimentsLeaderboardWidget: React.FunctionComponent<
     },
     {
       placeholderData: keepPreviousData,
-      enabled: experimentListParams.isEnabled,
     },
   );
 
@@ -194,8 +193,7 @@ const ExperimentsLeaderboardWidget: React.FunctionComponent<
     },
     {
       placeholderData: keepPreviousData,
-      enabled:
-        experimentListParams.isEnabled && enableRanking && !!rankingMetric,
+      enabled: enableRanking && !!rankingMetric,
     },
   );
 
@@ -420,7 +418,7 @@ const ExperimentsLeaderboardWidget: React.FunctionComponent<
   const noData = experiments.length === 0;
 
   const renderContent = () => {
-    if (isPending && experimentListParams.isEnabled) {
+    if (isPending) {
       return (
         <div className="flex size-full min-h-32 items-center justify-center">
           <Spinner />

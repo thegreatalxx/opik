@@ -147,18 +147,13 @@ const ExperimentsLeaderboardWidgetEditor = forwardRef<WidgetEditorHandle>(
       filters: remainingFilters,
     });
 
-    const { data: experimentsData } = useExperimentsList(
-      {
-        workspaceName,
-        experimentIds: experimentListParams.experimentIds,
-        filters: experimentListParams.filters,
-        page: 1,
-        size: 100,
-      },
-      {
-        enabled: experimentListParams.isEnabled,
-      },
-    );
+    const { data: experimentsData } = useExperimentsList({
+      workspaceName,
+      experimentIds: experimentListParams.experimentIds,
+      filters: experimentListParams.filters,
+      page: 1,
+      size: 100,
+    });
 
     const availableMetadataKeys = useMemo(() => {
       if (!experimentsData?.content) return [];

@@ -43,7 +43,6 @@ export const getExperimentListParams = ({
   return {
     experimentIds: hasExperimentIds ? experimentIds : undefined,
     filters: validFilters.length > 0 ? validFilters : undefined,
-    isEnabled: hasExperimentIds || validFilters.length > 0,
   };
 };
 
