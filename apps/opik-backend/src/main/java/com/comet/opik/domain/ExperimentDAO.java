@@ -324,7 +324,7 @@ class ExperimentDAO {
             ), experiment_items_final AS (
                 SELECT DISTINCT
                     id, experiment_id, trace_id, dataset_item_id, execution_policy
-                FROM experiment_items
+                FROM experiment_items FINAL
                 WHERE workspace_id = :workspace_id
                 <if(experiment_ids)> AND experiment_id IN :experiment_ids <endif>
                 AND experiment_id IN (SELECT id FROM experiments_final)
@@ -782,8 +782,8 @@ class ExperimentDAO {
                 AND ea.id IN (SELECT id FROM experiments_initial)
             ), experiment_items_final AS (
                 SELECT
-                    id, experiment_id, trace_id
-                FROM experiment_items final
+                    DISTINCT id, experiment_id, trace_id
+                FROM experiment_items
                 WHERE workspace_id = :workspace_id
                 <if(experiment_ids)> AND experiment_id IN :experiment_ids <endif>
                 AND experiment_id IN (SELECT id FROM experiments_final)
@@ -1020,8 +1020,8 @@ class ExperimentDAO {
                     ON ef.id = ea.id AND ea.workspace_id = :workspace_id
             ), experiment_items_final AS (
                 SELECT
-                    id, experiment_id, trace_id
-                FROM experiment_items final
+                    DISTINCT id, experiment_id, trace_id
+                FROM experiment_items
                 WHERE workspace_id = :workspace_id
                 AND experiment_id IN (SELECT id FROM experiments_final)
             )
@@ -1155,7 +1155,7 @@ class ExperimentDAO {
             ), experiment_items_final AS (
                 SELECT DISTINCT
                     id, experiment_id, trace_id, dataset_item_id, execution_policy
-                FROM experiment_items
+                FROM experiment_items FINAL
                 WHERE workspace_id = :workspace_id
                 AND experiment_id IN (SELECT id FROM experiments_final)
             ), experiment_durations AS (

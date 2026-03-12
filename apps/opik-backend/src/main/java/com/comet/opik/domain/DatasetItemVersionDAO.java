@@ -1438,7 +1438,7 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
                 <endif>
             )
             <if(sorting)>
-            ORDER BY <sorting>
+            ORDER BY <sorting>, id DESC
             <else>
             ORDER BY id DESC
             <endif>
@@ -2523,8 +2523,7 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
                                     : null;
 
                             var hasDynamicKeys = criteria.sortingFields() != null
-                                    && sortingQueryBuilder.hasDynamicKeys(criteria.sortingFields(),
-                                            fieldMapping);
+                                    && sortingQueryBuilder.hasDynamicKeys(criteria.sortingFields());
 
                             if (criteria.sortingFields() != null && !criteria.sortingFields().isEmpty()) {
                                 String sortingQuery = sortingQueryBuilder.toOrderBySql(
@@ -2566,10 +2565,12 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
                                         criteria.experimentIds().toArray(UUID[]::new));
                             }
 
-                            // Bind dynamic sorting keys if present
+                            // Bind dynamic sorting keys if present.
+                            // Pass without fieldMapping so ALL dynamic keys are bound,
+                            // including those used in the top_sorting SELECT expression.
                             if (hasDynamicKeys) {
                                 statement = sortingQueryBuilder.bindDynamicKeys(statement,
-                                        criteria.sortingFields(), fieldMapping);
+                                        criteria.sortingFields());
                             }
 
                             // Bind search and filter parameters using helper method
@@ -3886,13 +3887,14 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
      * and optionally dataset_items_aggr_resolved (di_t).
      */
     private String buildTopItemsSorting(List<com.comet.opik.api.sorting.SortingField> sortingFields) {
-        return sortingFields.stream()
+        String primarySort = sortingFields.stream()
                 .map(sf -> {
                     String expr = getTopSortExpression(sf);
                     String dir = sf.direction() != null ? sf.direction().name() : "ASC";
                     return expr + " " + dir;
                 })
                 .collect(Collectors.joining(", "));
+        return primarySort + ", eia_t.dataset_item_id DESC";
     }
 
     private String getTopSortExpression(com.comet.opik.api.sorting.SortingField sf) {
@@ -3926,28 +3928,22 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
             return "avg(eia_t.total_estimated_cost)";
         }
         if (field.startsWith("data.")) {
-            String key = field.substring("data.".length());
-            return "any(di_t.data)['%s']".formatted(key);
+            return "any(di_t.data)[:%s]".formatted(sf.bindKey());
         }
         if (field.startsWith("usage.")) {
-            String key = field.substring("usage.".length());
-            return "avgMap(eia_t.usage)['%s']".formatted(key);
+            return "avgMap(eia_t.usage)[:%s]".formatted(sf.bindKey());
         }
         if (field.startsWith("feedback_scores.")) {
-            String key = field.substring("feedback_scores.".length());
-            return "avgMap(eia_t.feedback_scores)['%s']".formatted(key);
+            return "avgMap(eia_t.feedback_scores)[:%s]".formatted(sf.bindKey());
         }
         if (field.startsWith("input.")) {
-            String key = field.substring("input.".length());
-            return "JSONExtractRaw(argMax(eia_t.input, eia_t.id), '%s')".formatted(key);
+            return "JSONExtractRaw(argMax(eia_t.input, eia_t.id), :%s)".formatted(sf.bindKey());
         }
         if (field.startsWith("output.")) {
-            String key = field.substring("output.".length());
-            return "JSONExtractRaw(argMax(eia_t.output, eia_t.id), '%s')".formatted(key);
+            return "JSONExtractRaw(argMax(eia_t.output, eia_t.id), :%s)".formatted(sf.bindKey());
         }
         if (field.startsWith("metadata.")) {
-            String key = field.substring("metadata.".length());
-            return "JSONExtractRaw(argMax(eia_t.metadata, eia_t.id), '%s')".formatted(key);
+            return "JSONExtractRaw(argMax(eia_t.metadata, eia_t.id), :%s)".formatted(sf.bindKey());
         }
 
         // Fallback — should not happen if supportsPushTopLimit is checked first
