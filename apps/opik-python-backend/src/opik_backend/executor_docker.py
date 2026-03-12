@@ -102,7 +102,7 @@ class DockerExecutor(CodeExecutorBase):
         self.cpu_shares = int(os.getenv("PYTHON_CODE_EXECUTOR_CPU_SHARES", str(DEFAULT_CPU_SHARES)))
         self.mem_limit = os.getenv("PYTHON_CODE_EXECUTOR_MEM_LIMIT", DEFAULT_MEM_LIMIT)
         self.nano_cpus = self._parse_cpu_limit()
-        self.metrics_interval = int(os.getenv("PYTHON_CODE_EXECUTOR_METRICS_INTERVAL_IN_SECONDS", "60"))
+        self.metrics_interval = self._parse_metrics_interval()
 
         self.client = docker.from_env()
         self.instance_id = str(uuid7())
@@ -144,6 +144,21 @@ class DockerExecutor(CodeExecutorBase):
             logger.warning(f"PYTHON_CODE_EXECUTOR_CPU_LIMIT must be positive, got '{cpu_limit_str}', ignoring")
             return DEFAULT_CPU_LIMIT
         return int(cpu_limit * 1e9)
+
+    @staticmethod
+    def _parse_metrics_interval():
+        """Parse PYTHON_CODE_EXECUTOR_METRICS_INTERVAL_IN_SECONDS env var, defaulting to 60."""
+        default = 60
+        val = os.getenv("PYTHON_CODE_EXECUTOR_METRICS_INTERVAL_IN_SECONDS", str(default))
+        try:
+            interval = int(val)
+        except ValueError:
+            logger.warning(f"Invalid PYTHON_CODE_EXECUTOR_METRICS_INTERVAL_IN_SECONDS value '{val}', using default {default}s")
+            return default
+        if interval <= 0:
+            logger.warning(f"PYTHON_CODE_EXECUTOR_METRICS_INTERVAL_IN_SECONDS must be positive, got '{val}', using default {default}s")
+            return default
+        return interval
 
     def _start_pool_monitor(self):
         """Start a background thread that periodically checks and fills the container pool."""
