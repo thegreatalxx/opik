@@ -483,9 +483,7 @@ def test_evaluation_suite__assertion_fails__item_fails(
     retrieved_experiment = opik_client.get_experiment_by_name(experiment_name)
     items = retrieved_experiment.get_items()
     assert len(items) > 0, "Expected at least 1 experiment item"
-    assert len(items[0].assertion_results) > 0, (
-        "Expected at least 1 assertion result"
-    )
+    assert len(items[0].assertion_results) > 0, "Expected at least 1 assertion result"
     assertion = items[0].assertion_results[0]
     assert assertion["passed"] is False, (
         f"Expected failing assertion (passed=False), got {assertion['passed']}"
