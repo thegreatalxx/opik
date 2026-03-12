@@ -312,7 +312,10 @@ class ExperimentDAO {
                     if(isFinite(ea.total_estimated_cost_sum), toDecimal128(ea.total_estimated_cost_sum, 12), toDecimal128(0, 12)) AS total_estimated_cost_sum,
                     if(isFinite(ea.total_estimated_cost_avg), toDecimal128(ea.total_estimated_cost_avg, 12), toDecimal128(0, 12)) AS total_estimated_cost_avg,
                     mapApply((k, v) -> (k, toDecimal64(v, 9)), ea.feedback_scores_avg) AS feedback_scores_avg,
-                    ea.experiment_scores AS experiment_scores
+                    ea.experiment_scores AS experiment_scores,
+                    if(ea.total_count = 0, NULL, ea.pass_rate) AS pass_rate,
+                    if(ea.total_count = 0, NULL, ea.passed_count) AS passed_count,
+                    if(ea.total_count = 0, NULL, ea.total_count) AS total_count
                 FROM experiment_aggregates ea FINAL
                 WHERE ea.workspace_id = :workspace_id
                 <if(experiment_ids)> AND id IN :experiment_ids <endif>
@@ -602,9 +605,9 @@ class ExperimentDAO {
                     agg.total_estimated_cost_sum as total_estimated_cost,
                     agg.total_estimated_cost_avg as total_estimated_cost_avg,
                     ca.comments_array_agg as comments_array_agg,
-                    agg.pass_rate as pass_rate,
-                    agg.passed_count as passed_count,
-                    agg.total_count as total_count
+                    if(agg.total_count = 0, NULL, agg.pass_rate) AS pass_rate,
+                    if(agg.total_count = 0, NULL, agg.passed_count) AS passed_count,
+                    if(agg.total_count = 0, NULL, agg.total_count) AS total_count
                 FROM experiments_resolved AS e
                 INNER JOIN experiments_from_aggregates_final AS agg ON e.id = agg.experiment_id
                 LEFT JOIN (
@@ -1160,7 +1163,10 @@ class ExperimentDAO {
                     if(isFinite(ea.total_estimated_cost_sum), toDecimal128(ea.total_estimated_cost_sum, 12), toDecimal128(0, 12)) AS total_estimated_cost_sum,
                     if(isFinite(ea.total_estimated_cost_avg), toDecimal128(ea.total_estimated_cost_avg, 12), toDecimal128(0, 12)) AS total_estimated_cost_avg,
                     mapApply((k, v) -> (k, toDecimal64(v, 9)), ea.feedback_scores_avg) AS feedback_scores,
-                    ea.experiment_scores AS experiment_scores
+                    ea.experiment_scores AS experiment_scores,
+                    if(ea.total_count = 0, NULL, ea.pass_rate) AS pass_rate,
+                    if(ea.total_count = 0, NULL, ea.passed_count) AS passed_count,
+                    if(ea.total_count = 0, NULL, ea.total_count) AS total_count
                 FROM experiment_aggregates AS ea FINAL
                 WHERE ea.workspace_id = :workspace_id
                 AND ea.id IN (SELECT id FROM experiments_from_aggregates)
