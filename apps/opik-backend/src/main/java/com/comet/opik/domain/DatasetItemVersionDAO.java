@@ -1103,7 +1103,7 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
                 AND eia_t.experiment_id IN (SELECT id FROM experiment_aggregated_scope_ids)
                 GROUP BY eia_t.dataset_item_id
                 ORDER BY <top_sorting>
-                LIMIT :top_limit
+                LIMIT :top_limit OFFSET :top_offset
             )
             <endif>
             SELECT
@@ -1443,7 +1443,7 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
             ORDER BY id DESC
             <endif>
             LIMIT :limit
-            OFFSET :offset
+            <if(!push_top_limit)>OFFSET :offset<endif>
             SETTINGS output_format_json_named_tuples_as_objects = 1
             ;
             """;
@@ -2534,11 +2534,13 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
                                     .bind("workspace_id", workspaceId)
                                     .bind("datasetId", criteria.datasetId())
                                     .bind("versionId", versionId)
-                                    .bind("limit", size)
-                                    .bind("offset", (page - 1) * size);
+                                    .bind("limit", size);
 
                             if (pushTopLimit) {
-                                statement.bind("top_limit", size + (page - 1) * size);
+                                statement.bind("top_limit", size);
+                                statement.bind("top_offset", (page - 1) * size);
+                            } else {
+                                statement.bind("offset", (page - 1) * size);
                             }
 
                             // Bind target project IDs (from separate query to reduce traces table scans)

@@ -6163,7 +6163,7 @@ class DatasetsResourceTest {
 
                         assertThat(actualExperimentItem.feedbackScores())
                                 .usingRecursiveComparison()
-                                .withComparatorForType(BigDecimal::compareTo, BigDecimal.class)
+                                .withComparatorForType(StatsUtils::bigDecimalComparator, BigDecimal.class)
                                 .ignoringCollectionOrder()
                                 .isEqualTo(expectedExperimentItem.feedbackScores());
 
