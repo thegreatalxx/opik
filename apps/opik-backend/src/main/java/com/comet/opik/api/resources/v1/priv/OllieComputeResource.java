@@ -1,8 +1,8 @@
 package com.comet.opik.api.resources.v1.priv;
 
 import com.codahale.metrics.annotation.Timed;
-import com.comet.opik.infrastructure.AuthenticationConfig;
-import com.comet.opik.infrastructure.OpikConfiguration;
+import com.comet.opik.domain.OllieComputeService;
+import com.comet.opik.domain.OllieComputeService.ProxyResult;
 import com.comet.opik.infrastructure.auth.RequestContext;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -11,11 +11,10 @@ import jakarta.inject.Inject;
 import jakarta.inject.Provider;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.Path;
+import jakarta.ws.rs.ProcessingException;
 import jakarta.ws.rs.Produces;
-import jakarta.ws.rs.client.Client;
-import jakarta.ws.rs.client.Invocation;
+import jakarta.ws.rs.WebApplicationException;
 import jakarta.ws.rs.core.Context;
-import jakarta.ws.rs.core.Cookie;
 import jakarta.ws.rs.core.HttpHeaders;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.NewCookie;
@@ -23,8 +22,6 @@ import jakarta.ws.rs.core.Response;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-
-import java.net.URI;
 
 @Path("/v1/private/ollie")
 @Produces(MediaType.APPLICATION_JSON)
@@ -34,8 +31,7 @@ import java.net.URI;
 @Tag(name = "Ollie Compute", description = "Ollie compute engine resources")
 public class OllieComputeResource {
 
-    private final @NonNull Client httpClient;
-    private final @NonNull OpikConfiguration config;
+    private final @NonNull OllieComputeService ollieComputeService;
     private final @NonNull Provider<RequestContext> requestContext;
 
     @GET
@@ -45,48 +41,45 @@ public class OllieComputeResource {
             @ApiResponse(responseCode = "503", description = "Ollie not enabled")
     })
     public Response getCompute(@Context HttpHeaders incomingHeaders) {
-        if (!config.getServiceToggles().isOllieEnabled()) {
+        if (!ollieComputeService.isEnabled()) {
             return Response.ok()
-                    .entity(new DisabledResponse("", false))
+                    .entity(ollieComputeService.getDisabledResponse())
                     .build();
         }
 
-        AuthenticationConfig.UrlConfig reactService = config.getAuthentication().getReactService();
+        if (!ollieComputeService.isConfigured()) {
+            log.warn("Ollie enabled but reactService URL is not configured");
+            return Response.status(Response.Status.SERVICE_UNAVAILABLE)
+                    .entity(ollieComputeService.getDisabledResponse())
+                    .build();
+        }
+
         String apiKey = requestContext.get().getApiKey();
         String workspaceName = requestContext.get().getWorkspaceName();
 
-        Invocation.Builder upstream = httpClient.target(URI.create(reactService.url()))
-                .path("opik")
-                .path("ollie")
-                .path("compute")
-                .request(MediaType.APPLICATION_JSON)
-                .header(HttpHeaders.AUTHORIZATION, apiKey)
-                .header(RequestContext.WORKSPACE_HEADER, workspaceName);
+        try {
+            ProxyResult result = ollieComputeService.proxyCompute(
+                    apiKey, workspaceName, incomingHeaders.getCookies());
 
-        for (Cookie cookie : incomingHeaders.getCookies().values()) {
-            upstream = upstream.cookie(cookie);
-        }
-
-        try (Response upstreamResponse = upstream.get()) {
-
-            String body = upstreamResponse.readEntity(String.class);
-            Response.ResponseBuilder builder = Response.status(upstreamResponse.getStatus())
+            Response.ResponseBuilder builder = Response.status(result.status())
                     .type(MediaType.APPLICATION_JSON)
-                    .entity(body);
+                    .entity(result.body());
 
-            for (NewCookie cookie : upstreamResponse.getCookies().values()) {
+            for (NewCookie cookie : result.cookies().values()) {
                 builder.cookie(cookie);
             }
 
             return builder.build();
-        } catch (Exception e) {
-            log.error("Failed to proxy ollie compute request", e);
-            return Response.serverError()
-                    .entity(new DisabledResponse("", false))
+        } catch (ProcessingException e) {
+            log.error("Network error proxying ollie compute request", e);
+            return Response.status(Response.Status.BAD_GATEWAY)
+                    .entity(ollieComputeService.getDisabledResponse())
+                    .build();
+        } catch (WebApplicationException e) {
+            log.error("Upstream error proxying ollie compute request", e);
+            return Response.status(Response.Status.BAD_GATEWAY)
+                    .entity(ollieComputeService.getDisabledResponse())
                     .build();
         }
-    }
-
-    record DisabledResponse(String computeUrl, boolean enabled) {
     }
 }
