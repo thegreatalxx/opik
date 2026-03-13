@@ -13,7 +13,6 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.inject.Inject;
 import jakarta.inject.Provider;
-import jakarta.ws.rs.GET;
 import jakarta.ws.rs.POST;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.Produces;
@@ -50,9 +49,9 @@ public class OllieComputeResource {
         return Response.accepted().build();
     }
 
-    @GET
+    @POST
     @Path("/compute")
-    @Operation(operationId = "getOllieCompute", summary = "Get Ollie compute URL", description = "Provisions pod if needed, returns compute URL and sets auth cookie.", responses = {
+    @Operation(operationId = "provisionOllieCompute", summary = "Provision Ollie compute URL", description = "Provisions pod if needed, returns compute URL and sets auth cookie.", responses = {
             @ApiResponse(responseCode = "200", description = "Compute URL", content = @Content(schema = @Schema(implementation = OllieComputeResponse.class)))
     })
     public Response getCompute() {

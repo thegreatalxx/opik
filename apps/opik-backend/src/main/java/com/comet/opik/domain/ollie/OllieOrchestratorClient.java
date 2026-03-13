@@ -34,7 +34,7 @@ public class OllieOrchestratorClient {
             }
             if (response.getStatusInfo().getFamily() != Response.Status.Family.SUCCESSFUL) {
                 String body = response.readEntity(String.class);
-                log.error("Orchestrator install failed: status={}, body={}", response.getStatus(), body);
+                log.error("Orchestrator install failed: status=\"{}\", body=\"{}\"", response.getStatus(), body);
                 throw new OllieProvisioningException(
                         "Failed to provision Ollie pod: orchestrator returned " + response.getStatus());
             }
@@ -49,7 +49,7 @@ public class OllieOrchestratorClient {
             try {
                 install(label, request);
             } catch (Exception e) {
-                log.warn("Async Ollie warm-up failed for label={}: {}", label, e.getMessage());
+                log.warn("Async Ollie warm-up failed for label=\"{}\"", label, e);
             }
         });
     }

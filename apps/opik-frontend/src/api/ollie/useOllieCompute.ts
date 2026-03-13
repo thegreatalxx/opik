@@ -7,7 +7,7 @@ type OllieComputeResponse = {
 };
 
 const getOllieCompute = async () => {
-  const { data } = await api.get<OllieComputeResponse>(
+  const { data } = await api.post<OllieComputeResponse>(
     `${OLLIE_REST_ENDPOINT}compute`,
   );
   return data;

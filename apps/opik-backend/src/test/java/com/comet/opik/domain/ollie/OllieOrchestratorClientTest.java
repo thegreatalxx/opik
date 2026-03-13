@@ -4,11 +4,14 @@ import com.comet.opik.infrastructure.OllieConfig;
 import com.github.tomakehurst.wiremock.WireMockServer;
 import jakarta.ws.rs.client.Client;
 import jakarta.ws.rs.client.ClientBuilder;
+import org.awaitility.Awaitility;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
+
+import java.time.Duration;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
 import static com.github.tomakehurst.wiremock.client.WireMock.equalToJson;
@@ -94,7 +97,7 @@ class OllieOrchestratorClientTest {
     }
 
     @Test
-    void installAsync__firesRequestWithoutBlocking() throws InterruptedException {
+    void installAsync__firesRequestWithoutBlocking() {
         wireMock.stubFor(post(urlEqualTo("/orchestrator/install/ollielabel"))
                 .willReturn(aResponse()
                         .withStatus(200)
@@ -106,14 +109,12 @@ class OllieOrchestratorClientTest {
         var request = new OllieInstallRequest("user1", "key1", "ws1");
         client.installAsync("ollielabel", request);
 
-        // Give virtual thread time to execute
-        Thread.sleep(500);
-
-        wireMock.verify(postRequestedFor(urlEqualTo("/orchestrator/install/ollielabel")));
+        Awaitility.await().atMost(Duration.ofSeconds(5))
+                .untilAsserted(() -> wireMock.verify(postRequestedFor(urlEqualTo("/orchestrator/install/ollielabel"))));
     }
 
     @Test
-    void installAsync__doesNotThrowOnFailure() throws InterruptedException {
+    void installAsync__doesNotThrowOnFailure() {
         wireMock.stubFor(post(urlEqualTo("/orchestrator/install/ollielabel"))
                 .willReturn(aResponse().withStatus(500)));
 
@@ -121,6 +122,7 @@ class OllieOrchestratorClientTest {
 
         // Should not throw — errors are logged and swallowed
         client.installAsync("ollielabel", request);
-        Thread.sleep(500);
+        Awaitility.await().atMost(Duration.ofSeconds(5))
+                .untilAsserted(() -> wireMock.verify(postRequestedFor(urlEqualTo("/orchestrator/install/ollielabel"))));
     }
 }

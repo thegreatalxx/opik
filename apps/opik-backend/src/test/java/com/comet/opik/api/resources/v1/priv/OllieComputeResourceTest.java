@@ -16,6 +16,7 @@ import com.comet.opik.extensions.RegisterApp;
 import com.github.tomakehurst.wiremock.WireMockServer;
 import com.redis.testcontainers.RedisContainer;
 import jakarta.ws.rs.core.HttpHeaders;
+import org.awaitility.Awaitility;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
@@ -29,6 +30,7 @@ import org.testcontainers.mysql.MySQLContainer;
 import ru.vyarus.dropwizard.guice.test.ClientSupport;
 import ru.vyarus.dropwizard.guice.test.jupiter.ext.TestDropwizardAppExtension;
 
+import java.time.Duration;
 import java.util.List;
 
 import static com.comet.opik.api.resources.utils.ClickHouseContainerUtils.DATABASE_NAME;
@@ -125,18 +127,16 @@ public class OllieComputeResourceTest {
         assertThat(warmResponse.getStatus()).isEqualTo(202);
         warmResponse.close();
 
-        // Give async warm-up time to reach the orchestrator
-        TestUtils.waitForMillis(1000);
-
-        // Verify warm-up hit the orchestrator
-        orchestratorMock.verify(postRequestedFor(urlMatching("/orchestrator/install/ollie.*")));
+        // Wait for async warm-up to reach the orchestrator
+        Awaitility.await().atMost(Duration.ofSeconds(5)).untilAsserted(
+                () -> orchestratorMock.verify(postRequestedFor(urlMatching("/orchestrator/install/ollie.*"))));
 
         // Step 2: compute — synchronous provisioning with cookie
         var computeResponse = client.target(baseUrl + "/v1/private/ollie/compute")
                 .request()
                 .header(HttpHeaders.AUTHORIZATION, API_KEY)
                 .header("Comet-Workspace", TEST_WORKSPACE)
-                .get();
+                .post(null);
 
         assertThat(computeResponse.getStatus()).isEqualTo(200);
 
@@ -152,8 +152,8 @@ public class OllieComputeResourceTest {
     }
 
     @Test
-    @DisplayName("Compute when ollie disabled returns empty URL and enabled=false")
-    void compute__whenDisabled__returnsDisabledResponse(ClientSupport client) {
+    @DisplayName("Compute with label reuse: same user gets same label across calls")
+    void compute__labelReuse__sameUserGetsSameLabel(ClientSupport client) {
         // The toggle is enabled for this test class, so we test the enabled path above.
         // This test verifies the response shape — the disabled path is a simple code check
         // that doesn't need a full integration test (covered by unit tests).
@@ -173,7 +173,7 @@ public class OllieComputeResourceTest {
                 .request()
                 .header(HttpHeaders.AUTHORIZATION, API_KEY)
                 .header("Comet-Workspace", TEST_WORKSPACE)
-                .get();
+                .post(null);
         assertThat(resp1.getStatus()).isEqualTo(200);
         resp1.close();
 
@@ -182,7 +182,7 @@ public class OllieComputeResourceTest {
                 .request()
                 .header(HttpHeaders.AUTHORIZATION, API_KEY)
                 .header("Comet-Workspace", TEST_WORKSPACE)
-                .get();
+                .post(null);
         assertThat(resp2.getStatus()).isEqualTo(200);
         resp2.close();
 
