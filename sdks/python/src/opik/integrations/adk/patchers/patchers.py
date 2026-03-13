@@ -71,6 +71,7 @@ def _patch_adk_opentelemetry_tracers(
     if _adk_opentelemetry_tracers_patched:
         if _patched_adk_tracer is not None:
             _patched_adk_tracer.opik_client = opik_client
+            _patched_adk_tracer._distributed_headers = distributed_headers
         return
 
     _patched_adk_tracer = opik_adk_otel_tracer.OpikADKOtelTracer(
