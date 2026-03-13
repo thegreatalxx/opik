@@ -2,7 +2,7 @@
 
 A Helm chart for Comet Opik
 
-![Version: 1.10.32](https://img.shields.io/badge/Version-1.10.32-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 1.10.32](https://img.shields.io/badge/AppVersion-1.10.32-informational?style=flat-square)
+![Version: 1.10.39](https://img.shields.io/badge/Version-1.10.39-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 1.10.39](https://img.shields.io/badge/AppVersion-1.10.39-informational?style=flat-square)
 [![Artifact Hub](https://img.shields.io/endpoint?url=https://artifacthub.io/badge/repository/opik)](https://artifacthub.io/packages/search?repo=opik)
 
 # Run Comet Opik with Helm
@@ -108,6 +108,16 @@ Call opik api on http://localhost:5173/api
 | chartMigration.nodeSelector | object | `{}` |  |
 | chartMigration.serviceAccountName | string | `""` |  |
 | chartMigration.tolerations | list | `[]` |  |
+| clickhouse.additionalProfiles[0].name | string | `"ollie_readonly"` |  |
+| clickhouse.additionalProfiles[0].settings.max_execution_time | int | `30` |  |
+| clickhouse.additionalProfiles[0].settings.max_memory_usage | int | `536870912` |  |
+| clickhouse.additionalProfiles[0].settings.max_result_bytes | int | `5242880` |  |
+| clickhouse.additionalProfiles[0].settings.max_result_rows | int | `1000` |  |
+| clickhouse.additionalProfiles[0].settings.max_rows_to_read | int | `10000000` |  |
+| clickhouse.additionalProfiles[0].settings.readonly | int | `2` |  |
+| clickhouse.additionalUsers[0].password | string | `"ollie_readonly"` |  |
+| clickhouse.additionalUsers[0].profile | string | `"ollie_readonly"` |  |
+| clickhouse.additionalUsers[0].username | string | `"ollie_readonly"` |  |
 | clickhouse.adminUser.password | string | `"opik"` |  |
 | clickhouse.adminUser.useSecret.enabled | bool | `false` |  |
 | clickhouse.adminUser.username | string | `"opik"` |  |
