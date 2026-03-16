@@ -54,7 +54,7 @@ class AssertionResultMapper {
                 .build();
     }
 
-    static Map<String, ExperimentRunSummary> computeRunSummaries(@NonNull List<ExperimentItem> items) {
+    static Map<String, ExperimentRunSummary> computeRunSummaries(List<ExperimentItem> items) {
         if (CollectionUtils.isEmpty(items)) {
             return null;
         }
