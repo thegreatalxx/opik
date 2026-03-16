@@ -401,8 +401,10 @@ class OptimizationsResourceTest {
 
             mockTargetWorkspace(apiKey, workspaceName, workspaceId);
 
-            // Create dataset with items
-            Dataset dataset = podamFactory.manufacturePojo(Dataset.class);
+            // Create dataset with items (use UUID in name to avoid conflicts on retry)
+            Dataset dataset = podamFactory.manufacturePojo(Dataset.class).toBuilder()
+                    .name("test-dataset-" + UUID.randomUUID())
+                    .build();
             datasetResourceClient.createDataset(dataset, apiKey, workspaceName);
 
             List<DatasetItem> items = PodamFactoryUtils.manufacturePojoList(podamFactory, DatasetItem.class);
