@@ -402,8 +402,8 @@ class OptimizationsResourceTest {
             mockTargetWorkspace(apiKey, workspaceName, workspaceId);
 
             // Create dataset with items
-            var datasetName = "test-dataset-agg-" + RandomStringUtils.secure().nextAlphanumeric(20);
-            Dataset dataset = podamFactory.manufacturePojo(Dataset.class).toBuilder()
+            var datasetName = "agg-test-" + UUID.randomUUID();
+            Dataset dataset = Dataset.builder()
                     .name(datasetName)
                     .build();
             var datasetId = datasetResourceClient.createDataset(dataset, apiKey, workspaceName);
