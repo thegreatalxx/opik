@@ -845,9 +845,7 @@ def verify_evaluation_suite_result(
     for exp_item in experiment_items:
         if exp_item.assertion_results:
             all_assertion_results.extend(exp_item.assertion_results)
-            all_assertion_names.update(
-                ar["value"] for ar in exp_item.assertion_results
-            )
+            all_assertion_names.update(ar["value"] for ar in exp_item.assertion_results)
         if exp_item.feedback_scores:
             all_scores.extend(exp_item.feedback_scores)
             all_score_names.update(s["name"] for s in exp_item.feedback_scores)
