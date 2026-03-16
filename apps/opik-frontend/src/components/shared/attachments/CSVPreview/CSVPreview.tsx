@@ -67,10 +67,7 @@ const CSVPreview: React.FC<CSVPreviewProps> = ({ url, name }) => {
     },
   });
 
-  const rows = useMemo(
-    () => (!data || data.tooLarge ? [] : data.rows),
-    [data],
-  );
+  const rows = useMemo(() => (!data || data.tooLarge ? [] : data.rows), [data]);
 
   const columns = useMemo(() => {
     if (rows.length === 0) return [];
