@@ -8,19 +8,37 @@ import {
 import { useVirtualizer } from "@tanstack/react-virtual";
 import isString from "lodash/isString";
 import { csv2json } from "json-2-csv";
+import { Download } from "lucide-react";
 
 import Loader from "@/components/shared/Loader/Loader";
 import NoData from "@/components/shared/NoData/NoData";
+import { Button } from "@/components/ui/button";
+
+const SIZE_LIMIT = 5 * 1024 * 1024; // 5 MB
+
+type CSVPreviewData =
+  | { tooLarge: true }
+  | { tooLarge: false; rows: Record<string, unknown>[] };
 
 interface CSVPreviewProps {
   url: string;
+  name?: string;
 }
 
-const CSVPreview: React.FC<CSVPreviewProps> = ({ url }) => {
-  const { data, isPending, isError, error } = useQuery({
+const CSVPreview: React.FC<CSVPreviewProps> = ({ url, name }) => {
+  const { data, isPending, isError, error } = useQuery<CSVPreviewData>({
     queryKey: ["csv", url],
     queryFn: async () => {
       try {
+        const headResponse = await fetch(url, { method: "HEAD" });
+        const contentLength = parseInt(
+          headResponse.headers.get("Content-Length") ?? "",
+          10,
+        );
+        if (!isNaN(contentLength) && contentLength > SIZE_LIMIT) {
+          return { tooLarge: true };
+        }
+
         const response = await fetch(url);
         const text = await response.text();
         const normalizedText = text.replace(/\r\n|\r/g, "\n");
@@ -34,7 +52,7 @@ const CSVPreview: React.FC<CSVPreviewProps> = ({ url }) => {
           throw new Error("CSV file is empty or invalid");
         }
 
-        return parsed as Record<string, unknown>[];
+        return { tooLarge: false, rows: parsed as Record<string, unknown>[] };
       } catch (error) {
         let message: string | undefined;
         if (isString(error)) {
@@ -49,9 +67,11 @@ const CSVPreview: React.FC<CSVPreviewProps> = ({ url }) => {
     },
   });
 
+  const rows = !data || data.tooLarge ? [] : data.rows;
+
   const columns = useMemo(() => {
-    if (!data || data.length === 0) return [];
-    const firstRow = data[0];
+    if (rows.length === 0) return [];
+    const firstRow = rows[0];
     return Object.keys(firstRow).map((key) => ({
       accessorKey: key,
       header: key,
@@ -61,20 +81,20 @@ const CSVPreview: React.FC<CSVPreviewProps> = ({ url }) => {
         return String(value);
       },
     }));
-  }, [data]);
+  }, [rows]);
 
   const table = useReactTable({
-    data: data ?? [],
+    data: rows,
     columns,
     getCoreRowModel: getCoreRowModel(),
   });
 
   const tableContainerRef = React.useRef<HTMLDivElement>(null);
 
-  const { rows } = table.getRowModel();
+  const { rows: tableRows } = table.getRowModel();
 
   const rowVirtualizer = useVirtualizer({
-    count: rows.length,
+    count: tableRows.length,
     getScrollElement: () => tableContainerRef.current,
     estimateSize: () => 35,
     overscan: 10,
@@ -85,7 +105,25 @@ const CSVPreview: React.FC<CSVPreviewProps> = ({ url }) => {
 
     if (isError) return <NoData icon={null} message={error?.message} />;
 
-    if (!data || data.length === 0) {
+    if (!data) return <NoData message="CSV file is empty" icon={null} />;
+
+    if (data.tooLarge) {
+      return (
+        <div className="flex size-full flex-col items-center justify-center gap-4">
+          <p className="text-sm text-muted-foreground">
+            This file is too large to preview.
+          </p>
+          <Button asChild variant="outline">
+            <a href={url} download={name ?? true}>
+              <Download className="mr-2 size-4" />
+              Download
+            </a>
+          </Button>
+        </div>
+      );
+    }
+
+    if (data.rows.length === 0) {
       return <NoData message="CSV file is empty" icon={null} />;
     }
 
@@ -117,7 +155,7 @@ const CSVPreview: React.FC<CSVPreviewProps> = ({ url }) => {
           </thead>
           <tbody>
             {rowVirtualizer.getVirtualItems().map((virtualRow) => {
-              const row = rows[virtualRow.index];
+              const row = tableRows[virtualRow.index];
               return (
                 <tr
                   key={row.id}

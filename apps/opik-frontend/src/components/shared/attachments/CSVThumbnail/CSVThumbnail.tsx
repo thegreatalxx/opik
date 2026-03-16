@@ -15,9 +15,15 @@ const CSVThumbnail: React.FC<CSVThumbnailProps> = ({ url, name }) => {
   const { data, isPending, isError } = useQuery({
     queryKey: ["csv-thumbnail", url],
     queryFn: async () => {
-      const response = await fetch(url);
+      const response = await fetch(url, {
+        headers: { Range: "bytes=0-16383" },
+      });
       const text = await response.text();
-      const normalizedText = text.replace(/\r\n|\r/g, "\n");
+      // Drop the last (potentially partial) line from the range-fetched chunk
+      const trimmed = text.includes("\n")
+        ? text.slice(0, text.lastIndexOf("\n"))
+        : text;
+      const normalizedText = trimmed.replace(/\r\n|\r/g, "\n");
       const parsed = await csv2json(normalizedText, {
         excelBOM: true,
         trimHeaderFields: true,
