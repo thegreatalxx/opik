@@ -41,6 +41,8 @@ import static java.util.stream.Collectors.toMap;
 public class DatasetItemResultMapper {
 
     private static final int COMMENT_INDEX = 11;
+    /** Tuple index for execution_policy, added after description (index 17) in the experiment_items_array */
+    private static final int EXECUTION_POLICY_INDEX = 18;
 
     private DatasetItemResultMapper() {
     }
@@ -78,9 +80,9 @@ public class DatasetItemResultMapper {
                                 .map(Object::toString)
                                 .filter(StringUtils::isNotBlank)
                                 .orElse(null))
-                        .executionPolicy(experimentItem.size() > 18
+                        .executionPolicy(experimentItem.size() > EXECUTION_POLICY_INDEX
                                 ? ExecutionPolicyMapper.fromJson(
-                                        Optional.ofNullable(experimentItem.get(18))
+                                        Optional.ofNullable(experimentItem.get(EXECUTION_POLICY_INDEX))
                                                 .map(Object::toString)
                                                 .orElse(null))
                                 : null)

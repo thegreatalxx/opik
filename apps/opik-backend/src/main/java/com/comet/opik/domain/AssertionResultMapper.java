@@ -4,7 +4,10 @@ import com.comet.opik.api.AssertionResult;
 import com.comet.opik.api.ExecutionPolicy;
 import com.comet.opik.api.ExperimentItem;
 import com.comet.opik.api.ExperimentRunSummary;
+import com.comet.opik.api.RunStatus;
+import lombok.NonNull;
 import lombok.experimental.UtilityClass;
+import org.apache.commons.collections4.CollectionUtils;
 
 import java.math.BigDecimal;
 import java.util.LinkedHashMap;
@@ -17,9 +20,9 @@ class AssertionResultMapper {
 
     static final String SUITE_ASSERTION_CATEGORY = "suite_assertion";
 
-    static ExperimentItem enrichWithAssertions(ExperimentItem item) {
+    static ExperimentItem enrichWithAssertions(@NonNull ExperimentItem item) {
         var feedbackScores = item.feedbackScores();
-        if (feedbackScores == null || feedbackScores.isEmpty()) {
+        if (CollectionUtils.isEmpty(feedbackScores)) {
             return item;
         }
 
@@ -30,7 +33,7 @@ class AssertionResultMapper {
         var assertions = partitioned.get(true);
         var regularScores = partitioned.get(false);
 
-        if (assertions.isEmpty()) {
+        if (CollectionUtils.isEmpty(assertions)) {
             return item;
         }
 
@@ -47,12 +50,12 @@ class AssertionResultMapper {
         return item.toBuilder()
                 .feedbackScores(regularScores.isEmpty() ? null : regularScores)
                 .assertionResults(assertionResults)
-                .status(allPassed ? "passed" : "failed")
+                .status(allPassed ? RunStatus.PASSED : RunStatus.FAILED)
                 .build();
     }
 
-    static Map<String, ExperimentRunSummary> computeRunSummaries(List<ExperimentItem> items) {
-        if (items == null || items.isEmpty()) {
+    static Map<String, ExperimentRunSummary> computeRunSummaries(@NonNull List<ExperimentItem> items) {
+        if (CollectionUtils.isEmpty(items)) {
             return null;
         }
 
@@ -71,7 +74,7 @@ class AssertionResultMapper {
             }
 
             long passedRuns = group.stream()
-                    .filter(i -> "passed".equals(i.status()))
+                    .filter(i -> RunStatus.PASSED.equals(i.status()))
                     .count();
             int totalRuns = group.size();
 
@@ -82,7 +85,7 @@ class AssertionResultMapper {
                     .map(ExecutionPolicy::passThreshold)
                     .orElse(1);
 
-            String itemStatus = passedRuns >= passThreshold ? "passed" : "failed";
+            RunStatus itemStatus = passedRuns >= passThreshold ? RunStatus.PASSED : RunStatus.FAILED;
 
             summaries.put(entry.getKey().toString(),
                     ExperimentRunSummary.builder()

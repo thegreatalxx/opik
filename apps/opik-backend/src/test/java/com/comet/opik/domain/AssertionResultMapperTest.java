@@ -5,6 +5,7 @@ import com.comet.opik.api.ExecutionPolicy;
 import com.comet.opik.api.ExperimentItem;
 import com.comet.opik.api.ExperimentRunSummary;
 import com.comet.opik.api.FeedbackScore;
+import com.comet.opik.api.RunStatus;
 import com.comet.opik.api.ScoreSource;
 import org.junit.jupiter.api.Test;
 
@@ -54,7 +55,7 @@ class AssertionResultMapperTest {
 
         assertThat(result.assertionResults()).hasSize(2);
         assertThat(result.assertionResults()).allMatch(AssertionResult::passed);
-        assertThat(result.status()).isEqualTo("passed");
+        assertThat(result.status()).isEqualTo(RunStatus.PASSED);
         assertThat(result.feedbackScores()).isNull();
     }
 
@@ -69,7 +70,7 @@ class AssertionResultMapperTest {
         var result = AssertionResultMapper.enrichWithAssertions(item);
 
         assertThat(result.assertionResults()).hasSize(2);
-        assertThat(result.status()).isEqualTo("failed");
+        assertThat(result.status()).isEqualTo(RunStatus.FAILED);
         assertThat(result.assertionResults().get(0).passed()).isTrue();
         assertThat(result.assertionResults().get(1).passed()).isFalse();
     }
@@ -90,14 +91,14 @@ class AssertionResultMapperTest {
                 .containsExactly("accuracy", "relevance");
         assertThat(result.assertionResults()).hasSize(1);
         assertThat(result.assertionResults().getFirst().value()).isEqualTo("Should link to docs");
-        assertThat(result.status()).isEqualTo("passed");
+        assertThat(result.status()).isEqualTo(RunStatus.PASSED);
     }
 
     @Test
     void computeRunSummaries_singleRun_returnsNull() {
         var item = baseItem()
                 .assertionResults(List.of(AssertionResult.builder().value("a").passed(true).build()))
-                .status("passed")
+                .status(RunStatus.PASSED)
                 .build();
 
         var result = AssertionResultMapper.computeRunSummaries(List.of(item));
@@ -111,13 +112,13 @@ class AssertionResultMapperTest {
         var items = List.of(
                 baseItem().experimentId(experimentId)
                         .assertionResults(List.of(AssertionResult.builder().value("a").passed(true).build()))
-                        .status("passed").build(),
+                        .status(RunStatus.PASSED).build(),
                 baseItem().experimentId(experimentId)
                         .assertionResults(List.of(AssertionResult.builder().value("a").passed(false).build()))
-                        .status("failed").build(),
+                        .status(RunStatus.FAILED).build(),
                 baseItem().experimentId(experimentId)
                         .assertionResults(List.of(AssertionResult.builder().value("a").passed(true).build()))
-                        .status("passed").build());
+                        .status(RunStatus.PASSED).build());
 
         Map<String, ExperimentRunSummary> result = AssertionResultMapper.computeRunSummaries(items);
 
@@ -125,7 +126,7 @@ class AssertionResultMapperTest {
         var summary = result.get(experimentId.toString());
         assertThat(summary.passedRuns()).isEqualTo(2);
         assertThat(summary.totalRuns()).isEqualTo(3);
-        assertThat(summary.status()).isEqualTo("passed");
+        assertThat(summary.status()).isEqualTo(RunStatus.PASSED);
     }
 
     @Test
@@ -135,13 +136,13 @@ class AssertionResultMapperTest {
         var items = List.of(
                 baseItem().experimentId(experimentId).executionPolicy(policy)
                         .assertionResults(List.of(AssertionResult.builder().value("a").passed(true).build()))
-                        .status("passed").build(),
+                        .status(RunStatus.PASSED).build(),
                 baseItem().experimentId(experimentId).executionPolicy(policy)
                         .assertionResults(List.of(AssertionResult.builder().value("a").passed(false).build()))
-                        .status("failed").build(),
+                        .status(RunStatus.FAILED).build(),
                 baseItem().experimentId(experimentId).executionPolicy(policy)
                         .assertionResults(List.of(AssertionResult.builder().value("a").passed(true).build()))
-                        .status("passed").build());
+                        .status(RunStatus.PASSED).build());
 
         Map<String, ExperimentRunSummary> result = AssertionResultMapper.computeRunSummaries(items);
 
@@ -149,7 +150,7 @@ class AssertionResultMapperTest {
         var summary = result.get(experimentId.toString());
         assertThat(summary.passedRuns()).isEqualTo(2);
         assertThat(summary.totalRuns()).isEqualTo(3);
-        assertThat(summary.status()).isEqualTo("failed");
+        assertThat(summary.status()).isEqualTo(RunStatus.FAILED);
     }
 
     @Test
@@ -159,13 +160,13 @@ class AssertionResultMapperTest {
         var items = List.of(
                 baseItem().experimentId(experimentId).executionPolicy(policy)
                         .assertionResults(List.of(AssertionResult.builder().value("a").passed(true).build()))
-                        .status("passed").build(),
+                        .status(RunStatus.PASSED).build(),
                 baseItem().experimentId(experimentId).executionPolicy(policy)
                         .assertionResults(List.of(AssertionResult.builder().value("a").passed(false).build()))
-                        .status("failed").build(),
+                        .status(RunStatus.FAILED).build(),
                 baseItem().experimentId(experimentId).executionPolicy(policy)
                         .assertionResults(List.of(AssertionResult.builder().value("a").passed(true).build()))
-                        .status("passed").build());
+                        .status(RunStatus.PASSED).build());
 
         Map<String, ExperimentRunSummary> result = AssertionResultMapper.computeRunSummaries(items);
 
@@ -173,7 +174,7 @@ class AssertionResultMapperTest {
         var summary = result.get(experimentId.toString());
         assertThat(summary.passedRuns()).isEqualTo(2);
         assertThat(summary.totalRuns()).isEqualTo(3);
-        assertThat(summary.status()).isEqualTo("passed");
+        assertThat(summary.status()).isEqualTo(RunStatus.PASSED);
     }
 
     @Test

@@ -31,6 +31,7 @@ import com.comet.opik.api.Project;
 import com.comet.opik.api.Prompt;
 import com.comet.opik.api.PromptVersion;
 import com.comet.opik.api.ReactServiceErrorResponse;
+import com.comet.opik.api.RunStatus;
 import com.comet.opik.api.ScoreSource;
 import com.comet.opik.api.Span;
 import com.comet.opik.api.Trace;
@@ -8015,7 +8016,7 @@ class ExperimentsResourceTest {
             var streamedItem = streamedItems.getFirst();
             assertThat(streamedItem.assertionResults()).hasSize(2);
             assertThat(streamedItem.assertionResults()).allMatch(AssertionResult::passed);
-            assertThat(streamedItem.status()).isEqualTo("passed");
+            assertThat(streamedItem.status()).isEqualTo(RunStatus.PASSED);
             assertThat(streamedItem.feedbackScores()).hasSize(1);
             assertThat(streamedItem.feedbackScores().getFirst().name()).isEqualTo("accuracy");
         }
@@ -8053,7 +8054,7 @@ class ExperimentsResourceTest {
 
             var streamedItem = streamedItems.getFirst();
             assertThat(streamedItem.assertionResults()).hasSize(2);
-            assertThat(streamedItem.status()).isEqualTo("failed");
+            assertThat(streamedItem.status()).isEqualTo(RunStatus.FAILED);
             assertThat(streamedItem.assertionResults().get(0).passed()).isTrue();
             assertThat(streamedItem.assertionResults().get(1).passed()).isFalse();
             assertThat(streamedItem.assertionResults().get(1).reason()).isEqualTo("Too long");

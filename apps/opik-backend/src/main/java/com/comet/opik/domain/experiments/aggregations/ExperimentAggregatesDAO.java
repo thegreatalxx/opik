@@ -1883,7 +1883,9 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
                     .bind("created_by" + i, item.createdBy())
                     .bind("last_updated_by" + i, item.lastUpdatedBy())
                     .bind("execution_policy" + i,
-                            Optional.ofNullable(item.executionPolicy()).orElse(""));
+                            Optional.ofNullable(item.executionPolicy())
+                                    .filter(StringUtils::isNotBlank)
+                                    .orElse(""));
 
             // Bind array parameters only if maps are not empty
             var usageArrays = mapToArrays(usageMap, String[]::new, Long[]::new, Long::longValue);

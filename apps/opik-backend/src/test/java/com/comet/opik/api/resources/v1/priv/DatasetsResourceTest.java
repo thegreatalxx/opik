@@ -38,6 +38,7 @@ import com.comet.opik.api.ProjectStats.ProjectStatItem;
 import com.comet.opik.api.Prompt;
 import com.comet.opik.api.PromptVersion;
 import com.comet.opik.api.ReactServiceErrorResponse;
+import com.comet.opik.api.RunStatus;
 import com.comet.opik.api.ScoreSource;
 import com.comet.opik.api.Span;
 import com.comet.opik.api.Trace;
@@ -7357,17 +7358,18 @@ class DatasetsResourceTest {
     class FindDatasetItemsWithExperimentItemsAssertionResults {
 
         private FeedbackScoreBatchItem regularScore(Trace trace, String name, BigDecimal value) {
-            return FeedbackScoreBatchItem.builder()
+            return factory.manufacturePojo(FeedbackScoreBatchItem.class).toBuilder()
                     .id(trace.id())
                     .projectName(trace.projectName())
                     .name(name)
                     .value(value)
+                    .categoryName(null)
                     .source(ScoreSource.SDK)
                     .build();
         }
 
         private FeedbackScoreBatchItem assertionScore(Trace trace, String name, BigDecimal value, String reason) {
-            return FeedbackScoreBatchItem.builder()
+            return factory.manufacturePojo(FeedbackScoreBatchItem.class).toBuilder()
                     .id(trace.id())
                     .projectName(trace.projectName())
                     .name(name)
@@ -7427,13 +7429,15 @@ class DatasetsResourceTest {
 
             assertThat(actualPage.content()).hasSize(1);
             var actualDatasetItem = actualPage.content().getFirst();
+            assertThat(actualDatasetItem.id()).isEqualTo(datasetItem.id());
             assertThat(actualDatasetItem.experimentItems()).hasSize(1);
 
             var actualExpItem = actualDatasetItem.experimentItems().getFirst();
+            assertThat(actualExpItem.experimentId()).isEqualTo(experimentId);
 
             assertThat(actualExpItem.assertionResults()).hasSize(2);
             assertThat(actualExpItem.assertionResults()).allMatch(AssertionResult::passed);
-            assertThat(actualExpItem.status()).isEqualTo("passed");
+            assertThat(actualExpItem.status()).isEqualTo(RunStatus.PASSED);
 
             assertThat(actualExpItem.feedbackScores()).hasSize(1);
             assertThat(actualExpItem.feedbackScores().getFirst().name()).isEqualTo("accuracy");
@@ -7486,10 +7490,13 @@ class DatasetsResourceTest {
                     datasetId, List.of(experimentId), apiKey, workspaceName);
 
             assertThat(actualPage.content()).hasSize(1);
-            var actualExpItem = actualPage.content().getFirst().experimentItems().getFirst();
+            var actualDatasetItem = actualPage.content().getFirst();
+            assertThat(actualDatasetItem.id()).isEqualTo(datasetItem.id());
+            var actualExpItem = actualDatasetItem.experimentItems().getFirst();
+            assertThat(actualExpItem.experimentId()).isEqualTo(experimentId);
 
             assertThat(actualExpItem.assertionResults()).hasSize(2);
-            assertThat(actualExpItem.status()).isEqualTo("failed");
+            assertThat(actualExpItem.status()).isEqualTo(RunStatus.FAILED);
             assertThat(actualExpItem.feedbackScores()).isNull();
         }
 
@@ -7573,7 +7580,7 @@ class DatasetsResourceTest {
             // Suite experiment item has assertion results and status
             assertThat(suiteItem.assertionResults()).hasSize(1);
             assertThat(suiteItem.assertionResults().getFirst().passed()).isTrue();
-            assertThat(suiteItem.status()).isEqualTo("passed");
+            assertThat(suiteItem.status()).isEqualTo(RunStatus.PASSED);
             assertThat(suiteItem.feedbackScores()).isNull();
 
             // Regular experiment item has no assertion results and no status
@@ -7656,7 +7663,7 @@ class DatasetsResourceTest {
             var summary = actualDatasetItem.runSummariesByExperiment().get(experimentId.toString());
             assertThat(summary.totalRuns()).isEqualTo(3);
             assertThat(summary.passedRuns()).isEqualTo(2);
-            assertThat(summary.status()).isEqualTo("passed"); // 2 >= passThreshold(2)
+            assertThat(summary.status()).isEqualTo(RunStatus.PASSED); // 2 >= passThreshold(2)
         }
 
         @Test
@@ -7728,7 +7735,7 @@ class DatasetsResourceTest {
             var summary = actualDatasetItem.runSummariesByExperiment().get(experimentId.toString());
             assertThat(summary.totalRuns()).isEqualTo(3);
             assertThat(summary.passedRuns()).isEqualTo(2);
-            assertThat(summary.status()).isEqualTo("failed"); // 2 < passThreshold(3)
+            assertThat(summary.status()).isEqualTo(RunStatus.FAILED); // 2 < passThreshold(3)
         }
 
         @Test
@@ -7806,11 +7813,11 @@ class DatasetsResourceTest {
 
             assertThat(itemA.assertionResults()).hasSize(1);
             assertThat(itemA.assertionResults().getFirst().passed()).isTrue();
-            assertThat(itemA.status()).isEqualTo("passed");
+            assertThat(itemA.status()).isEqualTo(RunStatus.PASSED);
 
             assertThat(itemB.assertionResults()).hasSize(1);
             assertThat(itemB.assertionResults().getFirst().passed()).isFalse();
-            assertThat(itemB.status()).isEqualTo("failed");
+            assertThat(itemB.status()).isEqualTo(RunStatus.FAILED);
 
             // runSummariesByExperiment is null for single-run experiments (only populated when group.size() > 1)
             assertThat(actualDatasetItem.runSummariesByExperiment()).isNull();

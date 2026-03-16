@@ -11,5 +11,5 @@ import lombok.Builder;
 public record ExperimentRunSummary(
         int passedRuns,
         int totalRuns,
-        String status) {
+        RunStatus status) {
 }
