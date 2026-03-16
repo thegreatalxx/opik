@@ -180,6 +180,8 @@ jobs:
       build_from: ${{needs.set-version.outputs.build_from}}
       build_comet_image: ${{ !inputs.is_adhoc }}
       comet_build_args: ${{ !inputs.is_adhoc && 'BUILD_MODE=comet' || '' }}
+      build_ro_image: ${{ !inputs.is_adhoc }}
+      ro_build_args: ${{ !inputs.is_adhoc && 'BUILD_MODE=readonly' || '' }}
       is_release: ${{ inputs.is_release || false }}
       is_adhoc: ${{ inputs.is_adhoc || false }}
 
