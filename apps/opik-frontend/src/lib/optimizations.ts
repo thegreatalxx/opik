@@ -2,9 +2,14 @@ import {
   OPTIMIZER_TYPE,
   OPTIMIZATION_STATUS,
   METRIC_TYPE,
+  Optimization,
   OptimizerParameters,
   MetricParameters,
+  AggregatedCandidate,
 } from "@/types/optimizations";
+import { AggregatedFeedbackScore } from "@/types/shared";
+import { getFeedbackScore } from "@/lib/feedback-scores";
+import { Experiment } from "@/types/datasets";
 import { extractMetricNameFromPythonCode } from "@/lib/rules";
 import {
   DEFAULT_GEPA_OPTIMIZER_CONFIGS,
@@ -32,13 +37,29 @@ import { parseComposedProviderType } from "@/lib/provider";
 import { COLUMN_TYPE } from "@/types/shared";
 import { Filters } from "@/types/filters";
 
+export const getBaselineCandidate = (
+  candidates?: AggregatedCandidate[],
+): AggregatedCandidate | undefined =>
+  candidates?.find((c) => c.stepIndex === 0);
+
 export const getOptimizerLabel = (type: string): string => {
   return OPTIMIZER_OPTIONS.find((opt) => opt.value === type)?.label || type;
 };
 
+export const getBestOptimizationScore = (
+  row: Pick<
+    Optimization,
+    "feedback_scores" | "experiment_scores" | "objective_name"
+  >,
+): AggregatedFeedbackScore | undefined =>
+  getFeedbackScore(row.feedback_scores ?? [], row.objective_name) ??
+  getFeedbackScore(row.experiment_scores ?? [], row.objective_name);
+
 export const extractMetricNameFromCode = (code: string): string => {
   return extractMetricNameFromPythonCode(code) || "code";
 };
+
+export const MAX_EXPERIMENTS_LOADED = 1000;
 
 export const IN_PROGRESS_OPTIMIZATION_STATUSES: OPTIMIZATION_STATUS[] = [
   OPTIMIZATION_STATUS.RUNNING,
@@ -158,6 +179,10 @@ export const getOptimizationDefaultConfigByProvider = (
   }
 
   return {};
+};
+
+export const checkIsEvaluationSuite = (experiments: Experiment[]): boolean => {
+  return experiments.some((e) => e.evaluation_method === "evaluation_suite");
 };
 
 export const convertOptimizationVariableFormat = (
