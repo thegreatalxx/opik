@@ -428,3 +428,66 @@ class TestExtractFieldsWithValues:
         # Only supported types should be present
         for _, (py_type, _, _) in result.items():
             assert py_type in (str, int, float, bool) or hasattr(py_type, "__origin__")
+
+
+# ---------------------------------------------------------------------------
+# _inject_trace_metadata – project mismatch check
+# ---------------------------------------------------------------------------
+
+
+class TestInjectTraceMetadataProjectCheck:
+    def _make_config_with_service(self, service_project="my-project"):
+        service = mock.Mock(spec=AgentConfigService)
+        service.project_name = service_project
+        bp = _make_blueprint(envs=["prod"])
+        cfg = AgentConfig._from_blueprint(bp, service=service)
+        return cfg
+
+    @mock.patch("opik.context_storage.get_trace_data")
+    def test_matching_project__no_error(self, mock_get_trace):
+        trace_data = mock.Mock()
+        trace_data.project_name = "my-project"
+        mock_get_trace.return_value = trace_data
+
+        cfg = self._make_config_with_service("my-project")
+        # Should not raise
+        cfg._inject_trace_metadata("temp", 0.6)
+
+    @mock.patch("opik.context_storage.get_trace_data")
+    def test_mismatched_project__raises_value_error(self, mock_get_trace):
+        trace_data = mock.Mock()
+        trace_data.project_name = "other-project"
+        mock_get_trace.return_value = trace_data
+
+        cfg = self._make_config_with_service("my-project")
+        with pytest.raises(ValueError, match="my-project.*other-project"):
+            cfg._inject_trace_metadata("temp", 0.6)
+
+    @mock.patch("opik.context_storage.get_trace_data")
+    def test_no_active_trace__no_error(self, mock_get_trace):
+        mock_get_trace.return_value = None
+
+        cfg = self._make_config_with_service("my-project")
+        # Should not raise
+        cfg._inject_trace_metadata("temp", 0.6)
+
+    @mock.patch("opik.context_storage.get_trace_data")
+    def test_no_service__no_error(self, mock_get_trace):
+        trace_data = mock.Mock()
+        trace_data.project_name = "other-project"
+        mock_get_trace.return_value = trace_data
+
+        bp = _make_blueprint()
+        cfg = AgentConfig._from_blueprint(bp, service=None)
+        # Should not raise – no service means no project to compare
+        cfg._inject_trace_metadata("temp", 0.6)
+
+    @mock.patch("opik.context_storage.get_trace_data")
+    def test_trace_project_none__no_error(self, mock_get_trace):
+        trace_data = mock.Mock()
+        trace_data.project_name = None
+        mock_get_trace.return_value = trace_data
+
+        cfg = self._make_config_with_service("my-project")
+        # Should not raise – trace has no project set
+        cfg._inject_trace_metadata("temp", 0.6)

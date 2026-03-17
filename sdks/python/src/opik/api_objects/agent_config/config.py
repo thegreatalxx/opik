@@ -92,7 +92,7 @@ class AgentConfig:
             masked_values = self._mask_cache[context_mask]
             if key in masked_values:
                 return masked_values[key]
-        except (rest_api_core.ApiError, TypeError, KeyError) as e:
+        except Exception as e:
             logger.warning(
                 "Failed to resolve masked config value for mask_id=%s, key=%s: %s",
                 context_mask,
@@ -192,8 +192,26 @@ class AgentConfig:
         """Attach the accessed config value to the active trace's metadata.
 
         No-ops silently when there is no active trace or on any error.
+        Raises ``ValueError`` if the active trace belongs to a different
+        project than the agent config.
         """
-        from opik import exceptions, opik_context
+        from opik import exceptions, opik_context, context_storage
+
+        trace_data = context_storage.get_trace_data()
+        if trace_data is None:
+            return
+
+        if (
+            self._service is not None
+            and trace_data.project_name is not None
+            and trace_data.project_name != self._service.project_name
+        ):
+            raise ValueError(
+                f"Agent config belongs to project "
+                f"'{self._service.project_name}', but the active trace "
+                f"belongs to project '{trace_data.project_name}'. "
+                f"Use the same project for both."
+            )
 
         try:
             # ALEX
@@ -256,6 +274,8 @@ class AgentConfig:
         except KeyError:
             raise AttributeError(name)
 
+    # ALEX
+    # to do: remove 
     def create_mask(
         self,
         parameters: typing.Dict[str, typing.Any],
