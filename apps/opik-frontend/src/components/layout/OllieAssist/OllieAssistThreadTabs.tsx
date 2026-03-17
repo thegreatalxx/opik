@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from "react";
+import React, { useRef, useEffect, useCallback } from "react";
 import { Plus, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import useOllieAssistStore, { OllieThread } from "./OllieAssistStore";
@@ -43,8 +43,20 @@ const OllieAssistThreadTabs: React.FC = () => {
   const activeThreadId = useOllieAssistStore((s) => s.activeThreadId);
   const setActiveThread = useOllieAssistStore((s) => s.setActiveThread);
   const closeThread = useOllieAssistStore((s) => s.closeThread);
+  const abortBg = useOllieAssistStore((s) => s.abortBackgroundSession);
   const setShowNewThread = useOllieAssistStore((s) => s.setShowNewThread);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  const handleCloseThread = useCallback(
+    (id: string) => {
+      const thread = threads[id];
+      if (thread?.isRunning) {
+        abortBg?.(id);
+      }
+      closeThread(id);
+    },
+    [threads, closeThread, abortBg],
+  );
 
   const threadEntries = Object.entries(threads);
 
@@ -74,7 +86,7 @@ const OllieAssistThreadTabs: React.FC = () => {
               onSelect={() => setActiveThread(id)}
               onClose={(e) => {
                 e.stopPropagation();
-                closeThread(id);
+                handleCloseThread(id);
               }}
             />
           </div>

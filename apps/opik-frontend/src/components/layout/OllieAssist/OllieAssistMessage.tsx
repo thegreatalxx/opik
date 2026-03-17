@@ -2,7 +2,7 @@ import React, { useCallback, useMemo } from "react";
 import MarkdownPreview from "@/components/shared/MarkdownPreview/MarkdownPreview";
 import useOllieAssistStore from "./OllieAssistStore";
 import { OllieContentBlock, OllieMessage, OllieToolCall } from "./OllieAssistStore";
-import { fetchThreadMessages } from "./useThreads";
+import { fetchThread } from "./useThreads";
 import OllieAssistToolCallGroup from "./OllieAssistToolCallGroup";
 import OllieAssistSubAgent from "./OllieAssistSubAgent";
 
@@ -52,6 +52,7 @@ const OllieAssistMessage: React.FC<OllieAssistMessageProps> = ({ message }) => {
   const isUser = message.role === "user";
   const groups = useMemo(() => groupBlocks(message.blocks), [message.blocks]);
   const loadThread = useOllieAssistStore((s) => s.loadThread);
+  const attachToSession = useOllieAssistStore((s) => s.attachToSession);
 
   const handleClick = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
@@ -61,15 +62,18 @@ const OllieAssistMessage: React.FC<OllieAssistMessageProps> = ({ message }) => {
       if (!href.startsWith("#ollie-thread-")) return;
       e.preventDefault();
       const threadId = href.replace("#ollie-thread-", "");
-      fetchThreadMessages(threadId)
-        .then((msgs) => {
-          loadThread(threadId, threadId, threadId.slice(0, 12), msgs);
+      fetchThread(threadId)
+        .then(({ messages, isLive }) => {
+          loadThread(threadId, threadId, threadId.slice(0, 12), messages);
+          if (isLive) {
+            attachToSession?.(threadId);
+          }
         })
         .catch(() => {
           loadThread(threadId, threadId, threadId.slice(0, 12), []);
         });
     },
-    [loadThread],
+    [loadThread, attachToSession],
   );
 
   if (isUser) {

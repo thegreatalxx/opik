@@ -17,6 +17,7 @@ export default defineConfig(({ mode }) => {
   const devPort = parseInt(env.VITE_DEV_PORT || "5174", 10);
   const backendPort = parseInt(env.VITE_BACKEND_PORT || "8080", 10);
   const opikAiBackendPort = parseInt(env.VITE_OPIK_AI_BACKEND_PORT || "8081", 10);
+  const ollieAssistPort = parseInt(env.VITE_OLLIE_ASSIST_PORT || "9080", 10);
 
   return {
     base: env.VITE_BASE_URL || "/",
@@ -58,6 +59,11 @@ export default defineConfig(({ mode }) => {
         "/opik-ai": {
           target: `http://localhost:${opikAiBackendPort}`,
           changeOrigin: true,
+        },
+        "/ollie": {
+          target: `http://localhost:${ollieAssistPort}`,
+          changeOrigin: true,
+          rewrite: (requestPath) => requestPath.replace(/^\/ollie/, ""),
         },
       },
     },

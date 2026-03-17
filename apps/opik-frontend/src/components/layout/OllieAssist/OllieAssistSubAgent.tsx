@@ -78,8 +78,12 @@ const OllieAssistSubAgent: React.FC<Props> = ({ subAgent, msgId }) => {
       {subAgent.confirmStatus === "pending" && (
         <OllieAssistConfirmGate
           toolUseId={subAgent.id}
+          confirmToolUseId={subAgent.confirmToolUseId}
           toolName={subAgent.tool}
           msgId={msgId}
+          input={subAgent.confirmInput}
+          summary={subAgent.confirmSummary}
+          confirmSessionId={subAgent.confirmSessionId}
         />
       )}
 

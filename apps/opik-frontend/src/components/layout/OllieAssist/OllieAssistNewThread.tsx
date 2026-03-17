@@ -5,7 +5,7 @@ import {
   useThreadsList,
   ThreadSummary,
   extractThreadTitle,
-  fetchThreadMessages,
+  fetchThread,
 } from "./useThreads";
 
 const formatRelativeTime = (iso: string | null): string => {
@@ -50,10 +50,10 @@ const ThreadItem: React.FC<{
 
 const OllieAssistNewThread: React.FC = () => {
   const [search, setSearch] = useState("");
-  const [loadingId, setLoadingId] = useState<string | null>(null);
   const threads = useOllieAssistStore((s) => s.threads);
   const setActiveThread = useOllieAssistStore((s) => s.setActiveThread);
   const loadThread = useOllieAssistStore((s) => s.loadThread);
+  const attachToSession = useOllieAssistStore((s) => s.attachToSession);
 
   const { data: recentData } = useThreadsList(
     { page: 1, size: 20 },
@@ -72,22 +72,15 @@ const OllieAssistNewThread: React.FC = () => {
   }, [search, searchData, recentData]);
 
   const handleSelectThread = async (thread: ThreadSummary) => {
-    const existing = threads[thread.id];
-    if (existing && existing.messages.length > 0) {
-      setActiveThread(thread.id);
-      return;
-    }
-
-    setLoadingId(thread.id);
+    const title = extractThreadTitle(thread);
     try {
-      const messages = await fetchThreadMessages(thread.id);
-      const title = extractThreadTitle(thread);
+      const { messages, isLive } = await fetchThread(thread.id);
       loadThread(thread.id, thread.id, title, messages);
+      if (isLive) {
+        attachToSession?.(thread.id);
+      }
     } catch {
-      const title = extractThreadTitle(thread);
       loadThread(thread.id, thread.id, title, []);
-    } finally {
-      setLoadingId(null);
     }
   };
 
@@ -115,7 +108,7 @@ const OllieAssistNewThread: React.FC = () => {
               <ThreadItem
                 key={thread.id}
                 thread={thread}
-                loading={loadingId === thread.id}
+                loading={false}
                 onSelect={handleSelectThread}
               />
             ))}

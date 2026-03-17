@@ -16,6 +16,10 @@ export type OllieToolCall = {
   startedAt: number;
   completedAt?: number;
   confirmStatus?: "pending" | "confirmed" | "denied";
+  confirmToolUseId?: string;
+  confirmInput?: Record<string, unknown>;
+  confirmSummary?: string;
+  confirmSessionId?: string;
 };
 
 export type OllieSubAgent = {
@@ -30,6 +34,10 @@ export type OllieSubAgent = {
   startedAt: number;
   completedAt?: number;
   confirmStatus?: "pending" | "confirmed" | "denied";
+  confirmToolUseId?: string;
+  confirmInput?: Record<string, unknown>;
+  confirmSummary?: string;
+  confirmSessionId?: string;
 };
 
 export type OllieNestedToolCall = {
@@ -53,6 +61,7 @@ export type OllieThread = {
   messages: OllieMessage[];
   title: string;
   isRunning: boolean;
+  isBackground?: boolean;
 };
 
 type OllieAssistState = {
@@ -72,6 +81,7 @@ type OllieAssistState = {
 
   // Thread management
   createThread: (sessionId: string, title?: string) => void;
+  createBackgroundThread: (sessionId: string, title?: string) => void;
   setActiveThread: (threadId: string) => void;
   closeThread: (threadId: string) => void;
   setShowNewThread: (show: boolean) => void;
@@ -111,11 +121,19 @@ type OllieAssistState = {
     msgId: string,
     toolCallId: string,
     status: "pending" | "confirmed" | "denied",
+    input?: Record<string, unknown>,
+    summary?: string,
+    confirmSessionId?: string,
+    confirmToolUseId?: string,
   ) => void;
-  confirmTool: ((toolUseId: string, decision: string) => void) | null;
+  confirmTool: ((toolUseId: string, decision: string, sessionIdOverride?: string) => void) | null;
   setConfirmTool: (
-    fn: ((toolUseId: string, decision: string) => void) | null,
+    fn: ((toolUseId: string, decision: string, sessionIdOverride?: string) => void) | null,
   ) => void;
+  attachToSession: ((sessionId: string) => void) | null;
+  setAttachToSession: (fn: ((sessionId: string) => void) | null) => void;
+  abortBackgroundSession: ((sessionId: string) => void) | null;
+  setAbortBackgroundSession: (fn: ((sessionId: string) => void) | null) => void;
 };
 
 const getStoredOpen = (): boolean => {
@@ -221,6 +239,23 @@ const useOllieAssistStore = create<OllieAssistState>()(
         },
         activeThreadId: threadId,
         showNewThread: false,
+      };
+    }),
+
+  createBackgroundThread: (sessionId, title = "") =>
+    set((state) => {
+      if (state.threads[sessionId]) return {};
+      return {
+        threads: {
+          ...state.threads,
+          [sessionId]: {
+            sessionId,
+            messages: [],
+            title,
+            isRunning: false,
+            isBackground: true,
+          },
+        },
       };
     }),
 
@@ -355,6 +390,15 @@ const useOllieAssistStore = create<OllieAssistState>()(
                 };
               }
               if (type === "tool_call_start") {
+                let toolName = parsed.tool as string | null;
+                let toolDisplay = parsed.display as string | null;
+                if (!toolName && typeof parsed.delta === "string") {
+                  try {
+                    const inner = JSON.parse(parsed.delta);
+                    toolName = inner.tool || inner.name || null;
+                    toolDisplay = inner.display || null;
+                  } catch { /* ignore */ }
+                }
                 return {
                   type: "subagent",
                   subAgent: {
@@ -362,8 +406,8 @@ const useOllieAssistStore = create<OllieAssistState>()(
                     toolCalls: [
                       ...sa.toolCalls,
                       {
-                        name: (parsed.tool as string) || "unknown",
-                        display: (parsed.display as string) || (parsed.tool as string) || "Working...",
+                        name: toolName || "unknown",
+                        display: toolDisplay || toolName || "Working...",
                         completed: false,
                         isError: false,
                       },
@@ -449,19 +493,26 @@ const useOllieAssistStore = create<OllieAssistState>()(
       };
     }),
 
-  setToolCallConfirmStatus: (sessionId, msgId, toolCallId, status) =>
+  setToolCallConfirmStatus: (sessionId, msgId, toolCallId, status, input, summary, confirmSessionId, confirmToolUseId) =>
     set((state) =>
       updateThreadMessages(state, sessionId, (msgs) =>
         msgs.map((m) => {
           if (m.id !== msgId) return m;
+          const extra = {
+            confirmStatus: status,
+            ...(input && { confirmInput: input }),
+            ...(summary && { confirmSummary: summary }),
+            ...(confirmSessionId && { confirmSessionId }),
+            ...(confirmToolUseId && { confirmToolUseId }),
+          };
           return {
             ...m,
             blocks: updateBlocks(m.blocks, toolCallId, (b) => {
               if (b.type === "tool_call") {
-                return { type: "tool_call", toolCall: { ...b.toolCall, confirmStatus: status } };
+                return { type: "tool_call", toolCall: { ...b.toolCall, ...extra } };
               }
               if (b.type === "subagent") {
-                return { type: "subagent", subAgent: { ...b.subAgent, confirmStatus: status } };
+                return { type: "subagent", subAgent: { ...b.subAgent, ...extra } };
               }
               return b;
             }),
@@ -472,6 +523,10 @@ const useOllieAssistStore = create<OllieAssistState>()(
 
   confirmTool: null,
   setConfirmTool: (fn) => set({ confirmTool: fn }),
+  attachToSession: null,
+  setAttachToSession: (fn) => set({ attachToSession: fn }),
+  abortBackgroundSession: null,
+  setAbortBackgroundSession: (fn) => set({ abortBackgroundSession: fn }),
 }),
     {
       name: "ollie-assist",

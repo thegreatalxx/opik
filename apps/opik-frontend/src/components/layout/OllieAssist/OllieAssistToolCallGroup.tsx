@@ -40,8 +40,12 @@ const OllieAssistToolCallGroup: React.FC<Props> = ({ toolCalls, msgId }) => {
           {tc.confirmStatus === "pending" && (
             <OllieAssistConfirmGate
               toolUseId={tc.id}
+              confirmToolUseId={tc.confirmToolUseId}
               toolName={tc.tool}
               msgId={msgId}
+              input={tc.confirmInput}
+              summary={tc.confirmSummary}
+              confirmSessionId={tc.confirmSessionId}
             />
           )}
           {tc.completed &&

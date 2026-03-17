@@ -4,7 +4,7 @@ import axios from "axios";
 export const BASE_API_URL = import.meta.env.VITE_BASE_API_URL || "/api";
 export const BASE_OPIK_AI_URL = import.meta.env.VITE_BASE_OPIK_AI_URL || "";
 export const OLLIE_ASSIST_BASE_URL =
-  import.meta.env.VITE_OLLIE_ASSIST_URL || "http://localhost:8081";
+  import.meta.env.VITE_OLLIE_ASSIST_URL || "/ollie";
 
 const axiosInstance = axios.create({
   baseURL: BASE_API_URL,

@@ -8,6 +8,7 @@ import OllieAssistMessages from "./OllieAssistMessages";
 import OllieAssistInput from "./OllieAssistInput";
 import OllieAssistThreadTabs from "./OllieAssistThreadTabs";
 import OllieAssistNewThread from "./OllieAssistNewThread";
+import OllieAssistBackgroundTasks from "./OllieAssistBackgroundTasks";
 import useOllieAssistSSE from "./useOllieAssistSSE";
 
 const PANEL_WIDTH = 440;
@@ -18,8 +19,10 @@ const OllieAssistSidebar: React.FC = () => {
   const activeThreadId = useOllieAssistStore((s) => s.activeThreadId);
   const showNewThread = useOllieAssistStore((s) => s.showNewThread);
   const threads = useOllieAssistStore((s) => s.threads);
-  const { sendMessage, abort, confirmTool } = useOllieAssistSSE();
+  const { sendMessage, attachToSession, abort, confirmTool, abortBackgroundSession } = useOllieAssistSSE();
   const setConfirmTool = useOllieAssistStore((s) => s.setConfirmTool);
+  const setAttachToSession = useOllieAssistStore((s) => s.setAttachToSession);
+  const setAbortBackgroundSession = useOllieAssistStore((s) => s.setAbortBackgroundSession);
 
   const hasThreads = Object.keys(threads).length > 0;
   const showLanding = showNewThread || !activeThreadId;
@@ -28,6 +31,16 @@ const OllieAssistSidebar: React.FC = () => {
     setConfirmTool(confirmTool);
     return () => setConfirmTool(null);
   }, [confirmTool, setConfirmTool]);
+
+  useEffect(() => {
+    setAttachToSession(attachToSession);
+    return () => setAttachToSession(null);
+  }, [attachToSession, setAttachToSession]);
+
+  useEffect(() => {
+    setAbortBackgroundSession(abortBackgroundSession);
+    return () => setAbortBackgroundSession(null);
+  }, [abortBackgroundSession, setAbortBackgroundSession]);
 
   useEffect(() => {
     document.documentElement.style.setProperty(
@@ -97,6 +110,7 @@ const OllieAssistSidebar: React.FC = () => {
 
         {/* Thread tabs */}
         {hasThreads && <OllieAssistThreadTabs />}
+        <OllieAssistBackgroundTasks />
 
         {/* Content area */}
         {showLanding ? (

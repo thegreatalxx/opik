@@ -9,48 +9,36 @@ export type ThreadSummary = {
   agent_name: string | null;
   message_count: number;
   match_snippet: string | null;
+  is_live: boolean;
   created_at: string;
   updated_at: string;
 };
 
-type ThreadsApiResponse = {
+type SessionsApiResponse = {
   threads: ThreadSummary[];
   total: number;
   page: number;
   page_size: number;
 };
 
-type ThreadsPage = {
+type SessionsPage = {
   content: ThreadSummary[];
   total: number;
   page: number;
   size: number;
 };
 
-type ThreadMessage = {
-  id: string;
-  role: "user" | "assistant";
-  content: string;
-  created_at: string;
-};
-
-type ThreadDetail = {
-  id: string;
-  title: string;
-  messages: ThreadMessage[];
-};
-
-type UseThreadsListParams = {
+type UseSessionsListParams = {
   page?: number;
   size?: number;
   search?: string;
 };
 
-const getThreadsList = async (
+const getSessionsList = async (
   { signal }: QueryFunctionContext,
-  { page = 1, size = 20, search }: UseThreadsListParams,
+  { page = 1, size = 20, search }: UseSessionsListParams,
 ) => {
-  const { data } = await ollieAssistApi.get<ThreadsApiResponse>("/threads", {
+  const { data } = await ollieAssistApi.get<SessionsApiResponse>("/sessions", {
     signal,
     params: {
       page,
@@ -67,12 +55,12 @@ const getThreadsList = async (
 };
 
 export function useThreadsList(
-  params: UseThreadsListParams,
-  options?: QueryConfig<ThreadsPage>,
+  params: UseSessionsListParams,
+  options?: QueryConfig<SessionsPage>,
 ) {
   return useQuery({
     queryKey: [THREADS_KEY, params],
-    queryFn: (context) => getThreadsList(context, params),
+    queryFn: (context) => getSessionsList(context, params),
     ...options,
   });
 }
@@ -81,17 +69,49 @@ export function extractThreadTitle(thread: ThreadSummary): string {
   return thread.title || thread.id.slice(0, 12);
 }
 
-export async function fetchThreadMessages(
-  threadId: string,
-): Promise<OllieMessage[]> {
-  const { data } = await ollieAssistApi.get<ThreadDetail>(
-    `/threads/${threadId}`,
+type SessionMessage = {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  created_at: string;
+};
+
+type SessionDetail = {
+  id: string;
+  title: string;
+  is_live: boolean;
+  messages: SessionMessage[];
+};
+
+export type FetchThreadResult = {
+  messages: OllieMessage[];
+  isLive: boolean;
+};
+
+export async function fetchThread(
+  sessionId: string,
+): Promise<FetchThreadResult> {
+  const { data } = await ollieAssistApi.get<SessionDetail>(
+    `/sessions/${sessionId}`,
   );
 
-  return (data.messages ?? []).map((msg) => ({
+  const messages = (data.messages ?? []).map((msg) => ({
     id: msg.id,
-    role: msg.role,
+    role: msg.role as "user" | "assistant",
     content: msg.content,
     blocks: [{ type: "text" as const, text: msg.content }],
   }));
+
+  return { messages, isLive: data.is_live };
+}
+
+export async function fetchLiveThreads(): Promise<ThreadSummary[]> {
+  const { data } = await ollieAssistApi.get<SessionsApiResponse>("/sessions", {
+    params: { page: 1, size: 50 },
+  });
+  return (data.threads ?? []).filter((t) => t.is_live);
+}
+
+export async function deleteSession(sessionId: string): Promise<void> {
+  await ollieAssistApi.delete(`/sessions/${sessionId}`);
 }
