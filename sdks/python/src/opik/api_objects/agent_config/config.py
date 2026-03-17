@@ -40,6 +40,7 @@ class AgentConfig:
     _blueprint_id: typing.Optional[str]
     _blueprint_envs: typing.Optional[typing.List[str]]
     _service: typing.Optional["AgentConfigService"]
+    _mask_id: typing.Optional[str]
     _mask_cache: typing.Dict[str, typing.Dict[str, typing.Any]]
     _field_metadata: typing.Dict[str, typing.Tuple[str, typing.Optional[str]]]
     _is_fallback: bool
@@ -54,6 +55,7 @@ class AgentConfig:
         cls,
         blueprint: Blueprint,
         service: typing.Optional["AgentConfigService"] = None,
+        mask_id: typing.Optional[str] = None,
     ) -> "AgentConfig":
         """Create an AgentConfig populated from a Blueprint."""
         instance = object.__new__(cls)
@@ -61,6 +63,7 @@ class AgentConfig:
         instance._blueprint_id = blueprint.id
         instance._blueprint_envs = blueprint.envs
         instance._service = service
+        instance._mask_id = mask_id
         instance._mask_cache = {}
         instance._field_metadata = {
             v.key: (v.type, v.description) for v in blueprint._raw.values
@@ -154,6 +157,7 @@ class AgentConfig:
         self._blueprint_id = None
         self._blueprint_envs = None
         self._service = None
+        self._mask_id = None
         self._mask_cache = {}
         self._field_metadata = {
             k: (type_helpers.python_type_to_backend_type(py_type), desc)
@@ -240,23 +244,27 @@ class AgentConfig:
         except Exception:
             logger.debug("Failed to inject config metadata into trace", exc_info=True)
 
+    def _effective_mask_id(self) -> typing.Optional[str]:
+        """Return the active context mask, falling back to the fetch-time mask."""
+        return get_active_config_mask() or self._mask_id
+
     def get(self, key: str, default: typing.Any = None) -> typing.Any:
         """Get a config value by key, with an optional default."""
         masked = self._resolve_masked_value(key)
         if masked is not _MISSING:
-            self._inject_trace_metadata(key, masked, mask_id=get_active_config_mask())
+            self._inject_trace_metadata(key, masked, mask_id=self._effective_mask_id())
             return masked
         value = self._values.get(key, default)
-        self._inject_trace_metadata(key, value)
+        self._inject_trace_metadata(key, value, mask_id=self._effective_mask_id())
         return value
 
     def __getitem__(self, key: str) -> typing.Any:
         masked = self._resolve_masked_value(key)
         if masked is not _MISSING:
-            self._inject_trace_metadata(key, masked, mask_id=get_active_config_mask())
+            self._inject_trace_metadata(key, masked, mask_id=self._effective_mask_id())
             return masked
         value = self._values[key]
-        self._inject_trace_metadata(key, value)
+        self._inject_trace_metadata(key, value, mask_id=self._effective_mask_id())
         return value
 
     def __getattr__(self, name: str) -> typing.Any:
