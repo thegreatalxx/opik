@@ -30,7 +30,6 @@ import { DashboardRowActionsCell } from "@/components/pages/DashboardsPage/Dashb
 import DashboardsActionsPanel from "@/components/pages/DashboardsPage/DashboardsActionsPanel";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { Tag } from "@/components/ui/tag";
 import useAppStore from "@/store/AppStore";
 import SearchInput from "@/components/shared/SearchInput/SearchInput";
 import TimeCell from "@/components/shared/DataTableCells/TimeCell";
@@ -346,9 +345,8 @@ const DashboardsPage: React.FunctionComponent = () => {
   return (
     <div className="pt-6">
       <div className="mb-1 flex items-center justify-between">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center">
           <h1 className="comet-title-l truncate break-words">Dashboards</h1>
-          <Tag variant="green">Beta</Tag>
         </div>
       </div>
       <ExplainerDescription
