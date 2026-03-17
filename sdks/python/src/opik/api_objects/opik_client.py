@@ -2406,9 +2406,7 @@ class Opik:
                 fallback._is_fallback = True
             return fallback
 
-        return AgentConfig._from_blueprint(
-            blueprint, service=service, mask_id=mask_id
-        )
+        return AgentConfig._from_blueprint(blueprint, service=service, mask_id=mask_id)
 
 
 @functools.lru_cache()
