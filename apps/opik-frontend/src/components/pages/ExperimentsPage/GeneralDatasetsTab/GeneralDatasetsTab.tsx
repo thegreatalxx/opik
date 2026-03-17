@@ -601,7 +601,10 @@ const GeneralDatasetsTab: React.FC = () => {
         (experiment.experiment_scores ?? []).forEach((s) => {
           scores[s.name] = s.value;
         });
-        if (isEvalSuiteExperiment(experiment) && isNumber(experiment.pass_rate)) {
+        if (
+          isEvalSuiteExperiment(experiment) &&
+          isNumber(experiment.pass_rate)
+        ) {
           scores[PASS_RATE_LABEL] = experiment.pass_rate;
         }
 
