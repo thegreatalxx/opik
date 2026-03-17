@@ -1845,7 +1845,11 @@ class ExperimentDAO {
                     .passRate(getPassRateValue(row, "pass_rate"))
                     .passedCount(row.get("passed_count", Long.class))
                     .totalCount(row.get("total_count", Long.class))
-                    .assertionScores(getFeedbackScores(row, "assertion_scores"))
+                    .assertionScores(
+                            EvaluationMethod.fromString(row.get("evaluation_method", String.class))
+                                    .filter(EvaluationMethod.EVALUATION_SUITE::equals)
+                                    .map(__ -> getFeedbackScores(row, "assertion_scores"))
+                                    .orElse(null))
                     .build();
         });
     }

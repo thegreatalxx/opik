@@ -2091,20 +2091,22 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
                 .build();
     }
 
-    private FeedbackScoreAggregations mapFeedbackScoreAggregations(Row row) {
-        // Convert feedbackScoresAvg map values from BigDecimal to Double
-        Map<String, Object> feedbackScoresAvgRaw = row.get("feedback_scores_avg", Map.class);
-        Map<String, Double> feedbackScoresAvg = Optional.ofNullable(feedbackScoresAvgRaw)
-                .map(raw -> raw.entrySet().stream()
+    @SuppressWarnings("unchecked")
+    private Map<String, Double> toNullableDoubleMap(Row row, String columnName) {
+        Map<String, Object> raw = row.get(columnName, Map.class);
+        return Optional.ofNullable(raw)
+                .map(m -> m.entrySet().stream()
                         .collect(Collectors.toMap(
                                 Map.Entry::getKey,
                                 e -> ((Number) e.getValue()).doubleValue())))
                 .orElse(null);
+    }
 
+    private FeedbackScoreAggregations mapFeedbackScoreAggregations(Row row) {
         return FeedbackScoreAggregations.builder()
                 .experimentId(getUUID(row, "experiment_id"))
                 .feedbackScoresPercentiles(row.get("feedback_scores_percentiles", Map.class))
-                .feedbackScoresAvg(feedbackScoresAvg)
+                .feedbackScoresAvg(toNullableDoubleMap(row, "feedback_scores_avg"))
                 .build();
     }
 
@@ -2532,17 +2534,9 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
     }
 
     private AssertionScoreAggregations mapAssertionScoreAggregations(Row row) {
-        Map<String, Object> assertionScoresAvgRaw = row.get("assertion_scores_avg", Map.class);
-        Map<String, Double> assertionScoresAvg = Optional.ofNullable(assertionScoresAvgRaw)
-                .map(raw -> raw.entrySet().stream()
-                        .collect(Collectors.toMap(
-                                Map.Entry::getKey,
-                                e -> ((Number) e.getValue()).doubleValue())))
-                .orElse(null);
-
         return AssertionScoreAggregations.builder()
                 .experimentId(getUUID(row, "experiment_id"))
-                .assertionScoresAvg(assertionScoresAvg)
+                .assertionScoresAvg(toNullableDoubleMap(row, "assertion_scores_avg"))
                 .build();
     }
 
