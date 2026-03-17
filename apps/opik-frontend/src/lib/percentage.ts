@@ -10,8 +10,13 @@ export const calcFormatterAwarePercentage = (
   baseline: number | undefined,
   formatter?: (v: number) => string,
 ): number | undefined => {
-  if (current === undefined || baseline === undefined || baseline === 0) {
+  if (current === undefined || baseline === undefined) {
     return undefined;
+  }
+
+  if (baseline === 0) {
+    if (current === 0) return 0;
+    return current > 0 ? Infinity : -Infinity;
   }
 
   if (formatter && formatter(current) === formatter(baseline)) return 0;

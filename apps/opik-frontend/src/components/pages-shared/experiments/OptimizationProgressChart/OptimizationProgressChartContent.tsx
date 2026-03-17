@@ -31,7 +31,6 @@ import {
 import type { InProgressInfo } from "./optimizationChartUtils";
 import {
   OVERLAP_SPACING,
-  GHOST_OVERLAP_OFFSET_PER_DOT,
   CHART_MARGIN,
   X_AXIS_PADDING,
   X_DOMAIN_EXTRA,
@@ -41,6 +40,8 @@ import useScatterDot from "./ScatterDot";
 import type { DotPosition } from "./ScatterDot";
 import useChartEdges from "./ChartEdges";
 import useGhostCandidate from "./GhostCandidate";
+
+const GHOST_ID = "__ghost__";
 
 type OptimizationProgressChartContentProps = {
   chartData: CandidateDataPoint[];
@@ -90,7 +91,7 @@ const OptimizationProgressChartContent: React.FC<
     return inProgressInfo.stepIndex;
   }, [isInProgress, steps, inProgressInfo]);
 
-  const overlapOffsets = useMemo(() => {
+  const { overlapOffsets, ghostXOffset } = useMemo(() => {
     const groups = new Map<string, string[]>();
     for (const d of chartData) {
       const key = `${d.stepIndex}:${d.value}`;
@@ -98,6 +99,21 @@ const OptimizationProgressChartContent: React.FC<
       list.push(d.candidateId);
       groups.set(key, list);
     }
+
+    // Include ghost in overlap groups so it spreads evenly with siblings
+    if (ghostStep != null && inProgressInfo) {
+      // Ghost has null value — group it with the parent's value at ghost step
+      // Find the parent's score to determine which group the ghost joins
+      const parentData = chartData.find((d) =>
+        inProgressInfo.parentCandidateIds.includes(d.candidateId),
+      );
+      const ghostValue = parentData?.value ?? null;
+      const ghostKey = `${ghostStep}:${ghostValue}`;
+      const list = groups.get(ghostKey) ?? [];
+      list.push(GHOST_ID);
+      groups.set(ghostKey, list);
+    }
+
     const offsets = new Map<string, number>();
     for (const ids of groups.values()) {
       if (ids.length <= 1) continue;
@@ -106,17 +122,12 @@ const OptimizationProgressChartContent: React.FC<
         offsets.set(id, -totalWidth / 2 + i * OVERLAP_SPACING);
       });
     }
-    return offsets;
-  }, [chartData]);
 
-  const ghostXOffset = useMemo(() => {
-    if (ghostStep == null) return 0;
-    const dotsAtStep = chartData.filter(
-      (d) => d.stepIndex === ghostStep && d.value != null,
-    ).length;
-    if (dotsAtStep === 0) return 0;
-    return dotsAtStep * GHOST_OVERLAP_OFFSET_PER_DOT;
-  }, [ghostStep, chartData]);
+    return {
+      overlapOffsets: offsets,
+      ghostXOffset: offsets.get(GHOST_ID) ?? 0,
+    };
+  }, [chartData, ghostStep, inProgressInfo]);
 
   const values = useMemo(
     () => positionedData.map((d) => d.value),

@@ -15,7 +15,6 @@ export const DOT_STROKE_COLOR = "white";
 
 // Overlap spacing for dots sharing the same (step, score)
 export const OVERLAP_SPACING = 16;
-export const GHOST_OVERLAP_OFFSET_PER_DOT = 8;
 
 // "Best candidate" label dimensions
 export const BEST_LABEL_WIDTH = 92;

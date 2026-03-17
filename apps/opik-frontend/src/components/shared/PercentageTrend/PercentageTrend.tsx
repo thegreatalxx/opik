@@ -52,28 +52,31 @@ const PercentageTrend: React.FC<PercentageTrendProps> = ({
 
   const { Icon, variant } = getConfig(percentage, trend, precision);
 
-  const tag = iconOnly ? (
-    <Tag
-      size="sm"
-      variant={variant as TagProps["variant"]}
-      className="inline-flex items-center justify-center px-1"
-    >
-      <Icon className="size-3" />
-    </Tag>
-  ) : (
-    <Tag
-      size="md"
-      variant={variant as TagProps["variant"]}
-      className="flex-row flex-nowrap gap-1"
-    >
-      <div className="flex max-w-full items-center justify-between gap-0.5">
-        <Icon className="size-3 shrink-0" />
-        <div className="min-w-8 text-right">
-          {formatNumericData(percentage, precision)}%
+  const isFinitePercentage = isFinite(percentage);
+
+  const tag =
+    iconOnly || !isFinitePercentage ? (
+      <Tag
+        size="sm"
+        variant={variant as TagProps["variant"]}
+        className="inline-flex items-center justify-center px-1"
+      >
+        <Icon className="size-3" />
+      </Tag>
+    ) : (
+      <Tag
+        size="md"
+        variant={variant as TagProps["variant"]}
+        className="flex-row flex-nowrap gap-1"
+      >
+        <div className="flex max-w-full items-center justify-between gap-0.5">
+          <Icon className="size-3 shrink-0" />
+          <div className="min-w-8 text-right">
+            {formatNumericData(percentage, precision)}%
+          </div>
         </div>
-      </div>
-    </Tag>
-  );
+      </Tag>
+    );
 
   if (tooltip) {
     return <TooltipWrapper content={tooltip}>{tag}</TooltipWrapper>;
