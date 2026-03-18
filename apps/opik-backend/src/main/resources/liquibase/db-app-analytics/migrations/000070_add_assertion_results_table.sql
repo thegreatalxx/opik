@@ -14,10 +14,11 @@ CREATE TABLE IF NOT EXISTS ${ANALYTICS_DB_DATABASE_NAME}.assertion_results ON CL
     source          Enum8('sdk' = 1, 'ui' = 2, 'online_scoring' = 3),
     created_at      DateTime64(9, 'UTC') DEFAULT now64(9),
     last_updated_at DateTime64(9, 'UTC') DEFAULT now64(9),
+    author          String               DEFAULT '',
     created_by      String               DEFAULT '',
     last_updated_by String               DEFAULT ''
 ) ENGINE = ReplicatedReplacingMergeTree('/clickhouse/tables/{shard}/${ANALYTICS_DB_DATABASE_NAME}/assertion_results', '{replica}', last_updated_at)
-        ORDER BY (workspace_id, project_id, entity_type, entity_id, name)
+        ORDER BY (workspace_id, project_id, entity_type, entity_id, author, name)
         SETTINGS index_granularity = 8192;
 
 --rollback DROP TABLE IF EXISTS ${ANALYTICS_DB_DATABASE_NAME}.assertion_results ON CLUSTER '{cluster}';

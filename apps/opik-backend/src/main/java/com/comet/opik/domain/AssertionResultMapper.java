@@ -61,44 +61,6 @@ class AssertionResultMapper {
                 .build();
     }
 
-    /**
-     * Legacy overload: partitions assertions from feedback scores by category_name.
-     * Used by DatasetItemResultMapper which doesn't yet read from assertion_results table.
-     */
-    static ExperimentItem enrichWithAssertions(@NonNull ExperimentItem item) {
-        var feedbackScores = item.feedbackScores();
-        if (CollectionUtils.isEmpty(feedbackScores)) {
-            return item;
-        }
-
-        var partitioned = feedbackScores.stream()
-                .collect(Collectors.partitioningBy(
-                        fs -> "suite_assertion".equals(fs.categoryName())));
-
-        var assertions = partitioned.get(true);
-        var regularScores = partitioned.get(false);
-
-        if (CollectionUtils.isEmpty(assertions)) {
-            return item;
-        }
-
-        var assertionResults = assertions.stream()
-                .map(fs -> AssertionResult.builder()
-                        .value(fs.name())
-                        .passed(fs.value().compareTo(java.math.BigDecimal.ONE) >= 0)
-                        .reason(fs.reason())
-                        .build())
-                .toList();
-
-        boolean allPassed = assertionResults.stream().allMatch(AssertionResult::passed);
-
-        return item.toBuilder()
-                .feedbackScores(regularScores.isEmpty() ? null : regularScores)
-                .assertionResults(assertionResults)
-                .status(allPassed ? RunStatus.PASSED : RunStatus.FAILED)
-                .build();
-    }
-
     static Map<String, ExperimentRunSummary> computeRunSummaries(List<ExperimentItem> items) {
         if (CollectionUtils.isEmpty(items)) {
             return null;
@@ -114,7 +76,7 @@ class AssertionResultMapper {
             boolean hasAssertions = group.stream()
                     .anyMatch(i -> i.assertionResults() != null);
 
-            if (!hasAssertions || group.size() <= 1) {
+            if (!hasAssertions) {
                 continue;
             }
 
