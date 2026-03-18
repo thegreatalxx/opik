@@ -207,7 +207,7 @@ class AssertionResultMapperTest {
     private static FeedbackScore assertionScore(String name, BigDecimal value, String reason) {
         return FeedbackScore.builder()
                 .name(name)
-                .categoryName(AssertionResultMapper.SUITE_ASSERTION_CATEGORY)
+                .categoryName("suite_assertion")
                 .value(value)
                 .reason(reason)
                 .source(ScoreSource.SDK)
