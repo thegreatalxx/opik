@@ -205,8 +205,9 @@ class ExperimentsResourceTest {
     private static final String API_KEY = UUID.randomUUID().toString();
 
     private static final String[] EXPERIMENT_IGNORED_FIELDS = new String[]{
-            "id", "datasetId", "name", "feedbackScores", "assertionScores", "traceCount", "createdAt", "lastUpdatedAt",
-            "createdBy", "lastUpdatedBy", "comments", "projectId", "projectName"};
+            "id", "datasetId", "name", "feedbackScores", "assertionScores", "traceCount", "createdAt",
+            "lastUpdatedAt", "createdBy", "lastUpdatedBy", "comments", "projectId", "projectName",
+            "datasetItemCount"};
 
     private static final String WORKSPACE_ID = UUID.randomUUID().toString();
     private static final String USER = "user-" + RandomStringUtils.secure().nextAlphanumeric(36);
