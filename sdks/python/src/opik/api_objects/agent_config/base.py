@@ -118,9 +118,10 @@ class AgentConfig:
     def _resolve_field(self, attr: str) -> typing.Any:
         state = self._state
         project = typing.cast(str, state.project)  # guarded by __getattribute__
+        active_mask = get_active_config_mask()
         if (
-            state.mask_id is None
-            and get_active_config_mask() is not None
+            active_mask is not None
+            and state.mask_id != active_mask
             and not state.mask_mismatch_warned
         ):
             state.mask_mismatch_warned = True
