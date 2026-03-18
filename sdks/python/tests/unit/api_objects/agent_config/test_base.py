@@ -5,7 +5,6 @@ from unittest import mock
 import pytest
 
 from opik.api_objects.agent_config.base import AgentConfig
-from opik.api_objects.agent_config.config import AgentConfigManager
 from opik.api_objects.opik_client import Opik
 from opik.exceptions import AgentConfigNotFound
 from opik.rest_api.types.agent_blueprint_public import AgentBlueprintPublic
@@ -98,7 +97,7 @@ class TestAgentConfigBaseClass:
 
 
 class TestCreateAgentConfigVersion:
-    def test_first_call__creates_blueprint_and_returns_version_name(
+    def test_first_call__creates_blueprint_and_returns_version_name__happyflow(
         self, mock_rest_client
     ):
         class MyConfig(AgentConfig):
@@ -131,7 +130,9 @@ class TestCreateAgentConfigVersion:
         mock_rest_client.agent_configs.create_agent_config.assert_called_once()
         assert result == "v1"
 
-    def test_same_values__no_op_returns_existing_name(self, mock_rest_client):
+    def test_same_values__no_op_returns_existing_name__happyflow(
+        self, mock_rest_client
+    ):
         class MyConfig(AgentConfig):
             temp: float
 
@@ -159,7 +160,7 @@ class TestCreateAgentConfigVersion:
         mock_rest_client.agent_configs.create_agent_config.assert_not_called()
         assert result == "v1"
 
-    def test_different_values__creates_new_version(self, mock_rest_client):
+    def test_different_values__creates_new_version__happyflow(self, mock_rest_client):
         class MyConfig(AgentConfig):
             temp: float
 
@@ -234,7 +235,7 @@ class TestGetAgentConfig:
         with pytest.raises(AgentConfigNotFound):
             client.get_agent_config(fallback=fallback)
 
-    def test_backend_values__returned_in_result(self, mock_rest_client):
+    def test_backend_values__returned_in_result__happyflow(self, mock_rest_client):
         class MyConfig(AgentConfig):
             temp: float
             name: str
@@ -265,7 +266,7 @@ class TestGetAgentConfig:
         assert result.temp == pytest.approx(0.9)
         assert result.name == "backend-model"
 
-    def test_return_type__isinstance_of_user_class(self, mock_rest_client):
+    def test_return_type__isinstance_of_user_class__happyflow(self, mock_rest_client):
         class MyConfig(AgentConfig):
             temp: float
 
@@ -292,7 +293,7 @@ class TestGetAgentConfig:
         assert isinstance(result, MyConfig)
         assert isinstance(result, AgentConfig)
 
-    def test_latest_flag__fetches_latest(self, mock_rest_client):
+    def test_latest_flag__fetches_latest__happyflow(self, mock_rest_client):
         class MyConfig(AgentConfig):
             temp: float
 
@@ -317,7 +318,7 @@ class TestGetAgentConfig:
         mock_rest_client.agent_configs.get_latest_blueprint.assert_called()
         assert result.temp == pytest.approx(0.8)
 
-    def test_version_param__fetches_by_name(self, mock_rest_client):
+    def test_version_param__fetches_by_name__happyflow(self, mock_rest_client):
         class MyConfig(AgentConfig):
             temp: float
 
@@ -346,7 +347,7 @@ class TestGetAgentConfig:
         )
         assert result.temp == pytest.approx(0.3)
 
-    def test_env_param__fetches_by_env(self, mock_rest_client):
+    def test_env_param__fetches_by_env__happyflow(self, mock_rest_client):
         class MyConfig(AgentConfig):
             temp: float
 
@@ -375,6 +376,32 @@ class TestGetAgentConfig:
         )
         assert result.temp == pytest.approx(0.6)
 
+    def test_backend_explicit_none__preserved_not_overridden_by_fallback(
+        self, mock_rest_client
+    ):
+        class MyConfig(AgentConfig):
+            temp: Optional[float]
+
+        fallback = MyConfig(temp=0.5)
+        client = Opik.__new__(Opik)
+        client._rest_client = mock_rest_client
+        client._project_name = "test-project"
+
+        bp = AgentBlueprintPublic(
+            id="bp-1",
+            type="blueprint",
+            values=[
+                AgentConfigValuePublic(key="MyConfig.temp", type="float", value=None),
+            ],
+        )
+        mock_rest_client.projects.retrieve_project.return_value = mock.Mock(id="proj-1")
+        mock_rest_client.agent_configs.get_latest_blueprint.side_effect = None
+        mock_rest_client.agent_configs.get_latest_blueprint.return_value = bp
+
+        result = client.get_agent_config(fallback=fallback, latest=True)
+
+        assert result.temp is None
+
     def test_non_agentconfig__raises_type_error(self, mock_rest_client):
         client = Opik.__new__(Opik)
         client._rest_client = mock_rest_client
@@ -390,14 +417,14 @@ class TestGetAgentConfig:
 
 
 class TestLiveInstance:
-    def test_live_instance__reads_from_cache(self, mock_rest_client):
+    def test_live_instance__reads_from_cache__happyflow(self, mock_rest_client):
         class MyConfig(AgentConfig):
             temp: float
 
         fallback = MyConfig(temp=0.5)
-        manager = AgentConfigManager(
-            project_name="test-project", rest_client_=mock_rest_client
-        )
+        client = Opik.__new__(Opik)
+        client._rest_client = mock_rest_client
+        client._project_name = "test-project"
 
         bp = AgentBlueprintPublic(
             id="bp-1",
@@ -410,9 +437,7 @@ class TestLiveInstance:
         mock_rest_client.agent_configs.get_latest_blueprint.side_effect = None
         mock_rest_client.agent_configs.get_latest_blueprint.return_value = bp
 
-        live = MyConfig._resolve_from_backend(
-            fallback, manager, "test-project", env=None, latest=True, version=None
-        )
+        live = client.get_agent_config(fallback=fallback, latest=True)
 
         assert live.temp == pytest.approx(0.9)
         assert isinstance(live, MyConfig)
@@ -567,9 +592,10 @@ class TestEnvsAndIsFallback:
             temp: float
 
         fallback = MyConfig(temp=0.5)
-        manager = AgentConfigManager(
-            project_name="test-project", rest_client_=mock_rest_client
-        )
+        client = Opik.__new__(Opik)
+        client._rest_client = mock_rest_client
+        client._project_name = "test-project"
+
         bp = AgentBlueprintPublic(
             id="bp-1",
             type="blueprint",
@@ -581,9 +607,7 @@ class TestEnvsAndIsFallback:
         mock_rest_client.agent_configs.get_latest_blueprint.side_effect = None
         mock_rest_client.agent_configs.get_latest_blueprint.return_value = bp
 
-        live = MyConfig._resolve_from_backend(
-            fallback, manager, "test-project", env=None, latest=True, version=None
-        )
+        live = client.get_agent_config(fallback=fallback, latest=True)
         assert live.is_fallback is False
 
         _registry.clear()
@@ -600,9 +624,10 @@ class TestEnvsAndIsFallback:
             temp: float
 
         fallback = MyConfig(temp=0.5)
-        manager = AgentConfigManager(
-            project_name="test-project", rest_client_=mock_rest_client
-        )
+        client = Opik.__new__(Opik)
+        client._rest_client = mock_rest_client
+        client._project_name = "test-project"
+
         bp = AgentBlueprintPublic(
             id="bp-1",
             type="blueprint",
@@ -614,9 +639,7 @@ class TestEnvsAndIsFallback:
         mock_rest_client.agent_configs.get_latest_blueprint.side_effect = None
         mock_rest_client.agent_configs.get_latest_blueprint.return_value = bp
 
-        live = MyConfig._resolve_from_backend(
-            fallback, manager, "test-project", env=None, latest=True, version=None
-        )
+        live = client.get_agent_config(fallback=fallback, latest=True)
         _registry.clear()
         _ = live.temp  # cache is empty → is_fallback=True
         assert live.is_fallback is True
@@ -666,15 +689,13 @@ class TestEnvsAndIsFallback:
 
 def _make_live_instance(mock_rest_client, fallback, bp):
     """Helper: resolve a live AgentConfig instance from a mocked blueprint."""
-    manager = AgentConfigManager(
-        project_name="test-project", rest_client_=mock_rest_client
-    )
+    client = Opik.__new__(Opik)
+    client._rest_client = mock_rest_client
+    client._project_name = "test-project"
     mock_rest_client.projects.retrieve_project.return_value = mock.Mock(id="proj-1")
     mock_rest_client.agent_configs.get_latest_blueprint.side_effect = None
     mock_rest_client.agent_configs.get_latest_blueprint.return_value = bp
-    return type(fallback)._resolve_from_backend(
-        fallback, manager, "test-project", env=None, latest=True, version=None
-    )
+    return client.get_agent_config(fallback=fallback, latest=True)
 
 
 class TestMetadataInjection:

@@ -252,9 +252,8 @@ class AgentConfig:
 
         kwargs: typing.Dict[str, typing.Any] = {}
         for f_name, cf in cls.__field_metadata__.items():
-            bp_value = bp.get(cf.prefixed_key)
-            if bp_value is not None:
-                kwargs[f_name] = bp_value
+            if cf.prefixed_key in bp.keys():
+                kwargs[f_name] = bp[cf.prefixed_key]
             else:
                 kwargs[f_name] = object.__getattribute__(fallback, f_name)
 

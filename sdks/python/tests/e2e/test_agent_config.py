@@ -40,7 +40,7 @@ def project_name(opik_client: opik.Opik):
 # ---------------------------------------------------------------------------
 
 
-def test_create_agent_config_version__first_call__writes_config(
+def test_create_agent_config_version__first_call__writes_config__happyflow(
     opik_client: opik.Opik,
     project_name: str,
 ):
@@ -58,7 +58,7 @@ def test_create_agent_config_version__first_call__writes_config(
     assert result.model_name == "gpt-4"
 
 
-def test_create_agent_config_version__duplicate__no_op(
+def test_create_agent_config_version__duplicate__no_op__happyflow(
     opik_client: opik.Opik,
     project_name: str,
 ):
@@ -79,7 +79,7 @@ def test_create_agent_config_version__duplicate__no_op(
     assert len(history.content) == 1
 
 
-def test_create_agent_config_version__different_values__new_version(
+def test_create_agent_config_version__different_values__new_version__happyflow(
     opik_client: opik.Opik,
     project_name: str,
 ):
@@ -109,7 +109,7 @@ def test_create_agent_config_version__different_values__new_version(
 # ---------------------------------------------------------------------------
 
 
-def test_get_agent_config__no_backend__returns_fallback(
+def test_get_agent_config__no_backend__returns_fallback__happyflow(
     opik_client: opik.Opik,
     project_name: str,
 ):
@@ -123,7 +123,7 @@ def test_get_agent_config__no_backend__returns_fallback(
     assert result.temperature == pytest.approx(0.99)
 
 
-def test_get_agent_config__backend_values__override_fallback(
+def test_get_agent_config__backend_values__override_fallback__happyflow(
     opik_client: opik.Opik,
     project_name: str,
 ):
@@ -177,7 +177,7 @@ def test_get_agent_config__backend_values__override_fallback(
     )
 
 
-def test_get_agent_config__env_tag__fetches_correct_version(
+def test_get_agent_config__env_tag__fetches_correct_version__happyflow(
     opik_client: opik.Opik,
     project_name: str,
 ):
@@ -202,7 +202,7 @@ def test_get_agent_config__env_tag__fetches_correct_version(
     assert result.temperature == pytest.approx(0.4)
 
 
-def test_get_agent_config__version_param__fetches_by_name(
+def test_get_agent_config__version_param__fetches_by_name__happyflow(
     opik_client: opik.Opik,
     project_name: str,
 ):
@@ -237,7 +237,7 @@ def test_get_agent_config__version_param__fetches_by_name(
 # ---------------------------------------------------------------------------
 
 
-def test_annotated_descriptions__sent_to_backend(
+def test_annotated_descriptions__sent_to_backend__happyflow(
     opik_client: opik.Opik,
     project_name: str,
 ):
@@ -268,7 +268,7 @@ def test_annotated_descriptions__sent_to_backend(
 # ---------------------------------------------------------------------------
 
 
-def test_prompt_field__roundtrip(
+def test_prompt_field__roundtrip__happyflow(
     opik_client: opik.Opik,
     project_name: str,
 ):
@@ -297,7 +297,7 @@ def test_prompt_field__roundtrip(
 # ---------------------------------------------------------------------------
 
 
-def test_mask__overrides_base_config_values(
+def test_mask__overrides_base_config_values__happyflow(
     opik_client: opik.Opik,
     project_name: str,
 ):
