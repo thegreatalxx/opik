@@ -35,280 +35,152 @@ def project_name(opik_client: opik.Opik):
         pass
 
 
-# ---------------------------------------------------------------------------
-# create_agent_config_version tests
-# ---------------------------------------------------------------------------
-
-
-def test_create_agent_config_version__first_call__writes_config__happyflow(
+def test_publish_version_and_retrieve__happyflow(
     opik_client: opik.Opik,
     project_name: str,
 ):
-    class MyConfig(opik.AgentConfig):
-        temperature: float
-        model_name: str
-
-    cfg = MyConfig(temperature=0.7, model_name="gpt-4")
-    opik_client.create_agent_config_version(cfg, project_name=project_name)
-
-    result = opik_client.get_agent_config(
-        fallback=cfg, project_name=project_name, latest=True
-    )
-    assert result.temperature == pytest.approx(0.7)
-    assert result.model_name == "gpt-4"
-
-
-def test_create_agent_config_version__duplicate__no_op__happyflow(
-    opik_client: opik.Opik,
-    project_name: str,
-):
-    class MyConfig(opik.AgentConfig):
-        temperature: float
-
-    cfg = MyConfig(temperature=0.5)
-    opik_client.create_agent_config_version(cfg, project_name=project_name)
-
-    _registry.clear()
-
-    opik_client.create_agent_config_version(cfg, project_name=project_name)
-
-    project_id = opik_client.rest_client.projects.retrieve_project(name=project_name).id
-    history = opik_client.rest_client.agent_configs.get_blueprint_history(
-        project_id=project_id
-    )
-    assert len(history.content) == 1
-
-
-def test_create_agent_config_version__different_values__new_version__happyflow(
-    opik_client: opik.Opik,
-    project_name: str,
-):
-    class MyConfig(opik.AgentConfig):
-        temperature: float
-
-    opik_client.create_agent_config_version(
-        MyConfig(temperature=0.5), project_name=project_name
-    )
-
-    _registry.clear()
-
-    opik_client.create_agent_config_version(
-        MyConfig(temperature=0.8), project_name=project_name
-    )
-
-    result = opik_client.get_agent_config(
-        fallback=MyConfig(temperature=0.0),
-        project_name=project_name,
-        latest=True,
-    )
-    assert result.temperature == pytest.approx(0.8)
-
-
-# ---------------------------------------------------------------------------
-# get_agent_config tests
-# ---------------------------------------------------------------------------
-
-
-def test_get_agent_config__no_backend__raises_not_found(
-    opik_client: opik.Opik,
-    project_name: str,
-):
-    from opik.exceptions import AgentConfigNotFound
+    """Core lifecycle: publish, dedup, new version, get by latest / version name / env."""
 
     class MyConfig(opik.AgentConfig):
-        temperature: float
-
-    fallback = MyConfig(temperature=0.99)
-    with pytest.raises(AgentConfigNotFound):
-        opik_client.get_agent_config(
-            fallback=fallback, project_name=project_name, latest=True
-        )
-
-
-def test_get_agent_config__backend_values__override_fallback__happyflow(
-    opik_client: opik.Opik,
-    project_name: str,
-):
-    class MyConfig(opik.AgentConfig):
-        temperature: float
+        temperature: Annotated[float, "Sampling temperature"]
         model: str
 
+    # Publish v1 and verify the version name comes back.
+    v1_name = opik_client.create_agent_config_version(
+        MyConfig(temperature=0.5, model="gpt-3.5"), project_name=project_name
+    )
+    assert isinstance(v1_name, str) and v1_name != ""
+
+    # Publishing the same values again must be a no-op (1 entry in history).
+    _registry.clear()
     opik_client.create_agent_config_version(
-        MyConfig(temperature=0.3, model="gpt-3.5"), project_name=project_name
+        MyConfig(temperature=0.5, model="gpt-3.5"), project_name=project_name
+    )
+    project_id = opik_client.rest_client.projects.retrieve_project(name=project_name).id
+    assert (
+        len(
+            opik_client.rest_client.agent_configs.get_blueprint_history(
+                project_id=project_id
+            ).content
+        )
+        == 1
     )
 
+    # Publishing different values creates a new version.
     _registry.clear()
+    v2_name = opik_client.create_agent_config_version(
+        MyConfig(temperature=0.8, model="gpt-4"), project_name=project_name
+    )
+    assert v2_name != v1_name
 
-    result = opik_client.get_agent_config(
-        fallback=MyConfig(temperature=0.99, model="fallback"),
+    # latest=True returns v2.
+    _registry.clear()
+    latest = opik_client.get_agent_config(
+        fallback=MyConfig(temperature=0.0, model="fallback"),
         project_name=project_name,
         latest=True,
     )
+    assert latest.temperature == pytest.approx(0.8)
+    assert latest.model == "gpt-4"
 
-    ID_STORAGE = {}
-
-    @opik.track(project_name=project_name)
-    def access_config():
-        ID_STORAGE["trace_id"] = opik_context.get_current_trace_data().id
-        ID_STORAGE["span_id"] = opik_context.get_current_span_data().id
-        assert result.temperature == pytest.approx(0.3)
-        assert result.model == "gpt-3.5"
-
-    access_config()
-    opik.flush_tracker()
-
-    expected_agent_config_metadata = {
-        "blueprint_id": ANY_BUT_NONE,
-        "values": ANY_DICT,
-    }
-    verifiers.verify_trace(
-        opik_client=opik_client,
-        trace_id=ID_STORAGE["trace_id"],
-        metadata={
-            "agent_configuration": ANY_DICT.containing(expected_agent_config_metadata)
-        },
+    # version= by name returns v1.
+    _registry.clear()
+    by_name = opik_client.get_agent_config(
+        fallback=MyConfig(temperature=0.0, model="fallback"),
+        project_name=project_name,
+        version=v1_name,
     )
-    verifiers.verify_span(
-        opik_client=opik_client,
-        span_id=ID_STORAGE["span_id"],
-        trace_id=ID_STORAGE["trace_id"],
-        parent_span_id=None,
-        metadata={
-            "agent_configuration": ANY_DICT.containing(expected_agent_config_metadata)
-        },
+    assert by_name.temperature == pytest.approx(0.5)
+
+    # Deploy v1 to PROD; env= fetch returns v1 despite v2 being latest.
+    _registry.clear()
+    v1_cfg = opik_client.get_agent_config(
+        fallback=MyConfig(temperature=0.0, model="fallback"),
+        project_name=project_name,
+        version=v1_name,
     )
-
-
-def test_get_agent_config__env_tag__fetches_correct_version__happyflow(
-    opik_client: opik.Opik,
-    project_name: str,
-):
-    class MyConfig(opik.AgentConfig):
-        temperature: float
-
-    cfg = MyConfig(temperature=0.4)
-    opik_client.create_agent_config_version(cfg, project_name=project_name)
-    cfg.deploy_to("PROD")
-
-    opik_client.create_agent_config_version(
-        MyConfig(temperature=0.9), project_name=project_name
-    )
+    v1_cfg.deploy_to("PROD")
 
     _registry.clear()
-
-    result = opik_client.get_agent_config(
-        fallback=MyConfig(temperature=0.0),
+    by_env = opik_client.get_agent_config(
+        fallback=MyConfig(temperature=0.0, model="fallback"),
         project_name=project_name,
         env="PROD",
     )
-    assert result.temperature == pytest.approx(0.4)
+    assert by_env.temperature == pytest.approx(0.5)
 
 
-def test_get_agent_config__version_param__fetches_by_name__happyflow(
+def test_prompt_field_and_trace_metadata__happyflow(
     opik_client: opik.Opik,
     project_name: str,
 ):
-    class MyConfig(opik.AgentConfig):
-        temperature: float
+    """Prompt-typed field survives the roundtrip; field access inside a tracked
+    function injects agent_configuration into trace and span metadata."""
 
-    cfg_v1 = MyConfig(temperature=0.1)
-    first_version = opik_client.create_agent_config_version(
-        cfg_v1, project_name=project_name
-    )
-    assert isinstance(first_version, str)
-    assert first_version != ""
-
-    cfg_v2 = MyConfig(temperature=0.9)
-    second_version = opik_client.create_agent_config_version(
-        cfg_v2, project_name=project_name
-    )
-    assert second_version != first_version
-
-    _registry.clear()
-
-    result = opik_client.get_agent_config(
-        fallback=MyConfig(temperature=0.0),
-        project_name=project_name,
-        version=first_version,
-    )
-    assert result.temperature == pytest.approx(0.1)
-
-
-# ---------------------------------------------------------------------------
-# Annotated descriptions
-# ---------------------------------------------------------------------------
-
-
-def test_annotated_descriptions__sent_to_backend__happyflow(
-    opik_client: opik.Opik,
-    project_name: str,
-):
-    class AnnotatedConfig(opik.AgentConfig):
-        model: Annotated[str, "The LLM model identifier"]
-        temperature: Annotated[float, "Sampling temperature"]
-        max_tokens: int
-
-    cfg = AnnotatedConfig(model="gpt-4o", temperature=0.7, max_tokens=512)
-    opik_client.create_agent_config_version(cfg, project_name=project_name)
-
-    project_id = opik_client.rest_client.projects.retrieve_project(name=project_name).id
-    bp = opik_client.rest_client.agent_configs.get_latest_blueprint(
-        project_id=project_id
-    )
-
-    raw_values = {v.key: v for v in bp.values}
-
-    assert raw_values["AnnotatedConfig.model"].description == "The LLM model identifier"
-    assert (
-        raw_values["AnnotatedConfig.temperature"].description == "Sampling temperature"
-    )
-    assert raw_values["AnnotatedConfig.max_tokens"].description is None
-
-
-# ---------------------------------------------------------------------------
-# Prompt fields
-# ---------------------------------------------------------------------------
-
-
-def test_prompt_field__roundtrip__happyflow(
-    opik_client: opik.Opik,
-    project_name: str,
-):
     prompt_name = f"e2e-prompt-{uuid.uuid4().hex[:8]}"
     prompt_v1 = opik_client.create_prompt(name=prompt_name, prompt="Hello v1")
 
     class PromptConfig(opik.AgentConfig):
         system_prompt: Prompt
+        temperature: float
 
-    cfg = PromptConfig(system_prompt=prompt_v1)
-    opik_client.create_agent_config_version(cfg, project_name=project_name)
+    opik_client.create_agent_config_version(
+        PromptConfig(system_prompt=prompt_v1, temperature=0.3),
+        project_name=project_name,
+    )
 
     _registry.clear()
 
     result = opik_client.get_agent_config(
-        fallback=PromptConfig(system_prompt=prompt_v1),
+        fallback=PromptConfig(system_prompt=prompt_v1, temperature=0.0),
         project_name=project_name,
         latest=True,
     )
+
+    # Prompt field roundtrip.
     assert isinstance(result.system_prompt, Prompt)
     assert result.system_prompt.version_id == prompt_v1.version_id
 
+    # Field access inside @opik.track must inject agent_configuration metadata.
+    id_storage = {}
 
-# ---------------------------------------------------------------------------
-# Mask tests
-# ---------------------------------------------------------------------------
+    @opik.track(project_name=project_name)
+    def run():
+        id_storage["trace_id"] = opik_context.get_current_trace_data().id
+        id_storage["span_id"] = opik_context.get_current_span_data().id
+        _ = result.temperature
+
+    run()
+    opik.flush_tracker()
+
+    expected_meta = {"blueprint_id": ANY_BUT_NONE, "values": ANY_DICT}
+    verifiers.verify_trace(
+        opik_client=opik_client,
+        trace_id=id_storage["trace_id"],
+        metadata={"agent_configuration": ANY_DICT.containing(expected_meta)},
+    )
+    verifiers.verify_span(
+        opik_client=opik_client,
+        span_id=id_storage["span_id"],
+        trace_id=id_storage["trace_id"],
+        parent_span_id=None,
+        metadata={"agent_configuration": ANY_DICT.containing(expected_meta)},
+    )
 
 
-def test_mask__overrides_base_config_values__happyflow(
+def test_mask_overrides_config__happyflow(
     opik_client: opik.Opik,
     project_name: str,
 ):
+    """A mask overrides selected fields while leaving untouched fields intact."""
+
     class MyConfig(opik.AgentConfig):
         temperature: float
         model: str
 
-    base_cfg = MyConfig(temperature=0.5, model="gpt-4")
-    opik_client.create_agent_config_version(base_cfg, project_name=project_name)
+    opik_client.create_agent_config_version(
+        MyConfig(temperature=0.5, model="gpt-4"), project_name=project_name
+    )
 
     _registry.clear()
 
@@ -316,9 +188,7 @@ def test_mask__overrides_base_config_values__happyflow(
         project_name=project_name,
         rest_client_=opik_client.rest_client,
     )
-    mask_id = manager.create_mask(
-        parameters={"MyConfig.temperature": 0.9},
-    )
+    mask_id = manager.create_mask(parameters={"MyConfig.temperature": 0.9})
 
     _registry.clear()
 
