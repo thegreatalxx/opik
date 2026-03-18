@@ -30,17 +30,21 @@ const CSVPreview: React.FC<CSVPreviewProps> = ({ url, name }) => {
     queryKey: ["csv", url],
     queryFn: async () => {
       try {
-        const headResponse = await fetch(url, { method: "HEAD" });
-        const contentLength = parseInt(
-          headResponse.headers.get("Content-Length") ?? "",
-          10,
-        );
-        if (!isNaN(contentLength) && contentLength > SIZE_LIMIT) {
-          return { tooLarge: true };
-        }
-
         const response = await fetch(url);
-        const text = await response.text();
+        const reader = response.body!.getReader();
+        const decoder = new TextDecoder();
+        let text = "";
+        let totalBytes = 0;
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          totalBytes += value.length;
+          if (totalBytes > SIZE_LIMIT) {
+            await reader.cancel();
+            return { tooLarge: true };
+          }
+          text += decoder.decode(value, { stream: true });
+        }
         const normalizedText = text.replace(/\r\n|\r/g, "\n");
         const parsed = await csv2json(normalizedText, {
           excelBOM: true,

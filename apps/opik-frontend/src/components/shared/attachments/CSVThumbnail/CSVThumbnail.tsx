@@ -15,11 +15,20 @@ const CSVThumbnail: React.FC<CSVThumbnailProps> = ({ url, name }) => {
   const { data, isPending, isError } = useQuery({
     queryKey: ["csv-thumbnail", url],
     queryFn: async () => {
-      const response = await fetch(url, {
-        headers: { Range: "bytes=0-16383" },
-      });
-      const text = await response.text();
-      // Drop the last (potentially partial) line from the range-fetched chunk
+      const response = await fetch(url);
+      const reader = response.body!.getReader();
+      const decoder = new TextDecoder();
+      let text = "";
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        text += decoder.decode(value, { stream: true });
+        if (text.length >= 16384) {
+          await reader.cancel();
+          break;
+        }
+      }
+      // Drop the last (potentially partial) line from the truncated chunk
       const trimmed = text.includes("\n")
         ? text.slice(0, text.lastIndexOf("\n"))
         : text;
