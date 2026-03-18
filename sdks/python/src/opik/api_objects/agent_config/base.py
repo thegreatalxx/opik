@@ -136,9 +136,7 @@ class AgentConfig:
         state.is_fallback = instance_cache.blueprint_id is None
         prefixed_key = type(self).__field_metadata__[attr].prefixed_key
         value = instance_cache.values.get(prefixed_key, _MISSING)
-        self._inject_trace_metadata(
-            attr, value=value, shared_cache=instance_cache, mask_id=state.mask_id
-        )
+        self._inject_trace_metadata(attr, value=value, shared_cache=instance_cache)
         return value if value is not _MISSING else object.__getattribute__(self, attr)
 
     def _extract_fields_with_values(self) -> typing.Dict[str, tuple]:
@@ -298,12 +296,11 @@ class AgentConfig:
         value: typing.Any = _MISSING,
         *,
         shared_cache: typing.Optional[cache_mod.SharedConfigCache] = None,
-        mask_id: typing.Optional[str] = None,
     ) -> None:
         from opik import exceptions, opik_context
 
         try:
-            metadata = self._build_trace_metadata(attr, value, shared_cache, mask_id)
+            metadata = self._build_trace_metadata(attr, value, shared_cache)
             payload = {"agent_configuration": metadata}
             opik_context.update_current_trace(metadata=payload)
             opik_context.update_current_span(metadata=payload)
@@ -317,7 +314,6 @@ class AgentConfig:
         attr: str,
         value: typing.Any,
         shared_cache: typing.Optional[cache_mod.SharedConfigCache],
-        mask_id: typing.Optional[str],
     ) -> typing.Dict[str, typing.Any]:
         state = self._state
         project = typing.cast(
@@ -342,7 +338,7 @@ class AgentConfig:
         result: typing.Dict[str, typing.Any] = {
             "blueprint_id": resolved_cache.blueprint_id,
         }
-        if mask_id is not None:
-            result["_mask_id"] = mask_id
+        if state.mask_id is not None:
+            result["_mask_id"] = state.mask_id
         result["values"] = values
         return result
