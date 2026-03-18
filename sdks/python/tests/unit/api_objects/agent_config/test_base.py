@@ -424,4 +424,4 @@ class TestLiveInstance:
 
         cfg = MyConfig(temp=0.5)
         assert cfg.temp == 0.5
-        assert cfg._opik_project is None
+        assert cfg._state.project is None
