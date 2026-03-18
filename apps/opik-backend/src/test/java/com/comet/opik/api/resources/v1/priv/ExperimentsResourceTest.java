@@ -6049,7 +6049,7 @@ class ExperimentsResourceTest {
             experimentResourceClient.createExperimentItem(Set.of(item), apiKey, workspaceName);
 
             var actualEntity = experimentResourceClient.getFeedbackScoreNames(
-                    List.of(experiment.id()), null, apiKey, workspaceName);
+                    List.of(experiment.id()), apiKey, workspaceName);
             assertThat(actualEntity.scores()).isEmpty();
         }
 
@@ -6082,7 +6082,7 @@ class ExperimentsResourceTest {
             experimentResourceClient.createExperimentItem(Set.of(item), apiKey, workspaceName);
 
             var actualEntity = experimentResourceClient.getFeedbackScoreNames(
-                    List.of(experiment.id()), null, apiKey, workspaceName);
+                    List.of(experiment.id()), apiKey, workspaceName);
             assertThat(actualEntity.scores())
                     .allMatch(score -> "experiment_scores".equals(score.type()));
             assertThat(actualEntity.scores())
@@ -6142,7 +6142,7 @@ class ExperimentsResourceTest {
 
             // Query both experiment IDs
             var actualEntity = experimentResourceClient.getFeedbackScoreNames(
-                    List.of(regularExperiment.id(), evalSuiteExperiment.id()), null, apiKey, workspaceName);
+                    List.of(regularExperiment.id(), evalSuiteExperiment.id()), apiKey, workspaceName);
             var feedbackScoreNames = actualEntity.scores().stream()
                     .filter(score -> "feedback_scores".equals(score.type()))
                     .map(FeedbackScoreNames.ScoreName::name)
