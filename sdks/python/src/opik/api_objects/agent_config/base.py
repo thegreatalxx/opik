@@ -56,9 +56,18 @@ class AgentConfig:
             temperature: Annotated[float, "Sampling temperature"]
             model: str
 
-    Instantiate directly for a plain dataclass (no server interaction)::
+    Publish a version via :meth:`opik.Opik.create_agent_config_version`::
 
-        cfg = MyConfig(temperature=0.5, model="gpt-4")
+        cfg = MyConfig(temperature=0.7, model="gpt-4")
+        client.create_agent_config_version(cfg, project_name="my-project")
+
+    Retrieve it via :meth:`opik.Opik.get_agent_config`::
+
+        result = client.get_agent_config(
+            fallback=MyConfig(temperature=0.0, model="fallback"),
+            project_name="my-project",
+            latest=True,
+        )
     """
 
     __field_metadata__: typing.ClassVar[typing.Dict[str, ConfigField]]
@@ -105,7 +114,7 @@ class AgentConfig:
 
     @property
     def is_fallback(self) -> bool:
-        """True if local fallback values are used because no backend blueprint was found."""
+        """True if local fallback values are used because there was an issue communicating with the backend."""
         return self._state.is_fallback
 
     def __getattribute__(self, attr: str) -> typing.Any:
