@@ -105,7 +105,7 @@ public class OptimizationsResource {
                 OptimizationFilter.LIST_TYPE_REFERENCE);
 
         var searchCriteria = OptimizationSearchCriteria.builder()
-                .datasetId(datasetId)
+                .datasetIds(datasetId != null ? List.of(datasetId) : null)
                 .name(name)
                 .datasetName(datasetName)
                 .datasetDeleted(datasetDeleted)

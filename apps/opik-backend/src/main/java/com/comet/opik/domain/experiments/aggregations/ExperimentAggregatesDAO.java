@@ -187,6 +187,7 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
                 prompt_versions,
                 experiment_scores,
                 trace_count,
+                dataset_item_count,
                 duration_percentiles,
                 feedback_scores_percentiles,
                 feedback_scores_avg,
@@ -531,6 +532,7 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
                 experiment_scores,
                 trace_count,
                 experiment_items_count,
+                dataset_item_count,
                 duration_percentiles,
                 feedback_scores_percentiles,
                 feedback_scores_avg,
@@ -566,6 +568,7 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
                 mapFromArrays(:experiment_scores_keys, :experiment_scores_values),
                 :trace_count,
                 :experiment_items_count,
+                :dataset_item_count,
                 mapFromArrays(:duration_percentiles_keys, :duration_percentiles_values),
                 :feedback_scores_percentiles,
                 mapFromArrays(:feedback_scores_avg_keys, :feedback_scores_avg_values),
@@ -999,6 +1002,15 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
             ;
             """;
 
+    private static final String GET_DATASET_ITEM_COUNT = """
+            SELECT count(DISTINCT dataset_item_id) as count
+            FROM experiment_items FINAL
+            WHERE workspace_id = :workspace_id
+            AND experiment_id = :experiment_id
+            SETTINGS log_comment = '<log_comment>'
+            ;
+            """;
+
     private static final String FIND_COUNT_FROM_AGGREGATES = """
             SELECT count(id) as count
             FROM experiment_aggregates FINAL
@@ -1418,8 +1430,11 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
         return getExperimentData(experimentId)
                 .flatMap(experimentData -> {
                     // First check if experiment has any items
-                    return getExperimentItemsCount(experimentId)
-                            .flatMap(itemsCount -> {
+                    return Mono.zip(getExperimentItemsCount(experimentId), getDatasetItemCount(experimentId))
+                            .flatMap(counts -> {
+                                long itemsCount = counts.getT1();
+                                long datasetItemCount = counts.getT2();
+
                                 if (itemsCount == 0) {
                                     return insertExperimentAggregate(
                                             experimentData,
@@ -1428,6 +1443,7 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
                                             createEmptyFeedbackScoreAggregations(experimentId),
                                             createEmptyPassRateAggregation(experimentId),
                                             "[]",
+                                            0L,
                                             0L);
                                 }
 
@@ -1443,7 +1459,8 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
                                                         createEmptyFeedbackScoreAggregations(experimentId),
                                                         createEmptyPassRateAggregation(experimentId),
                                                         EMPTY_ARRAY_STR,
-                                                        itemsCount);
+                                                        itemsCount,
+                                                        datasetItemCount);
                                             }
 
                                             var projectId = projectIdOpt.get();
@@ -1470,7 +1487,8 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
                                                                 feedbackAgg,
                                                                 passRateAgg,
                                                                 commentsAgg,
-                                                                itemsCount);
+                                                                itemsCount,
+                                                                datasetItemCount);
                                                     });
                                         });
                             });
@@ -1614,6 +1632,21 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
                 .defaultIfEmpty(0L));
     }
 
+    private Mono<Long> getDatasetItemCount(UUID experimentId) {
+        return asyncTemplate.nonTransaction(connection -> makeFluxContextAware((userName, workspaceId) -> {
+            var template = getSTWithLogComment(GET_DATASET_ITEM_COUNT,
+                    "getDatasetItemCount", workspaceId, experimentId.toString());
+
+            var statement = connection.createStatement(template.render())
+                    .bind("workspace_id", workspaceId)
+                    .bind("experiment_id", experimentId);
+
+            return Flux.from(statement.execute())
+                    .flatMap(result -> result.map((row, metadata) -> row.get("count", Long.class)));
+        }).singleOrEmpty()
+                .defaultIfEmpty(0L));
+    }
+
     private Mono<Void> insertExperimentAggregate(
             ExperimentData experimentData,
             TraceAggregations traceAgg,
@@ -1621,7 +1654,8 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
             FeedbackScoreAggregations feedbackAgg,
             PassRateAggregation passRateAgg,
             String commentsArrayAgg,
-            long itemsCount) {
+            long itemsCount,
+            long datasetItemCount) {
 
         return asyncTemplate.nonTransaction(connection -> {
             var template = getSTWithLogComment(INSERT_EXPERIMENT_AGGREGATE,
@@ -1680,6 +1714,7 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
                     .bind("experiment_scores_values", experimentScoresArrays.values())
                     .bind("trace_count", traceAgg.traceCount())
                     .bind("experiment_items_count", itemsCount)
+                    .bind("dataset_item_count", datasetItemCount)
                     .bind("duration_percentiles_keys", durationPercentilesArrays.keys())
                     .bind("duration_percentiles_values", durationPercentilesArrays.values())
                     .bind("feedback_scores_percentiles",
@@ -2195,7 +2230,7 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
                 feedbackScores,
                 CommentResultMapper.parseCommentsFromJson(row.get("comments_array_agg", String.class)),
                 traceCount,
-                null, // datasetItemCount - not in aggregates table
+                row.get("dataset_item_count", Long.class),
                 createdAt,
                 duration,
                 totalEstimatedCost, // total_estimated_cost_sum

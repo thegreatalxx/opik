@@ -12,7 +12,6 @@ import java.util.UUID;
 public record OptimizationSearchCriteria(
         String name,
         String datasetName,
-        UUID datasetId,
         @NonNull EntityType entityType,
         Boolean datasetDeleted,
         Collection<UUID> datasetIds,

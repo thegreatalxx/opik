@@ -114,7 +114,6 @@ class OptimizationDAOImpl implements OptimizationDAO {
                 WHERE workspace_id = :workspace_id
                 <if(id)>AND id = :id <endif>
                 <if(name)>AND ilike(name, CONCAT('%%', :name ,'%%'))<endif>
-                <if(dataset_id)>AND dataset_id = :dataset_id <endif>
                 <if(dataset_ids)>AND dataset_id IN :dataset_ids <endif>
                 <if(dataset_deleted)>AND dataset_deleted = :dataset_deleted<endif>
                 <if(studio_only)>AND studio_config != ''<endif>
@@ -371,7 +370,6 @@ class OptimizationDAOImpl implements OptimizationDAO {
                 WHERE workspace_id = :workspace_id
                 <if(id)>AND id = :id <endif>
                 <if(name)>AND ilike(name, CONCAT('%%', :name ,'%%'))<endif>
-                <if(dataset_id)>AND dataset_id = :dataset_id <endif>
                 <if(dataset_ids)>AND dataset_id IN :dataset_ids <endif>
                 <if(dataset_deleted)>AND dataset_deleted = :dataset_deleted<endif>
                 <if(studio_only)>AND studio_config != ''<endif>
@@ -664,9 +662,6 @@ class OptimizationDAOImpl implements OptimizationDAO {
         Optional.ofNullable(searchCriteria.datasetDeleted())
                 .ifPresent(datasetDeleted -> template.add("dataset_deleted", datasetDeleted.toString()));
 
-        Optional.ofNullable(searchCriteria.datasetId())
-                .ifPresent(datasetId -> template.add("dataset_id", datasetId));
-
         Optional.ofNullable(searchCriteria.datasetIds())
                 .filter(ids -> !ids.isEmpty())
                 .ifPresent(datasetIds -> template.add("dataset_ids", datasetIds));
@@ -690,9 +685,6 @@ class OptimizationDAOImpl implements OptimizationDAO {
 
         Optional.ofNullable(searchCriteria.datasetDeleted())
                 .ifPresent(datasetDeleted -> statement.bind("dataset_deleted", datasetDeleted));
-
-        Optional.ofNullable(searchCriteria.datasetId())
-                .ifPresent(datasetId -> statement.bind("dataset_id", datasetId));
 
         Optional.ofNullable(searchCriteria.datasetIds())
                 .filter(ids -> !ids.isEmpty())
