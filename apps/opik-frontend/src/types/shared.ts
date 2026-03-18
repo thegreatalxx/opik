@@ -192,3 +192,15 @@ export interface AggregatedDuration {
   p90: number;
   p99: number;
 }
+
+export type JsonValue =
+  | string
+  | number
+  | boolean
+  | null
+  | JsonObject
+  | JsonValue[];
+
+export interface JsonObject {
+  [key: string]: JsonValue;
+}
