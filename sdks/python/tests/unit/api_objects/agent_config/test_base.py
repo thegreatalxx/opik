@@ -7,6 +7,7 @@ import pytest
 from opik.api_objects.agent_config.base import AgentConfig
 from opik.api_objects.agent_config.config import AgentConfigManager
 from opik.api_objects.opik_client import Opik
+from opik.exceptions import AgentConfigNotFound
 from opik.rest_api.types.agent_blueprint_public import AgentBlueprintPublic
 from opik.rest_api.types.agent_config_value_public import AgentConfigValuePublic
 
@@ -221,7 +222,7 @@ class TestCreateAgentConfigVersion:
 
 
 class TestGetAgentConfig:
-    def test_no_backend_config__returns_fallback(self, mock_rest_client):
+    def test_no_backend_config__raises_agent_config_not_found(self, mock_rest_client):
         class MyConfig(AgentConfig):
             temp: float
 
@@ -230,9 +231,8 @@ class TestGetAgentConfig:
         client._rest_client = mock_rest_client
         client._project_name = "test-project"
 
-        result = client.get_agent_config(fallback=fallback)
-
-        assert result.temp == 0.5
+        with pytest.raises(AgentConfigNotFound):
+            client.get_agent_config(fallback=fallback)
 
     def test_backend_values__returned_in_result(self, mock_rest_client):
         class MyConfig(AgentConfig):
@@ -442,7 +442,7 @@ class TestEnvsAndIsFallback:
         cfg = MyConfig(temp=0.5)
         assert cfg.envs is None
 
-    def test_no_backend_config__is_fallback_true(self, mock_rest_client):
+    def test_no_backend_config__raises_agent_config_not_found(self, mock_rest_client):
         class MyConfig(AgentConfig):
             temp: float
 
@@ -451,9 +451,8 @@ class TestEnvsAndIsFallback:
         client._rest_client = mock_rest_client
         client._project_name = "test-project"
 
-        result = client.get_agent_config(fallback=fallback)
-
-        assert result.is_fallback is True
+        with pytest.raises(AgentConfigNotFound):
+            client.get_agent_config(fallback=fallback)
 
     def test_backend_config__is_fallback_false(self, mock_rest_client):
         class MyConfig(AgentConfig):
@@ -761,3 +760,190 @@ class TestMetadataInjection:
             _ = live.temp
 
         mock_trace.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# Mask with env resolution tests
+# ---------------------------------------------------------------------------
+
+
+class TestGetAgentConfigWithMask:
+    def test_mask_active__passed_to_get_blueprint_by_env(self, mock_rest_client):
+        from opik.api_objects.agent_config.context import agent_config_context
+
+        class MyConfig(AgentConfig):
+            greeting: str
+
+        fallback = MyConfig(greeting="default")
+        client = Opik.__new__(Opik)
+        client._rest_client = mock_rest_client
+        client._project_name = "test-project"
+
+        bp = AgentBlueprintPublic(
+            id="bp-masked",
+            type="blueprint",
+            values=[
+                AgentConfigValuePublic(
+                    key="MyConfig.greeting", type="string", value="custom"
+                ),
+            ],
+        )
+        mock_rest_client.projects.retrieve_project.return_value = mock.Mock(id="proj-1")
+        mock_rest_client.agent_configs.get_blueprint_by_env.side_effect = None
+        mock_rest_client.agent_configs.get_blueprint_by_env.return_value = bp
+
+        with agent_config_context("mask-abc"):
+            result = client.get_agent_config(fallback=fallback)
+
+        mock_rest_client.agent_configs.get_blueprint_by_env.assert_called_with(
+            env_name="PROD",
+            project_id="proj-1",
+            mask_id="mask-abc",
+        )
+        assert result.greeting == "custom"
+
+    def test_mask_active__masked_value_overrides_base(self, mock_rest_client):
+        from opik.api_objects.agent_config.context import agent_config_context
+
+        class MyConfig(AgentConfig):
+            greeting: str
+
+        fallback = MyConfig(greeting="default")
+        client = Opik.__new__(Opik)
+        client._rest_client = mock_rest_client
+        client._project_name = "test-project"
+
+        masked_bp = AgentBlueprintPublic(
+            id="bp-1",
+            type="blueprint",
+            values=[
+                AgentConfigValuePublic(
+                    key="MyConfig.greeting", type="string", value="custom-greeting"
+                ),
+            ],
+        )
+        mock_rest_client.projects.retrieve_project.return_value = mock.Mock(id="proj-1")
+        mock_rest_client.agent_configs.get_blueprint_by_env.side_effect = None
+        mock_rest_client.agent_configs.get_blueprint_by_env.return_value = masked_bp
+
+        with agent_config_context("mask-xyz"):
+            result = client.get_agent_config(fallback=fallback)
+
+        assert result.greeting == "custom-greeting"
+
+    def test_no_mask__mask_id_none_in_request(self, mock_rest_client):
+        class MyConfig(AgentConfig):
+            greeting: str
+
+        fallback = MyConfig(greeting="default")
+        client = Opik.__new__(Opik)
+        client._rest_client = mock_rest_client
+        client._project_name = "test-project"
+
+        bp = AgentBlueprintPublic(
+            id="bp-1",
+            type="blueprint",
+            values=[
+                AgentConfigValuePublic(
+                    key="MyConfig.greeting", type="string", value="prod-greeting"
+                ),
+            ],
+        )
+        mock_rest_client.projects.retrieve_project.return_value = mock.Mock(id="proj-1")
+        mock_rest_client.agent_configs.get_blueprint_by_env.side_effect = None
+        mock_rest_client.agent_configs.get_blueprint_by_env.return_value = bp
+
+        result = client.get_agent_config(fallback=fallback)
+
+        mock_rest_client.agent_configs.get_blueprint_by_env.assert_called_with(
+            env_name="PROD",
+            project_id="proj-1",
+            mask_id=None,
+        )
+        assert result.greeting == "prod-greeting"
+
+    def test_no_prod_env__raises_agent_config_not_found(self, mock_rest_client):
+        from opik.api_objects.agent_config.context import agent_config_context
+
+        class MyConfig(AgentConfig):
+            greeting: str
+
+        fallback = MyConfig(greeting="default")
+        client = Opik.__new__(Opik)
+        client._rest_client = mock_rest_client
+        client._project_name = "test-project"
+
+        mock_rest_client.projects.retrieve_project.return_value = mock.Mock(id="proj-1")
+        # PROD env returns 404 (default in conftest)
+
+        with agent_config_context("mask-abc"):
+            with pytest.raises(AgentConfigNotFound, match="env='PROD'"):
+                client.get_agent_config(fallback=fallback)
+
+
+# ---------------------------------------------------------------------------
+# Fallback on unexpected backend errors
+# ---------------------------------------------------------------------------
+
+
+class TestGetAgentConfigFallbackOnError:
+    def test_server_error_on_env_lookup__returns_fallback(self, mock_rest_client):
+        from opik.rest_api import core as rest_api_core
+
+        class MyConfig(AgentConfig):
+            temp: float
+
+        fallback = MyConfig(temp=0.5)
+        client = Opik.__new__(Opik)
+        client._rest_client = mock_rest_client
+        client._project_name = "test-project"
+
+        mock_rest_client.projects.retrieve_project.return_value = mock.Mock(id="proj-1")
+        mock_rest_client.agent_configs.get_blueprint_by_env.side_effect = (
+            rest_api_core.ApiError(status_code=500, body="internal server error")
+        )
+
+        result = client.get_agent_config(fallback=fallback)
+
+        assert result.temp == 0.5
+        assert result.is_fallback is True
+
+    def test_server_error_on_latest_lookup__returns_fallback(self, mock_rest_client):
+        from opik.rest_api import core as rest_api_core
+
+        class MyConfig(AgentConfig):
+            temp: float
+
+        fallback = MyConfig(temp=0.5)
+        client = Opik.__new__(Opik)
+        client._rest_client = mock_rest_client
+        client._project_name = "test-project"
+
+        mock_rest_client.projects.retrieve_project.return_value = mock.Mock(id="proj-1")
+        mock_rest_client.agent_configs.get_latest_blueprint.side_effect = (
+            rest_api_core.ApiError(status_code=503, body="service unavailable")
+        )
+
+        result = client.get_agent_config(fallback=fallback, latest=True)
+
+        assert result.temp == 0.5
+        assert result.is_fallback is True
+
+    def test_network_error_on_env_lookup__returns_fallback(self, mock_rest_client):
+        class MyConfig(AgentConfig):
+            temp: float
+
+        fallback = MyConfig(temp=0.5)
+        client = Opik.__new__(Opik)
+        client._rest_client = mock_rest_client
+        client._project_name = "test-project"
+
+        mock_rest_client.projects.retrieve_project.return_value = mock.Mock(id="proj-1")
+        mock_rest_client.agent_configs.get_blueprint_by_env.side_effect = (
+            ConnectionError("network unreachable")
+        )
+
+        result = client.get_agent_config(fallback=fallback)
+
+        assert result.temp == 0.5
+        assert result.is_fallback is True

@@ -13,6 +13,7 @@ from .api_objects.experiment.experiment_item import (
 )
 from .api_objects.agent_config import AgentConfig, Blueprint
 from .api_objects.agent_config.context import agent_config_context
+from .exceptions import AgentConfigNotFound
 from .api_objects.opik_client import Opik
 from .api_objects.prompt import Prompt, ChatPrompt
 from .api_objects.prompt.types import PromptType
@@ -79,6 +80,7 @@ __all__ = [
     "run_simulation",
     "record_traces_locally",
     "AgentConfig",
+    "AgentConfigNotFound",
     "Blueprint",
     "agent_config_context",
 ]

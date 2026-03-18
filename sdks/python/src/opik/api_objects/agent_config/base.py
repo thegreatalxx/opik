@@ -2,6 +2,7 @@ import dataclasses
 import logging
 import typing
 
+from opik.exceptions import AgentConfigNotFound
 from . import type_helpers
 from . import cache as cache_mod
 from .context import get_active_config_mask
@@ -215,18 +216,38 @@ class AgentConfig:
         }
 
         mask_id = get_active_config_mask()
-        if version is not None:
-            bp = manager.get_blueprint(
-                name=version, mask_id=mask_id, field_types=field_types
+        try:
+            if version is not None:
+                bp = manager.get_blueprint(
+                    name=version, mask_id=mask_id, field_types=field_types
+                )
+                if bp is None:
+                    raise AgentConfigNotFound(
+                        f"No agent config blueprint found for version={version!r} in project {project_name!r}."
+                    )
+            elif latest:
+                bp = manager.get_blueprint(mask_id=mask_id, field_types=field_types)
+                if bp is None:
+                    raise AgentConfigNotFound(
+                        f"No agent config blueprint found in project {project_name!r}. "
+                        f"Use create_agent_config_version() to publish one."
+                    )
+            else:
+                bp = manager.get_blueprint(
+                    env=env, mask_id=mask_id, field_types=field_types
+                )
+                if bp is None:
+                    raise AgentConfigNotFound(
+                        f"No agent config blueprint found for env={env!r} in project {project_name!r}. "
+                        f"Use create_agent_config_version() and deploy_to({env!r}) to publish one."
+                    )
+        except AgentConfigNotFound:
+            raise
+        except Exception:
+            logger.debug(
+                "Failed to fetch agent config from backend, using fallback",
+                exc_info=True,
             )
-        elif latest:
-            bp = manager.get_blueprint(mask_id=mask_id, field_types=field_types)
-        else:
-            bp = manager.get_blueprint(
-                env=env, mask_id=mask_id, field_types=field_types
-            )
-
-        if bp is None:
             return fallback
 
         kwargs: typing.Dict[str, typing.Any] = {}

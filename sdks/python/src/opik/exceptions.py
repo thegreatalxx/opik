@@ -169,3 +169,9 @@ class SearchTimeoutError(OpikException):
     """Exception raised when a search times out."""
 
     pass
+
+
+class AgentConfigNotFound(OpikException):
+    """Exception raised when no agent config blueprint is found for the requested env/version/latest."""
+
+    pass
