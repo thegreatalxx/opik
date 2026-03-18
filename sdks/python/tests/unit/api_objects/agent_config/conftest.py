@@ -2,6 +2,7 @@ from unittest import mock
 
 import pytest
 
+from opik.api_objects import opik_client
 from opik.rest_api import core as rest_api_core
 from opik.rest_api.types.agent_blueprint_public import AgentBlueprintPublic
 
@@ -36,10 +37,9 @@ def mock_rest_client():
 
 @pytest.fixture
 def mock_opik_client(mock_rest_client):
-    client = mock.Mock()
+    client = opik_client.Opik.__new__(opik_client.Opik)
     client._rest_client = mock_rest_client
     client._project_name = "test-project"
-    client.rest_client = mock_rest_client
     return client
 
 

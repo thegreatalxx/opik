@@ -155,10 +155,9 @@ class AgentConfig:
             result[cf.prefixed_key] = (cf.py_type, value, cf.description)
         return result
 
-    def _prefixed_field_types(self) -> typing.Dict[str, typing.Any]:
-        return {
-            cf.prefixed_key: cf.py_type for cf in type(self).__field_metadata__.values()
-        }
+    @classmethod
+    def _prefixed_field_types(cls) -> typing.Dict[str, typing.Any]:
+        return {cf.prefixed_key: cf.py_type for cf in cls.__field_metadata__.values()}
 
     def _matches_blueprint(
         self,
@@ -189,17 +188,14 @@ class AgentConfig:
         latest = manager.get_blueprint(field_types=field_types)
 
         if latest is not None and self._matches_blueprint(latest, fields_with_values):
-            self._state.manager = manager
-            self._state.blueprint_id = latest.id
-            self._state.envs = latest.envs
-            self._state.is_fallback = False
-            return latest.name or ""
+            bp = latest
+        else:
+            bp = manager.create_blueprint(
+                fields_with_values=fields_with_values,
+                description=description,
+                field_types=field_types,
+            )
 
-        bp = manager.create_blueprint(
-            fields_with_values=fields_with_values,
-            description=description,
-            field_types=field_types,
-        )
         self._state.manager = manager
         self._state.blueprint_id = bp.id
         self._state.envs = bp.envs
@@ -234,9 +230,7 @@ class AgentConfig:
         latest: bool,
         version: typing.Optional[str],
     ) -> T:
-        field_types = {
-            cf.prefixed_key: cf.py_type for cf in cls.__field_metadata__.values()
-        }
+        field_types = cls._prefixed_field_types()
 
         mask_id = get_active_config_mask()
         try:
