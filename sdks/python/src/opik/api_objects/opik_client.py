@@ -43,7 +43,8 @@ from .experiment import helpers as experiment_helpers
 from .experiment import rest_operations as experiment_rest_operations
 from . import prompt as prompt_module
 from .prompt import client as prompt_client
-from .agent_config.config import AgentConfig
+from .agent_config.base import AgentConfig
+from .agent_config.config import AgentConfigManager
 from .threads import threads_client
 from .trace import migration as trace_migration, trace_client
 from .. import config as opik_config
@@ -88,6 +89,7 @@ from ..file_upload import upload_manager
 LOGGER = logging.getLogger(__name__)
 
 T = TypeVar("T")
+_AgentConfigT = TypeVar("_AgentConfigT", bound=AgentConfig)
 QueueT = TypeVar("QueueT", TracesAnnotationQueue, ThreadsAnnotationQueue)
 
 
@@ -2306,14 +2308,77 @@ class Opik:
             ids=[queue_id]
         )
 
+    def create_agent_config_version(
+        self,
+        config: AgentConfig,
+        project_name: Optional[str] = None,
+        description: Optional[str] = None,
+    ) -> str:
+        """Write a config version to the backend. No-op if nothing changed.
+
+        Args:
+            config: An instance of a user-defined ``AgentConfig`` subclass.
+            project_name: Opik project name. Defaults to the client's default.
+            description: Optional description stored with the version.
+
+        Returns:
+            The version name — either the newly created version or the
+            existing version when values already match.
+        """
+        if not isinstance(config, AgentConfig) or type(config) is AgentConfig:
+            raise TypeError(
+                "config must be an instance of an AgentConfig subclass, "
+                f"got {type(config).__name__}"
+            )
+
+        manager = AgentConfigManager(
+            project_name=project_name or self._project_name,
+            rest_client_=self._rest_client,
+        )
+        return config._create_version(manager, description)
+
     def get_agent_config(
         self,
+        fallback: _AgentConfigT,
+        *,
         project_name: Optional[str] = None,
-    ) -> AgentConfig:
-        project_name = project_name or self._project_name
-        return AgentConfig(
-            project_name=project_name,
+        env: Optional[str] = "PROD",
+        latest: bool = False,
+        version: Optional[str] = None,
+    ) -> _AgentConfigT:
+        """Fetch an agent config from the backend.
+
+        Args:
+            fallback: An instance of a user-defined ``AgentConfig`` subclass.
+                Used as the return value when the backend has no config, and
+                its type determines the return type.
+            project_name: Opik project name. Defaults to the client's default.
+            env: Environment tag to fetch. Defaults to ``"PROD"``.
+            latest: If ``True``, fetch the latest version regardless of env.
+            version: Fetch a specific version by its name (as returned by
+                ``create_agent_config_version``).
+        """
+        if not isinstance(fallback, AgentConfig) or type(fallback) is AgentConfig:
+            raise TypeError(
+                "fallback must be an instance of an AgentConfig subclass, "
+                f"got {type(fallback).__name__}"
+            )
+
+        resolved_project = project_name or self._project_name
+        manager = AgentConfigManager(
+            project_name=resolved_project,
             rest_client_=self._rest_client,
+        )
+        return cast(
+            _AgentConfigT,
+            type(fallback)._resolve_from_backend(
+                fallback,
+                manager,
+                resolved_project,
+                env=env,
+                latest=latest,
+                version=version,
+            ),
         )
 
 

@@ -166,3 +166,41 @@ class SharedCacheRegistry:
 
 
 _registry = SharedCacheRegistry()
+
+
+# ---------------------------------------------------------------------------
+# Module-level helpers (used by base.py and opik_client.py)
+# ---------------------------------------------------------------------------
+
+
+def get_cached_config(
+    project_name: str,
+    env: typing.Optional[str],
+    mask_id: typing.Optional[str],
+) -> SharedConfigCache:
+    return _registry.get(project_name, env, mask_id)
+
+
+def init_cache_entry(
+    project_name: str,
+    env: typing.Optional[str],
+    mask_id: typing.Optional[str],
+    prefixed_field_types: typing.Dict[str, typing.Any],
+    agent_config_manager: typing.Any,
+) -> SharedConfigCache:
+    shared_cache = _registry.get(project_name, env, mask_id)
+    shared_cache.register_fields(prefixed_field_types)
+
+    if agent_config_manager is not None and mask_id is None:
+
+        def _refresh() -> typing.Optional[Blueprint]:
+            return agent_config_manager.get_blueprint(
+                env=env,
+                mask_id=mask_id,
+                field_types=shared_cache.all_field_types,
+            )
+
+        shared_cache.set_refresh_callback(_refresh)
+        _registry.ensure_refresh_thread_started()
+
+    return shared_cache
