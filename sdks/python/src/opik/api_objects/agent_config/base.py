@@ -113,8 +113,9 @@ class AgentConfig:
 
     def _resolve_field(self, attr: str) -> typing.Any:
         state = self._state
+        project = typing.cast(str, state.project)  # guarded by __getattribute__
         mask_id = get_active_config_mask()
-        instance_cache = cache_mod.get_cached_config(state.project, state.env, mask_id)
+        instance_cache = cache_mod.get_cached_config(project, state.env, mask_id)
         state.is_fallback = instance_cache.blueprint_id is None
         prefixed_key = type(self).__field_metadata__[attr].prefixed_key
         value = instance_cache.values.get(prefixed_key, _MISSING)
@@ -282,11 +283,14 @@ class AgentConfig:
         mask_id: typing.Optional[str],
     ) -> typing.Dict[str, typing.Any]:
         state = self._state
+        project = typing.cast(
+            str, state.project
+        )  # guarded by _resolve_field caller chain
         resolved_cache = (
             shared_cache
             if shared_cache is not None
             else cache_mod.get_cached_config(
-                state.project, state.env, get_active_config_mask()
+                project, state.env, get_active_config_mask()
             )
         )
 
