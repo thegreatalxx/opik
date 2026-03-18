@@ -1,5 +1,5 @@
 --liquibase formatted sql
---changeset danield:000071_add_assertion_scores_avg_to_experiment_aggregates
+--changeset danield:000072_add_assertion_scores_avg_to_experiment_aggregates
 --comment: Add assertion_scores_avg field to experiment_aggregates table for per-assertion average pass rate tracking
 
 ALTER TABLE ${ANALYTICS_DB_DATABASE_NAME}.experiment_aggregates ON CLUSTER '{cluster}'

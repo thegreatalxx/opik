@@ -1,5 +1,5 @@
 --liquibase formatted sql
---changeset danield:000070_add_assertion_results_table
+--changeset danield:000071_add_assertion_results_table
 --comment: Create dedicated assertion_results table to separate assertion data from feedback_scores
 
 CREATE TABLE IF NOT EXISTS ${ANALYTICS_DB_DATABASE_NAME}.assertion_results ON CLUSTER '{cluster}'
