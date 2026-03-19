@@ -1,5 +1,5 @@
 import React, { useMemo } from "react";
-import { FileSliders, GitCommitVertical, Info } from "lucide-react";
+import { FileSliders, Info } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 
 import { Span, Trace } from "@/types/traces";
@@ -7,7 +7,7 @@ import { BlueprintValue, BlueprintValueType } from "@/types/agent-configs";
 import useConfigVersionMap from "@/api/agent-configs/useConfigVersionMap";
 import BlueprintValuesList from "@/v1/pages-shared/traces/ConfigurationTab/BlueprintValuesList";
 import TooltipWrapper from "@/shared/TooltipWrapper/TooltipWrapper";
-import { Tag } from "@/ui/tag";
+import ConfigurationVersionTag from "@/shared/ConfigurationVersionTag/ConfigurationVersionTag";
 import { Button } from "@/ui/button";
 import { Separator } from "@/ui/separator";
 import useAppStore from "@/store/AppStore";
@@ -15,6 +15,7 @@ import { AGENT_CONFIGURATION_METADATA_KEY } from "@/utils/agent-configurations";
 
 type AgentConfigurationMetadata = {
   blueprint_id: string;
+  _mask_id?: string;
   values?: Record<
     string,
     { type: BlueprintValueType; value: unknown; description?: string }
@@ -45,6 +46,7 @@ const AgentConfigurationTab: React.FC<AgentConfigurationTabProps> = ({
     ? agentConfigMeta
     : undefined;
   const blueprintId = configMeta?.blueprint_id;
+  const maskId = configMeta?._mask_id;
 
   const values = useMemo<BlueprintValue[]>(() => {
     if (!configMeta?.values) return [];
@@ -84,12 +86,10 @@ const AgentConfigurationTab: React.FC<AgentConfigurationTabProps> = ({
             <Info className="size-3.5 text-muted-slate" />
           </TooltipWrapper>
           {version !== undefined && (
-            <Tag className="flex items-center gap-1" variant="gray" size="md">
-              <GitCommitVertical className="size-3.5 shrink-0" />v{version}
-            </Tag>
+            <ConfigurationVersionTag version={version} maskId={maskId} />
           )}
         </div>
-        {blueprintId && (
+        {blueprintId && !maskId && (
           <Link
             to="/$workspaceName/projects/$projectId/traces"
             params={{ workspaceName, projectId }}
