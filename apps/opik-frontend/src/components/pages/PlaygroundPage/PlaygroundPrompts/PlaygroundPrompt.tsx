@@ -32,6 +32,7 @@ import TooltipWrapper from "@/components/shared/TooltipWrapper/TooltipWrapper";
 import PromptModelConfigs from "@/components/pages-shared/llm/PromptModelSettings/PromptModelConfigs";
 import {
   useDatasetVariables,
+  useDatasetSampleData,
   useDeletePrompt,
   usePromptById,
   usePromptCount,
@@ -74,6 +75,7 @@ const PlaygroundPrompt = ({
   const prompt = usePromptById(promptId);
   const promptCount = usePromptCount();
   const datasetVariables = useDatasetVariables();
+  const datasetSampleData = useDatasetSampleData();
   const providerValidationTrigger = useProviderValidationTrigger();
 
   const [, setLastPickedModel] = useLastPickedModel({
@@ -272,7 +274,7 @@ const PlaygroundPrompt = ({
         <div className="flex items-center gap-1">
           <p className="comet-body-s-accented whitespace-nowrap">{name}</p>
           <span
-            className="comet-body-s-accented flex size-6 items-center justify-center rounded-md"
+            className="comet-body-s flex size-6 items-center justify-center rounded-md"
             style={{
               backgroundColor: promptColor.bg,
               color: promptColor.text,
@@ -300,7 +302,7 @@ const PlaygroundPrompt = ({
           />
         </div>
 
-        <div className="flex items-center text-muted-slate transition-opacity [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/prompt:opacity-100">
+        <div className="flex items-center transition-opacity [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/prompt:opacity-100">
           <PromptsSelectBox
             compact
             value={selectedChatPromptId}
@@ -314,7 +316,7 @@ const PlaygroundPrompt = ({
           {hasMessageContent && (
             <TooltipWrapper content="Save to prompt library">
               <Button
-                variant="ghost"
+                variant="minimal"
                 size="icon-sm"
                 onClick={handleSaveChatPrompt}
               >
@@ -328,7 +330,7 @@ const PlaygroundPrompt = ({
               <Separator orientation="vertical" className="mx-1 h-4" />
               <TooltipWrapper content="Remove prompt">
                 <Button
-                  variant="ghost"
+                  variant="minimal"
                   size="icon-sm"
                   onClick={() => deletePrompt(promptId)}
                 >
@@ -340,12 +342,13 @@ const PlaygroundPrompt = ({
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4">
+      <div className="flex-1 overflow-y-auto p-4" data-scroll-container>
         <LLMPromptMessages
           messages={messages}
           onChange={handleUpdateMessage}
           onAddMessage={handleAddMessage}
           promptVariables={promptVariablesArray}
+          jsonTreeData={datasetSampleData}
           hidePromptActions={false}
           improvePromptConfig={{
             model,
