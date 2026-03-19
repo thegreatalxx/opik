@@ -91,6 +91,8 @@ const ChangeStagePopover: React.FC<ChangeStagePopoverProps> = ({
     setOpen(false);
   };
 
+  const customStages = selectedStages.filter((s) => !isBasicStage(s));
+
   const renderStageLabel = (stage: string) =>
     isBasicStage(stage) ? (
       <BasicStageTag value={stage} size="sm" />
@@ -137,29 +139,23 @@ const ChangeStagePopover: React.FC<ChangeStagePopoverProps> = ({
             })}
           </div>
           <Separator className="my-2" />
-          {selectedStages.filter(
-            (s) => !BASIC_STAGE_ORDER.some((d) => isStageTag(s, d)),
-          ).length > 0 && (
+          {customStages.length > 0 && (
             <>
               <p className="comet-body-xs-accented mb-1 text-light-slate">
                 Custom envs
               </p>
               <div className="flex max-h-[140px] flex-col gap-1 overflow-y-auto">
-                {selectedStages
-                  .filter(
-                    (s) => !BASIC_STAGE_ORDER.some((d) => isStageTag(s, d)),
-                  )
-                  .map((stage) => (
-                    <button
-                      key={stage}
-                      type="button"
-                      className="flex cursor-pointer items-center justify-between rounded-md px-2 py-1.5 hover:bg-muted"
-                      onClick={() => toggleStage(stage)}
-                    >
-                      <ColoredTag label={stage} size="md" />
-                      <Check className="size-4 text-primary" />
-                    </button>
-                  ))}
+                {customStages.map((stage) => (
+                  <button
+                    key={stage}
+                    type="button"
+                    className="flex cursor-pointer items-center justify-between rounded-md px-2 py-1.5 hover:bg-muted"
+                    onClick={() => toggleStage(stage)}
+                  >
+                    <ColoredTag label={stage} size="md" />
+                    <Check className="size-4 text-primary" />
+                  </button>
+                ))}
               </div>
             </>
           )}
