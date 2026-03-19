@@ -1,5 +1,6 @@
 package com.comet.opik.domain;
 
+import com.comet.opik.api.AssertionScoreAverage;
 import com.comet.opik.api.BiInformationResponse;
 import com.comet.opik.api.DatasetLastExperimentCreated;
 import com.comet.opik.api.EvaluationMethod;
@@ -294,7 +295,8 @@ class ExperimentDAO {
                     ea.comments_array_agg AS comments_array_agg,
                     if(ea.total_count = 0, NULL, ea.pass_rate) AS pass_rate,
                     if(ea.total_count = 0, NULL, ea.passed_count) AS passed_count,
-                    if(ea.total_count = 0, NULL, ea.total_count) AS total_count
+                    if(ea.total_count = 0, NULL, ea.total_count) AS total_count,
+                    mapApply((k, v) -> (k, toDecimal64(v, 9)), ea.assertion_scores_avg) AS assertion_scores
                 FROM experiment_aggregates ea FINAL
                 WHERE ea.workspace_id = :workspace_id
                 <if(experiment_ids)> AND id IN :experiment_ids <endif>
@@ -446,6 +448,52 @@ class ExperimentDAO {
                 ) as fs_avg
                 GROUP BY experiment_id
             ),
+            assertion_results_final AS (
+                SELECT
+                    entity_id,
+                    name,
+                    if(count() = 1, any(toFloat64(passed)), avg(toFloat64(passed))) AS value
+                FROM (
+                    SELECT
+                        workspace_id,
+                        project_id,
+                        entity_id,
+                        name,
+                        passed,
+                        ROW_NUMBER() OVER (
+                            PARTITION BY workspace_id, project_id, entity_id, name, author
+                            ORDER BY last_updated_at DESC
+                        ) as rn
+                    FROM assertion_results
+                    WHERE entity_type = 'trace'
+                    AND workspace_id = :workspace_id
+                    <if(has_target_projects)>
+                    AND project_id IN :target_project_ids
+                    <endif>
+                    AND entity_id IN (SELECT trace_id FROM experiment_items_final)
+                )
+                WHERE rn = 1
+                GROUP BY entity_id, name
+            ),
+            assertion_scores_agg AS (
+                SELECT
+                    experiment_id,
+                    mapFromArrays(
+                        groupArray(ar_avg.name),
+                        groupArray(ar_avg.avg_value)
+                    ) AS assertion_scores
+                FROM (
+                    SELECT
+                        et.experiment_id,
+                        ar.name,
+                        toDecimal64(greatest(least(if(isFinite(avg(ar.value)), avg(ar.value), 0), 1.0), 0.0), 9) AS avg_value
+                    FROM experiment_items_final as et
+                    LEFT JOIN assertion_results_final ar ON ar.entity_id = et.trace_id
+                    GROUP BY et.experiment_id, ar.name
+                    HAVING length(ar.name) > 0
+                ) as ar_avg
+                GROUP BY experiment_id
+            ),
             <if(feedback_scores_empty_filters)>
              fsc AS (SELECT entity_id, COUNT(entity_id) AS feedback_scores_count
                  FROM feedback_scores_final
@@ -549,15 +597,15 @@ class ExperimentDAO {
                             JSONExtractUInt(ei.execution_policy, 'pass_threshold') AS item_pass_threshold,
                             JSONExtractUInt(ef.execution_policy, 'pass_threshold') AS suite_pass_threshold,
                             if(
-                                countIf(fs.name != '') = 0,
+                                countIf(ar.name != '') = 0,
                                 1,
-                                if(minIf(fs.value, fs.name != '') >= 1.0, 1, 0)
+                                if(minIf(ar.value, ar.name != '') >= 1.0, 1, 0)
                             ) AS run_passed
                         FROM experiment_items_final ei
                         INNER JOIN experiments_final ef
                             ON ei.experiment_id = ef.id
                             AND ef.evaluation_method = 'evaluation_suite'
-                        LEFT JOIN feedback_scores_final fs ON fs.entity_id = ei.trace_id
+                        LEFT JOIN assertion_results_final ar ON ar.entity_id = ei.trace_id
                         GROUP BY ei.experiment_id, ei.dataset_item_id, ei.trace_id,
                                  item_pass_threshold, suite_pass_threshold
                     )
@@ -601,6 +649,7 @@ class ExperimentDAO {
                     if(agg.total_count = 0, NULL, agg.pass_rate) AS pass_rate,
                     if(agg.total_count = 0, NULL, agg.passed_count) AS passed_count,
                     if(agg.total_count = 0, NULL, agg.total_count) AS total_count,
+                    agg.assertion_scores as assertion_scores,
                     agg.project_ids as combined_project_ids
                 FROM experiments_resolved AS e
                 INNER JOIN experiments_from_aggregates_final AS agg ON e.id = agg.experiment_id
@@ -660,6 +709,7 @@ class ExperimentDAO {
                     pra.pass_rate as pass_rate,
                     pra.passed_count as passed_count,
                     pra.total_count as total_count,
+                    asa.assertion_scores as assertion_scores,
                     arrayConcat(ed.project_ids, if(empty(e.project_id), [], [e.project_id])) as combined_project_ids
                 FROM experiments_final AS e
                 LEFT JOIN experiment_durations AS ed ON e.id = ed.experiment_id
@@ -667,6 +717,7 @@ class ExperimentDAO {
                 LEFT JOIN experiment_scores_agg AS es ON e.id = es.experiment_id
                 LEFT JOIN comments_agg AS ca ON e.id = ca.experiment_id
                 LEFT JOIN pass_rate_agg AS pra ON e.id = pra.experiment_id
+                LEFT JOIN assertion_scores_agg AS asa ON e.id = asa.experiment_id
                 WHERE 1=1
                 <if(feedback_scores_filters)>
                 AND e.id IN (
@@ -1138,7 +1189,8 @@ class ExperimentDAO {
                     ea.experiment_scores AS experiment_scores,
                     if(ea.total_count = 0, NULL, ea.pass_rate) AS pass_rate,
                     if(ea.total_count = 0, NULL, ea.passed_count) AS passed_count,
-                    if(ea.total_count = 0, NULL, ea.total_count) AS total_count
+                    if(ea.total_count = 0, NULL, ea.total_count) AS total_count,
+                    mapApply((k, v) -> (k, toDecimal64(v, 9)), ea.assertion_scores_avg) AS assertion_scores
                 FROM experiment_aggregates AS ea FINAL
                 WHERE ea.workspace_id = :workspace_id
                 AND ea.id IN (SELECT id FROM experiments_from_aggregates)
@@ -1285,6 +1337,52 @@ class ExperimentDAO {
                 ) as fs_avg
                 GROUP BY experiment_id
             ),
+            assertion_results_final AS (
+                SELECT
+                    entity_id,
+                    name,
+                    if(count() = 1, any(toFloat64(passed)), avg(toFloat64(passed))) AS value
+                FROM (
+                    SELECT
+                        workspace_id,
+                        project_id,
+                        entity_id,
+                        name,
+                        passed,
+                        ROW_NUMBER() OVER (
+                            PARTITION BY workspace_id, project_id, entity_id, name, author
+                            ORDER BY last_updated_at DESC
+                        ) as rn
+                    FROM assertion_results
+                    WHERE entity_type = 'trace'
+                    AND workspace_id = :workspace_id
+                    <if(has_target_projects)>
+                    AND project_id IN :target_project_ids
+                    <endif>
+                    AND entity_id IN (SELECT trace_id FROM experiment_items_final)
+                )
+                WHERE rn = 1
+                GROUP BY entity_id, name
+            ),
+            assertion_scores_agg AS (
+                SELECT
+                    experiment_id,
+                    mapFromArrays(
+                        groupArray(ar_avg.name),
+                        groupArray(ar_avg.avg_value)
+                    ) AS assertion_scores
+                FROM (
+                    SELECT
+                        et.experiment_id,
+                        ar.name,
+                        toDecimal64(greatest(least(if(isFinite(avg(ar.value)), avg(ar.value), 0), 1.0), 0.0), 9) AS avg_value
+                    FROM experiment_items_final as et
+                    LEFT JOIN assertion_results_final ar ON ar.entity_id = et.trace_id
+                    GROUP BY et.experiment_id, ar.name
+                    HAVING length(ar.name) > 0
+                ) as ar_avg
+                GROUP BY experiment_id
+            ),
             experiment_scores_agg AS (
                 SELECT
                     experiment_id,
@@ -1326,15 +1424,15 @@ class ExperimentDAO {
                             JSONExtractUInt(ei.execution_policy, 'pass_threshold') AS item_pass_threshold,
                             JSONExtractUInt(ef.execution_policy, 'pass_threshold') AS suite_pass_threshold,
                             if(
-                                countIf(fs.name != '') = 0,
+                                countIf(ar.name != '') = 0,
                                 1,
-                                if(minIf(fs.value, fs.name != '') >= 1.0, 1, 0)
+                                if(minIf(ar.value, ar.name != '') >= 1.0, 1, 0)
                             ) AS run_passed
                         FROM experiment_items_final ei
                         INNER JOIN experiments_final ef
                             ON ei.experiment_id = ef.id
                             AND ef.evaluation_method = 'evaluation_suite'
-                        LEFT JOIN feedback_scores_final fs ON fs.entity_id = ei.trace_id
+                        LEFT JOIN assertion_results_final ar ON ar.entity_id = ei.trace_id
                         GROUP BY ei.experiment_id, ei.dataset_item_id, ei.trace_id,
                                  item_pass_threshold, suite_pass_threshold
                     )
@@ -1353,6 +1451,7 @@ class ExperimentDAO {
                 avg(pass_rate) as pass_rate_avg,
                 sum(passed_count) as passed_count_sum,
                 sum(total_count) as total_count_sum,
+                avgMap(assertion_scores) as assertion_scores,
                 <groupSelects>
             FROM (
                 <if(has_aggregated)>
@@ -1371,7 +1470,8 @@ class ExperimentDAO {
                     if(empty(agg.project_ids), '', agg.project_ids[1]) as project_id,
                     agg.pass_rate as pass_rate,
                     agg.passed_count as passed_count,
-                    agg.total_count as total_count
+                    agg.total_count as total_count,
+                    agg.assertion_scores as assertion_scores
                 FROM experiments_resolved AS e
                 INNER JOIN experiments_from_aggregates_final AS agg ON e.id = agg.experiment_id
                 WHERE 1=1
@@ -1399,12 +1499,14 @@ class ExperimentDAO {
                     if(notEmpty(e.experiment_project_id), e.experiment_project_id, if(empty(ed.project_ids), '', ed.project_ids[1])) as project_id,
                     pra.pass_rate as pass_rate,
                     pra.passed_count as passed_count,
-                    pra.total_count as total_count
+                    pra.total_count as total_count,
+                    asa.assertion_scores as assertion_scores
                 FROM experiments_final AS e
                 LEFT JOIN experiment_durations AS ed ON e.id = ed.experiment_id
                 LEFT JOIN feedback_scores_agg AS fs ON e.id = fs.experiment_id
                 LEFT JOIN experiment_scores_agg AS es ON e.id = es.experiment_id
                 LEFT JOIN pass_rate_agg AS pra ON e.id = pra.experiment_id
+                LEFT JOIN assertion_scores_agg AS asa ON e.id = asa.experiment_id
                 WHERE 1=1
                 <if(project_id)>
                 AND has(project_ids, :project_id)
@@ -1431,7 +1533,8 @@ class ExperimentDAO {
                 null AS comments_array_agg,
                 null AS pass_rate,
                 null AS passed_count,
-                null AS total_count
+                null AS total_count,
+                null AS assertion_scores
             FROM experiments
             WHERE workspace_id = :workspace_id
             AND ilike(name, CONCAT('%', :name, '%'))
@@ -1777,6 +1880,7 @@ class ExperimentDAO {
                     .passRate(getPassRateValue(row, "pass_rate"))
                     .passedCount(row.get("passed_count", Long.class))
                     .totalCount(row.get("total_count", Long.class))
+                    .assertionScores(getAssertionScores(row, "assertion_scores"))
                     .build();
         });
     }
@@ -1810,6 +1914,19 @@ class ExperimentDAO {
 
     public static List<FeedbackScoreAverage> getFeedbackScores(Row row, String columnName) {
         return getScoresAggregation(row, columnName);
+    }
+
+    public static List<AssertionScoreAverage> getAssertionScores(Row row, String columnName) {
+        List<AssertionScoreAverage> scores = Optional
+                .ofNullable(row.get(columnName, Map.class))
+                .map(map -> (Map<String, ? extends Number>) map)
+                .orElse(Map.of())
+                .entrySet()
+                .stream()
+                .map(e -> new AssertionScoreAverage(e.getKey(),
+                        BigDecimal.valueOf(e.getValue().doubleValue()).setScale(SCALE, RoundingMode.HALF_EVEN)))
+                .toList();
+        return scores.isEmpty() ? null : scores;
     }
 
     private static List<FeedbackScoreAverage> getScoresAggregation(Row row, String columnName) {
@@ -2415,6 +2532,7 @@ class ExperimentDAO {
             var passRateAvg = getPassRateValue(row, "pass_rate_avg");
             var passedCountSum = row.get("passed_count_sum", Long.class);
             var totalCountSum = row.get("total_count_sum", Long.class);
+            var assertionScores = getAssertionScores(row, "assertion_scores");
 
             return ExperimentGroupAggregationItem.builder()
                     .groupValues(groupValues)
@@ -2428,6 +2546,7 @@ class ExperimentDAO {
                     .passRateAvg(passRateAvg)
                     .passedCountSum(passedCountSum)
                     .totalCountSum(totalCountSum)
+                    .assertionScores(assertionScores)
                     .build();
         });
     }
