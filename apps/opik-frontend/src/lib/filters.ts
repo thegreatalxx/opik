@@ -269,7 +269,7 @@ export const buildDatasetFilterColumns = (
   const dataFilterColumns = datasetColumns.map((c) => ({
     id: `${COLUMN_DATA_ID}.${c.name}`,
     label: c.name,
-    type: COLUMN_TYPE.string,
+    type: mapDynamicColumnTypesToColumnType(c.types),
   }));
   return [
     ...(includeId ? [{ id: "id", label: "ID", type: COLUMN_TYPE.string }] : []),
