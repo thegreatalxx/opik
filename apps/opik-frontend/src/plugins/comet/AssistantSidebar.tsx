@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef } from "react";
-import { useParams } from "@tanstack/react-router";
+import { useParams, useRouter } from "@tanstack/react-router";
 import { useIsFeatureEnabled } from "@/components/feature-toggles-provider";
 import { FeatureToggleKeys } from "@/types/feature-toggles";
 import {
@@ -89,6 +89,7 @@ type ContextChangedListener = (data: HostEventMap["context:changed"]) => void;
 
 const createBridge = (
   onWidthChangeRef: React.MutableRefObject<(w: number) => void>,
+  navigateRef: React.MutableRefObject<(path: string) => void>,
   contextRef: React.MutableRefObject<BridgeContext>,
   listenersRef: React.MutableRefObject<Set<ContextChangedListener>>,
 ): AssistantSidebarBridge => ({
@@ -107,6 +108,8 @@ const createBridge = (
   emit: (event, data) => {
     if (event === "sidebar:resized") {
       onWidthChangeRef.current((data as { width: number }).width);
+    } else if (event === "navigate") {
+      navigateRef.current((data as { path: string }).path);
     }
   },
 });
@@ -183,6 +186,7 @@ const AssistantSidebarContent: React.FC<AssistantSidebarProps> = ({
 }) => {
   const scriptReady = suspendUntilScript();
   const context = useBridgeContext();
+  const router = useRouter();
 
   const onWidthChangeRef = useRef(onWidthChange);
   onWidthChangeRef.current = onWidthChange;
@@ -190,9 +194,20 @@ const AssistantSidebarContent: React.FC<AssistantSidebarProps> = ({
   const contextRef = useRef(context);
   contextRef.current = context;
 
+  const navigateRef = useRef((path: string) => {
+    const ws = contextRef.current.workspaceName;
+    const fullPath = ws ? `/${ws}${path}` : path;
+    router.navigate({ to: fullPath });
+  });
+  navigateRef.current = (path: string) => {
+    const ws = contextRef.current.workspaceName;
+    const fullPath = ws ? `/${ws}${path}` : path;
+    router.navigate({ to: fullPath });
+  };
+
   const listenersRef = useRef<Set<ContextChangedListener>>(new Set());
   const bridgeRef = useRef(
-    createBridge(onWidthChangeRef, contextRef, listenersRef),
+    createBridge(onWidthChangeRef, navigateRef, contextRef, listenersRef),
   );
   const mountedElRef = useRef<HTMLDivElement | null>(null);
 
