@@ -1,14 +1,14 @@
+from .base import AgentConfig
 from .cache import SharedCacheRegistry, _registry
-from .config import AgentConfig
+from .config import AgentConfigManager
 from .blueprint import Blueprint
 from .context import agent_config_context
-from .decorator import agent_config_decorator
 
 __all__ = [
     "AgentConfig",
+    "AgentConfigManager",
     "Blueprint",
     "SharedCacheRegistry",
     "_registry",
     "agent_config_context",
-    "agent_config_decorator",
 ]
