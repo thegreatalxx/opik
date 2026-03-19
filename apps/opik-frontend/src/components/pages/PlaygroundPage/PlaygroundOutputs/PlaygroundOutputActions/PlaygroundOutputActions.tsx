@@ -95,7 +95,12 @@ const PlaygroundOutputActions = ({
   const createProjectMutation = useProjectCreateMutation();
 
   const {
-    permissions: { canViewExperiments, canInteractWithApp, canViewDatasets, canCreateProjects },
+    permissions: {
+      canViewExperiments,
+      canInteractWithApp,
+      canViewDatasets,
+      canCreateProjects,
+    },
   } = usePermissions();
 
   // Define filters column data - includes all dataset columns and tags

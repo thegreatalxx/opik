@@ -219,7 +219,11 @@ const AnnotationQueuesTab: React.FC<AnnotationQueuesTabProps> = ({
   const workspaceName = useAppStore((state) => state.activeWorkspaceName);
   const navigate = useNavigate();
   const {
-    permissions: { canInteractWithApp, canCreateAnnotationQueues, canDeleteAnnotationQueues },
+    permissions: {
+      canInteractWithApp,
+      canCreateAnnotationQueues,
+      canDeleteAnnotationQueues,
+    },
   } = usePermissions();
   const resetDialogKeyRef = useRef(0);
   const [openDialog, setOpenDialog] = useState<boolean>(false);
