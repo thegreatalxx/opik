@@ -59,6 +59,11 @@ export default defineConfig(({ mode }) => {
           target: `http://localhost:${opikAiBackendPort}`,
           changeOrigin: true,
         },
+        "/ollie-assist": {
+          target: "http://localhost:9080",
+          changeOrigin: true,
+          rewrite: (requestPath) => requestPath.replace(/^\/ollie-assist/, ""),
+        },
       },
     },
   } satisfies UserConfig;

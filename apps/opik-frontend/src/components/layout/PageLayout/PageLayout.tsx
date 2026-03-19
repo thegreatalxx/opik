@@ -10,6 +10,7 @@ import useWelcomeWizardStatus from "@/api/welcome-wizard/useWelcomeWizardStatus"
 import { useIsFeatureEnabled } from "@/components/feature-toggles-provider";
 import { FeatureToggleKeys } from "@/types/feature-toggles";
 import QuickstartDialog from "@/components/pages-shared/onboarding/QuickstartDialog/QuickstartDialog";
+import OllieSidebar from "@/components/layout/OllieSidebar/OllieSidebar";
 
 const MOBILE_BREAKPOINT = 1024; // lg breakpoint in Tailwind
 
@@ -74,12 +75,15 @@ const PageLayout = () => {
       ) : null}
 
       <SideBar expanded={expanded} setExpanded={setStoredExpanded} />
-      <main className="comet-content-inset absolute bottom-0 right-0 top-[var(--banner-height)] flex transition-all">
-        <TopBar />
-        <section className="comet-header-inset absolute inset-x-0 bottom-0 overflow-auto bg-soft-background px-6">
-          <Outlet />
-        </section>
-      </main>
+      <div className="comet-content-inset absolute bottom-0 right-0 top-[var(--banner-height)] flex transition-all">
+        <main className="relative flex min-w-0 flex-1 flex-col">
+          <TopBar />
+          <section className="comet-header-inset absolute inset-x-0 bottom-0 overflow-auto bg-soft-background px-6">
+            <Outlet />
+          </section>
+        </main>
+        <OllieSidebar />
+      </div>
 
       {/* Welcome Wizard Dialog */}
       <WelcomeWizardDialog
