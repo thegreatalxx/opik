@@ -19,6 +19,7 @@ import com.comet.opik.api.ProjectStats;
 import com.comet.opik.api.PromptVersion;
 import com.comet.opik.api.filter.ExperimentsComparisonFilter;
 import com.comet.opik.api.filter.Filter;
+import com.comet.opik.podam.PodamFactoryUtils;
 import com.comet.opik.utils.JsonUtils;
 import com.google.common.net.HttpHeaders;
 import jakarta.ws.rs.client.Entity;
@@ -30,6 +31,7 @@ import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.http.HttpStatus;
 import ru.vyarus.dropwizard.guice.test.ClientSupport;
+import uk.co.jemos.podam.api.PodamFactory;
 
 import java.util.HashSet;
 import java.util.List;
@@ -50,6 +52,25 @@ public class DatasetResourceClient {
 
     private final ClientSupport client;
     private final String baseURI;
+
+    public static Dataset buildDataset(PodamFactory factory) {
+        return factory.manufacturePojo(Dataset.class).toBuilder().projectId(null).projectName(null).build();
+    }
+
+    public static List<Dataset> buildDatasetList(PodamFactory factory) {
+        return PodamFactoryUtils.manufacturePojoList(factory, Dataset.class).stream()
+                .map(dataset -> dataset.toBuilder().projectId(null).projectName(null).build())
+                .toList();
+    }
+
+    public Response callCreateDataset(Dataset dataset, String apiKey, String workspaceName) {
+        return client.target(RESOURCE_PATH.formatted(baseURI))
+                .request()
+                .accept(MediaType.APPLICATION_JSON_TYPE)
+                .header(HttpHeaders.AUTHORIZATION, apiKey)
+                .header(WORKSPACE_HEADER, workspaceName)
+                .post(Entity.json(dataset));
+    }
 
     public UUID createDataset(Dataset dataset, String apiKey, String workspaceName) {
         try (var actualResponse = client.target(RESOURCE_PATH.formatted(baseURI))
@@ -92,6 +113,22 @@ public class DatasetResourceClient {
         try (var actualResponse = client.target(RESOURCE_PATH.formatted(baseURI))
                 .queryParam("page", 1)
                 .queryParam("size", 100)
+                .request()
+                .accept(MediaType.APPLICATION_JSON_TYPE)
+                .header(HttpHeaders.AUTHORIZATION, apiKey)
+                .header(WORKSPACE_HEADER, workspaceName)
+                .get()) {
+
+            assertThat(actualResponse.getStatusInfo().getStatusCode()).isEqualTo(200);
+            return actualResponse.readEntity(DatasetPage.class);
+        }
+    }
+
+    public DatasetPage getDatasetsByProjectId(UUID projectId, String workspaceName, String apiKey) {
+        try (var actualResponse = client.target(RESOURCE_PATH.formatted(baseURI))
+                .queryParam("page", 1)
+                .queryParam("size", 100)
+                .queryParam("project_id", projectId)
                 .request()
                 .accept(MediaType.APPLICATION_JSON_TYPE)
                 .header(HttpHeaders.AUTHORIZATION, apiKey)
@@ -318,6 +355,23 @@ public class DatasetResourceClient {
                 .delete();
     }
 
+    public Dataset getDatasetByIdentifier(DatasetIdentifier identifier, String apiKey, String workspaceName) {
+        try (var actualResponse = callGetDatasetByIdentifier(identifier, apiKey, workspaceName)) {
+            assertThat(actualResponse.getStatusInfo().getStatusCode()).isEqualTo(200);
+            return actualResponse.readEntity(Dataset.class);
+        }
+    }
+
+    public Response callGetDatasetByIdentifier(DatasetIdentifier identifier, String apiKey, String workspaceName) {
+        return client.target(RESOURCE_PATH.formatted(baseURI))
+                .path("retrieve")
+                .request()
+                .accept(MediaType.APPLICATION_JSON_TYPE)
+                .header(HttpHeaders.AUTHORIZATION, apiKey)
+                .header(WORKSPACE_HEADER, workspaceName)
+                .post(Entity.json(identifier));
+    }
+
     public void deleteDatasetByName(String name, String apiKey, String workspaceName) {
         try (var actualResponse = client.target(RESOURCE_PATH.formatted(baseURI))
                 .path("delete")
@@ -325,7 +379,7 @@ public class DatasetResourceClient {
                 .accept(MediaType.APPLICATION_JSON_TYPE)
                 .header(HttpHeaders.AUTHORIZATION, apiKey)
                 .header(WORKSPACE_HEADER, workspaceName)
-                .post(Entity.json(new DatasetIdentifier(name)))) {
+                .post(Entity.json(DatasetIdentifier.builder().datasetName(name).build()))) {
 
             assertThat(actualResponse.getStatusInfo().getStatusCode()).isEqualTo(HttpStatus.SC_NO_CONTENT);
             assertThat(actualResponse.hasEntity()).isFalse();

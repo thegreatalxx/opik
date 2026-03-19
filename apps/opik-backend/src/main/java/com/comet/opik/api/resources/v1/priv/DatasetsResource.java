@@ -149,6 +149,7 @@ public class DatasetsResource {
             @QueryParam("with_experiments_only") boolean withExperimentsOnly,
             @QueryParam("with_optimizations_only") boolean withOptimizationsOnly,
             @QueryParam("prompt_id") UUID promptId,
+            @QueryParam("project_id") UUID projectId,
             @QueryParam("name") @Schema(description = "Filter datasets by name (partial match, case insensitive)") String name,
             @QueryParam("sorting") String sorting,
             @QueryParam("filters") String filters) {
@@ -159,6 +160,7 @@ public class DatasetsResource {
                 .name(name)
                 .withExperimentsOnly(withExperimentsOnly)
                 .promptId(promptId)
+                .projectId(projectId)
                 .withOptimizationsOnly(withOptimizationsOnly)
                 .filters(queryFilters)
                 .build();
@@ -218,6 +220,7 @@ public class DatasetsResource {
     @Operation(operationId = "deleteDataset", summary = "Delete dataset by id", description = "Delete dataset by id", responses = {
             @ApiResponse(responseCode = "204", description = "No content"),
     })
+    @RequiredPermissions(WorkspaceUserPermission.DATASET_DELETE)
     public Response deleteDataset(@PathParam("id") UUID id) {
 
         String workspaceId = requestContext.get().getWorkspaceId();
@@ -232,6 +235,7 @@ public class DatasetsResource {
     @Operation(operationId = "deleteDatasetByName", summary = "Delete dataset by name", description = "Delete dataset by name", responses = {
             @ApiResponse(responseCode = "204", description = "No content"),
     })
+    @RequiredPermissions(WorkspaceUserPermission.DATASET_DELETE)
     public Response deleteDatasetByName(
             @RequestBody(content = @Content(schema = @Schema(implementation = DatasetIdentifier.class))) @NotNull @Valid DatasetIdentifier identifier) {
 
@@ -249,6 +253,7 @@ public class DatasetsResource {
     @Operation(operationId = "deleteDatasetsBatch", summary = "Delete datasets", description = "Delete datasets batch", responses = {
             @ApiResponse(responseCode = "204", description = "No content"),
     })
+    @RequiredPermissions(WorkspaceUserPermission.DATASET_DELETE)
     public Response deleteDatasetsBatch(
             @NotNull @RequestBody(content = @Content(schema = @Schema(implementation = BatchDelete.class))) @NotNull @Valid BatchDelete batchDelete) {
 
@@ -272,11 +277,12 @@ public class DatasetsResource {
 
         String workspaceId = requestContext.get().getWorkspaceId();
         Visibility visibility = requestContext.get().getVisibility();
-        String name = identifier.datasetName();
 
-        log.info("Finding dataset by name '{}' on workspace_id '{}'", name, workspaceId);
-        Dataset dataset = service.findByName(workspaceId, name, visibility);
-        log.info("Found dataset by name '{}', id '{}' on workspace_id '{}'", name, dataset.id(), workspaceId);
+        log.info("Finding dataset by name '{}', projectName '{}' on workspace_id '{}'", identifier.datasetName(),
+                identifier.projectName(), workspaceId);
+        Dataset dataset = service.findByName(workspaceId, identifier, visibility);
+        log.info("Found dataset by name '{}', id '{}' on workspace_id '{}'", identifier.datasetName(), dataset.id(),
+                workspaceId);
 
         return Response.ok(dataset).build();
     }
@@ -427,12 +433,14 @@ public class DatasetsResource {
         List<DatasetItemFilter> queryFilters = Optional.ofNullable((List<DatasetItemFilter>) filtersFactory.newFilters(
                 request.filters(), DatasetItemFilter.LIST_TYPE_REFERENCE)).orElse(List.of());
 
-        log.info("Streaming dataset items by '{}' on workspaceId '{}'", request, workspaceId);
+        log.info("Streaming dataset items for dataset '{}', projectName '{}' on workspaceId '{}'",
+                request.datasetName(), request.projectName(), workspaceId);
         var items = itemService.getItems(workspaceId, request, queryFilters, visibility)
                 .contextWrite(ctx -> ctx.put(RequestContext.USER_NAME, userName)
                         .put(RequestContext.WORKSPACE_ID, workspaceId));
         var outputStream = streamer.getOutputStream(items);
-        log.info("Streamed dataset items by '{}' on workspaceId '{}'", request, workspaceId);
+        log.info("Streamed dataset items for dataset '{}', projectName '{}' on workspaceId '{}'",
+                request.datasetName(), request.projectName(), workspaceId);
         return outputStream;
     }
 
@@ -621,6 +629,7 @@ public class DatasetsResource {
             @ApiResponse(responseCode = "204", description = "No content"),
             @ApiResponse(responseCode = "400", description = "Bad request - invalid parameters or conflicting fields"),
     })
+    @RequiredPermissions(WorkspaceUserPermission.DATASET_DELETE)
     public Response deleteDatasetItems(
             @RequestBody(content = @Content(schema = @Schema(implementation = DatasetItemsDelete.class))) @NotNull @Valid DatasetItemsDelete request) {
 

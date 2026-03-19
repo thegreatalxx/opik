@@ -9,6 +9,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import lombok.Builder;
 
@@ -19,16 +20,25 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
+import static com.comet.opik.utils.ValidationUtils.NULL_OR_NOT_BLANK;
+
 @Builder(toBuilder = true)
 @JsonIgnoreProperties(ignoreUnknown = true)
 @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
 public record Experiment(
         @JsonView( {
                 Experiment.View.Public.class, Experiment.View.Write.class}) UUID id,
-        @JsonView({Experiment.View.Public.class, Experiment.View.Write.class}) @NotBlank String datasetName,
+        /* We need to ensure that datasetName is not null or blank for public write views.
+        But at the same time allow it to be null for public read views. Otherwise, generated client
+        classes for the Python SDK will throw a validation error in case if the dataset associated with the experiment
+        was deleted. See: https://comet-ml.atlassian.net/browse/OPIK-4632 */
+        @JsonView({Experiment.View.Public.class,
+                Experiment.View.Write.class}) @NotBlank @Schema(nullable = true, requiredMode = Schema.RequiredMode.NOT_REQUIRED) String datasetName,
         @JsonView({Experiment.View.Public.class}) @Schema(accessMode = Schema.AccessMode.READ_ONLY) UUID datasetId,
-        @JsonView({Experiment.View.Public.class}) @Schema(accessMode = Schema.AccessMode.READ_ONLY) UUID projectId,
-        @JsonView({Experiment.View.Public.class}) @Schema(accessMode = Schema.AccessMode.READ_ONLY) String projectName,
+        @JsonView({Experiment.View.Public.class,
+                Experiment.View.Write.class}) @Schema(description = "Project ID. Takes precedence over project_name when both are provided.") UUID projectId,
+        @JsonView({Experiment.View.Public.class,
+                Experiment.View.Write.class}) @Schema(description = "Project name. Creates project if it doesn't exist. Ignored when project_id is provided.") @Pattern(regexp = NULL_OR_NOT_BLANK, message = "must not be blank") String projectName,
         @JsonView({Experiment.View.Public.class, Experiment.View.Write.class}) String name,
         @Schema(implementation = JsonListString.class) @JsonView({Experiment.View.Public.class,
                 Experiment.View.Write.class}) JsonNode metadata,
@@ -42,6 +52,8 @@ public record Experiment(
         @JsonView({
                 Experiment.View.Public.class}) @Schema(accessMode = Schema.AccessMode.READ_ONLY) List<Comment> comments,
         @JsonView({Experiment.View.Public.class}) @Schema(accessMode = Schema.AccessMode.READ_ONLY) Long traceCount,
+        @JsonView({
+                Experiment.View.Public.class}) @Schema(accessMode = Schema.AccessMode.READ_ONLY) Long datasetItemCount,
         @JsonView({Experiment.View.Public.class}) @Schema(accessMode = Schema.AccessMode.READ_ONLY) Instant createdAt,
         @JsonView({
                 Experiment.View.Public.class}) @Schema(accessMode = Schema.AccessMode.READ_ONLY) PercentageValues duration,

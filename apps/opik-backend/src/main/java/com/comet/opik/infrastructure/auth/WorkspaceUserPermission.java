@@ -12,7 +12,17 @@ public enum WorkspaceUserPermission {
     EXPERIMENT_VIEW("experiment_view"),
     DATASET_VIEW("dataset_view"),
     ANNOTATION_QUEUE_VIEW("annotation_queue_view"),
-    TRACE_SPAN_THREAD_LOG("trace_span_thread_log");
+    TRACE_SPAN_THREAD_LOG("trace_span_thread_log"),
+    PROJECT_DELETE("project_delete"),
+    TRACE_DELETE("trace_delete"),
+    DATASET_DELETE("dataset_delete"),
+    ANNOTATION_QUEUE_DELETE("annotation_queue_delete"),
+    PROMPT_DELETE("prompt_delete"),
+    OPTIMIZATION_RUN_DELETE("optimization_run_delete"),
+    WORKSPACE_SETTINGS_CONFIGURE("workspace_settings_configure"),
+    USER_ROLE_UPDATE("user_role_update"),
+    AI_PROVIDER_UPDATE("ai_provider_update"),
+    ANNOTATION_QUEUE_ANNOTATE("annotation_queue_annotate");
 
     @JsonValue
     private final String value;

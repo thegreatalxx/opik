@@ -90,6 +90,13 @@ const useUserPermission = (config?: { enabled?: boolean }) => {
     [canViewDatasets, checkNullablePermission],
   );
 
+  const canCreateExperiments = useMemo(
+    () =>
+      canViewExperiments &&
+      checkNullablePermission(ManagementPermissionsNames.EXPERIMENT_CREATE),
+    [canViewExperiments, checkNullablePermission],
+  );
+
   const canViewDashboards = useMemo(
     () => checkNullablePermission(ManagementPermissionsNames.DASHBOARD_VIEW),
     [checkNullablePermission],
@@ -185,6 +192,11 @@ const useUserPermission = (config?: { enabled?: boolean }) => {
     [checkNullablePermission],
   );
 
+  const canTagTrace = useMemo(
+    () => checkNullablePermission(ManagementPermissionsNames.TRACE_TAG),
+    [checkNullablePermission],
+  );
+
   const canAnnotateTraceSpanThread = useMemo(
     () =>
       checkNullablePermission(
@@ -193,10 +205,16 @@ const useUserPermission = (config?: { enabled?: boolean }) => {
     [checkNullablePermission],
   );
 
+  const canCreateDashboards = useMemo(
+    () => checkNullablePermission(ManagementPermissionsNames.DASHBOARD_CREATE),
+    [checkNullablePermission],
+  );
+
   return {
     canInviteMembers,
     isWorkspaceOwner,
     canViewExperiments,
+    canCreateExperiments,
     canViewDashboards,
     canViewDatasets,
     canDeleteProjects,
@@ -214,6 +232,8 @@ const useUserPermission = (config?: { enabled?: boolean }) => {
     canUpdateOnlineEvaluationRules,
     canUpdateAlerts,
     canAnnotateTraceSpanThread,
+    canCreateDashboards,
+    canTagTrace,
     isPending: isEnabled && isPending,
   };
 };

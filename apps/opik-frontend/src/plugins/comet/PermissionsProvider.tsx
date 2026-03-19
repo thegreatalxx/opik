@@ -8,6 +8,7 @@ const PermissionsProvider: React.FC<{ children: ReactNode }> = ({
 }) => {
   const {
     canViewExperiments,
+    canCreateExperiments,
     canViewDashboards,
     canViewDatasets,
     canDeleteProjects,
@@ -25,6 +26,8 @@ const PermissionsProvider: React.FC<{ children: ReactNode }> = ({
     canUpdateOnlineEvaluationRules,
     canUpdateAlerts,
     canAnnotateTraceSpanThread,
+    canCreateDashboards,
+    canTagTrace,
     isPending,
   } = useUserPermission();
 
@@ -32,6 +35,7 @@ const PermissionsProvider: React.FC<{ children: ReactNode }> = ({
     () => ({
       permissions: {
         canViewExperiments,
+        canCreateExperiments,
         canViewDashboards,
         canViewDatasets,
         canDeleteProjects,
@@ -49,11 +53,14 @@ const PermissionsProvider: React.FC<{ children: ReactNode }> = ({
         canUpdateOnlineEvaluationRules,
         canUpdateAlerts,
         canAnnotateTraceSpanThread,
+        canCreateDashboards,
+        canTagTrace,
       },
       isPending,
     }),
     [
       canViewExperiments,
+      canCreateExperiments,
       canViewDashboards,
       canViewDatasets,
       canDeleteProjects,
@@ -71,6 +78,8 @@ const PermissionsProvider: React.FC<{ children: ReactNode }> = ({
       canUpdateOnlineEvaluationRules,
       canUpdateAlerts,
       canAnnotateTraceSpanThread,
+      canCreateDashboards,
+      canTagTrace,
       isPending,
     ],
   );

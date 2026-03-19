@@ -5,6 +5,7 @@ import com.comet.opik.api.DatasetItem;
 import com.comet.opik.api.DatasetItemBatch;
 import com.comet.opik.api.Experiment;
 import com.comet.opik.api.ExperimentItem;
+import com.comet.opik.api.ExperimentScore;
 import com.comet.opik.api.ExperimentType;
 import com.comet.opik.api.FeedbackScoreAverage;
 import com.comet.opik.api.Optimization;
@@ -12,6 +13,7 @@ import com.comet.opik.api.OptimizationStatus;
 import com.comet.opik.api.OptimizationStudioConfig;
 import com.comet.opik.api.OptimizationUpdate;
 import com.comet.opik.api.Project;
+import com.comet.opik.api.Span;
 import com.comet.opik.api.Trace;
 import com.comet.opik.api.events.OptimizationCreated;
 import com.comet.opik.api.events.OptimizationsDeleted;
@@ -33,9 +35,11 @@ import com.comet.opik.api.resources.utils.resources.DatasetResourceClient;
 import com.comet.opik.api.resources.utils.resources.ExperimentResourceClient;
 import com.comet.opik.api.resources.utils.resources.OptimizationResourceClient;
 import com.comet.opik.api.resources.utils.resources.ProjectResourceClient;
+import com.comet.opik.api.resources.utils.resources.SpanResourceClient;
 import com.comet.opik.api.resources.utils.resources.TraceResourceClient;
 import com.comet.opik.extensions.DropwizardAppExtensionProvider;
 import com.comet.opik.extensions.RegisterApp;
+import com.comet.opik.infrastructure.auth.WorkspaceUserPermission;
 import com.comet.opik.infrastructure.queues.Queue;
 import com.comet.opik.podam.PodamFactoryUtils;
 import com.comet.opik.utils.JsonUtils;
@@ -75,8 +79,10 @@ import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.LongStream;
 import java.util.stream.Stream;
@@ -84,6 +90,10 @@ import java.util.stream.Stream;
 import static com.comet.opik.api.FeedbackScoreItem.FeedbackScoreBatchItem;
 import static com.comet.opik.api.resources.utils.ClickHouseContainerUtils.DATABASE_NAME;
 import static com.comet.opik.api.resources.utils.TestDropwizardAppExtensionUtils.newTestDropwizardAppExtension;
+import static com.github.tomakehurst.wiremock.client.WireMock.equalTo;
+import static com.github.tomakehurst.wiremock.client.WireMock.matchingJsonPath;
+import static com.github.tomakehurst.wiremock.client.WireMock.postRequestedFor;
+import static com.github.tomakehurst.wiremock.client.WireMock.urlPathEqualTo;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.within;
 import static org.awaitility.Awaitility.await;
@@ -94,7 +104,9 @@ import static org.junit.jupiter.params.provider.Arguments.arguments;
 class OptimizationsResourceTest {
 
     public static final String[] OPTIMIZATION_IGNORED_FIELDS = {"datasetId", "createdAt",
-            "lastUpdatedAt", "createdBy", "lastUpdatedBy", "studioConfig"};
+            "lastUpdatedAt", "createdBy", "lastUpdatedBy", "studioConfig", "datasetName",
+            "baselineObjectiveScore", "bestObjectiveScore", "baselineDuration", "bestDuration",
+            "baselineCost", "bestCost", "totalOptimizationCost", "experimentScores"};
 
     private static final String API_KEY = UUID.randomUUID().toString();
     private static final String WORKSPACE_ID = UUID.randomUUID().toString();
@@ -153,6 +165,7 @@ class OptimizationsResourceTest {
     private ExperimentResourceClient experimentResourceClient;
     private ProjectResourceClient projectResourceClient;
     private TraceResourceClient traceResourceClient;
+    private SpanResourceClient spanResourceClient;
 
     @BeforeAll
     void beforeAll(ClientSupport client) {
@@ -174,6 +187,7 @@ class OptimizationsResourceTest {
         this.experimentResourceClient = new ExperimentResourceClient(this.client, baseURI, podamFactory);
         this.projectResourceClient = new ProjectResourceClient(this.client, baseURI, podamFactory);
         this.traceResourceClient = new TraceResourceClient(this.client, baseURI);
+        this.spanResourceClient = new SpanResourceClient(this.client, baseURI);
 
         mockTargetWorkspace(API_KEY, TEST_WORKSPACE_NAME, WORKSPACE_ID);
     }
@@ -234,6 +248,30 @@ class OptimizationsResourceTest {
     }
 
     @Nested
+    @DisplayName("Required permissions")
+    class RequiredPermissionsTest {
+
+        @Test
+        @DisplayName("Delete optimizations passes required permissions to auth endpoint")
+        void deleteOptimizationsPassesRequiredPermissionsToAuthEndpoint() {
+            String apiKey = UUID.randomUUID().toString();
+            String workspaceName = "test-workspace-" + UUID.randomUUID();
+            String workspaceId = UUID.randomUUID().toString();
+            mockTargetWorkspace(apiKey, workspaceName, workspaceId);
+
+            var id = optimizationResourceClient.create(apiKey, workspaceName);
+
+            wireMock.server().resetRequests();
+            optimizationResourceClient.delete(Set.of(id), apiKey, workspaceName);
+
+            wireMock.server().verify(
+                    postRequestedFor(urlPathEqualTo("/opik/auth"))
+                            .withRequestBody(matchingJsonPath("$.requiredPermissions[0]",
+                                    equalTo(WorkspaceUserPermission.OPTIMIZATION_RUN_DELETE.getValue()))));
+        }
+    }
+
+    @Nested
     @DisplayName("Get optimizer by id")
     class GetOptimizerById {
 
@@ -286,7 +324,7 @@ class OptimizationsResourceTest {
         @DisplayName("Get optimizer by id with feedback scores")
         void getByIdWithFeedbackScores() {
             // Create dataset
-            Dataset dataset = podamFactory.manufacturePojo(Dataset.class);
+            Dataset dataset = buildDataset();
             datasetResourceClient.createDataset(dataset, API_KEY, TEST_WORKSPACE_NAME);
 
             List<DatasetItem> items = PodamFactoryUtils.manufacturePojoList(podamFactory, DatasetItem.class);
@@ -383,6 +421,184 @@ class OptimizationsResourceTest {
                     .isEqualTo(optimization);
         }
 
+        @Test
+        @DisplayName("Get optimizer by id with aggregated scores, durations, and costs")
+        void getById__whenExperimentsHaveScoresAndCosts__returnsAggregatedFields() {
+            String apiKey = UUID.randomUUID().toString();
+            String workspaceName = "test-workspace-" + UUID.randomUUID();
+            String workspaceId = UUID.randomUUID().toString();
+
+            mockTargetWorkspace(apiKey, workspaceName, workspaceId);
+
+            // Create dataset with items
+            var datasetName = "agg-test-" + UUID.randomUUID();
+            Dataset dataset = Dataset.builder()
+                    .name(datasetName)
+                    .build();
+            var datasetId = datasetResourceClient.createDataset(dataset, apiKey, workspaceName);
+
+            List<DatasetItem> items = PodamFactoryUtils.manufacturePojoList(podamFactory, DatasetItem.class);
+            DatasetItemBatch itemBatch = DatasetItemBatch.builder().datasetId(datasetId).items(items).build();
+            datasetResourceClient.createDatasetItems(itemBatch, workspaceName, apiKey);
+
+            // Create optimization with objectiveName
+            var objectiveName = "accuracy";
+            var optimization = optimizationResourceClient.createPartialOptimization()
+                    .datasetId(datasetId)
+                    .datasetName(datasetName)
+                    .objectiveName(objectiveName)
+                    .build();
+
+            var optimizationId = optimizationResourceClient.create(optimization, apiKey, workspaceName);
+
+            // Create project for traces
+            Project project = podamFactory.manufacturePojo(Project.class).toBuilder()
+                    .name("Experiment-%s".formatted(datasetName))
+                    .build();
+            projectResourceClient.createProject(project, apiKey, workspaceName);
+
+            // Experiment 1 (baseline - created first, lower score)
+            var baselineScore = BigDecimal.valueOf(0.6);
+            var baselineCandidateId = UUID.randomUUID().toString();
+            var baselineMetadata = JsonUtils.getJsonNodeFromString(
+                    JsonUtils.writeValueAsString(Map.of("candidate_id", baselineCandidateId)));
+
+            Experiment experiment1 = experimentResourceClient.createPartialExperiment()
+                    .datasetId(datasetId)
+                    .optimizationId(optimizationId)
+                    .datasetName(datasetName)
+                    .type(ExperimentType.TRIAL)
+                    .metadata(baselineMetadata)
+                    .experimentScores(List.of(
+                            ExperimentScore.builder().name(objectiveName).value(baselineScore).build()))
+                    .build();
+
+            experimentResourceClient.create(experiment1, apiKey, workspaceName);
+
+            // Experiment 2 (best - created second, higher score)
+            var bestScore = BigDecimal.valueOf(0.9);
+            var bestCandidateId = UUID.randomUUID().toString();
+            var bestMetadata = JsonUtils.getJsonNodeFromString(
+                    JsonUtils.writeValueAsString(Map.of("candidate_id", bestCandidateId)));
+
+            Experiment experiment2 = experimentResourceClient.createPartialExperiment()
+                    .datasetId(datasetId)
+                    .optimizationId(optimizationId)
+                    .datasetName(datasetName)
+                    .type(ExperimentType.TRIAL)
+                    .metadata(bestMetadata)
+                    .experimentScores(List.of(
+                            ExperimentScore.builder().name(objectiveName).value(bestScore).build()))
+                    .build();
+
+            experimentResourceClient.create(experiment2, apiKey, workspaceName);
+
+            // Create traces and experiment items for experiment 1
+            var experiment1Cost = BigDecimal.valueOf(0.05);
+            createTracesSpansAndItems(
+                    experiment1, items, project, apiKey, workspaceName,
+                    Instant.now().minusSeconds(2), Instant.now().minusSeconds(1),
+                    experiment1Cost);
+
+            // Create traces and experiment items for experiment 2
+            var experiment2Cost = BigDecimal.valueOf(0.10);
+            createTracesSpansAndItems(
+                    experiment2, items, project, apiKey, workspaceName,
+                    Instant.now().minusSeconds(3), Instant.now().minusSeconds(1),
+                    experiment2Cost);
+
+            // Wait for ClickHouse data to be queryable and verify aggregation fields
+            await().atMost(10, TimeUnit.SECONDS)
+                    .pollInterval(1, TimeUnit.SECONDS)
+                    .untilAsserted(() -> {
+                        var actualOptimization = optimizationResourceClient.get(
+                                optimizationId, apiKey, workspaceName, 200);
+
+                        assertThat(actualOptimization).isNotNull();
+                        assertThat(actualOptimization.numTrials()).isEqualTo(2L);
+
+                        // Baseline = earliest candidate's objective score
+                        assertThat(actualOptimization.baselineObjectiveScore()).isNotNull();
+                        assertThat(StatsUtils.bigDecimalComparator(
+                                actualOptimization.baselineObjectiveScore(), baselineScore)).isZero();
+
+                        // Best = highest objective score across candidates
+                        assertThat(actualOptimization.bestObjectiveScore()).isNotNull();
+                        assertThat(StatsUtils.bigDecimalComparator(
+                                actualOptimization.bestObjectiveScore(), bestScore)).isZero();
+
+                        // Duration fields are populated (traces have start/end times)
+                        assertThat(actualOptimization.baselineDuration()).isNotNull();
+                        assertThat(actualOptimization.bestDuration()).isNotNull();
+
+                        // Cost fields are populated (spans have total_estimated_cost)
+                        assertThat(actualOptimization.baselineCost()).isNotNull();
+                        assertThat(actualOptimization.bestCost()).isNotNull();
+
+                        // Total optimization cost is the sum of all experiment costs
+                        assertThat(actualOptimization.totalOptimizationCost()).isNotNull();
+                        assertThat(actualOptimization.totalOptimizationCost().compareTo(BigDecimal.ZERO))
+                                .isGreaterThan(0);
+
+                        // Experiment scores are populated
+                        assertThat(actualOptimization.experimentScores()).isNotNull();
+                        assertThat(actualOptimization.experimentScores()).isNotEmpty();
+                        assertThat(actualOptimization.experimentScores())
+                                .anyMatch(score -> score.name().equals(objectiveName));
+                    });
+        }
+
+        private void createTracesSpansAndItems(Experiment experiment, List<DatasetItem> datasetItems,
+                Project project, String apiKey, String workspaceName,
+                Instant traceStart, Instant traceEnd, BigDecimal costPerSpan) {
+            Set<ExperimentItem> experimentItems = new HashSet<>();
+            List<Trace> traces = new ArrayList<>();
+            List<Span> spans = new ArrayList<>();
+
+            for (DatasetItem datasetItem : datasetItems) {
+                Trace trace = podamFactory.manufacturePojo(Trace.class).toBuilder()
+                        .projectId(project.id())
+                        .projectName(project.name())
+                        .startTime(traceStart)
+                        .endTime(traceEnd)
+                        .guardrailsValidations(null)
+                        .threadId(null)
+                        .feedbackScores(null)
+                        .usage(null)
+                        .build();
+
+                ExperimentItem experimentItem = podamFactory.manufacturePojo(ExperimentItem.class).toBuilder()
+                        .experimentId(experiment.id())
+                        .traceId(trace.id())
+                        .input(JsonUtils.readTree(datasetItem.data()))
+                        .datasetItemId(datasetItem.id())
+                        .build();
+
+                Span span = podamFactory.manufacturePojo(Span.class).toBuilder()
+                        .projectId(project.id())
+                        .projectName(project.name())
+                        .traceId(trace.id())
+                        .parentSpanId(null)
+                        .startTime(traceStart)
+                        .endTime(traceEnd)
+                        .totalEstimatedCost(costPerSpan)
+                        .feedbackScores(null)
+                        .build();
+
+                traces.add(trace);
+                experimentItems.add(experimentItem);
+                spans.add(span);
+            }
+
+            traceResourceClient.batchCreateTraces(traces, apiKey, workspaceName);
+            experimentResourceClient.createExperimentItem(experimentItems, apiKey, workspaceName);
+            spanResourceClient.batchCreateSpans(spans, apiKey, workspaceName);
+        }
+
+    }
+
+    private Dataset buildDataset() {
+        return DatasetResourceClient.buildDataset(podamFactory);
     }
 
     @Test
@@ -528,7 +744,7 @@ class OptimizationsResourceTest {
             mockTargetWorkspace(apiKey, workspaceName, workspaceId);
 
             // Create dataset
-            Dataset dataset = podamFactory.manufacturePojo(Dataset.class);
+            Dataset dataset = buildDataset();
             datasetResourceClient.createDataset(dataset, apiKey, workspaceName);
 
             // Create optimization with specific dataset ID
@@ -614,7 +830,7 @@ class OptimizationsResourceTest {
             mockTargetWorkspace(apiKey, workspaceName, workspaceId);
 
             // Create dataset
-            Dataset dataset = podamFactory.manufacturePojo(Dataset.class);
+            Dataset dataset = buildDataset();
             datasetResourceClient.createDataset(dataset, apiKey, workspaceName);
 
             List<DatasetItem> items = PodamFactoryUtils.manufacturePojoList(podamFactory, DatasetItem.class);
@@ -776,7 +992,6 @@ class OptimizationsResourceTest {
                     .studioConfig(studioConfig)
                     .build();
 
-            // Get initial queue size
             String queueKey = "rq:queue:" + Queue.OPTIMIZER_CLOUD.toString();
             RQueueReactive<String> queue = redisClient.getQueue(queueKey, StringCodec.INSTANCE);
             Integer initialSize = queue.size().block();
@@ -1066,10 +1281,10 @@ class OptimizationsResourceTest {
             mockTargetWorkspace(apiKey, workspaceName, workspaceId);
 
             // Create datasets
-            var dataset1 = podamFactory.manufacturePojo(Dataset.class).toBuilder().build();
+            var dataset1 = buildDataset().toBuilder().build();
             var dataset1Id = datasetResourceClient.createDataset(dataset1, apiKey, workspaceName);
 
-            var dataset2 = podamFactory.manufacturePojo(Dataset.class).toBuilder().build();
+            var dataset2 = buildDataset().toBuilder().build();
             var dataset2Id = datasetResourceClient.createDataset(dataset2, apiKey, workspaceName);
 
             // Create optimizations for different datasets

@@ -30,6 +30,7 @@ import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.jdbi.v3.core.statement.UnableToExecuteStatementException;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
@@ -85,11 +86,15 @@ public interface ProjectService {
 
     List<Project> findByNames(String workspaceId, List<String> names);
 
+    Optional<UUID> findProjectIdByName(String workspaceId, String projectName);
+
     Map<UUID, String> findIdToNameByIds(String workspaceId, Set<UUID> ids);
 
     Mono<Map<UUID, Instant>> getDemoProjectIdsWithTimestamps();
 
     Mono<Project> getOrCreate(String projectName);
+
+    Project getOrCreate(String workspaceId, String projectName, String userName);
 
     Project retrieveByName(String projectName);
 
@@ -105,6 +110,8 @@ public interface ProjectService {
             @NonNull List<SortingField> sortingFields);
 
     Mono<Project> getOrFail(@NonNull UUID id);
+
+    void validateProjectIdExists(UUID projectId, String workspaceId);
 
     static Map<String, Project> groupByName(List<Project> projects) {
         return projects.stream().collect(Collectors.toMap(
@@ -235,6 +242,13 @@ class ProjectServiceImpl implements ProjectService {
                     .orElseThrow(() -> ErrorUtils.failWithNotFound("Project", id)))
                     .subscribeOn(Schedulers.boundedElastic());
         });
+    }
+
+    @Override
+    public void validateProjectIdExists(UUID projectId, String workspaceId) {
+        if (projectId != null && findByIds(workspaceId, Set.of(projectId)).isEmpty()) {
+            throw ErrorUtils.failWithNotFound("Project", projectId);
+        }
     }
 
     @Override
@@ -494,6 +508,17 @@ class ProjectServiceImpl implements ProjectService {
     }
 
     @Override
+    public Optional<UUID> findProjectIdByName(@NonNull String workspaceId, String projectName) {
+        if (StringUtils.isBlank(projectName)) {
+            return Optional.empty();
+        }
+
+        return findByNames(workspaceId, List.of(projectName)).stream()
+                .findFirst()
+                .map(Project::id);
+    }
+
+    @Override
     public Map<UUID, String> findIdToNameByIds(String workspaceId, Set<UUID> ids) {
         return findByIds(workspaceId, ids)
                 .stream()
@@ -528,7 +553,8 @@ class ProjectServiceImpl implements ProjectService {
                 .subscribeOn(Schedulers.boundedElastic()));
     }
 
-    private Project getOrCreate(String workspaceId, String projectName, String userName) {
+    @Override
+    public Project getOrCreate(String workspaceId, String projectName, String userName) {
 
         return findByNames(workspaceId, List.of(projectName))
                 .stream()
