@@ -22,19 +22,15 @@ import ConfigTagList from "./ConfigTagList";
 
 type ConfigurationDetailViewProps = {
   item: ConfigHistoryItem;
-  version: number;
   projectId: string;
   versions: ConfigHistoryItem[];
-  totalVersions: number;
   onEdit: () => void;
 };
 
 const ConfigurationDetailView: React.FC<ConfigurationDetailViewProps> = ({
   item,
-  version,
   projectId,
   versions,
-  totalVersions,
   onEdit,
 }) => {
   const { data: agentConfig, isPending } = useAgentConfigById({
@@ -65,12 +61,9 @@ const ConfigurationDetailView: React.FC<ConfigurationDetailViewProps> = ({
     blueprintId: string;
   } | null>(null);
 
-  const handleSelectDiffVersion = (
-    versionItem: ConfigHistoryItem,
-    versionNumber: number,
-  ) => {
+  const handleSelectDiffVersion = (versionItem: ConfigHistoryItem) => {
     setDiffBase({
-      label: `v${versionNumber}`,
+      label: versionItem.name,
       blueprintId: versionItem.id,
     });
     setDiffOpen(true);
@@ -84,13 +77,12 @@ const ConfigurationDetailView: React.FC<ConfigurationDetailViewProps> = ({
       <Card className="mx-6 my-4 p-6">
         <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
           <div className="flex flex-wrap items-center gap-2">
-            <h2 className="comet-title-m">v{version}</h2>
+            <h2 className="comet-title-m">{item.name}</h2>
             <ConfigTagList tags={item.tags} maxWidth={200} />
             {versions.length > 1 && (
               <DiffVersionPopover
                 currentItemId={item.id}
                 versions={versions}
-                totalVersions={totalVersions}
                 onSelectVersion={handleSelectDiffVersion}
               />
             )}
@@ -163,7 +155,7 @@ const ConfigurationDetailView: React.FC<ConfigurationDetailViewProps> = ({
             blueprintId: diffBase.blueprintId,
           }}
           diff={{
-            label: `v${version}`,
+            label: item.name,
             blueprintId: item.id,
           }}
         />

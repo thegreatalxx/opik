@@ -153,7 +153,7 @@ export const useConfigurationSave = ({
         type: v.type,
         value:
           v.type === BlueprintValueType.PROMPT
-            ? newCommits.get(v.key)!
+            ? newCommits.get(v.key) ?? v.value
             : draftValues[v.key],
         ...(v.description ? { description: v.description } : {}),
       }));

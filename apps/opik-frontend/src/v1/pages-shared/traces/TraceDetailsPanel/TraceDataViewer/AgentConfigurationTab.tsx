@@ -4,7 +4,6 @@ import { Link } from "@tanstack/react-router";
 
 import { Span, Trace } from "@/types/traces";
 import { BlueprintValue, BlueprintValueType } from "@/types/agent-configs";
-import useConfigVersionMap from "@/api/agent-configs/useConfigVersionMap";
 import BlueprintValuesList from "@/v1/pages-shared/traces/ConfigurationTab/BlueprintValuesList";
 import TooltipWrapper from "@/shared/TooltipWrapper/TooltipWrapper";
 import ConfigurationVersionTag from "@/shared/ConfigurationVersionTag/ConfigurationVersionTag";
@@ -14,12 +13,13 @@ import useAppStore from "@/store/AppStore";
 import { AGENT_CONFIGURATION_METADATA_KEY } from "@/utils/agent-configurations";
 
 type AgentConfigurationMetadata = {
-  blueprint_id: string;
+  _blueprint_id: string;
   _mask_id?: string;
   values?: Record<
     string,
     { type: BlueprintValueType; value: unknown; description?: string }
   >;
+  blueprint_version: string;
 };
 
 export const isAgentConfigurationMetadata = (
@@ -27,8 +27,8 @@ export const isAgentConfigurationMetadata = (
 ): value is AgentConfigurationMetadata =>
   typeof value === "object" &&
   value !== null &&
-  "blueprint_id" in value &&
-  typeof (value as AgentConfigurationMetadata).blueprint_id === "string";
+  "_blueprint_id" in value &&
+  typeof (value as AgentConfigurationMetadata)._blueprint_id === "string";
 
 type AgentConfigurationTabProps = {
   data: Trace | Span;
@@ -45,7 +45,7 @@ const AgentConfigurationTab: React.FC<AgentConfigurationTabProps> = ({
   const configMeta = isAgentConfigurationMetadata(agentConfigMeta)
     ? agentConfigMeta
     : undefined;
-  const blueprintId = configMeta?.blueprint_id;
+  const blueprintId = configMeta?._blueprint_id;
   const maskId = configMeta?._mask_id;
 
   const values = useMemo<BlueprintValue[]>(() => {
@@ -65,8 +65,7 @@ const AgentConfigurationTab: React.FC<AgentConfigurationTabProps> = ({
       .sort((a, b) => a.key.localeCompare(b.key));
   }, [configMeta?.values]);
 
-  const versionMap = useConfigVersionMap(projectId);
-  const version = blueprintId ? versionMap[blueprintId] : undefined;
+  const version = configMeta?.blueprint_version;
   const workspaceName = useAppStore((state) => state.activeWorkspaceName);
 
   if (!values.length) {

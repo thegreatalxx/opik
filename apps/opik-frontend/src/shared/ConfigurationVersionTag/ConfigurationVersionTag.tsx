@@ -25,14 +25,14 @@ const ConfigurationVersionTag: React.FC<ConfigurationVersionTagProps> = ({
       ) : (
         <GitCommitVertical className="size-3.5 shrink-0" />
       )}
-      v{version}
+      {version}
     </Tag>
   );
 
   if (hasMask) {
     return (
       <TooltipWrapper
-        content={`Used with mask_id ${maskId} on top v${version}`}
+        content={`Used with mask_id ${maskId} on top ${version}`}
       >
         {tag}
       </TooltipWrapper>

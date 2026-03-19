@@ -20,7 +20,7 @@ const ConfigurationTab: React.FC<ConfigurationTabProps> = ({ projectId }) => {
   });
   const [editItem, setEditItem] = useState<{
     item: ConfigHistoryItem;
-    version: number;
+    isLatest: boolean;
   } | null>(null);
 
   const { data, isPending, hasNextPage, fetchNextPage, isFetchingNextPage } =
@@ -30,7 +30,6 @@ const ConfigurationTab: React.FC<ConfigurationTabProps> = ({ projectId }) => {
     () => data?.pages.flatMap((p) => p.content) ?? [],
     [data],
   );
-  const total = data?.pages[0]?.total ?? 0;
 
   const selectedIndex = useMemo(() => {
     if (!selectedId) return 0;
@@ -75,8 +74,7 @@ const ConfigurationTab: React.FC<ConfigurationTabProps> = ({ projectId }) => {
         <ConfigurationEditView
           item={editItem.item}
           projectId={projectId}
-          version={editItem.version}
-          latestVersion={total}
+          isLatestVersion={editItem.isLatest}
           latestBlueprintId={allRows[0]?.id}
           onCancel={() => setEditItem(null)}
           onSaved={() => {
@@ -98,14 +96,12 @@ const ConfigurationTab: React.FC<ConfigurationTabProps> = ({ projectId }) => {
         {selectedItem ? (
           <ConfigurationDetailView
             item={selectedItem}
-            version={total - selectedIndex}
             projectId={projectId}
             versions={allRows}
-            totalVersions={total}
             onEdit={() =>
               setEditItem({
                 item: selectedItem,
-                version: total - selectedIndex,
+                isLatest: selectedIndex === 0,
               })
             }
           />
@@ -121,7 +117,6 @@ const ConfigurationTab: React.FC<ConfigurationTabProps> = ({ projectId }) => {
 
         <ConfigurationHistoryTimeline
           items={allRows}
-          total={total}
           selectedIndex={selectedIndex}
           onSelect={(index) => setSelectedId(allRows[index]?.id ?? undefined)}
           hasNextPage={hasNextPage}
