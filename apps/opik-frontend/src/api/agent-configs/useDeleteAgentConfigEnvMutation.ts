@@ -20,7 +20,9 @@ const useDeleteAgentConfigEnvMutation = () => {
       projectId,
     }: UseDeleteAgentConfigEnvMutationParams) => {
       const { data } = await api.delete(
-        `${AGENT_CONFIGS_REST_ENDPOINT}blueprints/environments/${encodeURIComponent(envName)}/projects/${projectId}`,
+        `${AGENT_CONFIGS_REST_ENDPOINT}blueprints/environments/${encodeURIComponent(
+          envName,
+        )}/projects/${projectId}`,
       );
 
       return data;

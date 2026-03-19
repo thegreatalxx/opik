@@ -88,7 +88,9 @@ const ConfigurationHistoryTimeline: React.FC<
               onClick={() => onSelect(index)}
             >
               <div className="flex items-center gap-1">
-                <span className="comet-body-s-accented shrink-0">v{total - index}</span>
+                <span className="comet-body-s-accented shrink-0">
+                  v{total - index}
+                </span>
                 <ConfigTagList tags={item.tags} size="sm" maxWidth={200} />
               </div>
               {(() => {

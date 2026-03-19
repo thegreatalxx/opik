@@ -29,7 +29,11 @@ const DiffVersionItem: React.FC<DiffVersionItemProps> = ({
     >
       <div className="flex items-center gap-1.5">
         <span className="comet-body-s-accented shrink-0">v{versionNumber}</span>
-        <ConfigTagList tags={version.tags} size="sm" className="min-w-0 flex-1" />
+        <ConfigTagList
+          tags={version.tags}
+          size="sm"
+          className="min-w-0 flex-1"
+        />
       </div>
       <span className="comet-body-xs text-light-slate">
         {getTimeFromNow(version.created_at)}
