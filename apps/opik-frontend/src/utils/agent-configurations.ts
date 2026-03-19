@@ -9,25 +9,19 @@ export enum AgentConfigurationBasicStage {
   PROD = "prod",
 }
 
-export const DEFAULT_STAGE_OPTIONS = [
-  AgentConfigurationBasicStage.DEV,
-  AgentConfigurationBasicStage.STAGING,
+export const BASIC_STAGE_ORDER = [
   AgentConfigurationBasicStage.PROD,
+  AgentConfigurationBasicStage.STAGING,
+  AgentConfigurationBasicStage.DEV,
 ];
 
 export const isProdTag = (tag: string) =>
   tag == AgentConfigurationBasicStage.PROD;
 
 export const isBasicStage = (tag: string) =>
-  DEFAULT_STAGE_OPTIONS.some((s) => s === tag);
+  BASIC_STAGE_ORDER.some((s) => s === tag);
 
 export const isStageTag = (tag: string, stage: string) => tag === stage;
-
-export const BASIC_STAGE_ORDER = [
-  AgentConfigurationBasicStage.PROD,
-  AgentConfigurationBasicStage.STAGING,
-  AgentConfigurationBasicStage.DEV,
-];
 
 export const sortTags = (tags: string[]) => [
   ...BASIC_STAGE_ORDER.filter((stage) => tags.some((t) => t === stage)),

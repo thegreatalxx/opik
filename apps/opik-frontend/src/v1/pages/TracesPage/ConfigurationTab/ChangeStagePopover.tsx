@@ -13,7 +13,6 @@ import { Separator } from "@/ui/separator";
 import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
 import {
   BASIC_STAGE_ORDER,
-  DEFAULT_STAGE_OPTIONS,
   isBasicStage,
   isProdTag,
   isStageTag,
@@ -139,7 +138,7 @@ const ChangeStagePopover: React.FC<ChangeStagePopoverProps> = ({
           </div>
           <Separator className="my-2" />
           {selectedStages.filter(
-            (s) => !DEFAULT_STAGE_OPTIONS.some((d) => isStageTag(s, d)),
+            (s) => !BASIC_STAGE_ORDER.some((d) => isStageTag(s, d)),
           ).length > 0 && (
             <>
               <p className="comet-body-xs-accented mb-1 text-light-slate">
@@ -148,7 +147,7 @@ const ChangeStagePopover: React.FC<ChangeStagePopoverProps> = ({
               <div className="flex max-h-[140px] flex-col gap-1 overflow-y-auto">
                 {selectedStages
                   .filter(
-                    (s) => !DEFAULT_STAGE_OPTIONS.some((d) => isStageTag(s, d)),
+                    (s) => !BASIC_STAGE_ORDER.some((d) => isStageTag(s, d)),
                   )
                   .map((stage) => (
                     <button
