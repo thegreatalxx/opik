@@ -30,9 +30,7 @@ export const BASIC_STAGE_ORDER = [
 ];
 
 export const sortTags = (tags: string[]) => [
-  ...BASIC_STAGE_ORDER.filter((stage) =>
-    tags.some((t) => t === stage),
-  ),
+  ...BASIC_STAGE_ORDER.filter((stage) => tags.some((t) => t === stage)),
   ...tags.filter((t) => !isBasicStage(t)),
 ];
 

@@ -10,11 +10,7 @@ import BasicStageTag from "./BasicStageTag";
 import { Button } from "@/ui/button";
 import { Input } from "@/ui/input";
 import { Separator } from "@/ui/separator";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/ui/popover";
+import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
 import {
   BASIC_STAGE_ORDER,
   DEFAULT_STAGE_OPTIONS,

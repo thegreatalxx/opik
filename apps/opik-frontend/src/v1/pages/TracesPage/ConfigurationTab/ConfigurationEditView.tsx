@@ -33,7 +33,6 @@ const ConfigurationEditView: React.FC<ConfigurationEditViewProps> = ({
   onCancel,
   onSaved,
 }) => {
-
   const { data: agentConfig, isPending } = useAgentConfigById({
     blueprintId: item.id,
   });

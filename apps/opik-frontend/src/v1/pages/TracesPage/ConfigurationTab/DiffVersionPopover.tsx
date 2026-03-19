@@ -4,11 +4,7 @@ import { GitCompareArrows } from "lucide-react";
 import { ConfigHistoryItem } from "@/types/agent-configs";
 import { getTimeFromNow } from "@/lib/date";
 import { Button } from "@/ui/button";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/ui/popover";
+import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
 import ConfigTagList from "./ConfigTagList";
 
 type DiffVersionItemProps = {
