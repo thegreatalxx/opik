@@ -6,7 +6,7 @@ import useLocalStorageState from "use-local-storage-state";
 import { Resizable } from "re-resizable";
 import { GripVertical } from "lucide-react";
 
-import DataTable from "@/components/shared/DataTable/DataTable";
+import StickyScrollTable from "@/components/pages/PlaygroundPage/PlaygroundOutputs/PlaygroundOutputTable/StickyScrollTable";
 import { DatasetItem, DatasetItemColumn } from "@/types/datasets";
 import { COLUMN_TYPE, ColumnData, ROW_HEIGHT } from "@/types/shared";
 import { mapDynamicColumnTypesToColumnType } from "@/lib/filters";
@@ -39,11 +39,6 @@ const LEFT_PANEL_WIDTH_KEY = "playground-output-left-panel-width";
 const DEFAULT_LEFT_WIDTH = "50%";
 const MIN_LEFT_WIDTH = "10%";
 const MAX_LEFT_WIDTH = "90%";
-
-// Overrides DataTable's default wrapper which adds unwanted border and overflow styles
-const SplitTableWrapper: React.FC<{ children: React.ReactNode }> = ({
-  children,
-}) => <div className="border-b">{children}</div>;
 
 const PlaygroundOutputTable = ({
   datasetItems,
@@ -209,30 +204,28 @@ const PlaygroundOutputTable = ({
           handleStyles={{ right: { right: 0, width: 1, zIndex: 10 } }}
           className="mr-3 shrink-0"
         >
-          <div className="h-full overflow-x-auto overflow-y-hidden">
-            <DataTable
+          <div className="h-full">
+            <StickyScrollTable
               columns={leftColumns}
               data={rows}
               rowHeight={ROW_HEIGHT.large}
               resizeConfig={resizeConfig}
               noData={<DataTableNoData title={noDataMessage} />}
               showLoadingOverlay={isFetchingData}
-              TableWrapper={SplitTableWrapper}
             />
           </div>
         </Resizable>
       )}
 
       {hasRightColumns && (
-        <div className="min-w-0 flex-1 overflow-x-auto overflow-y-hidden">
-          <DataTable
+        <div className="min-w-0 flex-1">
+          <StickyScrollTable
             columns={rightColumns}
             data={rows}
             rowHeight={ROW_HEIGHT.large}
             resizeConfig={resizeConfig}
             noData={<DataTableNoData title={noDataMessage} />}
             showLoadingOverlay={isFetchingData}
-            TableWrapper={SplitTableWrapper}
           />
         </div>
       )}
