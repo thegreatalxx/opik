@@ -21,7 +21,6 @@ import useAppStore from "@/store/AppStore";
 import { generateSMEURL } from "@/lib/annotation-queues";
 import { usePermissions } from "@/contexts/PermissionsContext";
 import AddEditAnnotationQueueDialog from "./AddEditAnnotationQueueDialog";
-import { usePermissions } from "@/contexts/PermissionsContext";
 
 const AnnotationQueueRowActionsCell: React.FunctionComponent<
   CellContext<AnnotationQueue, unknown>
