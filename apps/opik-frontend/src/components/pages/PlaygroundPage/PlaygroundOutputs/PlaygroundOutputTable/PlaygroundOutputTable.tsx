@@ -1,12 +1,10 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useCallback } from "react";
 import get from "lodash/get";
 import isEmpty from "lodash/isEmpty";
-import {
-  ColumnDef,
-  ColumnPinningState,
-  createColumnHelper,
-} from "@tanstack/react-table";
+import { ColumnDef } from "@tanstack/react-table";
 import useLocalStorageState from "use-local-storage-state";
+import { Resizable } from "re-resizable";
+import { GripVertical } from "lucide-react";
 
 import DataTable from "@/components/shared/DataTable/DataTable";
 import { DatasetItem, DatasetItemColumn } from "@/types/datasets";
@@ -17,9 +15,6 @@ import { convertColumnDataToColumn } from "@/lib/table";
 import { getAlphabetLetter } from "@/lib/utils";
 import PlaygroundOutputCell from "@/components/pages/PlaygroundPage/PlaygroundOutputs/PlaygroundOutputTable/PlaygroundOutputCell";
 import PlaygroundOutputColumnHeader from "@/components/pages/PlaygroundPage/PlaygroundOutputs/PlaygroundOutputTable/PlaygroundOutputColumnHeader";
-import PageBodyStickyTableWrapper from "@/components/layout/PageBodyStickyTableWrapper/PageBodyStickyTableWrapper";
-import SectionHeader from "@/components/shared/DataTableHeaders/SectionHeader";
-
 import PlaygroundVariableCell from "@/components/pages/PlaygroundPage/PlaygroundOutputs/PlaygroundOutputTable/PlaygroundVariableCell";
 import DataTableNoData from "@/components/shared/DataTableNoData/DataTableNoData";
 import { EXPLAINER_ID, EXPLAINERS_MAP } from "@/constants/explainers";
@@ -31,8 +26,6 @@ type PlaygroundOutputTableData = {
   tags: string[];
 };
 
-const columnHelper = createColumnHelper<PlaygroundOutputTableData>();
-
 interface PlaygroundOutputTableProps {
   datasetItems: DatasetItem[];
   datasetColumns: DatasetItemColumn[];
@@ -42,6 +35,15 @@ interface PlaygroundOutputTableProps {
 }
 
 const COLUMNS_WIDTH_KEY = "playground-output-table-width-keys";
+const LEFT_PANEL_WIDTH_KEY = "playground-output-left-panel-width";
+const DEFAULT_LEFT_WIDTH = "50%";
+const MIN_LEFT_WIDTH = "10%";
+const MAX_LEFT_WIDTH = "90%";
+
+// Overrides DataTable's default wrapper which adds unwanted border and overflow styles
+const SplitTableWrapper: React.FC<{ children: React.ReactNode }> = ({
+  children,
+}) => <div className="border-b">{children}</div>;
 
 const PlaygroundOutputTable = ({
   datasetItems,
@@ -55,6 +57,10 @@ const PlaygroundOutputTable = ({
   >(COLUMNS_WIDTH_KEY, {
     defaultValue: {},
   });
+
+  const [leftPanelWidth, setLeftPanelWidth] = useLocalStorageState<
+    string | number
+  >(LEFT_PANEL_WIDTH_KEY, { defaultValue: DEFAULT_LEFT_WIDTH });
 
   const { hydratedItems: hydratedDatasetItems } =
     useIncrementalDatasetHydration(datasetItems);
@@ -78,7 +84,7 @@ const PlaygroundOutputTable = ({
     }));
   }, [hydratedDatasetItems, isLoadingDatasetItems]);
 
-  const columns = useMemo(() => {
+  const leftColumns = useMemo(() => {
     if (isEmpty(datasetColumns)) {
       return [];
     }
@@ -107,7 +113,6 @@ const PlaygroundOutputTable = ({
           }) as ColumnData<PlaygroundOutputTableData>,
       );
 
-    // Add tags column
     inputColumns.push({
       id: "tags",
       label: "Tags",
@@ -118,18 +123,21 @@ const PlaygroundOutputTable = ({
     } as ColumnData<PlaygroundOutputTableData>);
 
     retVal.push(
-      columnHelper.group({
-        id: "variables",
-        meta: {
-          header: "Variables",
-        },
-        header: SectionHeader,
-        columns: convertColumnDataToColumn<
-          PlaygroundOutputTableData,
-          PlaygroundOutputTableData
-        >(inputColumns, {}),
-      }),
+      ...convertColumnDataToColumn<
+        PlaygroundOutputTableData,
+        PlaygroundOutputTableData
+      >(inputColumns, {}),
     );
+
+    return retVal;
+  }, [datasetColumns]);
+
+  const rightColumns = useMemo(() => {
+    if (promptIds.length === 0) {
+      return [];
+    }
+
+    const retVal: ColumnDef<PlaygroundOutputTableData>[] = [];
 
     const outputColumns = promptIds.map((promptId, promptIdx) => {
       return {
@@ -146,38 +154,15 @@ const PlaygroundOutputTable = ({
       } as ColumnData<PlaygroundOutputTableData>;
     });
 
-    // Split into pinned and non-pinned outputs
-    const nonPinnedOutputs = outputColumns.slice(0, -1);
-    const pinnedOutput = outputColumns[outputColumns.length - 1];
-
-    // Only add the output group if there are non-pinned outputs
-    if (nonPinnedOutputs.length > 0) {
-      retVal.push(
-        columnHelper.group({
-          id: "playground-output",
-          meta: {
-            header: "Output",
-          },
-          header: SectionHeader,
-          columns: convertColumnDataToColumn<
-            PlaygroundOutputTableData,
-            PlaygroundOutputTableData
-          >(nonPinnedOutputs, {}),
-        }),
-      );
-    }
-
-    // Add pinned output as standalone column (outside any group)
-    if (pinnedOutput) {
-      const pinnedColumns = convertColumnDataToColumn<
+    retVal.push(
+      ...convertColumnDataToColumn<
         PlaygroundOutputTableData,
         PlaygroundOutputTableData
-      >([pinnedOutput], {});
-      retVal.push(...pinnedColumns);
-    }
+      >(outputColumns, {}),
+    );
 
     return retVal;
-  }, [datasetColumns, promptIds]);
+  }, [promptIds]);
 
   const resizeConfig = useMemo(
     () => ({
@@ -188,31 +173,69 @@ const PlaygroundOutputTable = ({
     [columnsWidth, setColumnsWidth],
   );
 
-  const columnPinning = useMemo<ColumnPinningState>(
-    () => ({
-      right:
-        promptIds.length > 0
-          ? [`output-${promptIds[promptIds.length - 1]}`]
-          : [],
-    }),
-    [promptIds],
+  const handleResizeStop = useCallback(
+    (_e: unknown, _direction: unknown, ref: HTMLElement) => {
+      setLeftPanelWidth(ref.offsetWidth);
+    },
+    [setLeftPanelWidth],
   );
+
+  const hasLeftColumns = leftColumns.length > 0;
+  const hasRightColumns = rightColumns.length > 0;
+
+  if (!hasLeftColumns && !hasRightColumns) {
+    return null;
+  }
 
   return (
     <div
-      className="playground-table overflow-x-auto" // eslint-disable-line tailwindcss/no-custom-classname
+      className="playground-table flex" // eslint-disable-line tailwindcss/no-custom-classname
       style={{ "--cell-top-height": "28px" } as React.CSSProperties}
     >
-      <DataTable
-        columns={columns}
-        data={rows}
-        rowHeight={ROW_HEIGHT.large}
-        resizeConfig={resizeConfig}
-        columnPinningState={columnPinning}
-        noData={<DataTableNoData title={noDataMessage} />}
-        showLoadingOverlay={isFetchingData}
-        TableWrapper={PageBodyStickyTableWrapper}
-      />
+      {hasLeftColumns && (
+        <Resizable
+          size={{ width: leftPanelWidth, height: "auto" }}
+          minWidth={MIN_LEFT_WIDTH}
+          maxWidth={MAX_LEFT_WIDTH}
+          enable={{ right: true }}
+          onResizeStop={handleResizeStop}
+          handleComponent={{
+            right: (
+              <div className="flex h-full w-[13px] items-start justify-center border-x border-b pt-4 hover:bg-gray-100">
+                <GripVertical className="size-3 text-light-slate" />
+              </div>
+            ),
+          }}
+          handleStyles={{ right: { right: 0, width: 1, zIndex: 10 } }}
+          className="mr-3 shrink-0"
+        >
+          <div className="h-full overflow-x-auto overflow-y-hidden">
+            <DataTable
+              columns={leftColumns}
+              data={rows}
+              rowHeight={ROW_HEIGHT.large}
+              resizeConfig={resizeConfig}
+              noData={<DataTableNoData title={noDataMessage} />}
+              showLoadingOverlay={isFetchingData}
+              TableWrapper={SplitTableWrapper}
+            />
+          </div>
+        </Resizable>
+      )}
+
+      {hasRightColumns && (
+        <div className="min-w-0 flex-1 overflow-x-auto overflow-y-hidden">
+          <DataTable
+            columns={rightColumns}
+            data={rows}
+            rowHeight={ROW_HEIGHT.large}
+            resizeConfig={resizeConfig}
+            noData={<DataTableNoData title={noDataMessage} />}
+            showLoadingOverlay={isFetchingData}
+            TableWrapper={SplitTableWrapper}
+          />
+        </div>
+      )}
     </div>
   );
 };
