@@ -18,10 +18,7 @@ const ConfigurationTab: React.FC<ConfigurationTabProps> = ({ projectId }) => {
   const [selectedId, setSelectedId] = useQueryParam("configId", StringParam, {
     updateType: "replaceIn",
   });
-  const [editItem, setEditItem] = useState<{
-    item: ConfigHistoryItem;
-    isLatest: boolean;
-  } | null>(null);
+  const [editItem, setEditItem] = useState<ConfigHistoryItem | null>(null);
 
   const { data, isPending, hasNextPage, fetchNextPage, isFetchingNextPage } =
     useConfigHistoryListInfinite({ projectId });
@@ -72,10 +69,8 @@ const ConfigurationTab: React.FC<ConfigurationTabProps> = ({ projectId }) => {
     return (
       <div className="w-[70vw]">
         <ConfigurationEditView
-          item={editItem.item}
+          item={editItem}
           projectId={projectId}
-          isLatestVersion={editItem.isLatest}
-          latestBlueprintId={allRows[0]?.id}
           onCancel={() => setEditItem(null)}
           onSaved={() => {
             setSelectedId(undefined);
@@ -98,12 +93,7 @@ const ConfigurationTab: React.FC<ConfigurationTabProps> = ({ projectId }) => {
             item={selectedItem}
             projectId={projectId}
             versions={allRows}
-            onEdit={() =>
-              setEditItem({
-                item: selectedItem,
-                isLatest: selectedIndex === 0,
-              })
-            }
+            onEdit={() => setEditItem(allRows[0])}
           />
         ) : (
           <div className="flex h-full items-center justify-center text-muted-slate">

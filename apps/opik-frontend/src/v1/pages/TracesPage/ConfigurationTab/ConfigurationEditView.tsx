@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Info, Pencil, Split } from "lucide-react";
+import { Pencil, Split } from "lucide-react";
 
 import { BlueprintValueType, ConfigHistoryItem } from "@/types/agent-configs";
 import useAgentConfigById from "@/api/agent-configs/useAgentConfigById";
@@ -12,15 +12,12 @@ import TooltipWrapper from "@/shared/TooltipWrapper/TooltipWrapper";
 import BlueprintTypeIcon from "@/v1/pages-shared/traces/ConfigurationTab/BlueprintTypeIcon";
 import BlueprintValuePrompt from "@/v1/pages-shared/traces/ConfigurationTab/BlueprintValuePrompt";
 import { Separator } from "@/ui/separator";
-import { Alert, AlertDescription } from "@/ui/alert";
 import { useConfigurationSave } from "./useConfigurationSave";
 import BlueprintDiffDialog from "./BlueprintDiffDialog/BlueprintDiffDialog";
 
 type ConfigurationEditViewProps = {
   item: ConfigHistoryItem;
   projectId: string;
-  isLatestVersion: boolean;
-  latestBlueprintId?: string;
   onCancel: () => void;
   onSaved: () => void;
 };
@@ -28,29 +25,12 @@ type ConfigurationEditViewProps = {
 const ConfigurationEditView: React.FC<ConfigurationEditViewProps> = ({
   item,
   projectId,
-  isLatestVersion,
-  latestBlueprintId,
   onCancel,
   onSaved,
 }) => {
   const { data: agentConfig, isPending } = useAgentConfigById({
     blueprintId: item.id,
   });
-
-  const { data: latestConfig } = useAgentConfigById({
-    blueprintId: !isLatestVersion && latestBlueprintId ? latestBlueprintId : "",
-  });
-
-  const latestPromptCommits = useMemo(() => {
-    if (isLatestVersion || !latestConfig) return {};
-    const map: Record<string, string> = {};
-    latestConfig.values
-      .filter((v) => v.type === BlueprintValueType.PROMPT)
-      .forEach((v) => {
-        map[v.key] = v.value;
-      });
-    return map;
-  }, [isLatestVersion, latestConfig]);
 
   const [description, setDescription] = useState("");
   const [draftValues, setDraftValues] = useState<Record<string, string>>({});
@@ -67,8 +47,6 @@ const ConfigurationEditView: React.FC<ConfigurationEditViewProps> = ({
       originalValues,
       description,
       projectId,
-      isLatestVersion,
-      latestPromptCommits,
       onSaved,
     });
 
@@ -174,16 +152,6 @@ const ConfigurationEditView: React.FC<ConfigurationEditViewProps> = ({
           </TooltipWrapper>
         </div>
       </div>
-
-      {!isLatestVersion && (
-        <Alert variant="callout" size="sm" className="mb-4">
-          <Info />
-          <AlertDescription size="sm">
-            You&apos;re creating a version from {item.name}. More recent
-            versions contain prompt updates that won&apos;t be included.
-          </AlertDescription>
-        </Alert>
-      )}
 
       <div className="mb-4">
         <label className="comet-body-xs-accented mb-1.5 block text-foreground">
