@@ -190,6 +190,7 @@ class AgentConfig:
 
         latest = manager.get_blueprint(field_types=field_types)
 
+        is_first_blueprint = latest is None
         if latest is not None and self._matches_blueprint(latest, fields_with_values):
             bp = latest
         else:
@@ -198,6 +199,8 @@ class AgentConfig:
                 description=description,
                 field_types=field_types,
             )
+            if is_first_blueprint:
+                manager.tag_blueprint_with_env(env="PROD", blueprint_id=bp.id)
 
         self._state.manager = manager
         self._state.blueprint_id = bp.id
