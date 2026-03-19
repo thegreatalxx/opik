@@ -2345,6 +2345,7 @@ class Opik:
         env: Optional[str] = "PROD",
         latest: bool = False,
         version: Optional[str] = None,
+        timeout_in_seconds: Optional[int] = 5,
     ) -> _AgentConfigT:
         """Fetch an agent config from the backend.
 
@@ -2357,6 +2358,10 @@ class Opik:
             latest: If ``True``, fetch the latest version regardless of env.
             version: Fetch a specific version by its name (as returned by
                 ``create_agent_config_version``).
+            timeout_in_seconds: Maximum seconds to wait for the backend
+                response. If the request takes longer, ``fallback`` is returned
+                and the cache continues refreshing in the background. Pass
+                ``None`` to wait indefinitely.
         """
         if not isinstance(fallback, AgentConfig) or type(fallback) is AgentConfig:
             raise TypeError(
@@ -2378,6 +2383,7 @@ class Opik:
                 env=env,
                 latest=latest,
                 version=version,
+                timeout_in_seconds=timeout_in_seconds,
             ),
         )
 

@@ -236,21 +236,30 @@ class AgentConfig:
         env: typing.Optional[str],
         latest: bool,
         version: typing.Optional[str],
+        timeout_in_seconds: typing.Optional[int] = None,
     ) -> T:
         field_types = cls._prefixed_field_types()
-
         mask_id = get_active_config_mask()
+        resolved_env = None if (latest or version is not None) else env
+
         try:
             if version is not None:
                 bp = manager.get_blueprint(
-                    name=version, mask_id=mask_id, field_types=field_types
+                    name=version,
+                    mask_id=mask_id,
+                    field_types=field_types,
+                    timeout_in_seconds=timeout_in_seconds,
                 )
                 if bp is None:
                     raise AgentConfigNotFound(
                         f"No agent config blueprint found for version={version!r} in project {project_name!r}."
                     )
             elif latest:
-                bp = manager.get_blueprint(mask_id=mask_id, field_types=field_types)
+                bp = manager.get_blueprint(
+                    mask_id=mask_id,
+                    field_types=field_types,
+                    timeout_in_seconds=timeout_in_seconds,
+                )
                 if bp is None:
                     raise AgentConfigNotFound(
                         f"No agent config blueprint found in project {project_name!r}. "
@@ -258,7 +267,10 @@ class AgentConfig:
                     )
             else:
                 bp = manager.get_blueprint(
-                    env=env, mask_id=mask_id, field_types=field_types
+                    env=env,
+                    mask_id=mask_id,
+                    field_types=field_types,
+                    timeout_in_seconds=timeout_in_seconds,
                 )
                 if bp is None:
                     raise AgentConfigNotFound(
@@ -272,6 +284,9 @@ class AgentConfig:
                 "Failed to fetch agent config from backend, using fallback",
                 exc_info=True,
             )
+            cache_mod.init_cache_entry(
+                project_name, resolved_env, mask_id, field_types, manager
+            )
             return fallback
 
         kwargs: typing.Dict[str, typing.Any] = {}
@@ -283,7 +298,6 @@ class AgentConfig:
 
         instance = cls(**kwargs)
 
-        resolved_env = None if (latest or version is not None) else env
         state = instance._state
         state.project = project_name
         state.env = resolved_env
@@ -294,10 +308,9 @@ class AgentConfig:
         state.envs = bp.envs
         state.is_fallback = False
 
-        shared_cache = cache_mod.init_cache_entry(
-            project_name, resolved_env, mask_id, field_types, manager
+        cache_mod.init_cache_entry(
+            project_name, resolved_env, mask_id, field_types, manager, blueprint=bp
         )
-        shared_cache.update(bp)
 
         return instance
 

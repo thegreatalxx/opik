@@ -69,6 +69,7 @@ class TestAgentConfigManagerGetBlueprint:
             env_name="prod",
             project_id="proj-1",
             mask_id=None,
+            request_options=None,
         )
         mock_rest_client.agent_configs.get_latest_blueprint.assert_not_called()
 
@@ -85,6 +86,7 @@ class TestAgentConfigManagerGetBlueprint:
         mock_rest_client.agent_configs.get_latest_blueprint.assert_called_once_with(
             project_id="proj-1",
             mask_id="mask-1",
+            request_options=None,
         )
 
     def test_get_blueprint__with_field_types__resolves_values(
@@ -145,6 +147,7 @@ class TestAgentConfigManagerGetBlueprint:
         mock_rest_client.agent_configs.get_latest_blueprint.assert_called_once_with(
             project_id="proj-1",
             mask_id=mask_id,
+            request_options=None,
         )
 
     def test_get_blueprint__env_with_mask_id__routes_to_get_blueprint_by_env(
@@ -161,6 +164,7 @@ class TestAgentConfigManagerGetBlueprint:
             env_name="prod",
             project_id="proj-1",
             mask_id="mask-1",
+            request_options=None,
         )
 
 
@@ -178,7 +182,7 @@ class TestAgentConfigManagerGetBlueprintByName:
         assert isinstance(result, Blueprint)
         assert result.id == "bp-specific"
         mock_rest_client.agent_configs.get_blueprint_by_name.assert_called_once_with(
-            project_id="proj-1", name="v1", mask_id=None
+            project_id="proj-1", name="v1", mask_id=None, request_options=None
         )
 
     def test_get_blueprint_by_name__not_found__returns_none(

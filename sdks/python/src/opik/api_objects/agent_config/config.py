@@ -2,6 +2,7 @@ import typing
 
 from opik.rest_api import client as rest_client
 from opik.rest_api import core as rest_api_core
+from opik.rest_api.core.request_options import RequestOptions
 from opik.rest_api.types.agent_blueprint_write import AgentBlueprintWrite
 from opik.rest_api.types.agent_config_value_write import AgentConfigValueWrite
 from opik.rest_api.types.agent_config_env import AgentConfigEnv
@@ -78,6 +79,7 @@ class AgentConfigManager:
         env: typing.Optional[str] = None,
         mask_id: typing.Optional[str] = None,
         field_types: typing.Optional[typing.Dict[str, typing.Any]] = None,
+        timeout_in_seconds: typing.Optional[int] = None,
     ) -> typing.Optional[Blueprint]:
         """Fetch a blueprint by name, environment name, or latest.
 
@@ -90,7 +92,13 @@ class AgentConfigManager:
             mask_id: ID of a mask blueprint to overlay on the result.
             field_types: Mapping of prefixed field key to Python type used
                 for deserialising backend values.
+            timeout_in_seconds: HTTP request timeout in seconds.
         """
+        request_options: typing.Optional[RequestOptions] = (
+            RequestOptions(timeout_in_seconds=timeout_in_seconds)
+            if timeout_in_seconds is not None
+            else None
+        )
         try:
             project_id = rest_helpers.resolve_project_id_by_name(
                 self._rest_client, self._project_name
@@ -100,17 +108,20 @@ class AgentConfigManager:
                     project_id=project_id,
                     name=name,
                     mask_id=mask_id,
+                    request_options=request_options,
                 )
             elif env is not None:
                 raw = self._rest_client.agent_configs.get_blueprint_by_env(
                     env_name=env,
                     project_id=project_id,
                     mask_id=mask_id,
+                    request_options=request_options,
                 )
             else:
                 raw = self._rest_client.agent_configs.get_latest_blueprint(
                     project_id=project_id,
                     mask_id=mask_id,
+                    request_options=request_options,
                 )
         except rest_api_core.ApiError as e:
             if e.status_code == 404:

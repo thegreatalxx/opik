@@ -189,9 +189,13 @@ def init_cache_entry(
     mask_id: typing.Optional[str],
     prefixed_field_types: typing.Dict[str, typing.Any],
     agent_config_manager: typing.Any,
-) -> SharedConfigCache:
+    blueprint: typing.Optional[Blueprint] = None,
+) -> None:
     shared_cache = _registry.get(project_name, env, mask_id)
     shared_cache.register_fields(prefixed_field_types)
+
+    if blueprint is not None:
+        shared_cache.update(blueprint)
 
     if agent_config_manager is not None and mask_id is None:
 
@@ -204,5 +208,3 @@ def init_cache_entry(
 
         shared_cache.set_refresh_callback(_refresh)
         _registry.ensure_refresh_thread_started()
-
-    return shared_cache
