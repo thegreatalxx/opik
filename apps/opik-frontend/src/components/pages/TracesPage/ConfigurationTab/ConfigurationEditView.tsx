@@ -19,8 +19,7 @@ import BlueprintDiffDialog from "./BlueprintDiffDialog/BlueprintDiffDialog";
 type ConfigurationEditViewProps = {
   item: ConfigHistoryItem;
   projectId: string;
-  version: number;
-  latestVersion: number;
+  isLatestVersion: boolean;
   latestBlueprintId?: string;
   onCancel: () => void;
   onSaved: () => void;
@@ -29,13 +28,11 @@ type ConfigurationEditViewProps = {
 const ConfigurationEditView: React.FC<ConfigurationEditViewProps> = ({
   item,
   projectId,
-  version,
-  latestVersion,
+  isLatestVersion,
   latestBlueprintId,
   onCancel,
   onSaved,
 }) => {
-  const isLatestVersion = version === latestVersion;
 
   const { data: agentConfig, isPending } = useAgentConfigById({
     blueprintId: item.id,
@@ -140,7 +137,7 @@ const ConfigurationEditView: React.FC<ConfigurationEditViewProps> = ({
           <h2 className="comet-title-s">Create new version</h2>
           <div className="comet-body-xs flex items-center gap-1 rounded bg-[var(--edit-badge-bg)] px-2 py-0.5 text-[var(--edit-badge-text)]">
             <Pencil className="size-2.5" />
-            From v{version}
+            From {item.name}
           </div>
           <Button
             variant="outline"
@@ -179,12 +176,12 @@ const ConfigurationEditView: React.FC<ConfigurationEditViewProps> = ({
         </div>
       </div>
 
-      {version !== latestVersion && (
+      {!isLatestVersion && (
         <Alert variant="callout" size="sm" className="mb-4">
           <Info />
           <AlertDescription size="sm">
-            You&apos;re creating a version from v{version}. More recent versions
-            contain prompt updates that won&apos;t be included.
+            You&apos;re creating a version from {item.name}. More recent
+            versions contain prompt updates that won&apos;t be included.
           </AlertDescription>
         </Alert>
       )}
@@ -290,7 +287,7 @@ const ConfigurationEditView: React.FC<ConfigurationEditViewProps> = ({
         open={diffOpen}
         setOpen={setDiffOpen}
         base={{
-          label: `v${version} (original)`,
+          label: `${item.name} (original)`,
           blueprintId: item.id,
         }}
         diff={{

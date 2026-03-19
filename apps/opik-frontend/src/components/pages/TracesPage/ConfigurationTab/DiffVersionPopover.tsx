@@ -13,13 +13,11 @@ import ConfigTagList from "./ConfigTagList";
 
 type DiffVersionItemProps = {
   version: ConfigHistoryItem;
-  versionNumber: number;
   onSelect: () => void;
 };
 
 const DiffVersionItem: React.FC<DiffVersionItemProps> = ({
   version,
-  versionNumber,
   onSelect,
 }) => {
   return (
@@ -28,7 +26,7 @@ const DiffVersionItem: React.FC<DiffVersionItemProps> = ({
       onClick={onSelect}
     >
       <div className="flex items-center gap-1.5">
-        <span className="comet-body-s-accented shrink-0">v{versionNumber}</span>
+        <span className="comet-body-s-accented shrink-0">{version.name}</span>
         <ConfigTagList
           tags={version.tags}
           size="sm"
@@ -45,20 +43,18 @@ const DiffVersionItem: React.FC<DiffVersionItemProps> = ({
 type DiffVersionPopoverProps = {
   currentItemId: string;
   versions: ConfigHistoryItem[];
-  totalVersions: number;
-  onSelectVersion: (item: ConfigHistoryItem, versionNumber: number) => void;
+  onSelectVersion: (item: ConfigHistoryItem) => void;
 };
 
 const DiffVersionPopover: React.FC<DiffVersionPopoverProps> = ({
   currentItemId,
   versions,
-  totalVersions,
   onSelectVersion,
 }) => {
   const [open, setOpen] = useState(false);
 
-  const handleSelect = (item: ConfigHistoryItem, versionNumber: number) => {
-    onSelectVersion(item, versionNumber);
+  const handleSelect = (item: ConfigHistoryItem) => {
+    onSelectVersion(item);
     setOpen(false);
   };
 
@@ -75,15 +71,13 @@ const DiffVersionPopover: React.FC<DiffVersionPopoverProps> = ({
           Compare against
         </div>
         <div className="max-h-[40vh] overflow-y-auto">
-          {versions.map((v, index) => {
-            const vNum = totalVersions - index;
+          {versions.map((v) => {
             if (v.id === currentItemId) return null;
             return (
               <DiffVersionItem
                 key={v.id}
                 version={v}
-                versionNumber={vNum}
-                onSelect={() => handleSelect(v, vNum)}
+                onSelect={() => handleSelect(v)}
               />
             );
           })}

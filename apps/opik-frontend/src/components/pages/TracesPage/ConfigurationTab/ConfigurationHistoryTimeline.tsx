@@ -12,7 +12,6 @@ import ConfigTagList from "./ConfigTagList";
 
 type ConfigurationHistoryTimelineProps = {
   items: ConfigHistoryItem[];
-  total: number;
   selectedIndex: number | null;
   onSelect: (index: number) => void;
   hasNextPage: boolean;
@@ -24,7 +23,6 @@ const ConfigurationHistoryTimeline: React.FC<
   ConfigurationHistoryTimelineProps
 > = ({
   items,
-  total,
   selectedIndex,
   onSelect,
   hasNextPage,
@@ -89,7 +87,7 @@ const ConfigurationHistoryTimeline: React.FC<
             >
               <div className="flex items-center gap-1">
                 <span className="comet-body-s-accented shrink-0">
-                  v{total - index}
+                  {item.name}
                 </span>
                 <ConfigTagList tags={item.tags} size="sm" maxWidth={200} />
               </div>

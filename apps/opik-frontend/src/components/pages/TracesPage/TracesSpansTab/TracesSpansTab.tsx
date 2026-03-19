@@ -98,7 +98,6 @@ import useTracesOrSpansStatistic from "@/hooks/useTracesOrSpansStatistic";
 import { useDynamicColumnsCache } from "@/hooks/useDynamicColumnsCache";
 import { useIsFeatureEnabled } from "@/components/feature-toggles-provider";
 import { FeatureToggleKeys } from "@/types/feature-toggles";
-import useConfigVersionMap from "@/api/agent-configs/useConfigVersionMap";
 import { isAgentConfigurationMetadata } from "@/components/pages-shared/traces/TraceDetailsPanel/TraceDataViewer/AgentConfigurationTab";
 import { AGENT_CONFIGURATION_METADATA_KEY } from "@/utils/agent-configurations";
 import GuardrailsCell from "@/components/shared/DataTableCells/GuardrailsCell";
@@ -436,9 +435,6 @@ export const TracesSpansTab: React.FC<TracesSpansTabProps> = ({
     FeatureToggleKeys.AGENT_CONFIGURATION_ENABLED,
   );
 
-  const versionMap = useConfigVersionMap(projectId, {
-    enabled: isAgentConfigurationEnabled,
-  });
   const [sortedColumns, setSortedColumns] = useQueryParamAndLocalStorageState<
     ColumnSort[]
   >({
@@ -966,8 +962,8 @@ export const TracesSpansTab: React.FC<TracesSpansTabProps> = ({
 
                       if (!isAgentConfigurationMetadata(agentConfig))
                         return undefined;
-                      const version = versionMap[agentConfig.blueprint_id];
-                      if (version === undefined) return undefined;
+                      const version = agentConfig.blueprint_version;
+                      if (!version) return undefined;
                       return {
                         version,
                         maskId: agentConfig._mask_id,
@@ -1021,7 +1017,6 @@ export const TracesSpansTab: React.FC<TracesSpansTabProps> = ({
     handleThreadIdClick,
     isGuardrailsEnabled,
     isAgentConfigurationEnabled,
-    versionMap,
   ]);
 
   const filtersColumnData = useMemo(() => {

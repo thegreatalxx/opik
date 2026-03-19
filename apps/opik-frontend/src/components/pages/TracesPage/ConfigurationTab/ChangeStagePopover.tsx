@@ -52,8 +52,11 @@ const ChangeStagePopover: React.FC<ChangeStagePopoverProps> = ({
   const isSelected = (stage: string) =>
     selectedStages.some((s) => isStageTag(s, stage));
 
+  const isSavedProd = (stage: string) =>
+    isProdTag(stage) && item.tags.some((t) => isStageTag(t, stage));
+
   const toggleStage = (stage: string) => {
-    if (isProdTag(stage) && isSelected(stage)) return;
+    if (isSavedProd(stage) && isSelected(stage)) return;
 
     setSelectedStages((prev) =>
       prev.some((s) => isStageTag(s, stage))
@@ -118,7 +121,7 @@ const ChangeStagePopover: React.FC<ChangeStagePopoverProps> = ({
           <div className="flex flex-col gap-1">
             {BASIC_STAGE_ORDER.map((stage) => {
               const selected = isSelected(stage);
-              const locked = isProdTag(stage) && selected;
+              const locked = isSavedProd(stage) && selected;
 
               return (
                 <button
