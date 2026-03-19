@@ -1,12 +1,12 @@
 package com.comet.opik.api.resources.v1.priv;
 
 import com.comet.opik.api.AssertionResult;
+import com.comet.opik.api.AssertionScoreAverage;
 import com.comet.opik.api.Comment;
 import com.comet.opik.api.Dataset;
 import com.comet.opik.api.DatasetItem;
 import com.comet.opik.api.DatasetItemBatch;
 import com.comet.opik.api.DatasetItemChanges;
-import com.comet.opik.api.DatasetItemEdit;
 import com.comet.opik.api.DeleteIdsHolder;
 import com.comet.opik.api.EvaluationMethod;
 import com.comet.opik.api.ExecutionPolicy;
@@ -7604,6 +7604,7 @@ class ExperimentsResourceTest {
                     .id(trace.id())
                     .projectName(trace.projectName())
                     .name(name)
+                    .categoryName("suite_assertion")
                     .value(value)
                     .source(ScoreSource.SDK)
                     .build();
@@ -7665,7 +7666,15 @@ class ExperimentsResourceTest {
                     .totalCount(3L)
                     .passRate(BigDecimal.valueOf(2).divide(BigDecimal.valueOf(3), 9, RoundingMode.HALF_UP))
                     .build();
-            getAndAssert(experiment.id(), expectedExperiment, workspaceName, apiKey);
+            var asserted = getAndAssert(experiment.id(), expectedExperiment, workspaceName, apiKey);
+            assertThat(asserted.assertionScores())
+                    .usingRecursiveFieldByFieldElementComparator(RecursiveComparisonConfiguration.builder()
+                            .withComparatorForType(StatsUtils::bigDecimalComparator, BigDecimal.class)
+                            .build())
+                    .containsExactly(AssertionScoreAverage.builder()
+                            .name(scoreName)
+                            .value(BigDecimal.valueOf(2).divide(BigDecimal.valueOf(3), 9, RoundingMode.HALF_UP))
+                            .build());
         }
 
         @Test
@@ -7760,7 +7769,14 @@ class ExperimentsResourceTest {
                     .totalCount(2L)
                     .passRate(BigDecimal.valueOf(0.5))
                     .build();
-            getAndAssert(experiment.id(), expectedExperiment, workspaceName, apiKey);
+            var asserted = getAndAssert(experiment.id(), expectedExperiment, workspaceName, apiKey);
+            assertThat(asserted.assertionScores())
+                    .usingRecursiveFieldByFieldElementComparator(RecursiveComparisonConfiguration.builder()
+                            .withComparatorForType(StatsUtils::bigDecimalComparator, BigDecimal.class)
+                            .build())
+                    .containsExactlyInAnyOrder(
+                            AssertionScoreAverage.builder().name(scoreName1).value(BigDecimal.ONE).build(),
+                            AssertionScoreAverage.builder().name(scoreName2).value(BigDecimal.valueOf(0.5)).build());
         }
 
         @Test
@@ -8015,7 +8031,15 @@ class ExperimentsResourceTest {
                     .totalCount(1L)
                     .passRate(BigDecimal.ZERO)
                     .build();
-            getAndAssert(experimentId, expectedExperiment, workspaceName, apiKey);
+            var asserted = getAndAssert(experimentId, expectedExperiment, workspaceName, apiKey);
+            assertThat(asserted.assertionScores())
+                    .usingRecursiveFieldByFieldElementComparator(RecursiveComparisonConfiguration.builder()
+                            .withComparatorForType(StatsUtils::bigDecimalComparator, BigDecimal.class)
+                            .build())
+                    .containsExactly(AssertionScoreAverage.builder()
+                            .name(scoreName)
+                            .value(BigDecimal.ONE.divide(BigDecimal.valueOf(3), 9, RoundingMode.HALF_UP))
+                            .build());
         }
 
         @Test
@@ -8036,11 +8060,14 @@ class ExperimentsResourceTest {
                     .build();
             var datasetId = datasetResourceClient.createDataset(dataset, apiKey, workspaceName);
 
+            // itemA has per-item pass_threshold=3, itemB keeps default (1)
             var datasetItemA = podamFactory.manufacturePojo(DatasetItem.class).toBuilder()
                     .datasetId(datasetId)
+                    .executionPolicy(new ExecutionPolicy(3, 3))
                     .build();
             var datasetItemB = podamFactory.manufacturePojo(DatasetItem.class).toBuilder()
                     .datasetId(datasetId)
+                    .executionPolicy(null)
                     .build();
             datasetResourceClient.createDatasetItems(
                     DatasetItemBatch.builder()
@@ -8048,21 +8075,6 @@ class ExperimentsResourceTest {
                             .items(List.of(datasetItemA, datasetItemB))
                             .build(),
                     workspaceName, apiKey);
-
-            // Create version 2: set item-level pass_threshold=3 on itemA only, itemB keeps default (1)
-            var versions = datasetResourceClient.listVersions(datasetId, apiKey, workspaceName);
-            var version1 = versions.content().getFirst();
-
-            var changes = DatasetItemChanges.builder()
-                    .baseVersion(version1.id())
-                    .editedItems(List.of(
-                            DatasetItemEdit.builder()
-                                    .id(datasetItemA.id())
-                                    .executionPolicy(new ExecutionPolicy(3, 3))
-                                    .build()))
-                    .build();
-            datasetResourceClient.applyDatasetItemChanges(
-                    datasetId, changes, false, apiKey, workspaceName);
 
             // Create experiment linked to same dataset
             var experiment = experimentResourceClient.createPartialExperiment()
@@ -8128,7 +8140,15 @@ class ExperimentsResourceTest {
                     .totalCount(2L)
                     .passRate(BigDecimal.valueOf(0.5))
                     .build();
-            getAndAssert(experimentId, expectedExperiment, workspaceName, apiKey);
+            var asserted = getAndAssert(experimentId, expectedExperiment, workspaceName, apiKey);
+            assertThat(asserted.assertionScores())
+                    .usingRecursiveFieldByFieldElementComparator(RecursiveComparisonConfiguration.builder()
+                            .withComparatorForType(StatsUtils::bigDecimalComparator, BigDecimal.class)
+                            .build())
+                    .containsExactly(AssertionScoreAverage.builder()
+                            .name(scoreName)
+                            .value(BigDecimal.valueOf(4).divide(BigDecimal.valueOf(6), 9, RoundingMode.HALF_UP))
+                            .build());
         }
     }
 
