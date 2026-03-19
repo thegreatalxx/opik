@@ -18,7 +18,7 @@ const AssistantSidebarFallback = lazy(
   () => import("@/plugins/comet/AssistantSidebar"),
 );
 
-const PageLayout = () => {
+const PageLayout: React.FC = () => {
   const [storedExpanded = true, setStoredExpanded] =
     useLocalStorageState<boolean>("sidebar-expanded");
   const [bannerHeight, setBannerHeight] = useState(0);
@@ -101,7 +101,7 @@ const PageLayout = () => {
       </main>
 
       {AssistantSidebar ? (
-        <Suspense>
+        <Suspense fallback={null}>
           <AssistantSidebar onWidthChange={setAssistantSidebarWidth} />
         </Suspense>
       ) : null}

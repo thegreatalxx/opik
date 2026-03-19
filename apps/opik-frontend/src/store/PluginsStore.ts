@@ -83,6 +83,12 @@ const usePluginsStore = create<PluginStore>((set) => ({
           set({ [pluginName]: plugin.default });
         }
       } catch (error) {
+        if (import.meta.env.DEV) {
+          console.warn(
+            `[PluginsStore] Failed to load plugin "${pluginName}":`,
+            error,
+          );
+        }
         continue;
       }
     }

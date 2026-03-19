@@ -36,6 +36,7 @@ const loadScript = (src: string): Promise<void> =>
     }
     const script = document.createElement("script");
     script.src = src;
+    script.async = true;
     script.onload = () => resolve();
     script.onerror = () => reject(new Error(`Failed to load script: ${src}`));
     document.head.appendChild(script);
@@ -49,6 +50,10 @@ const isInCooldown = (): boolean => {
 
 const markFailure = (): void => {
   sessionStorage.setItem(FAILURE_KEY, String(Date.now()));
+};
+
+const clearFailure = (): void => {
+  sessionStorage.removeItem(FAILURE_KEY);
 };
 
 async function fetchManifest(
@@ -107,6 +112,8 @@ const createBridge = (
   emit: (event, data) => {
     if (event === "sidebar:resized") {
       onWidthChangeRef.current((data as { width: number }).width);
+    } else if (IS_DEV) {
+      console.warn(`[OllieBridge] Unhandled sidebar event: "${event}"`, data);
     }
   },
 });
@@ -121,8 +128,14 @@ function suspendUntilScript(): boolean {
   switch (status) {
     case "resolved":
       return true;
-    case "rejected":
+    case "rejected": {
+      // Allow retry once cooldown expires
+      if (!isInCooldown()) {
+        status = "idle";
+        return suspendUntilScript();
+      }
       return false;
+    }
     case "pending":
       throw promise;
     case "idle": {
@@ -136,6 +149,7 @@ function suspendUntilScript(): boolean {
       promise = (DEV_BASE_URL ? loadDevAssets() : loadProdAssets()).then(
         () => {
           status = "resolved";
+          clearFailure();
         },
         () => {
           status = "rejected";
@@ -204,13 +218,21 @@ const AssistantSidebarContent: React.FC<AssistantSidebarProps> = ({
 
   const containerRef = useCallback((el: HTMLDivElement | null) => {
     if (mountedElRef.current && window.OllieConsole) {
-      window.OllieConsole.unmount(mountedElRef.current);
+      try {
+        window.OllieConsole.unmount(mountedElRef.current);
+      } catch (err) {
+        console.error("[OllieSidebar] unmount failed:", err);
+      }
       mountedElRef.current = null;
       onWidthChangeRef.current(0);
     }
     if (el && window.OllieConsole) {
-      window.OllieConsole.mount(el, bridgeRef.current);
-      mountedElRef.current = el;
+      try {
+        window.OllieConsole.mount(el, bridgeRef.current);
+        mountedElRef.current = el;
+      } catch (err) {
+        console.error("[OllieSidebar] mount failed:", err);
+      }
     }
   }, []);
 
