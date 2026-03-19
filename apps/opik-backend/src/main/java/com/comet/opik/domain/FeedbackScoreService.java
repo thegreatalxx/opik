@@ -53,21 +53,19 @@ public interface FeedbackScoreService {
     Mono<Void> deleteSpanScore(UUID id, DeleteFeedbackScore score);
     Mono<Void> deleteTraceScore(UUID id, DeleteFeedbackScore score);
 
-    Mono<FeedbackScoreNames> getTraceFeedbackScoreNames(UUID projectId, Set<String> excludeCategoryNames);
+    Mono<FeedbackScoreNames> getTraceFeedbackScoreNames(UUID projectId);
 
-    Mono<FeedbackScoreNames> getSpanFeedbackScoreNames(UUID projectId, SpanType type,
-            Set<String> excludeCategoryNames);
+    Mono<FeedbackScoreNames> getSpanFeedbackScoreNames(UUID projectId, SpanType type);
 
-    Mono<FeedbackScoreNames> getExperimentsFeedbackScoreNames(Set<UUID> experimentIds,
-            Set<String> excludeCategoryNames);
+    Mono<FeedbackScoreNames> getExperimentsFeedbackScoreNames(Set<UUID> experimentIds);
 
-    Mono<FeedbackScoreNames> getProjectsFeedbackScoreNames(Set<UUID> projectIds, Set<String> excludeCategoryNames);
+    Mono<FeedbackScoreNames> getProjectsFeedbackScoreNames(Set<UUID> projectIds);
 
     Mono<Void> scoreBatchOfThreads(List<FeedbackScoreBatchItemThread> scores);
 
     Mono<Void> deleteThreadScores(String projectName, String threadId, Set<String> names, String author);
 
-    Mono<FeedbackScoreNames> getTraceThreadsFeedbackScoreNames(UUID projectId, Set<String> excludeCategoryNames);
+    Mono<FeedbackScoreNames> getTraceThreadsFeedbackScoreNames(UUID projectId);
 
     Mono<Void> deleteByTraceIds(Set<UUID> traceIds, UUID projectId);
 
@@ -241,8 +239,7 @@ class FeedbackScoreServiceImpl implements FeedbackScoreService {
     }
 
     @Override
-    public Mono<FeedbackScoreNames> getTraceFeedbackScoreNames(UUID projectId,
-            @NonNull Set<String> excludeCategoryNames) {
+    public Mono<FeedbackScoreNames> getTraceFeedbackScoreNames(UUID projectId) {
         if (projectId == null) {
             // Allow only for private access
             boolean isPublic = Optional.ofNullable(requestContext.get().getVisibility())
@@ -258,7 +255,7 @@ class FeedbackScoreServiceImpl implements FeedbackScoreService {
             projectService.get(projectId);
         }
 
-        return dao.getTraceFeedbackScoreNames(projectId, excludeCategoryNames)
+        return dao.getTraceFeedbackScoreNames(projectId)
                 .map(names -> names.stream()
                         .map(name -> FeedbackScoreNames.ScoreName.builder().name(name).build())
                         .toList())
@@ -266,11 +263,10 @@ class FeedbackScoreServiceImpl implements FeedbackScoreService {
     }
 
     @Override
-    public Mono<FeedbackScoreNames> getSpanFeedbackScoreNames(@NonNull UUID projectId, SpanType type,
-            @NonNull Set<String> excludeCategoryNames) {
+    public Mono<FeedbackScoreNames> getSpanFeedbackScoreNames(@NonNull UUID projectId, SpanType type) {
         // Will throw an error in case we try to get private project with public visibility
         projectService.get(projectId);
-        return dao.getSpanFeedbackScoreNames(projectId, type, excludeCategoryNames)
+        return dao.getSpanFeedbackScoreNames(projectId, type)
                 .map(names -> names.stream()
                         .map(name -> FeedbackScoreNames.ScoreName.builder().name(name).build())
                         .toList())
@@ -278,9 +274,8 @@ class FeedbackScoreServiceImpl implements FeedbackScoreService {
     }
 
     @Override
-    public Mono<FeedbackScoreNames> getExperimentsFeedbackScoreNames(Set<UUID> experimentIds,
-            @NonNull Set<String> excludeCategoryNames) {
-        return dao.getExperimentsFeedbackScoreNames(experimentIds, excludeCategoryNames)
+    public Mono<FeedbackScoreNames> getExperimentsFeedbackScoreNames(Set<UUID> experimentIds) {
+        return dao.getExperimentsFeedbackScoreNames(experimentIds)
                 .map(scores -> scores.stream()
                         .map(score -> FeedbackScoreNames.ScoreName.builder()
                                 .name(score.name())
@@ -291,9 +286,8 @@ class FeedbackScoreServiceImpl implements FeedbackScoreService {
     }
 
     @Override
-    public Mono<FeedbackScoreNames> getProjectsFeedbackScoreNames(Set<UUID> projectIds,
-            @NonNull Set<String> excludeCategoryNames) {
-        return dao.getProjectsFeedbackScoreNames(projectIds, excludeCategoryNames)
+    public Mono<FeedbackScoreNames> getProjectsFeedbackScoreNames(Set<UUID> projectIds) {
+        return dao.getProjectsFeedbackScoreNames(projectIds)
                 .map(names -> names.stream()
                         .map(name -> FeedbackScoreNames.ScoreName.builder().name(name).build())
                         .toList())
@@ -333,10 +327,8 @@ class FeedbackScoreServiceImpl implements FeedbackScoreService {
     }
 
     @Override
-    public Mono<FeedbackScoreNames> getTraceThreadsFeedbackScoreNames(UUID projectId,
-            @NonNull Set<String> excludeCategoryNames) {
-        return dao.getProjectsTraceThreadsFeedbackScoreNames(projectId == null ? List.of() : List.of(projectId),
-                excludeCategoryNames)
+    public Mono<FeedbackScoreNames> getTraceThreadsFeedbackScoreNames(UUID projectId) {
+        return dao.getProjectsTraceThreadsFeedbackScoreNames(projectId == null ? List.of() : List.of(projectId))
                 .map(names -> names.stream()
                         .map(name -> FeedbackScoreNames.ScoreName.builder().name(name).build())
                         .toList())
