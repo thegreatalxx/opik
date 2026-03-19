@@ -121,6 +121,10 @@ const ProjectsPage: React.FunctionComponent = () => {
     FeatureToggleKeys.GUARDRAILS_ENABLED,
   );
 
+  const {
+    permissions: { canDeleteProjects, canCreateProjects },
+  } = usePermissions();
+
   const columnsDef: ColumnData<ProjectWithStatistic>[] = useMemo(() => {
     return [
       {
@@ -377,7 +381,9 @@ const ProjectsPage: React.FunctionComponent = () => {
 
   const columns = useMemo(() => {
     return [
-      generateSelectColumDef<ProjectWithStatistic>(),
+      ...(canDeleteProjects
+        ? [generateSelectColumDef<ProjectWithStatistic>()]
+        : []),
       ...convertColumnDataToColumn<ProjectWithStatistic, ProjectWithStatistic>(
         columnsDef,
         {
@@ -385,11 +391,21 @@ const ProjectsPage: React.FunctionComponent = () => {
           selectedColumns,
         },
       ),
-      generateActionsColumDef({
-        cell: ProjectRowActionsCell,
-      }),
+      ...(canDeleteProjects || canCreateProjects
+        ? [
+            generateActionsColumDef({
+              cell: ProjectRowActionsCell,
+            }),
+          ]
+        : []),
     ];
-  }, [selectedColumns, columnsOrder, columnsDef]);
+  }, [
+    selectedColumns,
+    columnsOrder,
+    columnsDef,
+    canDeleteProjects,
+    canCreateProjects,
+  ]);
 
   const resizeConfig = useMemo(
     () => ({
@@ -440,8 +456,12 @@ const ProjectsPage: React.FunctionComponent = () => {
           dimension="sm"
         ></SearchInput>
         <div className="flex items-center gap-2">
-          <ProjectsActionsPanel projects={selectedRows} />
-          <Separator orientation="vertical" className="mx-2 h-4" />
+          {canDeleteProjects && (
+            <>
+              <ProjectsActionsPanel projects={selectedRows} />
+              <Separator orientation="vertical" className="mx-2 h-4" />
+            </>
+          )}
           <ColumnsButton
             columns={columnsDef}
             selectedColumns={selectedColumns}
@@ -449,14 +469,16 @@ const ProjectsPage: React.FunctionComponent = () => {
             order={columnsOrder}
             onOrderChange={setColumnsOrder}
           ></ColumnsButton>
-          <Button
-            variant="default"
-            size="sm"
-            onClick={handleNewProjectClick}
-            disabled={!canInteractWithApp}
-          >
-            Create new project
-          </Button>
+          {canCreateProjects && (
+            <Button
+              variant="default"
+              size="sm"
+              onClick={handleNewProjectClick}
+              disabled={!canInteractWithApp}
+            >
+              Create new project
+            </Button>
+          )}
         </div>
       </div>
       <DataTable
@@ -469,15 +491,19 @@ const ProjectsPage: React.FunctionComponent = () => {
           setSorting: setSortedColumns,
         }}
         resizeConfig={resizeConfig}
-        selectionConfig={{
-          rowSelection,
-          setRowSelection,
-        }}
+        selectionConfig={
+          canDeleteProjects
+            ? {
+                rowSelection,
+                setRowSelection,
+              }
+            : undefined
+        }
         getRowId={getRowId}
-        columnPinning={DEFAULT_COLUMN_PINNING}
+        columnPinning={canDeleteProjects ? DEFAULT_COLUMN_PINNING : undefined}
         noData={
           <DataTableNoData title={noDataText}>
-            {noData && (
+            {noData && canCreateProjects && (
               <Button
                 variant="link"
                 onClick={handleNewProjectClick}

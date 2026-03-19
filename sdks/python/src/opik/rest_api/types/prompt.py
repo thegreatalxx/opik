@@ -14,6 +14,16 @@ from .prompt_version import PromptVersion
 class Prompt(UniversalBaseModel):
     id: typing.Optional[str] = None
     name: str
+    project_id: typing.Optional[str] = pydantic.Field(default=None)
+    """
+    Project ID. Takes precedence over project_name when both are provided.
+    """
+
+    project_name: typing.Optional[str] = pydantic.Field(default=None)
+    """
+    For project scope, specify either project_id or project_name. If project_name is provided and the project does not exist, it will be created. Ignored when project_id is provided. If neither is provided, the prompt is created at workspace level.
+    """
+
     description: typing.Optional[str] = None
     template: typing.Optional[str] = None
     metadata: typing.Optional[JsonNode] = None
@@ -31,6 +41,7 @@ class Prompt(UniversalBaseModel):
     last_updated_by: typing.Optional[str] = None
     version_count: typing.Optional[int] = None
     latest_version: typing.Optional[PromptVersion] = None
+    requested_version: typing.Optional[PromptVersion] = None
 
     if IS_PYDANTIC_V2:
         model_config: typing.ClassVar[pydantic.ConfigDict] = pydantic.ConfigDict(extra="allow", frozen=True)  # type: ignore # Pydantic v2

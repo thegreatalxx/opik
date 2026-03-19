@@ -809,7 +809,8 @@ class DatasetItemServiceImpl implements DatasetItemService {
                 request.datasetVersion(), workspaceId);
 
         return Mono
-                .fromCallable(() -> datasetService.findByName(workspaceId, request.datasetName(), visibility))
+                .fromCallable(() -> datasetService.findByName(workspaceId, request.datasetName(), request.projectId(),
+                        visibility))
                 .subscribeOn(Schedulers.boundedElastic())
                 .flatMap(dataset -> Mono.deferContextual(ctx -> {
                     // Ensure dataset is migrated if lazy migration is enabled
@@ -1113,7 +1114,7 @@ class DatasetItemServiceImpl implements DatasetItemService {
                                         null, // Inherit evaluators from base version
                                         null, // Inherit execution policy from base version
                                         false, // Don't clear execution policy
-                                        batchGroupId, // Pass batch group ID
+                                        batchGroupId,
                                         workspaceId,
                                         userName);
                             })
@@ -1252,7 +1253,7 @@ class DatasetItemServiceImpl implements DatasetItemService {
                             null, // Inherit evaluators from base version
                             null, // Inherit execution policy from base version
                             false, // Don't clear execution policy
-                            batchGroupId, // Include batch group ID if provided
+                            batchGroupId,
                             workspaceId,
                             userName);
                 })
@@ -1946,10 +1947,10 @@ class DatasetItemServiceImpl implements DatasetItemService {
                             null, // No base version for first version
                             null, // No tags
                             changeDescription,
-                            null, // Inherit evaluators from base version
-                            null, // Inherit execution policy from base version
+                            null, // No evaluators for first version
+                            null, // No execution policy for first version
                             false, // Don't clear execution policy
-                            batchGroupId, // Include batch group ID if provided
+                            batchGroupId,
                             workspaceId,
                             userName);
                 });
@@ -2034,7 +2035,7 @@ class DatasetItemServiceImpl implements DatasetItemService {
                                         null, // Inherit evaluators from base version
                                         null, // Inherit execution policy from base version
                                         false, // Don't clear execution policy
-                                        batchGroupId, // Include batch group ID if provided
+                                        batchGroupId,
                                         workspaceId,
                                         userName);
                             });
@@ -2083,8 +2084,8 @@ class DatasetItemServiceImpl implements DatasetItemService {
                 batchGroupId,
                 workspaceId,
                 userName))
-                .retryWhen(RetryUtils.handleOnDeadLocks())
                 .subscribeOn(Schedulers.boundedElastic())
+                .retryWhen(RetryUtils.handleOnDeadLocks())
                 .doOnSuccess(version -> {
                     if (baseVersionId == null) {
                         log.info("Created first version '{}' for dataset '{}' with hash '{}'",

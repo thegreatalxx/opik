@@ -10,6 +10,7 @@ export const PromptDetail: core.serialization.ObjectSchema<serializers.PromptDet
     core.serialization.object({
         id: core.serialization.string().optional(),
         name: core.serialization.string(),
+        projectId: core.serialization.property("project_id", core.serialization.string().optional()),
         description: core.serialization.string().optional(),
         templateStructure: core.serialization.property("template_structure", PromptDetailTemplateStructure.optional()),
         tags: core.serialization.list(core.serialization.string()).optional(),
@@ -19,12 +20,14 @@ export const PromptDetail: core.serialization.ObjectSchema<serializers.PromptDet
         lastUpdatedBy: core.serialization.property("last_updated_by", core.serialization.string().optional()),
         versionCount: core.serialization.property("version_count", core.serialization.number().optional()),
         latestVersion: core.serialization.property("latest_version", PromptVersionDetail.optional()),
+        requestedVersion: core.serialization.property("requested_version", PromptVersionDetail.optional()),
     });
 
 export declare namespace PromptDetail {
     export interface Raw {
         id?: string | null;
         name: string;
+        project_id?: string | null;
         description?: string | null;
         template_structure?: PromptDetailTemplateStructure.Raw | null;
         tags?: string[] | null;
@@ -34,5 +37,6 @@ export declare namespace PromptDetail {
         last_updated_by?: string | null;
         version_count?: number | null;
         latest_version?: PromptVersionDetail.Raw | null;
+        requested_version?: PromptVersionDetail.Raw | null;
     }
 }

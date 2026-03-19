@@ -157,6 +157,18 @@ export class Dataset<T extends DatasetItemData = DatasetItemData> {
   }
 
   /**
+   * Retrieve the tags associated with this dataset.
+   *
+   * @returns An array of tag strings
+   */
+  public async getTags(): Promise<string[]> {
+    const datasetInfo = await this.opik.api.datasets.getDatasetByIdentifier({
+      datasetName: this.name,
+    });
+    return datasetInfo.tags ?? [];
+  }
+
+  /**
    * Retrieve a fixed number of dataset items.
    *
    * @param nbSamples The number of samples to retrieve. If not set - all items are returned
@@ -171,6 +183,19 @@ export class Dataset<T extends DatasetItemData = DatasetItemData> {
     });
 
     return datasetItems.map((item) => item.getContent(true));
+  }
+
+  /**
+   * Retrieve raw DatasetItem objects with full metadata (evaluators, executionPolicy) preserved.
+   *
+   * @param nbSamples The number of samples to retrieve. If not set - all items are returned
+   * @returns A list of DatasetItem objects
+   */
+  public async getRawItems(nbSamples?: number): Promise<DatasetItem<T>[]> {
+    return getDatasetItems<T>(this.opik, {
+      datasetName: this.name,
+      nbSamples,
+    });
   }
 
   /**
@@ -398,4 +423,5 @@ export class Dataset<T extends DatasetItemData = DatasetItemData> {
       throw error;
     }
   }
+
 }

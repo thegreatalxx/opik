@@ -6,17 +6,21 @@ import type * as serializers from "../../../../index.js";
 import { ExperimentScoreWrite } from "../../../../types/ExperimentScoreWrite.js";
 import { JsonListStringWrite } from "../../../../types/JsonListStringWrite.js";
 import { PromptVersionLinkWrite } from "../../../../types/PromptVersionLinkWrite.js";
+import { ExperimentWriteEvaluationMethod } from "../../types/ExperimentWriteEvaluationMethod.js";
 import { ExperimentWriteStatus } from "../../types/ExperimentWriteStatus.js";
 import { ExperimentWriteType } from "../../types/ExperimentWriteType.js";
 
 export const ExperimentWrite: core.serialization.Schema<serializers.ExperimentWrite.Raw, OpikApi.ExperimentWrite> =
     core.serialization.object({
         id: core.serialization.string().optional(),
-        datasetName: core.serialization.property("dataset_name", core.serialization.string()),
+        datasetName: core.serialization.property("dataset_name", core.serialization.string().nullable()),
+        projectId: core.serialization.property("project_id", core.serialization.string().optional()),
+        projectName: core.serialization.property("project_name", core.serialization.string().optional()),
         name: core.serialization.string().optional(),
         metadata: JsonListStringWrite.optional(),
         tags: core.serialization.list(core.serialization.string()).optional(),
         type: ExperimentWriteType.optional(),
+        evaluationMethod: core.serialization.property("evaluation_method", ExperimentWriteEvaluationMethod.optional()),
         optimizationId: core.serialization.property("optimization_id", core.serialization.string().optional()),
         status: ExperimentWriteStatus.optional(),
         experimentScores: core.serialization.property(
@@ -34,11 +38,14 @@ export const ExperimentWrite: core.serialization.Schema<serializers.ExperimentWr
 export declare namespace ExperimentWrite {
     export interface Raw {
         id?: string | null;
-        dataset_name: string;
+        dataset_name?: string | null;
+        project_id?: string | null;
+        project_name?: string | null;
         name?: string | null;
         metadata?: JsonListStringWrite.Raw | null;
         tags?: string[] | null;
         type?: ExperimentWriteType.Raw | null;
+        evaluation_method?: ExperimentWriteEvaluationMethod.Raw | null;
         optimization_id?: string | null;
         status?: ExperimentWriteStatus.Raw | null;
         experiment_scores?: ExperimentScoreWrite.Raw[] | null;

@@ -42,10 +42,6 @@ spec:
       {{- if .profile }}
       {{ .username }}/profile: {{ .profile }}
       {{- end }}
-      {{- if .allow_databases }}
-      {{ .username }}/allow_databases:
-        {{- toYaml .allow_databases | nindent 8 }}
-      {{- end }}
       {{ .username }}/networks/ip:
       {{- if .networks }}
         {{- toYaml .networks | nindent 8 }}
@@ -151,6 +147,10 @@ spec:
             - name: {{ $name }}
               value: {{ $value | quote }}
             {{-   end }}
+            {{- end }}
+            {{- with .Values.clickhouse.backupServer.envFrom }}
+            envFrom:
+            {{- toYaml . | nindent 12 }}
             {{- end }}
             ports:
             - name: ch-backup-rest

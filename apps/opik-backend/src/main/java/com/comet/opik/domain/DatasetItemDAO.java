@@ -634,10 +634,10 @@ class DatasetItemDAOImpl implements DatasetItemDAO {
                 di.last_updated_at AS last_updated_at,
                 di.created_by AS created_by,
                 di.last_updated_by AS last_updated_by,
-                argMax(tfs.duration, ei.created_at) AS duration,
-                argMax(tfs.total_estimated_cost, ei.created_at) AS total_estimated_cost,
-                argMax(tfs.usage, ei.created_at) AS usage,
-                argMax(tfs.feedback_scores, ei.created_at) AS feedback_scores,
+                avg(tfs.duration) AS duration,
+                avg(tfs.total_estimated_cost) AS total_estimated_cost,
+                avgMap(tfs.usage) AS usage,
+                avgMap(tfs.feedback_scores) AS feedback_scores,
                 argMax(tfs.input, ei.created_at) AS input,
                 argMax(tfs.output, ei.created_at) AS output,
                 argMax(tfs.metadata, ei.created_at) AS metadata,
@@ -660,7 +660,9 @@ class DatasetItemDAOImpl implements DatasetItemDAO {
                     tfs.total_estimated_cost,
                     tfs.usage,
                     tfs.visibility_mode,
-                    tfs.metadata
+                    tfs.metadata,
+                    '' AS description,
+                    ei.execution_policy
                 )) AS experiment_items_array
             FROM experiment_items_final AS ei
             LEFT JOIN dataset_items_final AS di ON di.id = ei.dataset_item_id
@@ -1409,12 +1411,15 @@ class DatasetItemDAOImpl implements DatasetItemDAO {
 
                             // Add sorting if present
                             var finalTemplate = selectTemplate;
+                            var itemFieldMapping = datasetItemSearchCriteria.sortingFields() != null
+                                    ? filterQueryBuilder
+                                            .buildDatasetItemFieldMapping(datasetItemSearchCriteria.sortingFields())
+                                    : null;
+
                             if (datasetItemSearchCriteria.sortingFields() != null) {
                                 Optional.ofNullable(
                                         sortingQueryBuilder.toOrderBySql(datasetItemSearchCriteria.sortingFields(),
-                                                filterQueryBuilder
-                                                        .buildDatasetItemFieldMapping(
-                                                                datasetItemSearchCriteria.sortingFields())))
+                                                itemFieldMapping))
                                         .ifPresent(sortFields -> {
                                             // feedback_scores is now exposed at outer query level via argMax(tfs.feedback_scores, ei.created_at)
                                             // so we don't need to map it to tfs.feedback_scores anymore
@@ -1423,7 +1428,8 @@ class DatasetItemDAOImpl implements DatasetItemDAO {
                             }
 
                             var hasDynamicKeys = datasetItemSearchCriteria.sortingFields() != null
-                                    && sortingQueryBuilder.hasDynamicKeys(datasetItemSearchCriteria.sortingFields());
+                                    && sortingQueryBuilder.hasDynamicKeys(datasetItemSearchCriteria.sortingFields(),
+                                            itemFieldMapping);
 
                             var selectStatement = connection.createStatement(finalTemplate.render())
                                     .bind("datasetId", datasetItemSearchCriteria.datasetId())
@@ -1441,7 +1447,7 @@ class DatasetItemDAOImpl implements DatasetItemDAO {
                             // Bind dynamic sorting keys if present
                             if (hasDynamicKeys) {
                                 selectStatement = sortingQueryBuilder.bindDynamicKeys(selectStatement,
-                                        datasetItemSearchCriteria.sortingFields());
+                                        datasetItemSearchCriteria.sortingFields(), itemFieldMapping);
                             }
 
                             bindSearchCriteria(datasetItemSearchCriteria, selectStatement);

@@ -53,6 +53,7 @@ import {
 } from "@/components/shared/DataTable/utils";
 import useAnnotationQueuesList from "@/api/annotation-queues/useAnnotationQueuesList";
 import useAppStore from "@/store/AppStore";
+import { usePermissions } from "@/contexts/PermissionsContext";
 
 import {
   COLUMN_FEEDBACK_SCORES_ID,
@@ -70,7 +71,6 @@ import {
 } from "@/types/annotation-queues";
 import useQueryParamAndLocalStorageState from "@/hooks/useQueryParamAndLocalStorageState";
 import { capitalizeFirstLetter } from "@/lib/utils";
-import { usePermissions } from "@/contexts/PermissionsContext";
 
 const SHARED_COLUMNS: ColumnData<AnnotationQueue>[] = [
   {
@@ -242,7 +242,7 @@ export const AnnotationQueuesPage: React.FC = () => {
   const workspaceName = useAppStore((state) => state.activeWorkspaceName);
   const navigate = useNavigate();
   const {
-    permissions: { canInteractWithApp },
+    permissions: { canInteractWithApp, canCreateAnnotationQueues, canDeleteAnnotationQueues },
   } = usePermissions();
   const resetDialogKeyRef = useRef(0);
   const [openDialog, setOpenDialog] = useState<boolean>(false);
@@ -452,8 +452,12 @@ export const AnnotationQueuesPage: React.FC = () => {
           />
         </div>
         <div className="flex items-center gap-2">
-          <AnnotationQueuesActionsPanel queues={selectedRows} />
-          <Separator orientation="vertical" className="mx-2 h-4" />
+          {canDeleteAnnotationQueues && (
+            <>
+              <AnnotationQueuesActionsPanel queues={selectedRows} />
+              <Separator orientation="vertical" className="mx-2 h-4" />
+            </>
+          )}
           <DataTableRowHeightSelector
             type={height as ROW_HEIGHT}
             setType={setHeight}
@@ -465,13 +469,15 @@ export const AnnotationQueuesPage: React.FC = () => {
             order={columnsOrder}
             onOrderChange={setColumnsOrder}
           />
-          <Button
-            size="sm"
-            onClick={handleNewQueue}
-            disabled={!canInteractWithApp}
-          >
-            Create new queue
-          </Button>
+          {canCreateAnnotationQueues && (
+            <Button
+              size="sm"
+              onClick={handleNewQueue}
+              disabled={!canInteractWithApp}
+            >
+              Create new queue
+            </Button>
+          )}
         </div>
       </div>
       <DataTable

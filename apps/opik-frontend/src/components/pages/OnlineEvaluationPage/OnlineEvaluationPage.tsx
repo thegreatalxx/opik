@@ -153,8 +153,9 @@ const PAGINATION_SIZE_KEY = "workspace-rules-pagination-size";
 
 export const OnlineEvaluationPage: React.FC = () => {
   const {
-    permissions: { canInteractWithApp },
+    permissions: { canInteractWithApp, canUpdateOnlineEvaluationRules },
   } = usePermissions();
+
   const resetDialogKeyRef = useRef(0);
   const [openDialogForCreate, setOpenDialogForCreate] =
     useState<boolean>(false);
@@ -281,7 +282,9 @@ export const OnlineEvaluationPage: React.FC = () => {
 
   const columns = useMemo(() => {
     return [
-      generateSelectColumDef<EvaluatorsRule>(),
+      ...(canUpdateOnlineEvaluationRules
+        ? [generateSelectColumDef<EvaluatorsRule>()]
+        : []),
       ...convertColumnDataToColumn<EvaluatorsRule, EvaluatorsRule>(
         DEFAULT_COLUMNS,
         {
@@ -299,20 +302,25 @@ export const OnlineEvaluationPage: React.FC = () => {
         enableHiding: false,
         enableSorting: false,
       } as ColumnDef<EvaluatorsRule>,
-      generateActionsColumDef<EvaluatorsRule>({
-        cell: (props) => (
-          <RuleRowActionsCell
-            {...props}
-            openEditDialog={handleOpenEditDialog}
-            openCloneDialog={handleOpenCloneDialog}
-          />
-        ),
-      }),
+      ...(canUpdateOnlineEvaluationRules
+        ? [
+            generateActionsColumDef<EvaluatorsRule>({
+              cell: (props) => (
+                <RuleRowActionsCell
+                  {...props}
+                  openEditDialog={handleOpenEditDialog}
+                  openCloneDialog={handleOpenCloneDialog}
+                />
+              ),
+            }),
+          ]
+        : []),
     ];
   }, [
     columnsOrder,
     selectedColumns,
     sortableBy,
+    canUpdateOnlineEvaluationRules,
     handleOpenEditDialog,
     handleOpenCloneDialog,
   ]);
@@ -413,8 +421,12 @@ export const OnlineEvaluationPage: React.FC = () => {
           ></FiltersButton>
         </div>
         <div className="flex items-center gap-2">
-          <RulesActionsPanel rules={selectedRows} />
-          <Separator orientation="vertical" className="mx-2 h-4" />
+          {canUpdateOnlineEvaluationRules && (
+            <>
+              <RulesActionsPanel rules={selectedRows} />
+              <Separator orientation="vertical" className="mx-2 h-4" />
+            </>
+          )}
           <ColumnsButton
             columns={DEFAULT_COLUMNS}
             selectedColumns={selectedColumns}
@@ -422,14 +434,16 @@ export const OnlineEvaluationPage: React.FC = () => {
             order={columnsOrder}
             onOrderChange={setColumnsOrder}
           ></ColumnsButton>
-          <Button
-            variant="default"
-            size="sm"
-            onClick={handleNewRuleClick}
-            disabled={!canInteractWithApp}
-          >
-            Create new rule
-          </Button>
+          {canUpdateOnlineEvaluationRules && (
+            <Button
+              variant="default"
+              size="sm"
+              onClick={handleNewRuleClick}
+              disabled={!canInteractWithApp}
+            >
+              Create new rule
+            </Button>
+          )}
         </div>
       </div>
       <DataTable

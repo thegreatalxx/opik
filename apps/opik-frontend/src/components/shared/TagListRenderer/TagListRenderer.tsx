@@ -25,6 +25,7 @@ export type TagListRendererProps = {
   addButtonText?: string;
   tagType?: string; // For error messages (e.g., "tag", "version tag")
   disabled?: boolean;
+  canAdd?: boolean;
 };
 
 const TagListRenderer: React.FC<TagListRendererProps> = ({
@@ -40,10 +41,13 @@ const TagListRenderer: React.FC<TagListRendererProps> = ({
   addButtonText = "Add tag",
   tagType = "tag",
   disabled = false,
+  canAdd = true,
 }) => {
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
   const [newTag, setNewTag] = useState<string>("");
+
+  const hasTags = tags.length > 0 || immutableTags.length > 0;
 
   const tagSizeClass = size === "sm" ? "w-3" : "w-4";
   const tagMarginClass = size === "sm" ? "mx-0" : "mx-1";
@@ -68,6 +72,10 @@ const TagListRenderer: React.FC<TagListRendererProps> = ({
     setOpen(false);
   };
 
+  if (!canAdd && !hasTags) {
+    return null;
+  }
+
   return (
     <div
       className={cn(
@@ -89,35 +97,37 @@ const TagListRenderer: React.FC<TagListRendererProps> = ({
           onDelete={disabled ? undefined : () => onDeleteTag(tag)}
         />
       ))}
-      <Popover onOpenChange={setOpen} open={open}>
-        <PopoverTrigger asChild>
-          <Button
-            data-testid="add-tag-button"
-            variant="outline"
-            size="icon-2xs"
-            disabled={disabled}
-          >
-            <Plus />
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent className="w-[420px] p-6" align={align}>
-          <div className="flex gap-2">
-            <Input
-              placeholder={placeholderText}
-              value={newTag}
-              onChange={(event) => setNewTag(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter") {
-                  handleAddTag();
-                }
-              }}
-            />
-            <Button variant="default" onClick={handleAddTag}>
-              {addButtonText}
+      {canAdd && (
+        <Popover onOpenChange={setOpen} open={open}>
+          <PopoverTrigger asChild>
+            <Button
+              data-testid="add-tag-button"
+              variant="outline"
+              size="icon-2xs"
+              disabled={disabled}
+            >
+              <Plus />
             </Button>
-          </div>
-        </PopoverContent>
-      </Popover>
+          </PopoverTrigger>
+          <PopoverContent className="w-[420px] p-6" align={align}>
+            <div className="flex gap-2">
+              <Input
+                placeholder={placeholderText}
+                value={newTag}
+                onChange={(event) => setNewTag(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    handleAddTag();
+                  }
+                }}
+              />
+              <Button variant="default" onClick={handleAddTag}>
+                {addButtonText}
+              </Button>
+            </div>
+          </PopoverContent>
+        </Popover>
+      )}
     </div>
   );
 };

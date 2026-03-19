@@ -22,7 +22,6 @@ const DEFAULT_STATE: FeatureToggles = {
   [FeatureToggleKeys.WELCOME_WIZARD_ENABLED]: false,
   [FeatureToggleKeys.CSV_UPLOAD_ENABLED]: false,
   [FeatureToggleKeys.EXPORT_ENABLED]: true,
-  [FeatureToggleKeys.DATASET_VERSIONING_ENABLED]: false,
   [FeatureToggleKeys.DATASET_EXPORT_ENABLED]: true,
   [FeatureToggleKeys.OPTIMIZATION_STUDIO_ENABLED]: false,
   [FeatureToggleKeys.SPAN_LLM_AS_JUDGE_ENABLED]: false,
@@ -37,6 +36,7 @@ const DEFAULT_STATE: FeatureToggles = {
   [FeatureToggleKeys.CUSTOMLLM_PROVIDER_ENABLED]: false,
   [FeatureToggleKeys.OLLAMA_PROVIDER_ENABLED]: false,
   [FeatureToggleKeys.COLLABORATORS_TAB_ENABLED]: false,
+  [FeatureToggleKeys.AGENT_CONFIGURATION_ENABLED]: false,
 };
 
 const initialState: FeatureTogglesState = {

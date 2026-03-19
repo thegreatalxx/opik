@@ -60,7 +60,7 @@ const useUserPermission = (config?: { enabled?: boolean }) => {
   );
 
   const checkNullablePermission = useCallback(
-    (permissionName: ManagementPermissionsNames) => {
+    (permissionName: ManagementPermissionsNames, requireExplicit?: boolean) => {
       if (isWorkspaceOwner) return true;
 
       const permissionValue = getUserPermissionValue(
@@ -68,15 +68,33 @@ const useUserPermission = (config?: { enabled?: boolean }) => {
         permissionName,
       );
 
+      if (requireExplicit) {
+        return permissionValue === true;
+      }
+
       // should default to true if the permission is not found
       return permissionValue !== false;
     },
     [workspacePermissions, isWorkspaceOwner],
   );
 
-  const canViewExperiments = useMemo(
-    () => checkNullablePermission(ManagementPermissionsNames.EXPERIMENT_VIEW),
+  const canViewDatasets = useMemo(
+    () => checkNullablePermission(ManagementPermissionsNames.DATASET_VIEW),
     [checkNullablePermission],
+  );
+
+  const canViewExperiments = useMemo(
+    () =>
+      canViewDatasets &&
+      checkNullablePermission(ManagementPermissionsNames.EXPERIMENT_VIEW),
+    [canViewDatasets, checkNullablePermission],
+  );
+
+  const canCreateExperiments = useMemo(
+    () =>
+      canViewExperiments &&
+      checkNullablePermission(ManagementPermissionsNames.EXPERIMENT_CREATE),
+    [canViewExperiments, checkNullablePermission],
   );
 
   const canViewDashboards = useMemo(
@@ -84,11 +102,132 @@ const useUserPermission = (config?: { enabled?: boolean }) => {
     [checkNullablePermission],
   );
 
+  const canDeleteProjects = useMemo(
+    () => checkNullablePermission(ManagementPermissionsNames.PROJECT_DELETE),
+    [checkNullablePermission],
+  );
+
+  const canCreateAnnotationQueues = useMemo(
+    () =>
+      checkNullablePermission(
+        ManagementPermissionsNames.ANNOTATION_QUEUE_CREATE,
+      ),
+    [checkNullablePermission],
+  );
+
+  const canDeleteAnnotationQueues = useMemo(
+    () =>
+      checkNullablePermission(
+        ManagementPermissionsNames.ANNOTATION_QUEUE_DELETE,
+      ),
+    [checkNullablePermission],
+  );
+
+  const canDeleteTraces = useMemo(
+    () => checkNullablePermission(ManagementPermissionsNames.TRACE_DELETE),
+    [checkNullablePermission],
+  );
+
+  const canDeletePrompts = useMemo(
+    () => checkNullablePermission(ManagementPermissionsNames.PROMPT_DELETE),
+    [checkNullablePermission],
+  );
+
+  const canDeleteDatasets = useMemo(
+    () => checkNullablePermission(ManagementPermissionsNames.DATASET_DELETE),
+    [checkNullablePermission],
+  );
+
+  const canDeleteOptimizationRuns = useMemo(
+    () =>
+      checkNullablePermission(
+        ManagementPermissionsNames.OPTIMIZATION_RUN_DELETE,
+      ),
+    [checkNullablePermission],
+  );
+
+  const canUpdateUserRole = useMemo(
+    () =>
+      checkNullablePermission(
+        ManagementPermissionsNames.USER_ROLE_UPDATE,
+        true,
+      ),
+    [checkNullablePermission],
+  );
+
+  const canConfigureWorkspaceSettings = useMemo(
+    () =>
+      checkNullablePermission(
+        ManagementPermissionsNames.WORKSPACE_SETTINGS_CONFIGURE,
+      ),
+    [checkNullablePermission],
+  );
+
+  const canUpdateAIProviders = useMemo(
+    () =>
+      checkNullablePermission(ManagementPermissionsNames.AI_PROVIDER_UPDATE),
+    [checkNullablePermission],
+  );
+
+  const canCreateProjects = useMemo(
+    () => checkNullablePermission(ManagementPermissionsNames.PROJECT_CREATE),
+    [checkNullablePermission],
+  );
+
+  const canWriteComments = useMemo(
+    () => checkNullablePermission(ManagementPermissionsNames.COMMENT_WRITE),
+    [checkNullablePermission],
+  );
+
+  const canUpdateOnlineEvaluationRules = useMemo(
+    () =>
+      checkNullablePermission(
+        ManagementPermissionsNames.ONLINE_EVALUATION_RULE_UPDATE,
+      ),
+    [checkNullablePermission],
+  );
+
+  const canUpdateAlerts = useMemo(
+    () => checkNullablePermission(ManagementPermissionsNames.ALERT_UPDATE),
+    [checkNullablePermission],
+  );
+
+  const canTagTrace = useMemo(
+    () => checkNullablePermission(ManagementPermissionsNames.TRACE_TAG),
+    [checkNullablePermission],
+  );
+
+  const canAnnotateTraceSpanThread = useMemo(
+    () =>
+      checkNullablePermission(
+        ManagementPermissionsNames.TRACE_SPAN_THREAD_ANNOTATE,
+      ),
+    [checkNullablePermission],
+  );
+
   return {
     canInviteMembers,
     isWorkspaceOwner,
     canViewExperiments,
+    canCreateExperiments,
     canViewDashboards,
+    canViewDatasets,
+    canDeleteProjects,
+    canCreateAnnotationQueues,
+    canDeleteAnnotationQueues,
+    canDeleteTraces,
+    canDeletePrompts,
+    canDeleteDatasets,
+    canDeleteOptimizationRuns,
+    canUpdateUserRole,
+    canConfigureWorkspaceSettings,
+    canUpdateAIProviders,
+    canCreateProjects,
+    canWriteComments,
+    canUpdateOnlineEvaluationRules,
+    canUpdateAlerts,
+    canAnnotateTraceSpanThread,
+    canTagTrace,
     isPending: isEnabled && isPending,
   };
 };

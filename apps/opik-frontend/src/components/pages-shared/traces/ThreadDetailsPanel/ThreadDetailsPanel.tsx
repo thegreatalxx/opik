@@ -38,6 +38,7 @@ import { formatDate, formatDuration } from "@/lib/date";
 import { formatCost } from "@/lib/money";
 import { manageToolFilter } from "@/lib/traces";
 import useAppStore from "@/store/AppStore";
+import { usePermissions } from "@/contexts/PermissionsContext";
 import TooltipWrapper from "@/components/shared/TooltipWrapper/TooltipWrapper";
 import Loader from "@/components/shared/Loader/Loader";
 import NoData from "@/components/shared/NoData/NoData";
@@ -85,7 +86,6 @@ import { useIsFeatureEnabled } from "@/components/feature-toggles-provider";
 import { useThreadMedia } from "@/hooks/useThreadMedia";
 import { FeatureToggleKeys } from "@/types/feature-toggles";
 import { LOGS_TYPE, PROJECT_TAB } from "@/constants/traces";
-import { usePermissions } from "@/contexts/PermissionsContext";
 
 type ThreadDetailsPanelProps = {
   projectId: string;
@@ -116,7 +116,7 @@ const ThreadDetailsPanel: React.FC<ThreadDetailsPanelProps> = ({
 }) => {
   const navigate = useNavigate();
   const {
-    permissions: { canInteractWithApp },
+    permissions: { canInteractWithApp, canAnnotateTraceSpanThread },
   } = usePermissions();
   const workspaceName = useAppStore((state) => state.activeWorkspaceName);
   const [popupOpen, setPopupOpen] = useState<boolean>(false);
@@ -462,20 +462,23 @@ const ThreadDetailsPanel: React.FC<ThreadDetailsPanelProps> = ({
         </TabsContent>
         <TabsContent value="feedback_scores" className="px-6">
           <ConfigurableFeedbackScoreTable
-            onDeleteFeedbackScore={handleDeleteFeedbackScore}
+            onDeleteFeedbackScore={
+              canAnnotateTraceSpanThread ? handleDeleteFeedbackScore : undefined
+            }
             feedbackScores={threadFeedbackScores}
             onAddHumanReview={() =>
               setActiveSection(DetailsActionSection.Annotations)
             }
             entityType="thread"
           />
-
-          <ThreadFeedbackScoresInfo
-            feedbackScores={threadFeedbackScores}
-            onAddHumanReview={() =>
-              setActiveSection(DetailsActionSection.Annotations)
-            }
-          />
+          {canAnnotateTraceSpanThread && (
+            <ThreadFeedbackScoresInfo
+              feedbackScores={threadFeedbackScores}
+              onAddHumanReview={() =>
+                setActiveSection(DetailsActionSection.Annotations)
+              }
+            />
+          )}
         </TabsContent>
       </Tabs>
     );
@@ -586,13 +589,15 @@ const ThreadDetailsPanel: React.FC<ThreadDetailsPanelProps> = ({
             type={DetailsActionSection.Comments}
           />
 
-          <DetailsActionSectionToggle
-            activeSection={currentActiveSection}
-            setActiveSection={setActiveSection}
-            layoutSize={ButtonLayoutSize.Large}
-            count={annotationCount}
-            type={DetailsActionSection.Annotations}
-          />
+          {canAnnotateTraceSpanThread && (
+            <DetailsActionSectionToggle
+              activeSection={currentActiveSection}
+              setActiveSection={setActiveSection}
+              layoutSize={ButtonLayoutSize.Large}
+              count={annotationCount}
+              type={DetailsActionSection.Annotations}
+            />
+          )}
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>

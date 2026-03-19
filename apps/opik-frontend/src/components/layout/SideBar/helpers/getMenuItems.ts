@@ -1,9 +1,9 @@
 import {
   Bell,
-  Database,
   FlaskConical,
   LayoutGrid,
   FileTerminal,
+  ListChecks,
   LucideHome,
   Blocks,
   Brain,
@@ -20,9 +20,11 @@ import { FeatureToggleKeys } from "@/types/feature-toggles";
 const getMenuItems = ({
   canViewExperiments,
   canViewDashboards,
+  canViewDatasets,
 }: {
   canViewExperiments: boolean;
   canViewDashboards: boolean;
+  canViewDatasets: boolean;
 }): MenuItemGroup[] => {
   return [
     {
@@ -79,14 +81,18 @@ const getMenuItems = ({
               },
             ]
           : []),
-        {
-          id: "datasets",
-          path: "/$workspaceName/datasets",
-          type: MENU_ITEM_TYPE.router,
-          icon: Database,
-          label: "Datasets",
-          count: "datasets",
-        },
+        ...(canViewDatasets
+          ? [
+              {
+                id: "evaluation_suites",
+                path: "/$workspaceName/evaluation-suites",
+                type: MENU_ITEM_TYPE.router,
+                icon: ListChecks,
+                label: "Evaluation suites",
+                count: "evaluation_suites",
+              },
+            ]
+          : []),
         {
           id: "annotation_queues",
           path: "/$workspaceName/annotation-queues",

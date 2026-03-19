@@ -1,6 +1,6 @@
 import React, { useState, useRef, useCallback } from "react";
-import { Tag, Trash, Brain } from "lucide-react";
-
+import { Tag, Trash } from "lucide-react";
+import slugify from "slugify";
 import { Button } from "@/components/ui/button";
 import { Span, Trace } from "@/types/traces";
 import { TRACE_DATA_TYPE } from "@/hooks/useTracesOrSpansList";
@@ -10,11 +10,12 @@ import useTracesBatchDeleteMutation from "@/api/traces/useTraceBatchDeleteMutati
 import TooltipWrapper from "@/components/shared/TooltipWrapper/TooltipWrapper";
 import ExportToButton from "@/components/shared/ExportToButton/ExportToButton";
 import AddTagDialog from "@/components/pages-shared/traces/AddTagDialog/AddTagDialog";
+import EvaluateButton from "@/components/pages-shared/automations/EvaluateButton/EvaluateButton";
 import RunEvaluationDialog from "@/components/pages-shared/automations/RunEvaluationDialog/RunEvaluationDialog";
+import useFilteredRulesList from "@/api/automations/useFilteredRulesList";
 import { useIsFeatureEnabled } from "@/components/feature-toggles-provider";
 import { FeatureToggleKeys } from "@/types/feature-toggles";
 import { mapRowDataForExport } from "@/lib/traces/exportUtils";
-import slugify from "slugify";
 import { usePermissions } from "@/contexts/PermissionsContext";
 
 type TracesActionsPanelProps = {
@@ -44,6 +45,21 @@ const TracesActionsPanel: React.FunctionComponent<TracesActionsPanelProps> = ({
   } = usePermissions();
   const isExportEnabled = useIsFeatureEnabled(FeatureToggleKeys.EXPORT_ENABLED);
 
+  const {
+    permissions: { canDeleteTraces },
+  } = usePermissions();
+
+  const showEvaluate =
+    type === TRACE_DATA_TYPE.traces || type === TRACE_DATA_TYPE.spans;
+  const entityType =
+    type === TRACE_DATA_TYPE.traces ? "trace" : ("span" as const);
+
+  const { rules, isLoading: isRulesLoading } = useFilteredRulesList({
+    projectId,
+    entityType,
+    enabled: showEvaluate,
+  });
+
   const deleteTracesHandler = useCallback(() => {
     mutate({
       projectId,
@@ -67,16 +83,18 @@ const TracesActionsPanel: React.FunctionComponent<TracesActionsPanelProps> = ({
 
   return (
     <div className="flex items-center gap-2">
-      <ConfirmDialog
-        key={`delete-${resetKeyRef.current}`}
-        open={open === 2}
-        setOpen={setOpen}
-        onConfirm={deleteTracesHandler}
-        title="Delete traces"
-        description="Deleting these traces will also remove their data from related experiment samples. This action cannot be undone. Are you sure you want to continue?"
-        confirmText="Delete traces"
-        confirmButtonVariant="destructive"
-      />
+      {canDeleteTraces && (
+        <ConfirmDialog
+          key={`delete-${resetKeyRef.current}`}
+          open={open === 2}
+          setOpen={setOpen}
+          onConfirm={deleteTracesHandler}
+          title="Delete traces"
+          description="Deleting these traces will also remove their data from related experiment samples. This action cannot be undone. Are you sure you want to continue?"
+          confirmText="Delete traces"
+          confirmButtonVariant="destructive"
+        />
+      )}
       <AddTagDialog
         key={`tag-${resetKeyRef.current}`}
         rows={selectedRows}
@@ -85,24 +103,16 @@ const TracesActionsPanel: React.FunctionComponent<TracesActionsPanelProps> = ({
         projectId={projectId}
         type={type}
       />
-      {type === TRACE_DATA_TYPE.traces && (
+      {showEvaluate && (
         <RunEvaluationDialog
           key={`evaluation-${resetKeyRef.current}`}
           open={open === 4}
           setOpen={setOpen}
           projectId={projectId}
           entityIds={selectedRows.map((row) => row.id)}
-          entityType="trace"
-        />
-      )}
-      {type === TRACE_DATA_TYPE.spans && (
-        <RunEvaluationDialog
-          key={`evaluation-${resetKeyRef.current}`}
-          open={open === 4}
-          setOpen={setOpen}
-          projectId={projectId}
-          entityIds={selectedRows.map((row) => row.id)}
-          entityType="span"
+          entityType={entityType}
+          rules={rules}
+          isLoading={isRulesLoading}
         />
       )}
       <AddToDropdown
@@ -124,20 +134,15 @@ const TracesActionsPanel: React.FunctionComponent<TracesActionsPanelProps> = ({
           <Tag />
         </Button>
       </TooltipWrapper>
-      {(type === TRACE_DATA_TYPE.traces || type === TRACE_DATA_TYPE.spans) && (
-        <TooltipWrapper content="Evaluate">
-          <Button
-            variant="outline"
-            size="icon-sm"
-            onClick={() => {
-              setOpen(4);
-              resetKeyRef.current = resetKeyRef.current + 1;
-            }}
-            disabled={disabled || !canInteractWithApp}
-          >
-            <Brain />
-          </Button>
-        </TooltipWrapper>
+      {showEvaluate && (
+        <EvaluateButton
+          isNoRules={!rules?.length}
+          disabled={disabled}
+          onClick={() => {
+            setOpen(4);
+            resetKeyRef.current = resetKeyRef.current + 1;
+          }}
+        />
       )}
       <ExportToButton
         disabled={disabled || columnsToExport.length === 0 || !isExportEnabled}
@@ -149,7 +154,7 @@ const TracesActionsPanel: React.FunctionComponent<TracesActionsPanelProps> = ({
             : undefined
         }
       />
-      {type === TRACE_DATA_TYPE.traces && (
+      {type === TRACE_DATA_TYPE.traces && canDeleteTraces && (
         <TooltipWrapper content="Delete">
           <Button
             variant="outline"

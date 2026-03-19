@@ -57,10 +57,11 @@ export const DEFAULT_COLUMN_PINNING: ColumnPinningState = {
 };
 
 const AIProvidersTab = () => {
-  const workspaceName = useAppStore((state) => state.activeWorkspaceName);
   const {
-    permissions: { canInteractWithApp },
+    permissions: { canUpdateAIProviders, canInteractWithApp },
   } = usePermissions();
+
+  const workspaceName = useAppStore((state) => state.activeWorkspaceName);
 
   const [search, setSearch] = useState("");
   const resetDialogKeyRef = useRef(0);
@@ -98,26 +99,32 @@ const AIProvidersTab = () => {
   }, [providerKeys, search]);
 
   const columns = useMemo(() => {
-    return [
-      ...convertColumnDataToColumn<ProviderObject, ProviderObject>(
-        DEFAULT_COLUMNS,
-        {},
-      ),
-      generateActionsColumDef({
-        cell: AIProvidersRowActionsCell,
-      }),
-    ];
-  }, []);
+    const basicColumns = convertColumnDataToColumn<
+      ProviderObject,
+      ProviderObject
+    >(DEFAULT_COLUMNS, {});
+
+    if (canUpdateAIProviders)
+      return [
+        ...basicColumns,
+        generateActionsColumDef({
+          cell: AIProvidersRowActionsCell,
+        }),
+      ];
+
+    return basicColumns;
+  }, [canUpdateAIProviders]);
 
   const handleAddConfigurationClick = () => {
     resetDialogKeyRef.current += 1;
     setOpenDialog(true);
   };
 
-  const noDataLabel =
-    search === ""
-      ? "Configure AI providers to use the playground and online scoring."
-      : "No search results";
+  const getNoDataLabel = () => {
+    if (search !== "") return "No search results";
+    if (!canUpdateAIProviders) return "No AI providers configured yet.";
+    return "Configure AI providers to use the playground and online scoring.";
+  };
 
   if (isPending) {
     return <Loader />;
@@ -137,13 +144,15 @@ const AIProvidersTab = () => {
           placeholder="Search by name"
           dimension="sm"
         />
-        <Button
-          onClick={handleAddConfigurationClick}
-          size="sm"
-          disabled={!canInteractWithApp}
-        >
-          Add configuration
-        </Button>
+        {canUpdateAIProviders && (
+          <Button
+            onClick={handleAddConfigurationClick}
+            size="sm"
+            disabled={!canInteractWithApp}
+          >
+            Add configuration
+          </Button>
+        )}
       </div>
 
       <DataTable
@@ -151,8 +160,8 @@ const AIProvidersTab = () => {
         data={filteredProviderKeys}
         columnPinning={DEFAULT_COLUMN_PINNING}
         noData={
-          <DataTableNoData title={noDataLabel}>
-            {search === "" && (
+          <DataTableNoData title={getNoDataLabel()}>
+            {search === "" && canUpdateAIProviders && (
               <Button
                 variant="link"
                 onClick={handleAddConfigurationClick}
@@ -164,13 +173,14 @@ const AIProvidersTab = () => {
           </DataTableNoData>
         }
       />
-
-      <ManageAIProviderDialog
-        configuredProvidersList={providerKeys}
-        key={resetDialogKeyRef.current}
-        open={openDialog}
-        setOpen={setOpenDialog}
-      />
+      {canUpdateAIProviders && (
+        <ManageAIProviderDialog
+          configuredProvidersList={providerKeys}
+          key={resetDialogKeyRef.current}
+          open={openDialog}
+          setOpen={setOpenDialog}
+        />
+      )}
     </div>
   );
 };

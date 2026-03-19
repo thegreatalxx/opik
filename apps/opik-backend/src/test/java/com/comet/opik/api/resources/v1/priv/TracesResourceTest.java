@@ -3,7 +3,6 @@ package com.comet.opik.api.resources.v1.priv;
 import com.comet.opik.api.BatchDelete;
 import com.comet.opik.api.BatchDeleteByProject;
 import com.comet.opik.api.Comment;
-import com.comet.opik.api.Dataset;
 import com.comet.opik.api.DeleteFeedbackScore;
 import com.comet.opik.api.DeleteTraceThreads;
 import com.comet.opik.api.ErrorInfo;
@@ -65,6 +64,7 @@ import com.comet.opik.domain.SpanType;
 import com.comet.opik.domain.cost.CostService;
 import com.comet.opik.extensions.DropwizardAppExtensionProvider;
 import com.comet.opik.extensions.RegisterApp;
+import com.comet.opik.infrastructure.auth.WorkspaceUserPermission;
 import com.comet.opik.infrastructure.db.TransactionTemplateAsync;
 import com.comet.opik.infrastructure.usagelimit.Quota;
 import com.comet.opik.podam.InRangeStrategy;
@@ -162,6 +162,7 @@ import static com.github.tomakehurst.wiremock.client.WireMock.matching;
 import static com.github.tomakehurst.wiremock.client.WireMock.matchingJsonPath;
 import static com.github.tomakehurst.wiremock.client.WireMock.okJson;
 import static com.github.tomakehurst.wiremock.client.WireMock.post;
+import static com.github.tomakehurst.wiremock.client.WireMock.postRequestedFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlPathEqualTo;
 import static java.util.UUID.randomUUID;
 import static java.util.function.Predicate.not;
@@ -260,6 +261,154 @@ class TracesResourceTest {
 
     private UUID getProjectId(String projectName, String workspaceName, String apiKey) {
         return projectResourceClient.getByName(projectName, apiKey, workspaceName).id();
+    }
+
+    @Nested
+    @DisplayName("Required permissions")
+    class RequiredPermissionsTest {
+
+        @Test
+        @DisplayName("Delete trace by id passes required permissions to auth endpoint")
+        void deleteTraceByIdPassesRequiredPermissionsToAuthEndpoint() {
+            String apiKey = UUID.randomUUID().toString();
+            String workspaceName = "test-workspace-" + UUID.randomUUID();
+            String workspaceId = UUID.randomUUID().toString();
+            mockTargetWorkspace(apiKey, workspaceName, workspaceId);
+
+            var trace = factory.manufacturePojo(Trace.class).toBuilder()
+                    .projectName(DEFAULT_PROJECT)
+                    .build();
+            var id = traceResourceClient.createTrace(trace, apiKey, workspaceName);
+
+            wireMock.server().resetRequests();
+            traceResourceClient.callDeleteTrace(id, apiKey, workspaceName).close();
+
+            wireMock.server().verify(
+                    postRequestedFor(urlPathEqualTo("/opik/auth"))
+                            .withRequestBody(matchingJsonPath("$.requiredPermissions[0]",
+                                    equalTo(WorkspaceUserPermission.TRACE_DELETE.getValue()))));
+        }
+
+        @Test
+        @DisplayName("Delete traces batch passes required permissions to auth endpoint")
+        void deleteTracesBatchPassesRequiredPermissionsToAuthEndpoint() {
+            String apiKey = UUID.randomUUID().toString();
+            String workspaceName = "test-workspace-" + UUID.randomUUID();
+            String workspaceId = UUID.randomUUID().toString();
+            mockTargetWorkspace(apiKey, workspaceName, workspaceId);
+
+            var trace = factory.manufacturePojo(Trace.class).toBuilder()
+                    .projectName(DEFAULT_PROJECT)
+                    .build();
+            var id = traceResourceClient.createTrace(trace, apiKey, workspaceName);
+            var projectId = getProjectId(DEFAULT_PROJECT, workspaceName, apiKey);
+
+            wireMock.server().resetRequests();
+            traceResourceClient.deleteTraces(
+                    new BatchDeleteByProject(Set.of(id), projectId), workspaceName, apiKey);
+
+            wireMock.server().verify(
+                    postRequestedFor(urlPathEqualTo("/opik/auth"))
+                            .withRequestBody(matchingJsonPath("$.requiredPermissions[0]",
+                                    equalTo(WorkspaceUserPermission.TRACE_DELETE.getValue()))));
+        }
+
+        @Test
+        @DisplayName("Create trace passes required permissions to auth endpoint")
+        void createTracePassesRequiredPermissionsToAuthEndpoint() {
+            String apiKey = UUID.randomUUID().toString();
+            String workspaceName = "test-workspace-" + UUID.randomUUID();
+            String workspaceId = UUID.randomUUID().toString();
+            mockTargetWorkspace(apiKey, workspaceName, workspaceId);
+
+            var trace = factory.manufacturePojo(Trace.class).toBuilder()
+                    .projectName(DEFAULT_PROJECT)
+                    .build();
+
+            wireMock.server().resetRequests();
+            traceResourceClient.createTrace(trace, apiKey, workspaceName);
+
+            wireMock.server().verify(
+                    postRequestedFor(urlPathEqualTo("/opik/auth"))
+                            .withRequestBody(matchingJsonPath("$.requiredPermissions[0]",
+                                    equalTo(WorkspaceUserPermission.TRACE_SPAN_THREAD_LOG.getValue()))));
+        }
+
+        @Test
+        @DisplayName("Open trace thread passes required permissions to auth endpoint")
+        void openTraceThreadPassesRequiredPermissionsToAuthEndpoint() {
+            String apiKey = UUID.randomUUID().toString();
+            String workspaceName = "test-workspace-" + UUID.randomUUID();
+            String workspaceId = UUID.randomUUID().toString();
+            mockTargetWorkspace(apiKey, workspaceName, workspaceId);
+
+            var trace = factory.manufacturePojo(Trace.class).toBuilder()
+                    .projectName(DEFAULT_PROJECT)
+                    .build();
+            traceResourceClient.createTrace(trace, apiKey, workspaceName);
+            var projectId = getProjectId(DEFAULT_PROJECT, workspaceName, apiKey);
+
+            wireMock.server().resetRequests();
+            traceResourceClient.openTraceThread(UUID.randomUUID().toString(), projectId,
+                    DEFAULT_PROJECT, apiKey, workspaceName);
+
+            wireMock.server().verify(
+                    postRequestedFor(urlPathEqualTo("/opik/auth"))
+                            .withRequestBody(matchingJsonPath("$.requiredPermissions[0]",
+                                    equalTo(WorkspaceUserPermission.TRACE_SPAN_THREAD_LOG.getValue()))));
+        }
+
+        @Test
+        @DisplayName("Update thread passes required permissions to auth endpoint")
+        void updateThreadPassesRequiredPermissionsToAuthEndpoint() {
+            String apiKey = UUID.randomUUID().toString();
+            String workspaceName = "test-workspace-" + UUID.randomUUID();
+            String workspaceId = UUID.randomUUID().toString();
+            mockTargetWorkspace(apiKey, workspaceName, workspaceId);
+
+            var trace = factory.manufacturePojo(Trace.class).toBuilder()
+                    .projectName(DEFAULT_PROJECT)
+                    .build();
+            traceResourceClient.createTrace(trace, apiKey, workspaceName);
+            var projectId = getProjectId(DEFAULT_PROJECT, workspaceName, apiKey);
+            var threadId = UUID.randomUUID().toString();
+            traceResourceClient.openTraceThread(threadId, projectId, DEFAULT_PROJECT, apiKey, workspaceName);
+
+            var threadUpdate = TraceThreadUpdate.builder()
+                    .tags(Set.of("test-tag"))
+                    .build();
+
+            wireMock.server().resetRequests();
+            traceResourceClient.updateThread(threadUpdate, UUID.randomUUID(), apiKey, workspaceName,
+                    HttpStatus.SC_NOT_FOUND);
+
+            wireMock.server().verify(
+                    postRequestedFor(urlPathEqualTo("/opik/auth"))
+                            .withRequestBody(matchingJsonPath("$.requiredPermissions[0]",
+                                    equalTo(WorkspaceUserPermission.TRACE_SPAN_THREAD_LOG.getValue()))));
+        }
+
+        @Test
+        @DisplayName("Batch update threads passes required permissions to auth endpoint")
+        void batchUpdateThreadsPassesRequiredPermissionsToAuthEndpoint() {
+            String apiKey = UUID.randomUUID().toString();
+            String workspaceName = "test-workspace-" + UUID.randomUUID();
+            String workspaceId = UUID.randomUUID().toString();
+            mockTargetWorkspace(apiKey, workspaceName, workspaceId);
+
+            var batchUpdate = TraceThreadBatchUpdate.builder()
+                    .ids(Set.of(UUID.randomUUID()))
+                    .update(TraceThreadUpdate.builder().tags(Set.of("test-tag")).build())
+                    .build();
+
+            wireMock.server().resetRequests();
+            traceResourceClient.callBatchUpdateThreads(batchUpdate, apiKey, workspaceName).close();
+
+            wireMock.server().verify(
+                    postRequestedFor(urlPathEqualTo("/opik/auth"))
+                            .withRequestBody(matchingJsonPath("$.requiredPermissions[0]",
+                                    equalTo(WorkspaceUserPermission.TRACE_SPAN_THREAD_LOG.getValue()))));
+        }
     }
 
     @Nested
@@ -4821,6 +4970,26 @@ class TracesResourceTest {
 
             createMultiValueTraceThreadScores(otherNames, unexpectedProject, apiKey, workspaceName);
 
+            // Create a suite_assertion score on the main project to verify default exclusion
+            String suiteThreadId = UUID.randomUUID().toString();
+            Trace suiteTrace = createTrace().toBuilder()
+                    .projectName(project.name())
+                    .threadId(suiteThreadId)
+                    .build();
+            traceResourceClient.batchCreateTraces(List.of(suiteTrace), apiKey, workspaceName);
+            Mono.delay(Duration.ofMillis(500)).block();
+            traceResourceClient.closeTraceThread(suiteThreadId, project.id(), null, apiKey, workspaceName);
+            traceResourceClient.threadFeedbackScores(List.of(
+                    FeedbackScoreBatchItemThread.builder()
+                            .projectName(project.name())
+                            .threadId(suiteThreadId)
+                            .name("suite_assertion_score")
+                            .categoryName("suite_assertion")
+                            .value(BigDecimal.ONE)
+                            .source(ScoreSource.SDK)
+                            .build()),
+                    apiKey, workspaceName);
+
             // when
             FeedbackScoreNames actualNames = traceResourceClient.getTraceThreadsFeedbackScoreNames(
                     useProjectId ? projectId : null, apiKey,
@@ -4829,7 +4998,7 @@ class TracesResourceTest {
             List<String> allNames = new ArrayList<>(names);
             allNames.addAll(otherNames);
 
-            // then
+            // then — suite_assertion_score should be excluded by default
             assertFeedbackScoreNames(actualNames, useProjectId ? names : allNames);
         }
     }
@@ -6016,11 +6185,11 @@ class TracesResourceTest {
     @Nested
     @DisplayName("Thread Reopening and Manual Score Deletion")
     @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-    class ThreadReopeningManualScoreDeletion {
+    class ThreadReopeningScorePreservation {
 
         @Test
-        @DisplayName("When thread is closed, manually scored, and reopened, then manual scores are deleted")
-        void whenThreadIsClosedManuallyScored_andReopened_thenManualScoresAreDeleted() {
+        @DisplayName("When thread is scored and new traces are added, then scores are preserved")
+        void whenThreadIsScored_andNewTracesAdded_thenScoresArePreserved() {
             // Given
             var workspaceName = RandomStringUtils.secure().nextAlphanumeric(10);
             var workspaceId = UUID.randomUUID().toString();
@@ -6046,13 +6215,8 @@ class TracesResourceTest {
             // Wait for thread processing
             Mono.delay(Duration.ofMillis(500)).block();
 
-            // Close the thread
-            traceResourceClient.closeTraceThread(threadId, projectId, null, apiKey, workspaceName);
-
-            // Wait for thread to be closed
-
-            // Add manual scores to the closed thread
-            List<FeedbackScoreBatchItemThread> manualScores = PodamFactoryUtils
+            // Add scores to the thread
+            List<FeedbackScoreBatchItemThread> scores = PodamFactoryUtils
                     .manufacturePojoList(factory, FeedbackScoreBatchItemThread.class)
                     .stream()
                     .map(item -> item.toBuilder()
@@ -6062,14 +6226,14 @@ class TracesResourceTest {
                             .build())
                     .collect(Collectors.toList());
 
-            manualScores.set(0, manualScores.get(0)
+            scores.set(0, scores.get(0)
                     .toBuilder()
                     .source(ScoreSource.SDK)
                     .build());
 
-            traceResourceClient.threadFeedbackScores(manualScores, apiKey, workspaceName);
+            traceResourceClient.threadFeedbackScores(scores, apiKey, workspaceName);
 
-            // Create new traces to reopen the thread
+            // Create new traces (new messages) for the thread
             List<Trace> newTraces = IntStream.range(0, 2)
                     .mapToObj(i -> createTrace().toBuilder()
                             .projectName(projectName)
@@ -6079,7 +6243,7 @@ class TracesResourceTest {
 
             traceResourceClient.batchCreateTraces(newTraces, apiKey, workspaceName);
 
-            // Wait for thread to be reopened and manual scores to be deleted
+            // Wait for thread processing and verify scores are preserved
             Awaitility.await()
                     .atMost(10, TimeUnit.SECONDS)
                     .untilAsserted(() -> {
@@ -6088,17 +6252,29 @@ class TracesResourceTest {
 
                         List<Trace> allTraces = Stream.concat(initialTraces.stream(), newTraces.stream()).toList();
 
-                        var expectedReopenedThreads = getExpectedThreads(allTraces, projectId, threadId, List.of(),
-                                TraceThreadStatus.ACTIVE);
+                        var expectedFeedbackScores = scores.stream()
+                                .map(s -> FeedbackScore.builder()
+                                        .name(s.name())
+                                        .categoryName(s.categoryName())
+                                        .value(s.value())
+                                        .reason(s.reason())
+                                        .source(s.source())
+                                        .createdBy(USER)
+                                        .lastUpdatedBy(USER)
+                                        .build())
+                                .toList();
 
-                        // Verify manual scores have been deleted
-                        TraceAssertions.assertThreads(expectedReopenedThreads, actualThreads.content());
+                        var expectedThreads = getExpectedThreads(allTraces, projectId, threadId, List.of(),
+                                TraceThreadStatus.ACTIVE, expectedFeedbackScores);
+
+                        // Verify scores are preserved after new traces are added
+                        TraceAssertions.assertThreads(expectedThreads, actualThreads.content());
                     });
         }
 
         @Test
-        @DisplayName("When thread is closed with mixed scores and reopened, then all scores are deleted")
-        void whenThreadIsClosedWithMixedScores_andReopened_thenAllScoresAreDeleted() {
+        @DisplayName("When thread has mixed scores and new traces are added, then all scores are preserved")
+        void whenThreadHasMixedScores_andNewTracesAdded_thenAllScoresArePreserved() {
             // Given
             var workspaceName = RandomStringUtils.secure().nextAlphanumeric(10);
             var workspaceId = UUID.randomUUID().toString();
@@ -6124,12 +6300,7 @@ class TracesResourceTest {
             // Wait for thread processing
             Mono.delay(Duration.ofMillis(500)).block();
 
-            // Close the thread
-            traceResourceClient.closeTraceThread(threadId, projectId, null, apiKey, workspaceName);
-
-            // Wait for thread to be closed
-
-            // Add mixed scores to the closed thread (manual, SDK, and online scoring)
+            // Add mixed scores to the thread (UI, SDK, and online scoring)
             List<FeedbackScoreBatchItemThread> mixedScores = PodamFactoryUtils
                     .manufacturePojoList(factory, FeedbackScoreBatchItemThread.class)
                     .stream()
@@ -6152,7 +6323,7 @@ class TracesResourceTest {
 
             traceResourceClient.threadFeedbackScores(mixedScores, apiKey, workspaceName);
 
-            // Create new traces to reopen the thread
+            // Create new traces (new messages) for the thread
             List<Trace> newTraces = IntStream.range(0, 2)
                     .mapToObj(i -> createTrace().toBuilder()
                             .projectName(projectName)
@@ -6162,22 +6333,33 @@ class TracesResourceTest {
 
             traceResourceClient.batchCreateTraces(newTraces, apiKey, workspaceName);
 
-            // Wait for thread to be reopened and ALL scores to be deleted
+            // Wait for thread processing and verify all scores are preserved
             Awaitility.await()
                     .atMost(10, TimeUnit.SECONDS)
                     .untilAsserted(() -> {
-
                         var actualThreads = traceResourceClient.getTraceThreads(projectId, null, apiKey, workspaceName,
                                 null, null, null);
 
                         List<Trace> allTraces = Stream.concat(initialTraces.stream(), newTraces.stream()).toList();
 
-                        // Expect no scores - all scores (UI, SDK, ONLINE_SCORING) should be deleted
-                        var expectedReopenedThreads = getExpectedThreads(allTraces, projectId, threadId, List.of(),
-                                TraceThreadStatus.ACTIVE);
+                        var expectedFeedbackScores = mixedScores.stream()
+                                .map(s -> FeedbackScore.builder()
+                                        .name(s.name())
+                                        .categoryName(s.categoryName())
+                                        .value(s.value())
+                                        .reason(s.reason())
+                                        .source(s.source())
+                                        .createdBy(USER)
+                                        .lastUpdatedBy(USER)
+                                        .build())
+                                .toList();
 
-                        // Verify all scores have been deleted (manual, SDK, and online scoring)
-                        TraceAssertions.assertThreads(expectedReopenedThreads, actualThreads.content());
+                        // Expect all scores to be preserved - scores should NOT be deleted when new traces are added
+                        var expectedThreads = getExpectedThreads(allTraces, projectId, threadId, List.of(),
+                                TraceThreadStatus.ACTIVE, expectedFeedbackScores);
+
+                        // Verify all scores are preserved (UI, SDK, and ONLINE_SCORING)
+                        TraceAssertions.assertThreads(expectedThreads, actualThreads.content());
                     });
         }
     }
@@ -6438,7 +6620,7 @@ class TracesResourceTest {
             UUID projectId = projectResourceClient.createProject(project, API_KEY, workspaceName);
 
             var datasetName = "dataset-" + RandomStringUtils.secure().nextAlphanumeric(10);
-            var dataset = factory.manufacturePojo(Dataset.class).toBuilder()
+            var dataset = DatasetResourceClient.buildDataset(factory).toBuilder()
                     .name(datasetName)
                     .build();
             var datasetId = datasetResourceClient.createDataset(dataset, API_KEY, workspaceName);

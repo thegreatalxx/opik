@@ -1,6 +1,6 @@
 import React, { useCallback, useMemo } from "react";
 import { Span, Trace } from "@/types/traces";
-import FeedbackScoresEditor from "../../FeedbackScoresEditor/FeedbackScoresEditor";
+import { usePermissions } from "@/contexts/PermissionsContext";
 import FeedbackScoreTag from "@/components/shared/FeedbackScoreTag/FeedbackScoreTag";
 import { EXPLAINER_ID, EXPLAINERS_MAP } from "@/constants/explainers";
 import {
@@ -11,7 +11,7 @@ import useTraceFeedbackScoreSetMutation from "@/api/traces/useTraceFeedbackScore
 import useTraceFeedbackScoreDeleteMutation from "@/api/traces/useTraceFeedbackScoreDeleteMutation";
 import { UpdateFeedbackScoreData } from "./types";
 import { extractSpanMetadataFromValueByAuthor } from "../TraceDataViewer/FeedbackScoreTable/utils";
-import { usePermissions } from "@/contexts/PermissionsContext";
+import FeedbackScoresEditor from "../../FeedbackScoresEditor/FeedbackScoresEditor";
 
 type TraceAnnotateViewerProps = {
   data: Trace | Span;
@@ -25,7 +25,7 @@ const TraceAnnotateViewer: React.FunctionComponent<
   TraceAnnotateViewerProps
 > = ({ data, spanId, traceId, activeSection, setActiveSection }) => {
   const {
-    permissions: { canInteractWithApp },
+    permissions: { canInteractWithApp, canAnnotateTraceSpanThread },
   } = usePermissions();
   const hasFeedbackScores = Boolean(data.feedback_scores?.length);
   const isTrace = !spanId;
@@ -100,20 +100,22 @@ const TraceAnnotateViewer: React.FunctionComponent<
             </div>
           </>
         )}
-        <FeedbackScoresEditor
-          key={`${traceId}-${spanId}`}
-          feedbackScores={filteredFeedbackScores}
-          onUpdateFeedbackScore={onUpdateFeedbackScore}
-          onDeleteFeedbackScore={onDeleteFeedbackScore}
-          className="mt-4"
-          disabled={!canInteractWithApp}
-          header={<FeedbackScoresEditor.Header isTrace={isTrace} />}
-          footer={
-            <FeedbackScoresEditor.Footer
-              entityCopy={isTrace ? "traces" : "spans"}
-            />
-          }
-        />
+        {canAnnotateTraceSpanThread && (
+          <FeedbackScoresEditor
+            key={`${traceId}-${spanId}`}
+            feedbackScores={filteredFeedbackScores}
+            onUpdateFeedbackScore={onUpdateFeedbackScore}
+            onDeleteFeedbackScore={onDeleteFeedbackScore}
+            className="mt-4"
+            disabled={!canInteractWithApp}
+            header={<FeedbackScoresEditor.Header isTrace={isTrace} />}
+            footer={
+              <FeedbackScoresEditor.Footer
+                entityCopy={isTrace ? "traces" : "spans"}
+              />
+            }
+          />
+        )}
       </div>
     </DetailsActionSectionLayout>
   );

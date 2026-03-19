@@ -6,6 +6,7 @@ import com.comet.opik.domain.attachment.FileService;
 import com.comet.opik.infrastructure.DatasetExportConfig;
 import com.comet.opik.infrastructure.auth.RequestContext;
 import com.comet.opik.infrastructure.lock.LockService;
+import com.comet.opik.infrastructure.redis.RedisStreamUtils;
 import com.google.inject.ImplementedBy;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
@@ -15,7 +16,6 @@ import lombok.NonNull;
 import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.RStreamReactive;
 import org.redisson.api.RedissonReactiveClient;
-import org.redisson.api.stream.StreamAddArgs;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 import ru.vyarus.dropwizard.guice.module.yaml.bind.Config;
@@ -164,7 +164,8 @@ class CsvDatasetExportServiceImpl implements CsvDatasetExportService {
                 exportConfig.getStreamName(),
                 exportConfig.getCodec());
 
-        return stream.add(StreamAddArgs.entry(DatasetExportConfig.PAYLOAD_FIELD, message))
+        return stream.add(RedisStreamUtils.buildAddArgs(
+                DatasetExportConfig.PAYLOAD_FIELD, message, exportConfig))
                 .doOnNext(messageId -> log.info(
                         "Export job published to Redis stream: jobId='{}', messageId='{}'",
                         job.id(), messageId))

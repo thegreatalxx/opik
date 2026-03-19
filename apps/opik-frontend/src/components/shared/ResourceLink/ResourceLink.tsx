@@ -16,9 +16,8 @@ import isUndefined from "lodash/isUndefined";
 import { cn } from "@/lib/utils";
 import TooltipWrapper from "@/components/shared/TooltipWrapper/TooltipWrapper";
 import useAppStore from "@/store/AppStore";
-import { Tag } from "@/components/ui/tag";
+import { Tag, TagProps } from "@/components/ui/tag";
 import { Button } from "@/components/ui/button";
-import { TagProps } from "@/components/ui/tag";
 import { Filter } from "@/types/filters";
 import { LOGS_TYPE, PROJECT_TAB } from "@/constants/traces";
 
@@ -31,6 +30,7 @@ export enum RESOURCE_TYPE {
   experimentItem,
   optimization,
   trial,
+  evaluationSuite,
   annotationQueue,
   dashboard,
   traces,
@@ -47,19 +47,19 @@ export const RESOURCE_MAP = {
     color: "var(--color-green)",
   },
   [RESOURCE_TYPE.dataset]: {
-    url: "/$workspaceName/datasets/$datasetId/items",
+    url: "/$workspaceName/evaluation-suites/$suiteId/items",
     icon: Database,
-    param: "datasetId",
-    deleted: "Deleted dataset",
-    label: "dataset",
+    param: "suiteId",
+    deleted: "Deleted evaluation suite",
+    label: "evaluation suite",
     color: "var(--color-yellow)",
   },
   [RESOURCE_TYPE.datasetItem]: {
-    url: "/$workspaceName/datasets/$datasetId/items",
+    url: "/$workspaceName/evaluation-suites/$suiteId/items",
     icon: Database,
-    param: "datasetId",
-    deleted: "Deleted dataset item",
-    label: "dataset item",
+    param: "suiteId",
+    deleted: "Deleted evaluation suite item",
+    label: "evaluation suite item",
     color: "var(--color-yellow)",
   },
   [RESOURCE_TYPE.prompt]: {
@@ -87,17 +87,17 @@ export const RESOURCE_MAP = {
     color: "var(--color-burgundy)",
   },
   [RESOURCE_TYPE.optimization]: {
-    url: "/$workspaceName/optimizations/$datasetId/compare",
+    url: "/$workspaceName/optimizations/$optimizationId",
     icon: SparklesIcon,
-    param: "datasetId",
+    param: "optimizationId",
     deleted: "Deleted optimization",
     label: "optimization run",
     color: "var(--color-orange)",
   },
   [RESOURCE_TYPE.trial]: {
-    url: "/$workspaceName/optimizations/$datasetId/$optimizationId/compare",
+    url: "/$workspaceName/optimizations/$optimizationId/trials",
     icon: SparklesIcon,
-    param: "datasetId",
+    param: "optimizationId",
     deleted: "Deleted optimization",
     label: "trial",
     color: "var(--color-orange)",
@@ -127,6 +127,14 @@ export const RESOURCE_MAP = {
     color: "var(--color-green)",
     search: { tab: PROJECT_TAB.logs, logsType: LOGS_TYPE.traces },
   },
+  [RESOURCE_TYPE.evaluationSuite]: {
+    url: "/$workspaceName/evaluation-suites/$suiteId/items",
+    icon: Database,
+    param: "suiteId",
+    deleted: "Deleted evaluation suite",
+    label: "evaluation suite",
+    color: "var(--color-yellow)",
+  },
   [RESOURCE_TYPE.threads]: {
     url: "/$workspaceName/projects/$projectId/traces",
     icon: MessagesSquare,
@@ -138,7 +146,7 @@ export const RESOURCE_MAP = {
   },
 };
 
-type ResourceLinkProps = {
+export type ResourceLinkProps = {
   name?: string;
   id: string;
   resource: RESOURCE_TYPE;
@@ -146,7 +154,7 @@ type ResourceLinkProps = {
   params?: Record<string, string | number | string[]>;
   variant?: TagProps["variant"];
   size?: TagProps["size"];
-  iconsSize?: number;
+  iconSize?: 3 | 3.5 | 4 | 5;
   gapSize?: number;
   tooltipContent?: string;
   asTag?: boolean;
@@ -155,7 +163,7 @@ type ResourceLinkProps = {
   className?: string;
 };
 
-const ResourceLink: React.FunctionComponent<ResourceLinkProps> = ({
+function ResourceLink({
   resource,
   name,
   id,
@@ -163,14 +171,14 @@ const ResourceLink: React.FunctionComponent<ResourceLinkProps> = ({
   params,
   variant = "gray",
   size = "md",
-  iconsSize = 4,
+  iconSize = 4,
   gapSize = 2,
   tooltipContent = "",
   asTag = false,
   isSmall = false,
   isDeleted = false,
   className,
-}) => {
+}: ResourceLinkProps): React.ReactElement {
   const workspaceName = useAppStore((state) => state.activeWorkspaceName);
   const props = RESOURCE_MAP[resource];
   const linkParams: Record<string, string> = {
@@ -203,6 +211,8 @@ const ResourceLink: React.FunctionComponent<ResourceLinkProps> = ({
               gapSize === 3 && "gap-3",
               gapSize === 4 && "gap-4",
               deleted && "opacity-50 cursor-default",
+              !deleted &&
+                "hover:bg-primary-foreground hover:text-foreground active:bg-primary-100 active:text-foreground",
               isSmall && "size-8 justify-center",
               className,
             )}
@@ -210,9 +220,10 @@ const ResourceLink: React.FunctionComponent<ResourceLinkProps> = ({
             <props.icon
               className={cn(
                 "shrink-0",
-                iconsSize === 3 && "size-3",
-                iconsSize === 4 && "size-4",
-                iconsSize === 5 && "size-5",
+                iconSize === 3 && "size-3",
+                iconSize === 3.5 && "size-3.5",
+                iconSize === 4 && "size-4",
+                iconSize === 5 && "size-5",
               )}
               style={{ color: props.color }}
             />
@@ -244,6 +255,6 @@ const ResourceLink: React.FunctionComponent<ResourceLinkProps> = ({
       )}
     </Link>
   );
-};
+}
 
 export default ResourceLink;

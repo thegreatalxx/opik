@@ -2,7 +2,7 @@
 
 A Helm chart for Comet Opik
 
-![Version: 1.10.20](https://img.shields.io/badge/Version-1.10.20-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 1.10.20](https://img.shields.io/badge/AppVersion-1.10.20-informational?style=flat-square)
+![Version: 1.10.42](https://img.shields.io/badge/Version-1.10.42-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 1.10.42](https://img.shields.io/badge/AppVersion-1.10.42-informational?style=flat-square)
 [![Artifact Hub](https://img.shields.io/endpoint?url=https://artifacthub.io/badge/repository/opik)](https://artifacthub.io/packages/search?repo=opik)
 
 # Run Comet Opik with Helm
@@ -206,48 +206,6 @@ Call opik api on http://localhost:5173/api
 | clickhouse.templates.serviceTemplate | string | `"clickhouse-cluster-svc-template"` |  |
 | clickhouse.templates.volumeClaimTemplate | string | `"storage-vc-template"` |  |
 | clickhouse.zookeeper.host | string | `"opik-zookeeper"` |  |
-| component.ai-backend.autoscaling.enabled | bool | `false` |  |
-| component.ai-backend.backendConfigMap.enabled | bool | `true` |  |
-| component.ai-backend.enabled | bool | `false` |  |
-| component.ai-backend.env.AGENT_OPIK_URL | string | `"http://opik-backend:8080"` |  |
-| component.ai-backend.env.OPIK_URL_OVERRIDE | string | `"http://opik-backend:8080"` |  |
-| component.ai-backend.env.PORT | string | `"8081"` |  |
-| component.ai-backend.env.SESSION_SERVICE_URI | string | `"mysql://opik:opik@opik-mysql:3306/opik"` |  |
-| component.ai-backend.env.URL_PREFIX | string | `"/opik-ai"` |  |
-| component.ai-backend.envFrom[0].configMapRef.name | string | `"opik-ai-backend"` |  |
-| component.ai-backend.image.pullPolicy | string | `"IfNotPresent"` |  |
-| component.ai-backend.image.repository | string | `"opik-ai-backend"` |  |
-| component.ai-backend.ingress.annotations | object | `{}` |  |
-| component.ai-backend.ingress.enabled | bool | `false` |  |
-| component.ai-backend.ingress.hosts | list | `[]` |  |
-| component.ai-backend.ingress.ingressClassName | string | `""` |  |
-| component.ai-backend.ingress.tls.enabled | bool | `false` |  |
-| component.ai-backend.ingress.tls.hosts | list | `[]` |  |
-| component.ai-backend.ingress.tls.secretName | string | `""` |  |
-| component.ai-backend.livenessProbe.httpGet.path | string | `"/opik-ai/healthz"` |  |
-| component.ai-backend.livenessProbe.httpGet.port | int | `8081` |  |
-| component.ai-backend.metrics.enabled | bool | `false` |  |
-| component.ai-backend.podDisruptionBudget.enabled | bool | `false` |  |
-| component.ai-backend.ports[0].containerPort | int | `8081` |  |
-| component.ai-backend.ports[0].name | string | `"http"` |  |
-| component.ai-backend.ports[0].protocol | string | `"TCP"` |  |
-| component.ai-backend.readinessProbe.httpGet.path | string | `"/opik-ai/healthz"` |  |
-| component.ai-backend.readinessProbe.httpGet.port | int | `8081` |  |
-| component.ai-backend.readinessProbe.initialDelaySeconds | int | `10` |  |
-| component.ai-backend.replicaCount | int | `1` |  |
-| component.ai-backend.secretRefs | list | `[]` |  |
-| component.ai-backend.securityContext | object | `{}` |  |
-| component.ai-backend.service.ports[0].name | string | `"http"` |  |
-| component.ai-backend.service.ports[0].port | int | `8081` |  |
-| component.ai-backend.service.ports[0].protocol | string | `"TCP"` |  |
-| component.ai-backend.service.ports[0].targetPort | int | `8081` |  |
-| component.ai-backend.service.type | string | `"ClusterIP"` |  |
-| component.ai-backend.serviceAccount.create | bool | `true` |  |
-| component.ai-backend.serviceAccount.name | string | `"opik-ai-backend"` |  |
-| component.ai-backend.startupProbe.failureThreshold | int | `30` |  |
-| component.ai-backend.startupProbe.httpGet.path | string | `"/opik-ai/healthz"` |  |
-| component.ai-backend.startupProbe.httpGet.port | int | `8081` |  |
-| component.ai-backend.startupProbe.periodSeconds | int | `10` |  |
 | component.backend.autoscaling.behavior.scaleDown.policies[0].periodSeconds | int | `60` |  |
 | component.backend.autoscaling.behavior.scaleDown.policies[0].type | string | `"Percent"` |  |
 | component.backend.autoscaling.behavior.scaleDown.policies[0].value | int | `50` |  |
@@ -331,11 +289,6 @@ Call opik api on http://localhost:5173/api
 | component.backend.waitForMysql.image.tag | float | `1.36` |  |
 | component.backend.waitForMysql.mysql.host | string | `"opik-mysql"` |  |
 | component.backend.waitForMysql.mysql.port | int | `3306` |  |
-| component.frontend.aiBackendUpstreamConfig.gzip | string | `"off"` |  |
-| component.frontend.aiBackendUpstreamConfig.proxy_buffering | string | `"off"` |  |
-| component.frontend.aiBackendUpstreamConfig.proxy_connect_timeout | int | `90` |  |
-| component.frontend.aiBackendUpstreamConfig.proxy_read_timeout | int | `300` |  |
-| component.frontend.aiBackendUpstreamConfig.proxy_send_timeout | int | `300` |  |
 | component.frontend.autoscaling.behavior.scaleDown.policies[0].periodSeconds | int | `60` |  |
 | component.frontend.autoscaling.behavior.scaleDown.policies[0].type | string | `"Percent"` |  |
 | component.frontend.autoscaling.behavior.scaleDown.policies[0].value | int | `50` |  |
@@ -377,8 +330,10 @@ Call opik api on http://localhost:5173/api
 | component.frontend.contentSecurityPolicy.img-src[4] | string | `"http:"` |  |
 | component.frontend.contentSecurityPolicy.manifest-src[0] | string | `"'self'"` |  |
 | component.frontend.contentSecurityPolicy.media-src[0] | string | `"'self'"` |  |
-| component.frontend.contentSecurityPolicy.media-src[1] | string | `"https:"` |  |
-| component.frontend.contentSecurityPolicy.media-src[2] | string | `"http:"` |  |
+| component.frontend.contentSecurityPolicy.media-src[1] | string | `"data:"` |  |
+| component.frontend.contentSecurityPolicy.media-src[2] | string | `"blob:"` |  |
+| component.frontend.contentSecurityPolicy.media-src[3] | string | `"https:"` |  |
+| component.frontend.contentSecurityPolicy.media-src[4] | string | `"http:"` |  |
 | component.frontend.contentSecurityPolicy.object-src[0] | string | `"'none'"` |  |
 | component.frontend.contentSecurityPolicy.script-src[0] | string | `"'self'"` |  |
 | component.frontend.contentSecurityPolicy.script-src[1] | string | `"'unsafe-inline'"` |  |
@@ -441,6 +396,7 @@ Call opik api on http://localhost:5173/api
 | component.python-backend.env.PYTHON_CODE_EXECUTOR_IMAGE_NAME | string | `"opik-sandbox-executor-python"` |  |
 | component.python-backend.env.PYTHON_CODE_EXECUTOR_IMAGE_REGISTRY | string | `"ghcr.io/comet-ml/opik"` |  |
 | component.python-backend.env.PYTHON_CODE_EXECUTOR_MEM_LIMIT | string | `"256m"` |  |
+| component.python-backend.env.PYTHON_CODE_EXECUTOR_METRICS_INTERVAL_IN_SECONDS | string | `"60"` |  |
 | component.python-backend.env.PYTHON_CODE_EXECUTOR_PARALLEL_NUM | string | `"5"` |  |
 | component.python-backend.env.PYTHON_CODE_EXECUTOR_STRATEGY | string | `"process"` |  |
 | component.python-backend.env.REDIS_URL | string | `"redis://:wFSuJX9nDBdCa25sKZG7bh@opik-redis-master:6379/"` |  |
@@ -520,6 +476,7 @@ Call opik api on http://localhost:5173/api
 | serviceAccount.name | string | `""` |  |
 | standalone | bool | `true` |  |
 | tolerations | list | `[]` |  |
+| topologySpreadConstraints | list | `[]` |  |
 | zookeeper.commonLabels."app.kubernetes.io/name" | string | `"zookeeper-opik"` |  |
 | zookeeper.enabled | bool | `true` |  |
 | zookeeper.extraEnvVars[0].name | string | `"ZK_HEAP_SIZE"` |  |

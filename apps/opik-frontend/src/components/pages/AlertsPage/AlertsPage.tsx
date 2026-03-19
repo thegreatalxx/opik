@@ -179,7 +179,7 @@ const AlertsPage: React.FunctionComponent = () => {
   const workspaceName = useAppStore((state) => state.activeWorkspaceName);
   const navigate = useNavigate();
   const {
-    permissions: { canInteractWithApp },
+    permissions: { canInteractWithApp, canUpdateAlerts },
   } = usePermissions();
 
   const [search = "", setSearch] = useQueryParam("alerts_search", StringParam, {
@@ -285,11 +285,15 @@ const AlertsPage: React.FunctionComponent = () => {
         selectedColumns,
         sortableColumns: sortableBy,
       }),
-      generateActionsColumDef({
-        cell: AlertsRowActionsCell,
-      }),
+      ...(canUpdateAlerts
+        ? [
+            generateActionsColumDef({
+              cell: AlertsRowActionsCell,
+            }),
+          ]
+        : []),
     ];
-  }, [columnsOrder, selectedColumns, sortableBy]);
+  }, [columnsOrder, selectedColumns, sortableBy, canUpdateAlerts]);
 
   const resizeConfig = useMemo(
     () => ({
@@ -360,14 +364,16 @@ const AlertsPage: React.FunctionComponent = () => {
               order={columnsOrder}
               onOrderChange={setColumnsOrder}
             ></ColumnsButton>
-            <Button
-              variant="default"
-              size="sm"
-              onClick={handleNewAlertClick}
-              disabled={!canInteractWithApp}
-            >
-              Create new alert
-            </Button>
+            {canUpdateAlerts && (
+              <Button
+                variant="default"
+                size="sm"
+                onClick={handleNewAlertClick}
+                disabled={!canInteractWithApp}
+              >
+                Create new alert
+              </Button>
+            )}
           </div>
         </div>
         <DataTable
@@ -383,7 +389,7 @@ const AlertsPage: React.FunctionComponent = () => {
           columnPinning={DEFAULT_COLUMN_PINNING}
           noData={
             <DataTableNoData title={noDataText}>
-              {noData && (
+              {noData && canUpdateAlerts && (
                 <Button
                   variant="link"
                   onClick={handleNewAlertClick}

@@ -16,6 +16,8 @@ type UseDashboardUpdateMutationParams = {
 
 type UseDashboardUpdateMutationOptions = {
   skipDefaultError?: boolean;
+  retry?: number;
+  retryDelay?: number;
 };
 
 const useDashboardUpdateMutation = (
@@ -25,6 +27,8 @@ const useDashboardUpdateMutation = (
   const { toast } = useToast();
 
   return useMutation({
+    retry: options?.retry ?? 0,
+    retryDelay: options?.retryDelay,
     mutationFn: async ({ dashboard }: UseDashboardUpdateMutationParams) => {
       const { data } = await api.patch(
         DASHBOARDS_REST_ENDPOINT + dashboard.id,
@@ -32,9 +36,29 @@ const useDashboardUpdateMutation = (
       );
       return data;
     },
+    onMutate: async ({ dashboard }: UseDashboardUpdateMutationParams) => {
+      const queryKey = [DASHBOARD_KEY, { dashboardId: dashboard.id }];
+
+      await queryClient.cancelQueries({ queryKey });
+
+      const previousDashboard = queryClient.getQueryData<Dashboard>(queryKey);
+
+      queryClient.setQueryData<Dashboard>(queryKey, (previous) =>
+        previous ? { ...previous, ...dashboard } : (dashboard as Dashboard),
+      );
+
+      return { previousDashboard };
+    },
     onError: options?.skipDefaultError
       ? undefined
-      : (error: AxiosError) => {
+      : (error: AxiosError, _variables, context) => {
+          if (context?.previousDashboard) {
+            queryClient.setQueryData(
+              [DASHBOARD_KEY, { dashboardId: context.previousDashboard.id }],
+              context.previousDashboard,
+            );
+          }
+
           const message = get(
             error,
             ["response", "data", "message"],

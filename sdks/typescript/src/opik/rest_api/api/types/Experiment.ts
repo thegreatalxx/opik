@@ -4,18 +4,22 @@ import type * as OpikApi from "../index.js";
 
 export interface Experiment {
     id?: string;
-    datasetName: string;
+    datasetName: string | null;
     datasetId?: string;
+    /** Project ID. Takes precedence over project_name when both are provided. */
     projectId?: string;
+    /** Project name. Creates project if it doesn't exist. Ignored when project_id is provided. */
     projectName?: string;
     name?: string;
     metadata?: OpikApi.JsonListString;
     tags?: string[];
     type?: OpikApi.ExperimentType;
+    evaluationMethod?: OpikApi.ExperimentEvaluationMethod;
     optimizationId?: string;
     feedbackScores?: OpikApi.FeedbackScoreAverage[];
     comments?: OpikApi.Comment[];
     traceCount?: number;
+    datasetItemCount?: number;
     createdAt?: Date;
     duration?: OpikApi.PercentageValues;
     totalEstimatedCost?: number;
@@ -31,4 +35,10 @@ export interface Experiment {
     /** ID of the dataset version this experiment is linked to. If not provided at creation, experiment will be automatically linked to the latest version. */
     datasetVersionId?: string;
     datasetVersionSummary?: OpikApi.DatasetVersionSummary;
+    /** Pass rate for evaluation suite experiments (0.0-1.0). Null for regular experiments. */
+    passRate?: number;
+    /** Number of items that passed for evaluation suite experiments. Null for regular experiments. */
+    passedCount?: number;
+    /** Total number of items for evaluation suite experiments. Null for regular experiments. */
+    totalCount?: number;
 }

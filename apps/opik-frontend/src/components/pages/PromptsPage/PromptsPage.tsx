@@ -211,6 +211,10 @@ const PromptsPage: React.FunctionComponent = () => {
     updateType: "replaceIn",
   });
 
+  const {
+    permissions: { canDeletePrompts },
+  } = usePermissions();
+
   const [sortedColumns, setSortedColumns] = useQueryParamAndLocalStorageState<
     ColumnSort[]
   >({
@@ -359,8 +363,12 @@ const PromptsPage: React.FunctionComponent = () => {
           />
         </div>
         <div className="flex items-center gap-2">
-          <PromptsActionsPanel prompts={selectedRows} />
-          <Separator orientation="vertical" className="mx-2 h-4" />
+          {canDeletePrompts && (
+            <>
+              <PromptsActionsPanel prompts={selectedRows} />
+              <Separator orientation="vertical" className="mx-2 h-4" />
+            </>
+          )}
           <ColumnsButton
             columns={DEFAULT_COLUMNS}
             selectedColumns={selectedColumns}

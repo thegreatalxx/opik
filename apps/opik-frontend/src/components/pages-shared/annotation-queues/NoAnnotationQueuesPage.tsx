@@ -28,7 +28,7 @@ const NoAnnotationQueuesPage: React.FC<NoAnnotationQueuesPageProps> = ({
   className,
 }) => {
   const {
-    permissions: { canInteractWithApp },
+    permissions: { canCreateAnnotationQueues, canInteractWithApp },
   } = usePermissions();
 
   return (
@@ -50,7 +50,7 @@ const NoAnnotationQueuesPage: React.FC<NoAnnotationQueuesPageProps> = ({
               Read documentation
             </a>
           </Button>
-          {openModal && (
+          {canCreateAnnotationQueues && openModal && (
             <Button onClick={openModal} disabled={!canInteractWithApp}>
               <Plus className="mr-2 size-4" />
               Create your first queue

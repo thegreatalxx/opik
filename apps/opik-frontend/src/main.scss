@@ -52,7 +52,7 @@
     --ring: 239 89% 64%;
 
     --warning: 348 86% 61%;
-    --success: 129 100% 42%;
+    --success: 142 64% 32%;
 
     /* Gray scale for utility classes */
     --gray-100: #f3f4f6;
@@ -76,18 +76,21 @@
     --codemirror-syntax-punctuation: #6a737d;
 
     /* Chart colors */
-    --chart-tick-stroke: #373d4d;
+    --chart-tick-stroke: #94a3b8;
     --chart-grid-stroke: #f1f5f8;
+    --chart-blue: #5899da;
+    --chart-yellow: #f4b400;
+    --chart-green: #19a979;
+    --chart-red: #ef6868;
+    --chart-burgundy: #bf399e;
+    --chart-purple: #945fcf;
+    --chart-pink: #ed4a7b;
+    --chart-orange: #fb9341;
 
     /* Template icon colors */
     --template-icon-metrics: #5899da;
     --template-icon-performance: #ef6868;
     --template-icon-scratch: #945fcf;
-    --template-icon-experiments: #10b981;
-
-    /* DataTable colors */
-    --table-best-row-bg: #e6f7ed;
-    --table-best-row-hover-bg: #d0f0dc;
 
     /* Trace thread colors */
     --thread-active: #ebf2f5;
@@ -114,9 +117,19 @@
     --feature-experiment-management: #6c6ff7;
     --feature-llm: #52aea4;
 
+    /* Config link icon color */
+    --color-fuchsia: #db46ef;
+
     /* Error indicator colors */
     --error-indicator-background: #ffd2d2;
     --error-indicator-text: #822c45;
+
+    /* Edit badge colors */
+    --edit-badge-bg: #ff5a3c;
+    --edit-badge-text: #ffffff;
+
+    /* Timeline connector colors */
+    --timeline-connector: #cfd0ff;
 
     /* Search highlight colors */
     --search-highlight: #ffdf20;
@@ -125,8 +138,10 @@
     /* Diff colors */
     --diff-removed-bg: #fde2e7;
     --diff-removed-text: #931a32;
+    --diff-removed-border: #fecdd3;
     --diff-added-bg: #e2fde6;
     --diff-added-text: #1d6728;
+    --diff-added-border: #bbf7d0;
 
     /* Upload field colors */
     --upload-icon-bg: 213 26.8% 83.9%;
@@ -152,6 +167,7 @@
     --color-orange: #f97316;
     --color-yellow: #eab308;
     --color-green: #10b981;
+    --color-lime: #a3e635;
     --color-turquoise: #06b6d4;
     --color-blue: #3b82f6;
     --color-primary: #6366f1;
@@ -169,7 +185,7 @@
     --tag-burgundy-text: #72275f;
     --tag-pink-bg: #fde2ea;
     --tag-pink-text: #822c45;
-    --tag-red-bg: #fdc9c9;
+    --tag-red-bg: #ffd2d2;
     --tag-red-text: #4e1d1d;
     --tag-orange-bg: #fee3d7;
     --tag-orange-text: #73422b;
@@ -177,10 +193,16 @@
     --tag-yellow-text: #675523;
     --tag-green-bg: #dafbf0;
     --tag-green-text: #295747;
+
+    --tag-lime-bg: #a3e635;
+    --tag-lime-text: #1a2e05;
     --tag-turquoise-bg: #cdf5f9;
     --tag-turquoise-text: #15545b;
     --tag-blue-bg: #e2effd;
     --tag-blue-text: #19426b;
+
+    /* Separator light color */
+    --separator-light: #f1f5f9;
 
     /* Info box colors (blue variant for informational content) */
     --info-box-bg: 214 100% 92%;
@@ -247,7 +269,7 @@
     --destructive-foreground: 210 40% 98%;
 
     --warning: 348 86% 61%;
-    --success: 129 100% 42%;
+    --success: 142 64% 40%;
 
     /* Gray scale for utility classes - Dark Mode */
     --gray-100: 217.2 32.6% 15%;
@@ -275,6 +297,16 @@
     --feature-experiment-management: #3b70f6;
     --feature-llm: #20ac74;
 
+    /* Config link icon color - Dark Mode */
+    --color-fuchsia: #c850c0;
+
+    /* Edit badge colors - Dark Mode */
+    --edit-badge-bg: #cc4730;
+    --edit-badge-text: #ffffff;
+
+    /* Timeline connector colors - Dark Mode */
+    --timeline-connector: #3b3d6b;
+
     /* Muted colors - Dark Mode */
     --muted: 0, 0%, 11%;
 
@@ -301,23 +333,29 @@
     /* Chart colors */
     --chart-tick-stroke: #a3a3a3;
     --chart-grid-stroke: #303030;
+    --chart-blue: #5899da;
+    --chart-yellow: #f4b400;
+    --chart-green: #19a979;
+    --chart-red: #ef6868;
+    --chart-burgundy: #bf399e;
+    --chart-purple: #945fcf;
+    --chart-pink: #ed4a7b;
+    --chart-orange: #fb9341;
 
     /* Template icon colors - Dark Mode */
     --template-icon-metrics: #5899da;
     --template-icon-performance: #ef6868;
     --template-icon-scratch: #945fcf;
-    --template-icon-experiments: #10b981;
 
     /* Diff colors - Dark Mode */
     --diff-removed-bg: #7f1d1d;
     --diff-removed-text: #fef2f2;
+    --diff-removed-border: #991b1b;
     --diff-added-bg: #14532d;
     --diff-added-text: #bbf7d0;
+    --diff-added-border: #166534;
 
     /* DataTable colors - Dark Mode */
-    --table-best-row-bg: #29322f;
-    --table-best-row-hover-bg: #314136;
-
     /* Upload field colors - Dark Mode */
     --upload-icon-bg: 215 19.3% 34.5%;
 
@@ -348,10 +386,16 @@
     --tag-yellow-text: #ebad00;
     --tag-green-bg: #29322f;
     --tag-green-text: #14bb83;
+
+    --tag-lime-bg: #3d5a0a;
+    --tag-lime-text: #d9f99d;
     --tag-turquoise-bg: #293232;
     --tag-turquoise-text: #0fbfd2;
     --tag-blue-bg: #292e32;
     --tag-blue-text: #6eabe7;
+
+    /* Separator light color - Dark Mode */
+    --separator-light: #2a2a2a;
 
     /* Info box colors - Dark Mode */
     --info-box-bg: 224 76% 33%;
@@ -541,11 +585,11 @@
   }
 
   .comet-table-row-best td {
-    background-color: var(--table-best-row-bg) !important;
+    background: hsl(var(--primary-foreground)) !important;
   }
 
   .comet-table-row-best:hover td {
-    background-color: var(--table-best-row-hover-bg) !important;
+    background: hsl(var(--primary-foreground)) !important;
   }
 
   .comet-table-row-active[data-row-active="true"] td {

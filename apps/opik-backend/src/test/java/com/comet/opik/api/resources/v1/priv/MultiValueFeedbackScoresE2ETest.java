@@ -584,7 +584,7 @@ class MultiValueFeedbackScoresE2ETest {
     @DisplayName("test score experiment by multiple authors")
     void testScoreExperimentByMultipleAuthors() {
         // first create a dataset
-        var dataset = factory.manufacturePojo(Dataset.class).toBuilder()
+        var dataset = buildDataset().toBuilder()
                 .id(null)
                 .build();
         var datasetId = datasetResourceClient.createDataset(dataset, API_KEY1, TEST_WORKSPACE);
@@ -647,11 +647,15 @@ class MultiValueFeedbackScoresE2ETest {
         assertDatasetItemsWithExperimentItems(experimentId, datasetId, user1Score, user2Score);
     }
 
+    private Dataset buildDataset() {
+        return DatasetResourceClient.buildDataset(factory);
+    }
+
     @Test
     @DisplayName("test score optimization by multiple authors")
     void testScoreOptimizationByMultipleAuthors() {
         // create a dataset
-        var dataset = factory.manufacturePojo(Dataset.class).toBuilder()
+        var dataset = buildDataset().toBuilder()
                 .id(null)
                 .build();
         var datasetId = datasetResourceClient.createDataset(dataset, API_KEY1, TEST_WORKSPACE);
@@ -969,7 +973,9 @@ class MultiValueFeedbackScoresE2ETest {
 
     private void assertAuthorValue(Map<String, ValueEntry> valueByAuthor, String author, FeedbackScore expected) {
         assertThat(valueByAuthor.get(author).categoryName()).isEqualTo(expected.categoryName());
-        assertThat(valueByAuthor.get(author).value()).isEqualByComparingTo(expected.value());
+        assertThat(valueByAuthor.get(author).value())
+                .usingComparator(StatsUtils::bigDecimalComparator)
+                .isEqualTo(expected.value());
         assertThat(valueByAuthor.get(author).reason()).isEqualTo(expected.reason());
         assertThat(valueByAuthor.get(author).source()).isEqualTo(expected.source());
     }

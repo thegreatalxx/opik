@@ -3,6 +3,7 @@ package com.comet.opik.domain.filter;
 import com.comet.opik.api.filter.AlertField;
 import com.comet.opik.api.filter.AnnotationQueueField;
 import com.comet.opik.api.filter.AutomationRuleEvaluatorField;
+import com.comet.opik.api.filter.DashboardField;
 import com.comet.opik.api.filter.DatasetField;
 import com.comet.opik.api.filter.DatasetItemField;
 import com.comet.opik.api.filter.ExperimentField;
@@ -21,7 +22,9 @@ import com.comet.opik.api.sorting.SortingField;
 import com.google.common.collect.ImmutableMap;
 import io.r2dbc.spi.Statement;
 import lombok.NonNull;
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.stringtemplate.v4.ST;
 
 import java.util.Arrays;
 import java.util.EnumMap;
@@ -94,6 +97,7 @@ public class FilterQueryBuilder {
     private static final String GUARDRAILS_RESULT_DB = "gagg.guardrails_result";
     private static final String VISIBILITY_MODE_DB = "visibility_mode";
     private static final String ERROR_INFO_DB = "error_info";
+    private static final String ERROR_TYPE_DB = "simpleJSONExtractString(error_info, 'exception_type')";
     private static final String STATUS_DB = "status";
     public static final String FEEDBACK_DEFINITIONS_DB = "feedback_definitions";
     public static final String SCOPE_DB = "scope";
@@ -301,6 +305,7 @@ public class FilterQueryBuilder {
                     .put(TraceField.GUARDRAILS, GUARDRAILS_RESULT_DB)
                     .put(TraceField.VISIBILITY_MODE, VISIBILITY_MODE_DB)
                     .put(TraceField.ERROR_INFO, ERROR_INFO_DB)
+                    .put(TraceField.ERROR_TYPE, ERROR_TYPE_DB)
                     .put(TraceField.ANNOTATION_QUEUE_IDS, ANNOTATION_QUEUE_IDS_ANALYTICS_DB)
                     .put(TraceField.EXPERIMENT_ID, EXPERIMENT_ID_DB)
                     .put(TraceField.CREATED_AT, CREATED_AT_DB)
@@ -346,6 +351,7 @@ public class FilterQueryBuilder {
                     .put(SpanField.DURATION, DURATION_ANALYTICS_DB)
                     .put(SpanField.TTFT, TTFT_ANALYTICS_DB)
                     .put(SpanField.ERROR_INFO, ERROR_INFO_DB)
+                    .put(SpanField.ERROR_TYPE, ERROR_TYPE_DB)
                     .put(SpanField.TYPE, TYPE_ANALYTICS_DB)
                     .put(SpanField.TRACE_ID, TRACE_ID_DB)
                     .build());
@@ -408,6 +414,7 @@ public class FilterQueryBuilder {
                     .put(DatasetField.LAST_UPDATED_BY, LAST_UPDATED_BY_DB)
                     .put(DatasetField.LAST_CREATED_EXPERIMENT_AT, LAST_CREATED_EXPERIMENT_AT_DB)
                     .put(DatasetField.LAST_CREATED_OPTIMIZATION_AT, LAST_CREATED_OPTIMIZATION_AT_DB)
+                    .put(DatasetField.TYPE, TYPE_DB)
                     .build());
 
     private static final Map<DatasetItemField, String> DATASET_ITEM_FIELDS_MAP = new EnumMap<>(
@@ -450,6 +457,18 @@ public class FilterQueryBuilder {
                     .put(AlertField.LAST_UPDATED_AT, LAST_UPDATED_AT_DB)
                     .put(AlertField.CREATED_BY, CREATED_BY_DB)
                     .put(AlertField.LAST_UPDATED_BY, LAST_UPDATED_BY_DB)
+                    .build());
+
+    private static final Map<DashboardField, String> DASHBOARD_FIELDS_MAP = new EnumMap<>(
+            ImmutableMap.<DashboardField, String>builder()
+                    .put(DashboardField.ID, ID_DB)
+                    .put(DashboardField.NAME, NAME_DB)
+                    .put(DashboardField.TYPE, TYPE_DB)
+                    .put(DashboardField.SCOPE, SCOPE_DB)
+                    .put(DashboardField.CREATED_AT, CREATED_AT_DB)
+                    .put(DashboardField.LAST_UPDATED_AT, LAST_UPDATED_AT_DB)
+                    .put(DashboardField.CREATED_BY, CREATED_BY_DB)
+                    .put(DashboardField.LAST_UPDATED_BY, LAST_UPDATED_BY_DB)
                     .build());
 
     private static final Map<AutomationRuleEvaluatorField, String> AUTOMATION_RULE_EVALUATOR_FIELDS_MAP = new EnumMap<>(
@@ -508,7 +527,8 @@ public class FilterQueryBuilder {
                 TraceField.THREAD_ID,
                 TraceField.GUARDRAILS,
                 TraceField.VISIBILITY_MODE,
-                TraceField.ERROR_INFO));
+                TraceField.ERROR_INFO,
+                TraceField.ERROR_TYPE));
 
         map.put(FilterStrategy.EXPERIMENT_AGGREGATION, Set.of(
                 TraceField.EXPERIMENT_ID));
@@ -544,6 +564,7 @@ public class FilterQueryBuilder {
                 SpanField.DURATION,
                 SpanField.TTFT,
                 SpanField.ERROR_INFO,
+                SpanField.ERROR_TYPE,
                 SpanField.TYPE,
                 SpanField.TRACE_ID));
 
@@ -554,11 +575,17 @@ public class FilterQueryBuilder {
                 TraceThreadField.FEEDBACK_SCORES,
                 ExperimentField.FEEDBACK_SCORES));
 
+        map.put(FilterStrategy.FEEDBACK_SCORES_AGGREGATED, Set.of(
+                ExperimentField.FEEDBACK_SCORES,
+                ExperimentsComparisonValidKnownField.FEEDBACK_SCORES));
+
         map.put(FilterStrategy.TRACE_SPAN_FEEDBACK_SCORES, Set.of(TraceField.SPAN_FEEDBACK_SCORES));
 
         map.put(FilterStrategy.SPAN_FEEDBACK_SCORES, Set.of(SpanField.FEEDBACK_SCORES));
 
         map.put(FilterStrategy.EXPERIMENT_SCORES, Set.of(ExperimentField.EXPERIMENT_SCORES));
+
+        map.put(FilterStrategy.EXPERIMENT_SCORES_AGGREGATED, Set.of(ExperimentField.EXPERIMENT_SCORES));
 
         map.put(FilterStrategy.EXPERIMENT_ITEM, Set.of(
                 ExperimentsComparisonValidKnownField.OUTPUT,
@@ -602,7 +629,8 @@ public class FilterQueryBuilder {
                 DatasetField.LAST_UPDATED_AT,
                 DatasetField.LAST_UPDATED_BY,
                 DatasetField.LAST_CREATED_EXPERIMENT_AT,
-                DatasetField.LAST_CREATED_OPTIMIZATION_AT));
+                DatasetField.LAST_CREATED_OPTIMIZATION_AT,
+                DatasetField.TYPE));
 
         map.put(FilterStrategy.ANNOTATION_QUEUE, Set.of(
                 AnnotationQueueField.ID,
@@ -678,6 +706,16 @@ public class FilterQueryBuilder {
                 OptimizationField.DATASET_ID,
                 OptimizationField.STATUS));
 
+        map.put(FilterStrategy.DASHBOARD, Set.of(
+                DashboardField.ID,
+                DashboardField.NAME,
+                DashboardField.TYPE,
+                DashboardField.SCOPE,
+                DashboardField.CREATED_AT,
+                DashboardField.LAST_UPDATED_AT,
+                DashboardField.CREATED_BY,
+                DashboardField.LAST_UPDATED_BY));
+
         return map;
     }
 
@@ -705,6 +743,53 @@ public class FilterQueryBuilder {
 
     public static String toAnalyticsDbOperator(@NonNull Filter filter) {
         return ANALYTICS_DB_OPERATOR_MAP.get(filter.operator()).get(filter.field().getType());
+    }
+
+    private static String toAnalyticsDbOperator(@NonNull Filter filter, @NonNull FilterStrategy filterStrategy) {
+        // For aggregated feedback scores, use map access patterns instead of groupArray patterns
+        if ((filterStrategy == FilterStrategy.FEEDBACK_SCORES_AGGREGATED
+                || filterStrategy == FilterStrategy.FEEDBACK_SCORES_AGGREGATED_IS_EMPTY)
+                && filter.field().getType() == FieldType.FEEDBACK_SCORES_NUMBER) {
+            return getAggregatedFeedbackScoresTemplate(filter.operator());
+        }
+
+        // For aggregated experiment scores (Map(String, Float64)), use Float64-based map access patterns
+        if ((filterStrategy == FilterStrategy.EXPERIMENT_SCORES_AGGREGATED
+                || filterStrategy == FilterStrategy.EXPERIMENT_SCORES_AGGREGATED_IS_EMPTY)
+                && filter.field().getType() == FieldType.FEEDBACK_SCORES_NUMBER) {
+            return getAggregatedExperimentScoresTemplate(filter.operator());
+        }
+
+        return ANALYTICS_DB_OPERATOR_MAP.get(filter.operator()).get(filter.field().getType());
+    }
+
+    private static String getAggregatedMapScoresTemplate(Operator operator, String valueCast) {
+        return switch (operator) {
+            case EQUAL ->
+                "arrayExists(k -> lower(k) = lower(:filterKey%2$d) AND %1$s[k] = " + valueCast + ", mapKeys(%1$s))";
+            case NOT_EQUAL ->
+                "arrayExists(k -> lower(k) = lower(:filterKey%2$d) AND %1$s[k] != " + valueCast + ", mapKeys(%1$s))";
+            case GREATER_THAN ->
+                "arrayExists(k -> lower(k) = lower(:filterKey%2$d) AND %1$s[k] > " + valueCast + ", mapKeys(%1$s))";
+            case GREATER_THAN_EQUAL ->
+                "arrayExists(k -> lower(k) = lower(:filterKey%2$d) AND %1$s[k] >= " + valueCast + ", mapKeys(%1$s))";
+            case LESS_THAN ->
+                "arrayExists(k -> lower(k) = lower(:filterKey%2$d) AND %1$s[k] < " + valueCast + ", mapKeys(%1$s))";
+            case LESS_THAN_EQUAL ->
+                "arrayExists(k -> lower(k) = lower(:filterKey%2$d) AND %1$s[k] <= " + valueCast + ", mapKeys(%1$s))";
+            case IS_EMPTY -> "NOT arrayExists(k -> lower(k) = lower(:filterKey%2$d), mapKeys(%1$s))";
+            case IS_NOT_EMPTY -> "arrayExists(k -> lower(k) = lower(:filterKey%2$d), mapKeys(%1$s))";
+            default -> throw new IllegalArgumentException(
+                    "Unsupported operator for aggregated map scores: '%s'".formatted(operator));
+        };
+    }
+
+    private static String getAggregatedFeedbackScoresTemplate(Operator operator) {
+        return getAggregatedMapScoresTemplate(operator, "toDecimal64(:filter%2$d, 9)");
+    }
+
+    private static String getAggregatedExperimentScoresTemplate(Operator operator) {
+        return getAggregatedMapScoresTemplate(operator, "toFloat64(:filter%2$d)");
     }
 
     public static Optional<Boolean> hasGuardrailsFilter(@NonNull List<? extends Filter> filters) {
@@ -750,11 +835,60 @@ public class FilterQueryBuilder {
             return Optional.of(FILTER_STRATEGY_MAP.get(FilterStrategy.EXPERIMENT_SCORES));
         }
 
+        if (filter.operator() == Operator.IS_EMPTY
+                && filterStrategy == FilterStrategy.FEEDBACK_SCORES_AGGREGATED_IS_EMPTY) {
+            return Optional.of(FILTER_STRATEGY_MAP.get(FilterStrategy.FEEDBACK_SCORES_AGGREGATED));
+        }
+
+        if (filter.operator() == Operator.IS_NOT_EMPTY
+                && filterStrategy == FilterStrategy.FEEDBACK_SCORES_AGGREGATED_IS_EMPTY) {
+            return Optional.of(FILTER_STRATEGY_MAP.get(FilterStrategy.FEEDBACK_SCORES_AGGREGATED));
+        }
+
+        if (filter.operator() == Operator.IS_EMPTY
+                && filterStrategy == FilterStrategy.EXPERIMENT_SCORES_AGGREGATED_IS_EMPTY) {
+            return Optional.of(FILTER_STRATEGY_MAP.get(FilterStrategy.EXPERIMENT_SCORES_AGGREGATED));
+        }
+
+        if (filter.operator() == Operator.IS_NOT_EMPTY
+                && filterStrategy == FilterStrategy.EXPERIMENT_SCORES_AGGREGATED_IS_EMPTY) {
+            return Optional.of(FILTER_STRATEGY_MAP.get(FilterStrategy.EXPERIMENT_SCORES_AGGREGATED));
+        }
+
+        // Skip IS_NOT_EMPTY for FEEDBACK_SCORES_AGGREGATED — it is handled by FEEDBACK_SCORES_AGGREGATED_IS_EMPTY
+        if (filter.operator() == Operator.IS_NOT_EMPTY && isFeedbackScore(filter)
+                && filterStrategy == FilterStrategy.FEEDBACK_SCORES_AGGREGATED) {
+            return Optional.empty();
+        }
+
+        // Skip IS_NOT_EMPTY for EXPERIMENT_SCORES_AGGREGATED — it is handled by EXPERIMENT_SCORES_AGGREGATED_IS_EMPTY
+        if (filter.operator() == Operator.IS_NOT_EMPTY && isFeedbackScore(filter)
+                && filterStrategy == FilterStrategy.EXPERIMENT_SCORES_AGGREGATED) {
+            return Optional.empty();
+        }
+
+        // Skip numerical operators for FEEDBACK_SCORES_AGGREGATED_IS_EMPTY — only IS_EMPTY/IS_NOT_EMPTY are handled there
+        if (filter.operator() != Operator.IS_EMPTY && filter.operator() != Operator.IS_NOT_EMPTY
+                && isFeedbackScore(filter)
+                && filterStrategy == FilterStrategy.FEEDBACK_SCORES_AGGREGATED_IS_EMPTY) {
+            return Optional.empty();
+        }
+
+        // Skip numerical operators for EXPERIMENT_SCORES_AGGREGATED_IS_EMPTY — only IS_EMPTY/IS_NOT_EMPTY are handled there
+        if (filter.operator() != Operator.IS_EMPTY && filter.operator() != Operator.IS_NOT_EMPTY
+                && isFeedbackScore(filter)
+                && filterStrategy == FilterStrategy.EXPERIMENT_SCORES_AGGREGATED_IS_EMPTY) {
+            return Optional.empty();
+        }
+
         if (isNotEmptyScoresFilter(filterStrategy, filter)) {
             return Optional.empty();
         }
 
-        if (filter.operator() == Operator.IS_EMPTY && isFeedbackScore(filter)) {
+        // Only allow IS_EMPTY for _IS_EMPTY strategies (not for regular AGGREGATED strategy)
+        if (filter.operator() == Operator.IS_EMPTY && isFeedbackScore(filter)
+                && filterStrategy != FilterStrategy.FEEDBACK_SCORES_AGGREGATED_IS_EMPTY
+                && filterStrategy != FilterStrategy.EXPERIMENT_SCORES_AGGREGATED_IS_EMPTY) {
             return Optional.empty();
         }
 
@@ -773,7 +907,7 @@ public class FilterQueryBuilder {
     }
 
     private static String toAnalyticsDbFilter(Filter filter, int i, FilterStrategy filterStrategy) {
-        var template = toAnalyticsDbOperator(filter);
+        var template = toAnalyticsDbOperator(filter, filterStrategy);
         var formattedTemplate = template.formatted(getAnalyticsDbField(filter.field(), filterStrategy, i), i);
         return "(%s)".formatted(formattedTemplate);
     }
@@ -792,6 +926,35 @@ public class FilterQueryBuilder {
             return EXPERIMENT_SCORE_COUNT_DB;
         }
 
+        // For aggregated feedback scores, use the appropriate column based on context
+        // ExperimentField.FEEDBACK_SCORES -> experiment_aggregates table uses feedback_scores_avg
+        if ((filterStrategy == FilterStrategy.FEEDBACK_SCORES_AGGREGATED
+                || filterStrategy == FilterStrategy.FEEDBACK_SCORES_AGGREGATED_IS_EMPTY)
+                && field == ExperimentField.FEEDBACK_SCORES) {
+            return "feedback_scores_avg";
+        }
+
+        // ExperimentsComparisonValidKnownField.FEEDBACK_SCORES -> experiment_item_aggregates table uses feedback_scores
+        if ((filterStrategy == FilterStrategy.FEEDBACK_SCORES_AGGREGATED
+                || filterStrategy == FilterStrategy.FEEDBACK_SCORES_AGGREGATED_IS_EMPTY)
+                && field == ExperimentsComparisonValidKnownField.FEEDBACK_SCORES) {
+            return "feedback_scores";
+        }
+
+        if ((filterStrategy == FilterStrategy.FEEDBACK_SCORES_AGGREGATED
+                || filterStrategy == FilterStrategy.FEEDBACK_SCORES_AGGREGATED_IS_EMPTY)
+                && field == ExperimentField.EXPERIMENT_SCORES) {
+            return "experiment_scores";
+        }
+
+        // experiment_aggregates.experiment_scores is Map(String, Float64); qualify with alias to avoid
+        // ambiguity with experiments.experiment_scores (JSON blob) in the same FROM clause
+        if ((filterStrategy == FilterStrategy.EXPERIMENT_SCORES_AGGREGATED
+                || filterStrategy == FilterStrategy.EXPERIMENT_SCORES_AGGREGATED_IS_EMPTY)
+                && field == ExperimentField.EXPERIMENT_SCORES) {
+            return "agg.experiment_scores";
+        }
+
         return switch (field) {
             case TraceField traceField -> TRACE_FIELDS_MAP.get(traceField);
             case SpanField spanField -> SPAN_FIELDS_MAP.get(spanField);
@@ -808,6 +971,7 @@ public class FilterQueryBuilder {
             case AutomationRuleEvaluatorField automationRuleEvaluatorField ->
                 AUTOMATION_RULE_EVALUATOR_FIELDS_MAP.get(automationRuleEvaluatorField);
             case OptimizationField optimizationField -> OPTIMIZATION_FIELDS_MAP.get(optimizationField);
+            case DashboardField dashboardField -> DASHBOARD_FIELDS_MAP.get(dashboardField);
             default -> {
 
                 if (field.isDynamic(filterStrategy)) {
@@ -866,6 +1030,51 @@ public class FilterQueryBuilder {
                     statement = statement.bind("filterKey%d".formatted(i), key);
                 }
             }
+        }
+        return statement;
+    }
+
+    /**
+     * Maps a {@link FilterStrategy} to the StringTemplate parameter name it populates.
+     */
+    public record FilterStrategyParam(FilterStrategy strategy, String templateParam) {
+    }
+
+    /**
+     * Applies a configurable list of filter strategies to a StringTemplate.
+     * For each entry whose strategy produces a non-empty SQL fragment, adds the fragment
+     * under the corresponding template parameter name.
+     *
+     * @param template       the ST template to populate
+     * @param filters        the caller-supplied filter list (may be null or empty)
+     * @param strategyParams ordered list of (strategy, templateParam) pairs to evaluate
+     */
+    public static void applyFiltersToTemplate(ST template, List<? extends Filter> filters,
+            List<FilterStrategyParam> strategyParams) {
+        if (CollectionUtils.isEmpty(filters)) {
+            return;
+        }
+        for (var entry : strategyParams) {
+            toAnalyticsDbFilters(filters, entry.strategy())
+                    .ifPresent(sql -> template.add(entry.templateParam(), sql));
+        }
+    }
+
+    /**
+     * Binds filter parameters for a configurable list of filter strategies to an R2DBC statement.
+     *
+     * @param statement  the statement to bind parameters to
+     * @param filters    the caller-supplied filter list (may be null or empty)
+     * @param strategies ordered list of strategies whose parameters should be bound
+     * @return the statement with all parameters bound
+     */
+    public static Statement bindFilters(Statement statement, List<? extends Filter> filters,
+            List<FilterStrategy> strategies) {
+        if (CollectionUtils.isEmpty(filters)) {
+            return statement;
+        }
+        for (var strategy : strategies) {
+            statement = bind(statement, filters, strategy);
         }
         return statement;
     }

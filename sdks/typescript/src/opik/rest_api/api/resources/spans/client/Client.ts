@@ -359,6 +359,7 @@ export class SpansClient {
             stripAttachments,
             sorting,
             exclude,
+            search,
             fromTime,
             toTime,
         } = request;
@@ -380,6 +381,7 @@ export class SpansClient {
             strip_attachments: stripAttachments,
             sorting,
             exclude,
+            search,
             from_time: fromTime?.toISOString(),
             to_time: toTime?.toISOString(),
         };
@@ -900,7 +902,7 @@ export class SpansClient {
         request: OpikApi.FindFeedbackScoreNames1Request = {},
         requestOptions?: SpansClient.RequestOptions,
     ): Promise<core.WithRawResponse<OpikApi.FeedbackScoreNamesPublic>> {
-        const { projectId, type: type_ } = request;
+        const { projectId, type: type_, excludeCategoryNames } = request;
         const _queryParams: Record<string, unknown> = {
             project_id: projectId,
             type:
@@ -910,6 +912,7 @@ export class SpansClient {
                           omitUndefined: true,
                       })
                     : undefined,
+            exclude_category_names: excludeCategoryNames,
         };
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             this._options?.headers,
@@ -1070,7 +1073,7 @@ export class SpansClient {
         request: OpikApi.GetSpanStatsRequest = {},
         requestOptions?: SpansClient.RequestOptions,
     ): Promise<core.WithRawResponse<OpikApi.ProjectStatsPublic>> {
-        const { projectId, projectName, traceId, type: type_, filters, fromTime, toTime } = request;
+        const { projectId, projectName, traceId, type: type_, filters, search, fromTime, toTime } = request;
         const _queryParams: Record<string, unknown> = {
             project_id: projectId,
             project_name: projectName,
@@ -1083,6 +1086,7 @@ export class SpansClient {
                       })
                     : undefined,
             filters,
+            search,
             from_time: fromTime?.toISOString(),
             to_time: toTime?.toISOString(),
         };

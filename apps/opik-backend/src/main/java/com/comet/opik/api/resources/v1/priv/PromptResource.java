@@ -20,7 +20,10 @@ import com.comet.opik.api.sorting.SortingFactoryPrompts;
 import com.comet.opik.api.sorting.SortingField;
 import com.comet.opik.domain.PromptService;
 import com.comet.opik.infrastructure.auth.RequestContext;
+import com.comet.opik.infrastructure.auth.RequiredPermissions;
+import com.comet.opik.infrastructure.auth.WorkspaceUserPermission;
 import com.comet.opik.infrastructure.ratelimit.RateLimited;
+import com.comet.opik.utils.ValidationUtils;
 import com.fasterxml.jackson.annotation.JsonView;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -36,6 +39,7 @@ import jakarta.inject.Provider;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.DELETE;
 import jakarta.ws.rs.DefaultValue;
@@ -108,6 +112,7 @@ public class PromptResource {
             @QueryParam("page") @Min(1) @DefaultValue("1") int page,
             @QueryParam("size") @Min(1) @DefaultValue("10") int size,
             @QueryParam("name") @Schema(description = "Filter prompts by name (partial match, case insensitive)") String name,
+            @QueryParam("project_id") UUID projectId,
             @QueryParam("sorting") String sorting,
             @QueryParam("filters") String filters) {
 
@@ -118,7 +123,7 @@ public class PromptResource {
 
         List<SortingField> sortingFields = sortingFactory.newSorting(sorting);
         var promptFilters = filtersFactory.newFilters(filters, PromptFilter.LIST_TYPE_REFERENCE);
-        PromptPage promptPage = promptService.find(name, page, size, sortingFields, promptFilters);
+        PromptPage promptPage = promptService.find(name, projectId, page, size, sortingFields, promptFilters);
 
         log.info("Got prompts by name '{}', count '{}' on workspace_id '{}', count '{}'", name, promptPage.size(),
                 workspaceId, promptPage.size());
@@ -174,6 +179,7 @@ public class PromptResource {
     @Operation(operationId = "deletePrompt", summary = "Delete prompt", description = "Delete prompt", responses = {
             @ApiResponse(responseCode = "204", description = "No content")
     })
+    @RequiredPermissions(WorkspaceUserPermission.PROMPT_DELETE)
     public Response deletePrompt(@PathParam("id") UUID id) {
 
         String workspaceId = requestContext.get().getWorkspaceId();
@@ -190,6 +196,7 @@ public class PromptResource {
     @Operation(operationId = "deletePromptsBatch", summary = "Delete prompts", description = "Delete prompts batch", responses = {
             @ApiResponse(responseCode = "204", description = "No Content"),
     })
+    @RequiredPermissions(WorkspaceUserPermission.PROMPT_DELETE)
     public Response deletePromptsBatch(
             @NotNull @RequestBody(content = @Content(schema = @Schema(implementation = BatchDelete.class))) @Valid BatchDelete batchDelete) {
         String workspaceId = requestContext.get().getWorkspaceId();
@@ -219,6 +226,29 @@ public class PromptResource {
                 prompts.size(), workspaceId);
 
         return Response.ok(prompts).build();
+    }
+
+    @GET
+    @Path("/by-commit/{commit}")
+    @Operation(operationId = "getPromptByCommit", summary = "Get prompt by commit", description = "Get prompt by commit", responses = {
+            @ApiResponse(responseCode = "200", description = "OK", content = @Content(schema = @Schema(implementation = Prompt.class))),
+            @ApiResponse(responseCode = "400", description = "Bad Request", content = @Content(schema = @Schema(implementation = ErrorMessage.class))),
+            @ApiResponse(responseCode = "404", description = "Not Found", content = @Content(schema = @Schema(implementation = io.dropwizard.jersey.errors.ErrorMessage.class))),
+            @ApiResponse(responseCode = "409", description = "Conflict", content = @Content(schema = @Schema(implementation = io.dropwizard.jersey.errors.ErrorMessage.class))),
+    })
+    @JsonView({Prompt.View.Detail.class})
+    public Response getPromptByCommit(
+            @PathParam("commit") @Pattern(regexp = ValidationUtils.COMMIT_PATTERN) String commit) {
+
+        String workspaceId = requestContext.get().getWorkspaceId();
+
+        log.info("Getting prompt by commit '{}' on workspace_id '{}'", commit, workspaceId);
+
+        Prompt result = promptService.getByCommit(commit);
+
+        log.info("Got prompt by commit '{}' on workspace_id '{}'", commit, workspaceId);
+
+        return Response.ok(result).build();
     }
 
     @POST

@@ -140,8 +140,9 @@ type RulesTabProps = {
 
 export const RulesTab: React.FC<RulesTabProps> = ({ projectId }) => {
   const {
-    permissions: { canInteractWithApp },
+    permissions: { canInteractWithApp, canUpdateOnlineEvaluationRules },
   } = usePermissions();
+
   const resetDialogKeyRef = useRef(0);
   const [openDialogForCreate, setOpenDialogForCreate] =
     useState<boolean>(false);
@@ -250,7 +251,9 @@ export const RulesTab: React.FC<RulesTabProps> = ({ projectId }) => {
 
   const columns = useMemo(() => {
     return [
-      generateSelectColumDef<EvaluatorsRule>(),
+      ...(canUpdateOnlineEvaluationRules
+        ? [generateSelectColumDef<EvaluatorsRule>()]
+        : []),
       ...convertColumnDataToColumn<EvaluatorsRule, EvaluatorsRule>(
         DEFAULT_COLUMNS,
         {
@@ -267,19 +270,24 @@ export const RulesTab: React.FC<RulesTabProps> = ({ projectId }) => {
         enableHiding: false,
         enableSorting: false,
       } as ColumnDef<EvaluatorsRule>,
-      generateActionsColumDef<EvaluatorsRule>({
-        cell: (props) => (
-          <RuleRowActionsCell
-            {...props}
-            openEditDialog={handleOpenEditDialog}
-            openCloneDialog={handleOpenCloneDialog}
-          />
-        ),
-      }),
+      ...(canUpdateOnlineEvaluationRules
+        ? [
+            generateActionsColumDef<EvaluatorsRule>({
+              cell: (props) => (
+                <RuleRowActionsCell
+                  {...props}
+                  openEditDialog={handleOpenEditDialog}
+                  openCloneDialog={handleOpenCloneDialog}
+                />
+              ),
+            }),
+          ]
+        : []),
     ];
   }, [
     columnsOrder,
     selectedColumns,
+    canUpdateOnlineEvaluationRules,
     handleOpenEditDialog,
     handleOpenCloneDialog,
   ]);
@@ -329,8 +337,12 @@ export const RulesTab: React.FC<RulesTabProps> = ({ projectId }) => {
           ></SearchInput>
         </div>
         <div className="flex items-center gap-2">
-          <RulesActionsPanel rules={selectedRows} />
-          <Separator orientation="vertical" className="mx-2 h-4" />
+          {canUpdateOnlineEvaluationRules && (
+            <>
+              <RulesActionsPanel rules={selectedRows} />
+              <Separator orientation="vertical" className="mx-2 h-4" />
+            </>
+          )}
           <ColumnsButton
             columns={DEFAULT_COLUMNS}
             selectedColumns={selectedColumns}
@@ -338,14 +350,16 @@ export const RulesTab: React.FC<RulesTabProps> = ({ projectId }) => {
             order={columnsOrder}
             onOrderChange={setColumnsOrder}
           ></ColumnsButton>
-          <Button
-            variant="default"
-            size="sm"
-            onClick={handleNewRuleClick}
-            disabled={!canInteractWithApp}
-          >
-            Create new rule
-          </Button>
+          {canUpdateOnlineEvaluationRules && (
+            <Button
+              variant="default"
+              size="sm"
+              onClick={handleNewRuleClick}
+              disabled={!canInteractWithApp}
+            >
+              Create new rule
+            </Button>
+          )}
         </div>
       </PageBodyStickyContainer>
       <DataTableStateHandler

@@ -119,6 +119,11 @@ const TraceDetailsActionsPanel: React.FunctionComponent<
     FeatureToggleKeys.TOGGLE_OPIK_AI_ENABLED,
   );
   const isExportEnabled = useIsFeatureEnabled(FeatureToggleKeys.EXPORT_ENABLED);
+
+  const {
+    permissions: { canDeleteTraces, canViewExperiments },
+  } = usePermissions();
+
   const { toast } = useToast();
 
   const { mutate } = useTraceDeleteMutation();
@@ -126,6 +131,8 @@ const TraceDetailsActionsPanel: React.FunctionComponent<
   const hasThread = Boolean(setThreadId && threadId);
   const experiment: ExperimentItemReference | undefined = (treeData[0] as Trace)
     ?.experiment;
+
+  const showExperimentButton = !!experiment && canViewExperiments;
 
   const minPanelWidth = useMemo(() => {
     const elements = [
@@ -382,10 +389,10 @@ const TraceDetailsActionsPanel: React.FunctionComponent<
 
   return (
     <div ref={ref} className="flex flex-auto items-center justify-between">
-      {hasThread || experiment ? (
+      {hasThread || showExperimentButton ? (
         <div className="flex items-center">
           <Separator orientation="vertical" className="mx-3 h-4" />
-          {experiment && (
+          {showExperimentButton && (
             <NavigationTag
               id={experiment.dataset_id}
               name="View in experiment"
@@ -563,26 +570,32 @@ const TraceDetailsActionsPanel: React.FunctionComponent<
                 Export as JSON
               </DropdownMenuItem>
             )}
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              onClick={() => setPopupOpen(true)}
-              variant="destructive"
-              disabled={!canInteractWithApp}
-            >
-              <Trash className="mr-2 size-4" />
-              Delete trace
-            </DropdownMenuItem>
+            {canDeleteTraces && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={() => setPopupOpen(true)}
+                  variant="destructive"
+                  disabled={!canInteractWithApp}
+                >
+                  <Trash className="mr-2 size-4" />
+                  Delete trace
+                </DropdownMenuItem>
+              </>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
-        <ConfirmDialog
-          open={popupOpen}
-          setOpen={setPopupOpen}
-          onConfirm={handleTraceDelete}
-          title="Delete trace"
-          description="Deleting a trace will also remove the trace data from related experiment samples. This action can’t be undone. Are you sure you want to continue?"
-          confirmText="Delete trace"
-          confirmButtonVariant="destructive"
-        />
+        {canDeleteTraces && (
+          <ConfirmDialog
+            open={popupOpen}
+            setOpen={setPopupOpen}
+            onConfirm={handleTraceDelete}
+            title="Delete trace"
+            description="Deleting a trace will also remove the trace data from related experiment samples. This action can’t be undone. Are you sure you want to continue?"
+            confirmText="Delete trace"
+            confirmButtonVariant="destructive"
+          />
+        )}
       </div>
     </div>
   );

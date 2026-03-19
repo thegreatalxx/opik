@@ -5,6 +5,7 @@ import * as core from "../../core/index.js";
 import type * as serializers from "../index.js";
 import { Comment } from "./Comment.js";
 import { DatasetVersionSummary } from "./DatasetVersionSummary.js";
+import { ExperimentEvaluationMethod } from "./ExperimentEvaluationMethod.js";
 import { ExperimentScore } from "./ExperimentScore.js";
 import { ExperimentStatus } from "./ExperimentStatus.js";
 import { ExperimentType } from "./ExperimentType.js";
@@ -16,7 +17,7 @@ import { PromptVersionLink } from "./PromptVersionLink.js";
 export const Experiment: core.serialization.ObjectSchema<serializers.Experiment.Raw, OpikApi.Experiment> =
     core.serialization.object({
         id: core.serialization.string().optional(),
-        datasetName: core.serialization.property("dataset_name", core.serialization.string()),
+        datasetName: core.serialization.property("dataset_name", core.serialization.string().nullable()),
         datasetId: core.serialization.property("dataset_id", core.serialization.string().optional()),
         projectId: core.serialization.property("project_id", core.serialization.string().optional()),
         projectName: core.serialization.property("project_name", core.serialization.string().optional()),
@@ -24,6 +25,7 @@ export const Experiment: core.serialization.ObjectSchema<serializers.Experiment.
         metadata: JsonListString.optional(),
         tags: core.serialization.list(core.serialization.string()).optional(),
         type: ExperimentType.optional(),
+        evaluationMethod: core.serialization.property("evaluation_method", ExperimentEvaluationMethod.optional()),
         optimizationId: core.serialization.property("optimization_id", core.serialization.string().optional()),
         feedbackScores: core.serialization.property(
             "feedback_scores",
@@ -31,6 +33,7 @@ export const Experiment: core.serialization.ObjectSchema<serializers.Experiment.
         ),
         comments: core.serialization.list(Comment).optional(),
         traceCount: core.serialization.property("trace_count", core.serialization.number().optional()),
+        datasetItemCount: core.serialization.property("dataset_item_count", core.serialization.number().optional()),
         createdAt: core.serialization.property("created_at", core.serialization.date().optional()),
         duration: PercentageValues.optional(),
         totalEstimatedCost: core.serialization.property("total_estimated_cost", core.serialization.number().optional()),
@@ -54,12 +57,15 @@ export const Experiment: core.serialization.ObjectSchema<serializers.Experiment.
         ),
         datasetVersionId: core.serialization.property("dataset_version_id", core.serialization.string().optional()),
         datasetVersionSummary: core.serialization.property("dataset_version_summary", DatasetVersionSummary.optional()),
+        passRate: core.serialization.property("pass_rate", core.serialization.number().optional()),
+        passedCount: core.serialization.property("passed_count", core.serialization.number().optional()),
+        totalCount: core.serialization.property("total_count", core.serialization.number().optional()),
     });
 
 export declare namespace Experiment {
     export interface Raw {
         id?: string | null;
-        dataset_name: string;
+        dataset_name?: string | null;
         dataset_id?: string | null;
         project_id?: string | null;
         project_name?: string | null;
@@ -67,10 +73,12 @@ export declare namespace Experiment {
         metadata?: JsonListString.Raw | null;
         tags?: string[] | null;
         type?: ExperimentType.Raw | null;
+        evaluation_method?: ExperimentEvaluationMethod.Raw | null;
         optimization_id?: string | null;
         feedback_scores?: FeedbackScoreAverage.Raw[] | null;
         comments?: Comment.Raw[] | null;
         trace_count?: number | null;
+        dataset_item_count?: number | null;
         created_at?: string | null;
         duration?: PercentageValues.Raw | null;
         total_estimated_cost?: number | null;
@@ -85,5 +93,8 @@ export declare namespace Experiment {
         prompt_versions?: PromptVersionLink.Raw[] | null;
         dataset_version_id?: string | null;
         dataset_version_summary?: DatasetVersionSummary.Raw | null;
+        pass_rate?: number | null;
+        passed_count?: number | null;
+        total_count?: number | null;
     }
 }

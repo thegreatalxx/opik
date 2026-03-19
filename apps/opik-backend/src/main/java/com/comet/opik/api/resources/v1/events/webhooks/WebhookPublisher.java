@@ -6,6 +6,7 @@ import com.comet.opik.api.AlertType;
 import com.comet.opik.api.events.webhooks.WebhookEvent;
 import com.comet.opik.domain.IdGenerator;
 import com.comet.opik.infrastructure.WebhookConfig;
+import com.comet.opik.infrastructure.redis.RedisStreamUtils;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 import lombok.NonNull;
@@ -13,7 +14,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.RStreamReactive;
 import org.redisson.api.RedissonReactiveClient;
-import org.redisson.api.stream.StreamAddArgs;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
@@ -38,12 +38,10 @@ public class WebhookPublisher {
      * Publishes a webhook event to the Redis stream for processing with custom retry count.
      *
      * @param eventType    The type of event
-     * @param alertId      The alert ID
+     * @param alert      The alert payload containing webhook configuration
      * @param workspaceId  The workspace ID associated with the event
      * @param workspaceName The workspace name associated with the event
-     * @param webhookUrl   The URL to send the webhook to
      * @param payload      The payload to include in the webhook
-     * @param headers      Optional custom headers to include in the HTTP request
      * @param maxRetries   Maximum number of retry attempts for this specific event
      * @return A Mono that completes when the event is published to the stream
      */
@@ -87,16 +85,15 @@ public class WebhookPublisher {
                     webhookConfig.getStreamName(),
                     webhookConfig.getCodec());
 
-            return stream.add(StreamAddArgs.entry(WebhookConfig.PAYLOAD_FIELD, webhookEvent))
+            return stream.add(RedisStreamUtils.buildAddArgs(
+                    WebhookConfig.PAYLOAD_FIELD, webhookEvent, webhookConfig))
                     .map(streamMessageId -> {
                         log.debug("Webhook event published successfully: id='{}', streamMessageId='{}'",
                                 eventId, streamMessageId);
                         return eventId;
                     })
-                    .doOnError(throwable -> {
-                        log.error("Failed to publish webhook event: id='{}', type='{}', error='{}'",
-                                eventId, eventType, throwable.getMessage(), throwable);
-                    });
+                    .doOnError(throwable -> log.error("Failed to publish webhook event: id='{}', type='{}', error='{}'",
+                            eventId, eventType, throwable.getMessage(), throwable));
         })
                 .subscribeOn(Schedulers.boundedElastic());
     }

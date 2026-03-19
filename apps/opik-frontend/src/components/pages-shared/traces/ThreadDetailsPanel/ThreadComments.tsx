@@ -1,9 +1,4 @@
 import React from "react";
-import TooltipWrapper from "@/components/shared/TooltipWrapper/TooltipWrapper";
-import UserCommentForm from "@/components/pages-shared/traces/UserComment/UserCommentForm";
-import UserComment from "@/components/pages-shared/traces/UserComment/UserComment";
-import { orderBy } from "lodash";
-import { useLoggedInUserName } from "@/store/AppStore";
 import {
   DetailsActionSectionValue,
   DetailsActionSectionLayout,
@@ -12,7 +7,7 @@ import { CommentItem } from "@/types/comment";
 import useCreateThreadCommentMutation from "@/api/traces/useCreateThreadCommentMutation";
 import useThreadCommentsBatchDeleteMutation from "@/api/traces/useThreadCommentsBatchDeleteMutation";
 import useUpdateThreadCommentMutation from "@/api/traces/useUpdateThreadCommentMutation";
-import { usePermissions } from "@/contexts/PermissionsContext";
+import CommentsSection from "@/components/pages-shared/traces/UserComment/CommentsSection";
 
 export type ThreadCommentsProps = {
   activeSection?: DetailsActionSectionValue | null;
@@ -33,11 +28,6 @@ const ThreadComments: React.FC<ThreadCommentsProps> = ({
     useThreadCommentsBatchDeleteMutation();
   const createThreadCommentMutation = useCreateThreadCommentMutation();
   const updateThreadCommentMutation = useUpdateThreadCommentMutation();
-
-  const userName = useLoggedInUserName();
-  const {
-    permissions: { canInteractWithApp },
-  } = usePermissions();
 
   const onSubmit = (text: string) => {
     createThreadCommentMutation.mutate({
@@ -70,56 +60,15 @@ const ThreadComments: React.FC<ThreadCommentsProps> = ({
       setActiveSection={setActiveSection}
       activeSection={activeSection}
     >
-      <UserCommentForm
-        onSubmit={(data) => onSubmit(data.commentText)}
-        className="mt-4 px-6"
-        actions={
-          <TooltipWrapper content={"Submit"} hotkeys={["⌘", "⏎"]}>
-            <UserCommentForm.SubmitButton disabled={!canInteractWithApp} />
-          </TooltipWrapper>
-        }
-      >
-        <UserCommentForm.TextareaField
-          placeholder="Add a comment..."
-          disabled={!canInteractWithApp}
-        />
-      </UserCommentForm>
-      <div className="mt-3 h-full overflow-auto pb-3">
-        {comments?.length ? (
-          orderBy(comments, "created_at", "desc").map((comment) => (
-            <UserComment
-              key={comment.id}
-              comment={comment}
-              avatar={<UserComment.Avatar />}
-              actions={
-                canInteractWithApp ? (
-                  <UserComment.Menu>
-                    <UserComment.MenuEditItem />
-                    <UserComment.MenuDeleteItem onDelete={onDelete} />
-                  </UserComment.Menu>
-                ) : undefined
-              }
-              userName={userName}
-              header={
-                <>
-                  <UserComment.Username />
-                  <UserComment.CreatedAt />
-                </>
-              }
-              className="px-6 hover:bg-soft-background"
-            >
-              <UserComment.Text />
-              {canInteractWithApp && (
-                <UserComment.Form onSubmit={onEditSubmit} />
-              )}
-            </UserComment>
-          ))
-        ) : (
-          <div className="comet-body-s py-3 text-center text-muted-slate">
-            No comments yet
-          </div>
-        )}
-      </div>
+      <CommentsSection
+        comments={comments}
+        onSubmit={onSubmit}
+        onEditSubmit={onEditSubmit}
+        onDelete={onDelete}
+        formClassName="mt-4 px-6"
+        listClassName="mt-3 h-full overflow-auto pb-3"
+        commentClassName="px-6 hover:bg-soft-background"
+      />
     </DetailsActionSectionLayout>
   );
 };

@@ -33,6 +33,7 @@ from ..types.feedback_score_names_public import FeedbackScoreNamesPublic
 from ..types.json_list_string_write import JsonListStringWrite
 from ..types.json_node import JsonNode
 from ..types.prompt_version_link_write import PromptVersionLinkWrite
+from .types.experiment_write_evaluation_method import ExperimentWriteEvaluationMethod
 from .types.experiment_write_status import ExperimentWriteStatus
 from .types.experiment_write_type import ExperimentWriteType
 
@@ -217,12 +218,15 @@ class RawExperimentsClient:
     def create_experiment(
         self,
         *,
-        dataset_name: str,
         id: typing.Optional[str] = OMIT,
+        dataset_name: typing.Optional[str] = OMIT,
+        project_id: typing.Optional[str] = OMIT,
+        project_name: typing.Optional[str] = OMIT,
         name: typing.Optional[str] = OMIT,
         metadata: typing.Optional[JsonListStringWrite] = OMIT,
         tags: typing.Optional[typing.Sequence[str]] = OMIT,
         type: typing.Optional[ExperimentWriteType] = OMIT,
+        evaluation_method: typing.Optional[ExperimentWriteEvaluationMethod] = OMIT,
         optimization_id: typing.Optional[str] = OMIT,
         status: typing.Optional[ExperimentWriteStatus] = OMIT,
         experiment_scores: typing.Optional[typing.Sequence[ExperimentScoreWrite]] = OMIT,
@@ -236,9 +240,15 @@ class RawExperimentsClient:
 
         Parameters
         ----------
-        dataset_name : str
-
         id : typing.Optional[str]
+
+        dataset_name : typing.Optional[str]
+
+        project_id : typing.Optional[str]
+            Project ID. Takes precedence over project_name when both are provided.
+
+        project_name : typing.Optional[str]
+            Project name. Creates project if it doesn't exist. Ignored when project_id is provided.
 
         name : typing.Optional[str]
 
@@ -247,6 +257,8 @@ class RawExperimentsClient:
         tags : typing.Optional[typing.Sequence[str]]
 
         type : typing.Optional[ExperimentWriteType]
+
+        evaluation_method : typing.Optional[ExperimentWriteEvaluationMethod]
 
         optimization_id : typing.Optional[str]
 
@@ -274,12 +286,15 @@ class RawExperimentsClient:
             json={
                 "id": id,
                 "dataset_name": dataset_name,
+                "project_id": project_id,
+                "project_name": project_name,
                 "name": name,
                 "metadata": convert_and_respect_annotation_metadata(
                     object_=metadata, annotation=JsonListStringWrite, direction="write"
                 ),
                 "tags": tags,
                 "type": type,
+                "evaluation_method": evaluation_method,
                 "optimization_id": optimization_id,
                 "status": status,
                 "experiment_scores": convert_and_respect_annotation_metadata(
@@ -514,7 +529,11 @@ class RawExperimentsClient:
         raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
 
     def find_feedback_score_names(
-        self, *, experiment_ids: typing.Optional[str] = None, request_options: typing.Optional[RequestOptions] = None
+        self,
+        *,
+        experiment_ids: typing.Optional[str] = None,
+        exclude_category_names: typing.Optional[typing.Union[str, typing.Sequence[str]]] = None,
+        request_options: typing.Optional[RequestOptions] = None,
     ) -> HttpResponse[FeedbackScoreNamesPublic]:
         """
         Find Feedback Score names
@@ -522,6 +541,8 @@ class RawExperimentsClient:
         Parameters
         ----------
         experiment_ids : typing.Optional[str]
+
+        exclude_category_names : typing.Optional[typing.Union[str, typing.Sequence[str]]]
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -536,6 +557,7 @@ class RawExperimentsClient:
             method="GET",
             params={
                 "experiment_ids": experiment_ids,
+                "exclude_category_names": exclude_category_names,
             },
             request_options=request_options,
         )
@@ -1252,12 +1274,15 @@ class AsyncRawExperimentsClient:
     async def create_experiment(
         self,
         *,
-        dataset_name: str,
         id: typing.Optional[str] = OMIT,
+        dataset_name: typing.Optional[str] = OMIT,
+        project_id: typing.Optional[str] = OMIT,
+        project_name: typing.Optional[str] = OMIT,
         name: typing.Optional[str] = OMIT,
         metadata: typing.Optional[JsonListStringWrite] = OMIT,
         tags: typing.Optional[typing.Sequence[str]] = OMIT,
         type: typing.Optional[ExperimentWriteType] = OMIT,
+        evaluation_method: typing.Optional[ExperimentWriteEvaluationMethod] = OMIT,
         optimization_id: typing.Optional[str] = OMIT,
         status: typing.Optional[ExperimentWriteStatus] = OMIT,
         experiment_scores: typing.Optional[typing.Sequence[ExperimentScoreWrite]] = OMIT,
@@ -1271,9 +1296,15 @@ class AsyncRawExperimentsClient:
 
         Parameters
         ----------
-        dataset_name : str
-
         id : typing.Optional[str]
+
+        dataset_name : typing.Optional[str]
+
+        project_id : typing.Optional[str]
+            Project ID. Takes precedence over project_name when both are provided.
+
+        project_name : typing.Optional[str]
+            Project name. Creates project if it doesn't exist. Ignored when project_id is provided.
 
         name : typing.Optional[str]
 
@@ -1282,6 +1313,8 @@ class AsyncRawExperimentsClient:
         tags : typing.Optional[typing.Sequence[str]]
 
         type : typing.Optional[ExperimentWriteType]
+
+        evaluation_method : typing.Optional[ExperimentWriteEvaluationMethod]
 
         optimization_id : typing.Optional[str]
 
@@ -1309,12 +1342,15 @@ class AsyncRawExperimentsClient:
             json={
                 "id": id,
                 "dataset_name": dataset_name,
+                "project_id": project_id,
+                "project_name": project_name,
                 "name": name,
                 "metadata": convert_and_respect_annotation_metadata(
                     object_=metadata, annotation=JsonListStringWrite, direction="write"
                 ),
                 "tags": tags,
                 "type": type,
+                "evaluation_method": evaluation_method,
                 "optimization_id": optimization_id,
                 "status": status,
                 "experiment_scores": convert_and_respect_annotation_metadata(
@@ -1549,7 +1585,11 @@ class AsyncRawExperimentsClient:
         raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
 
     async def find_feedback_score_names(
-        self, *, experiment_ids: typing.Optional[str] = None, request_options: typing.Optional[RequestOptions] = None
+        self,
+        *,
+        experiment_ids: typing.Optional[str] = None,
+        exclude_category_names: typing.Optional[typing.Union[str, typing.Sequence[str]]] = None,
+        request_options: typing.Optional[RequestOptions] = None,
     ) -> AsyncHttpResponse[FeedbackScoreNamesPublic]:
         """
         Find Feedback Score names
@@ -1557,6 +1597,8 @@ class AsyncRawExperimentsClient:
         Parameters
         ----------
         experiment_ids : typing.Optional[str]
+
+        exclude_category_names : typing.Optional[typing.Union[str, typing.Sequence[str]]]
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -1571,6 +1613,7 @@ class AsyncRawExperimentsClient:
             method="GET",
             params={
                 "experiment_ids": experiment_ids,
+                "exclude_category_names": exclude_category_names,
             },
             request_options=request_options,
         )

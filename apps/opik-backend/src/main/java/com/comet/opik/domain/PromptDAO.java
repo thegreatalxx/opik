@@ -33,9 +33,9 @@ import java.util.UUID;
 @RegisterColumnMapper(SetFlatArgumentFactory.class)
 interface PromptDAO {
 
-    @SqlUpdate("INSERT INTO prompts (id, name, description, created_by, last_updated_by, workspace_id, tags, template_structure) "
+    @SqlUpdate("INSERT INTO prompts (id, name, description, created_by, last_updated_by, workspace_id, project_id, tags, template_structure) "
             +
-            "VALUES (:bean.id, :bean.name, :bean.description, :bean.createdBy, :bean.lastUpdatedBy, :workspace_id, :bean.tags, :bean.templateStructure)")
+            "VALUES (:bean.id, :bean.name, :bean.description, :bean.createdBy, :bean.lastUpdatedBy, :workspace_id, :bean.projectId, :bean.tags, :bean.templateStructure)")
     void save(@Bind("workspace_id") String workspaceId, @BindMethods("bean") Prompt prompt);
 
     @SqlQuery("""
@@ -89,6 +89,7 @@ interface PromptDAO {
                 FROM prompts AS p
                 WHERE workspace_id = :workspace_id
                 <if(name)> AND name like concat('%', :name, '%') <endif>
+                <if(project_id)> AND project_id = :project_id <endif>
             ) AS prompt_full
             <if(filters)> WHERE <filters> <endif>
             ORDER BY <if(sort_fields)> <sort_fields>, <endif> id DESC
@@ -97,6 +98,7 @@ interface PromptDAO {
     @UseStringTemplateEngine
     @AllowUnusedBindings
     List<Prompt> find(@Define("name") @Bind("name") String name, @Bind("workspace_id") String workspaceId,
+            @Define("project_id") @Bind("project_id") UUID projectId,
             @Bind("offset") int offset, @Bind("limit") int limit,
             @Define("sort_fields") @Bind("sort_fields") String sortingFields,
             @Define("filters") String filters,
@@ -169,17 +171,23 @@ interface PromptDAO {
                 FROM prompts AS p
                 WHERE workspace_id = :workspace_id
                 <if(name)> AND name like concat('%', :name, '%') <endif>
+                <if(project_id)> AND project_id = :project_id <endif>
             ) AS prompt_full
             <if(filters)> WHERE <filters> <endif>
             """)
     @UseStringTemplateEngine
     @AllowUnusedBindings
     long count(@Define("name") @Bind("name") String name, @Bind("workspace_id") String workspaceId,
+            @Define("project_id") @Bind("project_id") UUID projectId,
             @Define("filters") String filters,
             @BindMap Map<String, Object> filterMapping);
 
-    @SqlQuery("SELECT * FROM prompts WHERE name = :name AND workspace_id = :workspace_id")
-    Prompt findByName(@Bind("name") String name, @Bind("workspace_id") String workspaceId);
+    @SqlQuery("SELECT * FROM prompts WHERE name = :name AND workspace_id = :workspace_id" +
+            " <if(project_id)> AND project_id = :project_id <endif>")
+    @UseStringTemplateEngine
+    @AllowUnusedBindings
+    Prompt findByName(@Bind("name") String name, @Bind("workspace_id") String workspaceId,
+            @Define("project_id") @Bind("project_id") UUID projectId);
 
     @SqlUpdate("UPDATE prompts SET name = :bean.name, description = :bean.description, last_updated_by = :bean.lastUpdatedBy, "
             +
@@ -199,6 +207,36 @@ interface PromptDAO {
     @SqlUpdate("UPDATE prompts SET last_updated_by = :lastUpdatedBy, last_updated_at = CURRENT_TIMESTAMP(6) WHERE id = :id AND workspace_id = :workspaceId")
     void updateLastUpdatedAt(@Bind("id") UUID id, @Bind("workspaceId") String workspaceId,
             @Bind("lastUpdatedBy") String lastUpdatedBy);
+
+    @SqlQuery("""
+            SELECT
+                p.*,
+                (
+                    SELECT COUNT(pv2.id)
+                    FROM prompt_versions pv2
+                    WHERE pv2.prompt_id = p.id
+                    AND pv2.workspace_id = p.workspace_id
+                ) AS version_count,
+                JSON_OBJECT(
+                    'id', pv.id,
+                    'prompt_id', pv.prompt_id,
+                    'commit', pv.commit,
+                    'template', pv.template,
+                    'metadata', pv.metadata,
+                    'change_description', pv.change_description,
+                    'type', pv.type,
+                    'tags', pv.tags,
+                    'created_at', pv.created_at,
+                    'created_by', pv.created_by,
+                    'last_updated_at', pv.last_updated_at,
+                    'last_updated_by', pv.last_updated_by
+                ) AS requested_version
+            FROM prompt_versions pv
+            INNER JOIN prompts p ON pv.prompt_id = p.id AND p.workspace_id = pv.workspace_id
+            WHERE pv.commit = :commit
+            AND pv.workspace_id = :workspace_id
+            """)
+    List<Prompt> findByCommit(@Bind("commit") String commit, @Bind("workspace_id") String workspaceId);
 
     @SqlQuery("""
             SELECT

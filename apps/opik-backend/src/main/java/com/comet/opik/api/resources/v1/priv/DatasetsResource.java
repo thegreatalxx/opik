@@ -16,7 +16,6 @@ import com.comet.opik.api.DatasetItemBatchUpdate;
 import com.comet.opik.api.DatasetItemChanges;
 import com.comet.opik.api.DatasetItemStreamRequest;
 import com.comet.opik.api.DatasetItemsDelete;
-import com.comet.opik.api.DatasetType;
 import com.comet.opik.api.DatasetUpdate;
 import com.comet.opik.api.DatasetVersion;
 import com.comet.opik.api.ExperimentItem;
@@ -39,9 +38,12 @@ import com.comet.opik.domain.DatasetService;
 import com.comet.opik.domain.DatasetVersionService;
 import com.comet.opik.domain.EntityType;
 import com.comet.opik.domain.IdGenerator;
+import com.comet.opik.domain.ProjectService;
 import com.comet.opik.domain.Streamer;
 import com.comet.opik.infrastructure.FeatureFlags;
 import com.comet.opik.infrastructure.auth.RequestContext;
+import com.comet.opik.infrastructure.auth.RequiredPermissions;
+import com.comet.opik.infrastructure.auth.WorkspaceUserPermission;
 import com.comet.opik.infrastructure.ratelimit.RateLimited;
 import com.comet.opik.utils.FileNameUtils;
 import com.comet.opik.utils.RetryUtils;
@@ -109,6 +111,7 @@ public class DatasetsResource {
     private final @NonNull DatasetItemService itemService;
     private final @NonNull DatasetExpansionService expansionService;
     private final @NonNull DatasetVersionService versionService;
+    private final @NonNull ProjectService projectService;
     private final @NonNull Provider<RequestContext> requestContext;
     private final @NonNull FiltersFactory filtersFactory;
     private final @NonNull IdGenerator idGenerator;
@@ -123,6 +126,7 @@ public class DatasetsResource {
     @Operation(operationId = "getDatasetById", summary = "Get dataset by id", description = "Get dataset by id", responses = {
             @ApiResponse(responseCode = "200", description = "Dataset resource", content = @Content(schema = @Schema(implementation = Dataset.class)))
     })
+    @RequiredPermissions(WorkspaceUserPermission.DATASET_VIEW)
     @JsonView(Dataset.View.Public.class)
     public Response getDatasetById(@PathParam("id") UUID id) {
 
@@ -139,6 +143,7 @@ public class DatasetsResource {
     @Operation(operationId = "findDatasets", summary = "Find datasets", description = "Find datasets", responses = {
             @ApiResponse(responseCode = "200", description = "Dataset resource", content = @Content(schema = @Schema(implementation = DatasetPage.class)))
     })
+    @RequiredPermissions(WorkspaceUserPermission.DATASET_VIEW)
     @JsonView(Dataset.View.Public.class)
     public Response findDatasets(
             @QueryParam("page") @Min(1) @DefaultValue("1") int page,
@@ -146,8 +151,8 @@ public class DatasetsResource {
             @QueryParam("with_experiments_only") boolean withExperimentsOnly,
             @QueryParam("with_optimizations_only") boolean withOptimizationsOnly,
             @QueryParam("prompt_id") UUID promptId,
+            @QueryParam("project_id") UUID projectId,
             @QueryParam("name") @Schema(description = "Filter datasets by name (partial match, case insensitive)") String name,
-            @QueryParam("type") @Schema(description = "Filter datasets by type (dataset or evaluation_suite)") DatasetType type,
             @QueryParam("sorting") String sorting,
             @QueryParam("filters") String filters) {
 
@@ -157,8 +162,8 @@ public class DatasetsResource {
                 .name(name)
                 .withExperimentsOnly(withExperimentsOnly)
                 .promptId(promptId)
+                .projectId(projectId)
                 .withOptimizationsOnly(withOptimizationsOnly)
-                .type(type)
                 .filters(queryFilters)
                 .build();
 
@@ -217,6 +222,7 @@ public class DatasetsResource {
     @Operation(operationId = "deleteDataset", summary = "Delete dataset by id", description = "Delete dataset by id", responses = {
             @ApiResponse(responseCode = "204", description = "No content"),
     })
+    @RequiredPermissions(WorkspaceUserPermission.DATASET_DELETE)
     public Response deleteDataset(@PathParam("id") UUID id) {
 
         String workspaceId = requestContext.get().getWorkspaceId();
@@ -231,6 +237,7 @@ public class DatasetsResource {
     @Operation(operationId = "deleteDatasetByName", summary = "Delete dataset by name", description = "Delete dataset by name", responses = {
             @ApiResponse(responseCode = "204", description = "No content"),
     })
+    @RequiredPermissions(WorkspaceUserPermission.DATASET_DELETE)
     public Response deleteDatasetByName(
             @RequestBody(content = @Content(schema = @Schema(implementation = DatasetIdentifier.class))) @NotNull @Valid DatasetIdentifier identifier) {
 
@@ -248,6 +255,7 @@ public class DatasetsResource {
     @Operation(operationId = "deleteDatasetsBatch", summary = "Delete datasets", description = "Delete datasets batch", responses = {
             @ApiResponse(responseCode = "204", description = "No content"),
     })
+    @RequiredPermissions(WorkspaceUserPermission.DATASET_DELETE)
     public Response deleteDatasetsBatch(
             @NotNull @RequestBody(content = @Content(schema = @Schema(implementation = BatchDelete.class))) @NotNull @Valid BatchDelete batchDelete) {
 
@@ -271,11 +279,17 @@ public class DatasetsResource {
 
         String workspaceId = requestContext.get().getWorkspaceId();
         Visibility visibility = requestContext.get().getVisibility();
-        String name = identifier.datasetName();
+        UUID projectId = resolveProjectIdByName(identifier.projectName(), workspaceId);
+        var criteria = DatasetCriteria.builder()
+                .name(identifier.datasetName())
+                .projectId(projectId)
+                .build();
 
-        log.info("Finding dataset by name '{}' on workspace_id '{}'", name, workspaceId);
-        Dataset dataset = service.findByName(workspaceId, name, visibility);
-        log.info("Found dataset by name '{}', id '{}' on workspace_id '{}'", name, dataset.id(), workspaceId);
+        log.info("Finding dataset by name '{}', projectId '{}' on workspace_id '{}'", criteria.name(), projectId,
+                workspaceId);
+        Dataset dataset = service.findByName(workspaceId, criteria, visibility);
+        log.info("Found dataset by name '{}', id '{}' on workspace_id '{}'", criteria.name(), dataset.id(),
+                workspaceId);
 
         return Response.ok(dataset).build();
     }
@@ -420,18 +434,26 @@ public class DatasetsResource {
         var workspaceId = requestContext.get().getWorkspaceId();
         var userName = requestContext.get().getUserName();
         var visibility = requestContext.get().getVisibility();
+        UUID resolvedProjectId = request.projectId() != null
+                ? request.projectId()
+                : resolveProjectIdByName(request.projectName(), workspaceId);
+        var resolvedRequest = resolvedProjectId != null
+                ? request.toBuilder().projectId(resolvedProjectId).build()
+                : request;
 
         // Suppress unchecked cast warning since we already pass DatasetItemFilter reference to newFilters
         @SuppressWarnings("unchecked")
         List<DatasetItemFilter> queryFilters = Optional.ofNullable((List<DatasetItemFilter>) filtersFactory.newFilters(
                 request.filters(), DatasetItemFilter.LIST_TYPE_REFERENCE)).orElse(List.of());
 
-        log.info("Streaming dataset items by '{}' on workspaceId '{}'", request, workspaceId);
-        var items = itemService.getItems(workspaceId, request, queryFilters, visibility)
+        log.info("Streaming dataset items for dataset '{}', projectId '{}' on workspaceId '{}'",
+                resolvedRequest.datasetName(), resolvedRequest.projectId(), workspaceId);
+        var items = itemService.getItems(workspaceId, resolvedRequest, queryFilters, visibility)
                 .contextWrite(ctx -> ctx.put(RequestContext.USER_NAME, userName)
                         .put(RequestContext.WORKSPACE_ID, workspaceId));
         var outputStream = streamer.getOutputStream(items);
-        log.info("Streamed dataset items by '{}' on workspaceId '{}'", request, workspaceId);
+        log.info("Streamed dataset items for dataset '{}', projectId '{}' on workspaceId '{}'",
+                resolvedRequest.datasetName(), resolvedRequest.projectId(), workspaceId);
         return outputStream;
     }
 
@@ -620,6 +642,7 @@ public class DatasetsResource {
             @ApiResponse(responseCode = "204", description = "No content"),
             @ApiResponse(responseCode = "400", description = "Bad request - invalid parameters or conflicting fields"),
     })
+    @RequiredPermissions(WorkspaceUserPermission.DATASET_DELETE)
     public Response deleteDatasetItems(
             @RequestBody(content = @Content(schema = @Schema(implementation = DatasetItemsDelete.class))) @NotNull @Valid DatasetItemsDelete request) {
 
@@ -766,6 +789,10 @@ public class DatasetsResource {
                 datasetId, experimentIds, workspaceId);
 
         return Response.ok(columns).build();
+    }
+
+    private UUID resolveProjectIdByName(String projectName, String workspaceId) {
+        return projectService.findProjectIdByName(workspaceId, projectName).orElse(null);
     }
 
     /**

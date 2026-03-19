@@ -16,8 +16,9 @@ import type { Prompt } from "@/prompt/Prompt";
 export interface ExperimentData {
   id?: string;
   name?: string;
-  datasetName: string;
+  datasetName?: string;
   prompts?: Prompt[];
+  tags?: string[];
 }
 
 /**
@@ -26,21 +27,23 @@ export interface ExperimentData {
 export class Experiment {
   public readonly id: string;
   private _name?: string;
-  public readonly datasetName: string;
+  public readonly datasetName?: string;
   public readonly prompts?: Prompt[];
+  public readonly tags?: string[];
 
   /**
    * Creates a new Experiment instance.
    * This should not be created directly, use static factory methods instead.
    */
   constructor(
-    { id, name, datasetName, prompts }: ExperimentData,
+    { id, name, datasetName, prompts, tags }: ExperimentData,
     private opik: OpikClient
   ) {
     this.id = id || generateId();
     this._name = name;
     this.datasetName = datasetName;
     this.prompts = prompts;
+    this.tags = tags;
   }
 
   /**
@@ -200,6 +203,12 @@ export class Experiment {
   }
 
   async getUrl(): Promise<string> {
+    if (!this.datasetName) {
+      throw new Error(
+        "Cannot get URL: the associated dataset has been deleted or is unavailable"
+      );
+    }
+
     const dataset = await this.opik.getDataset(this.datasetName);
     const baseUrl = this.opik.config.apiUrl || DEFAULT_CONFIG.apiUrl;
 

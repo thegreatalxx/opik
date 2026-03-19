@@ -29,6 +29,10 @@ export const PromptRowActionsCell: React.FunctionComponent<
   const prompt = context.row.original;
   const [open, setOpen] = useState<number | boolean>(false);
 
+  const {
+    permissions: { canDeletePrompts },
+  } = usePermissions();
+
   const promptDeleteMutation = usePromptDeleteMutation();
 
   const deletePromptHandler = useCallback(() => {
@@ -84,18 +88,21 @@ export const PromptRowActionsCell: React.FunctionComponent<
             <Pencil className="mr-2 size-4" />
             Edit
           </DropdownMenuItem>
-
-          <DropdownMenuSeparator />
-          <DropdownMenuItem
-            onClick={() => {
-              setOpen(DELETE_KEY);
-              resetKeyRef.current = resetKeyRef.current + 1;
-            }}
-            variant="destructive"
-          >
-            <Trash className="mr-2 size-4" />
-            Delete
-          </DropdownMenuItem>
+          {canDeletePrompts && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={() => {
+                  setOpen(DELETE_KEY);
+                  resetKeyRef.current = resetKeyRef.current + 1;
+                }}
+                variant="destructive"
+              >
+                <Trash className="mr-2 size-4" />
+                Delete
+              </DropdownMenuItem>
+            </>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
     </CellWrapper>
