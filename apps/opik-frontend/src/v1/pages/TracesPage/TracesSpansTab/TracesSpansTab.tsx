@@ -329,6 +329,7 @@ const DEFAULT_SPANS_COLUMNS_ORDER: string[] = [
   COLUMN_COMMENTS_ID,
   "created_by",
   COLUMN_GUARDRAILS_ID,
+  COLUMN_CONFIGURATION_VERSION_ID,
 ];
 
 const SELECTED_COLUMNS_KEY_SUFFIX = "selected-columns";
@@ -947,31 +948,6 @@ export const TracesSpansTab: React.FC<TracesSpansTabProps> = ({
                 }),
               },
             },
-            ...(isAgentConfigurationEnabled
-              ? [
-                  {
-                    id: COLUMN_CONFIGURATION_VERSION_ID,
-                    label: "Configuration",
-                    type: COLUMN_TYPE.string,
-                    sortable: false,
-                    cell: ConfigurationVersionCell as never,
-                    accessorFn: (row: BaseTraceData) => {
-                      const agentConfig = (
-                        row.metadata as Record<string, unknown>
-                      )?.[AGENT_CONFIGURATION_METADATA_KEY];
-
-                      if (!isAgentConfigurationMetadata(agentConfig))
-                        return undefined;
-                      const version = agentConfig.blueprint_version;
-                      if (!version) return undefined;
-                      return {
-                        version,
-                        maskId: agentConfig._mask_id,
-                      };
-                    },
-                  },
-                ]
-              : []),
           ]
         : []),
       ...(type === TRACE_DATA_TYPE.spans
@@ -1007,6 +983,31 @@ export const TracesSpansTab: React.FC<TracesSpansTabProps> = ({
                 row.guardrails_validations || [],
               cell: GuardrailsCell as never,
               statisticDataFormater: (value: number) => `${value} failed`,
+            },
+          ]
+        : []),
+      ...(isAgentConfigurationEnabled
+        ? [
+            {
+              id: COLUMN_CONFIGURATION_VERSION_ID,
+              label: "Configuration",
+              type: COLUMN_TYPE.string,
+              sortable: false,
+              cell: ConfigurationVersionCell as never,
+              accessorFn: (row: BaseTraceData) => {
+                const agentConfig = (
+                  row.metadata as Record<string, unknown>
+                )?.[AGENT_CONFIGURATION_METADATA_KEY];
+
+                if (!isAgentConfigurationMetadata(agentConfig))
+                  return undefined;
+                const version = agentConfig.blueprint_version;
+                if (!version) return undefined;
+                return {
+                  version,
+                  maskId: agentConfig._mask_id,
+                };
+              },
             },
           ]
         : []),

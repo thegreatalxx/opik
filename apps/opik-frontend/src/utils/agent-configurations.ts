@@ -19,10 +19,9 @@ export const isProdTag = (tag: string) =>
   tag == AgentConfigurationBasicStage.PROD;
 
 export const isBasicStage = (tag: string) =>
-  DEFAULT_STAGE_OPTIONS.some((s) => s === tag.toLowerCase());
+  DEFAULT_STAGE_OPTIONS.some((s) => s === tag);
 
-export const isStageTag = (tag: string, stage: string) =>
-  tag.toLowerCase() === stage.toLowerCase();
+export const isStageTag = (tag: string, stage: string) => tag === stage;
 
 export const BASIC_STAGE_ORDER = [
   AgentConfigurationBasicStage.PROD,
@@ -32,7 +31,7 @@ export const BASIC_STAGE_ORDER = [
 
 export const sortTags = (tags: string[]) => [
   ...BASIC_STAGE_ORDER.filter((stage) =>
-    tags.some((t) => t.toLowerCase() === stage),
+    tags.some((t) => t === stage),
   ),
   ...tags.filter((t) => !isBasicStage(t)),
 ];

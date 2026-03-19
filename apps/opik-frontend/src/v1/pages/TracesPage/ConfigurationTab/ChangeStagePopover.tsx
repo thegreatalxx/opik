@@ -109,12 +109,12 @@ const ChangeStagePopover: React.FC<ChangeStagePopoverProps> = ({
         <PopoverTrigger asChild>
           <Button size="xs" variant="outline" onClick={resetAndOpen}>
             <Tags className="mr-1.5 size-3.5 text-primary" />
-            Change stage
+            Change env
           </Button>
         </PopoverTrigger>
         <PopoverContent align="end" className="w-56 p-3">
           <p className="comet-body-xs-accented mb-1 text-light-slate">
-            Default stages
+            Default envs
           </p>
           <div className="flex flex-col gap-1">
             {BASIC_STAGE_ORDER.map((stage) => {
@@ -147,7 +147,7 @@ const ChangeStagePopover: React.FC<ChangeStagePopoverProps> = ({
           ).length > 0 && (
             <>
               <p className="comet-body-xs-accented mb-1 text-light-slate">
-                Custom stages
+                Custom envs
               </p>
               <div className="flex max-h-[140px] flex-col gap-1 overflow-y-auto">
                 {selectedStages
@@ -171,7 +171,7 @@ const ChangeStagePopover: React.FC<ChangeStagePopoverProps> = ({
           <div className="mt-2 flex items-center gap-1.5">
             <Input
               dimension="sm"
-              placeholder="Add custom stage"
+              placeholder="Add custom env"
               value={customValue}
               onChange={(e) => setCustomValue(e.target.value)}
               onKeyDown={(e) => {

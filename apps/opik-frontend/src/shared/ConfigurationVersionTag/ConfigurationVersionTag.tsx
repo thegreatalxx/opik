@@ -31,9 +31,7 @@ const ConfigurationVersionTag: React.FC<ConfigurationVersionTagProps> = ({
 
   if (hasMask) {
     return (
-      <TooltipWrapper
-        content={`Used with mask_id ${maskId} on top ${version}`}
-      >
+      <TooltipWrapper content="This configuration has been modified by the opik connect">
         {tag}
       </TooltipWrapper>
     );
