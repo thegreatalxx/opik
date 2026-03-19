@@ -21,6 +21,7 @@ type ConfigurationEditViewProps = {
   projectId: string;
   version: number;
   latestVersion: number;
+  latestBlueprintId?: string;
   onCancel: () => void;
   onSaved: () => void;
 };
@@ -30,12 +31,30 @@ const ConfigurationEditView: React.FC<ConfigurationEditViewProps> = ({
   projectId,
   version,
   latestVersion,
+  latestBlueprintId,
   onCancel,
   onSaved,
 }) => {
+  const isLatestVersion = version === latestVersion;
+
   const { data: agentConfig, isPending } = useAgentConfigById({
     blueprintId: item.id,
   });
+
+  const { data: latestConfig } = useAgentConfigById({
+    blueprintId: !isLatestVersion && latestBlueprintId ? latestBlueprintId : "",
+  });
+
+  const latestPromptCommits = useMemo(() => {
+    if (isLatestVersion || !latestConfig) return {};
+    const map: Record<string, string> = {};
+    latestConfig.values
+      .filter((v) => v.type === BlueprintValueType.PROMPT)
+      .forEach((v) => {
+        map[v.key] = v.value;
+      });
+    return map;
+  }, [isLatestVersion, latestConfig]);
 
   const [description, setDescription] = useState("");
   const [draftValues, setDraftValues] = useState<Record<string, string>>({});
@@ -44,7 +63,6 @@ const ConfigurationEditView: React.FC<ConfigurationEditViewProps> = ({
   >({});
   const originalValues = useRef<Record<string, string>>({});
   const initialized = useRef(false);
-  const isLatestVersion = version === latestVersion;
 
   const { handleSave, isSaving, errors, clearError, promptRefs } =
     useConfigurationSave({
@@ -54,6 +72,7 @@ const ConfigurationEditView: React.FC<ConfigurationEditViewProps> = ({
       description,
       projectId,
       isLatestVersion,
+      latestPromptCommits,
       onSaved,
     });
 
@@ -198,11 +217,6 @@ const ConfigurationEditView: React.FC<ConfigurationEditViewProps> = ({
                 <span className="comet-body-s-accented text-foreground">
                   {v.key}
                 </span>
-                {v.type === BlueprintValueType.PROMPT && isChanged && (
-                  <TooltipWrapper content="Saving will create a new prompt version visible everywhere in the platform">
-                    <Info className="size-3.5 text-muted-slate" />
-                  </TooltipWrapper>
-                )}
                 {isChanged && (
                   <span className="size-1.5 rounded-full bg-amber-400" />
                 )}
@@ -220,7 +234,7 @@ const ConfigurationEditView: React.FC<ConfigurationEditViewProps> = ({
                     key={v.value}
                     value={v}
                     projectId={projectId}
-                    isEditing={isLatestVersion}
+                    isEditing
                     ref={(el) => {
                       promptRefs.current[v.key] = el;
                     }}

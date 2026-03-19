@@ -5,15 +5,10 @@ import { useInView } from "react-intersection-observer";
 import { cn } from "@/lib/utils";
 import { ConfigHistoryItem } from "@/types/agent-configs";
 import { formatDate, getTimeFromNow } from "@/lib/date";
-import ColoredTag from "@/components/shared/ColoredTag/ColoredTag";
 import DataTableNoData from "@/components/shared/DataTableNoData/DataTableNoData";
 import TooltipWrapper from "@/components/shared/TooltipWrapper/TooltipWrapper";
-import ProdTag from "./ProdTag";
-import {
-  generateBlueprintDescription,
-  isProdTag,
-  sortTags,
-} from "@/utils/agent-configurations";
+import { generateBlueprintDescription } from "@/utils/agent-configurations";
+import ConfigTagList from "./ConfigTagList";
 
 type ConfigurationHistoryTimelineProps = {
   items: ConfigHistoryItem[];
@@ -53,7 +48,6 @@ const ConfigurationHistoryTimeline: React.FC<
       {items.map((item, index) => {
         const isSelected = index === selectedIndex;
         const isLast = index === items.length - 1;
-        const sortedTags = sortTags(item.tags);
 
         return (
           <li key={item.id} className="flex gap-2">
@@ -93,15 +87,9 @@ const ConfigurationHistoryTimeline: React.FC<
               )}
               onClick={() => onSelect(index)}
             >
-              <div className="flex flex-wrap items-center gap-1">
-                <span className="comet-body-s-accented">v{total - index}</span>
-                {sortedTags.map((tag) =>
-                  isProdTag(tag) ? (
-                    <ProdTag key={tag} size="xs" value={tag} />
-                  ) : (
-                    <ColoredTag key={tag} label={tag} size="sm" />
-                  ),
-                )}
+              <div className="flex items-center gap-1">
+                <span className="comet-body-s-accented shrink-0">v{total - index}</span>
+                <ConfigTagList tags={item.tags} size="sm" maxWidth={200} />
               </div>
               {(() => {
                 const desc =

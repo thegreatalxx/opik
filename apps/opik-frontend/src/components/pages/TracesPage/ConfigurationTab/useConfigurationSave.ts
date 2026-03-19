@@ -40,6 +40,7 @@ type UseConfigurationSaveParams = {
   description: string;
   projectId: string;
   isLatestVersion: boolean;
+  latestPromptCommits: Record<string, string>;
   onSaved: () => void;
 };
 
@@ -50,6 +51,7 @@ export const useConfigurationSave = ({
   description,
   projectId,
   isLatestVersion,
+  latestPromptCommits,
   onSaved,
 }: UseConfigurationSaveParams) => {
   const { toast } = useToast();
@@ -125,13 +127,18 @@ export const useConfigurationSave = ({
     }
 
     // Step 3: Build the payload
-    // When editing from a non-latest version, send all non-prompt values
-    // (prompts are excluded since they may have diverged in newer versions).
     // When editing from the latest version, send only changed values.
+    // When editing from a non-latest version, send all non-prompt values,
+    // and include prompts only if touched or their commit differs from the latest.
     const values: BlueprintValue[] = agentConfig.values
       .filter((v) => {
         if (v.type === BlueprintValueType.PROMPT) {
-          return newCommits.has(v.key);
+          if (newCommits.has(v.key)) return true;
+          if (!isLatestVersion) {
+            const latestCommit = latestPromptCommits[v.key];
+            return !latestCommit || latestCommit !== v.value;
+          }
+          return false;
         }
         if (!isLatestVersion) {
           return true;
@@ -172,6 +179,7 @@ export const useConfigurationSave = ({
     description,
     projectId,
     isLatestVersion,
+    latestPromptCommits,
     onSaved,
     createConfig,
     toast,

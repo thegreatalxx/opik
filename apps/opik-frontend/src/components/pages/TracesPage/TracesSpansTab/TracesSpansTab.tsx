@@ -963,10 +963,17 @@ export const TracesSpansTab: React.FC<TracesSpansTabProps> = ({
                       const agentConfig = (
                         row.metadata as Record<string, unknown>
                       )?.[AGENT_CONFIGURATION_METADATA_KEY];
+
+
+
                       if (!isAgentConfigurationMetadata(agentConfig))
-                        return "-";
+                        return undefined;
                       const version = versionMap[agentConfig.blueprint_id];
-                      return version !== undefined ? `v${version}` : "-";
+                      if (version === undefined) return undefined;
+                      return {
+                        version,
+                        maskId: agentConfig._mask_id,
+                      };
                     },
                   },
                 ]

@@ -6,7 +6,6 @@ import Loader from "@/components/shared/Loader/Loader";
 import { buildDocsUrl } from "@/lib/utils";
 import useConfigHistoryListInfinite from "@/api/agent-configs/useConfigHistoryListInfinite";
 import { ConfigHistoryItem } from "@/types/agent-configs";
-import { isProdTag } from "@/utils/agent-configurations";
 import ConfigurationHistoryTimeline from "./ConfigurationHistoryTimeline";
 import ConfigurationDetailView from "./ConfigurationDetailView";
 import ConfigurationEditView from "./ConfigurationEditView";
@@ -38,15 +37,6 @@ const ConfigurationTab: React.FC<ConfigurationTabProps> = ({ projectId }) => {
     const idx = allRows.findIndex((r) => r.id === selectedId);
     return idx >= 0 ? idx : 0;
   }, [allRows, selectedId]);
-
-  const prodVersion = useMemo(() => {
-    const idx = allRows.findIndex((r) => r.tags.some(isProdTag));
-    return idx >= 0 ? total - idx : null;
-  }, [allRows, total]);
-
-  const prodItem = useMemo(() => {
-    return allRows.find((r) => r.tags.some(isProdTag));
-  }, [allRows]);
 
   if (isPending) {
     return <Loader />;
@@ -87,6 +77,7 @@ const ConfigurationTab: React.FC<ConfigurationTabProps> = ({ projectId }) => {
           projectId={projectId}
           version={editItem.version}
           latestVersion={total}
+          latestBlueprintId={allRows[0]?.id}
           onCancel={() => setEditItem(null)}
           onSaved={() => {
             setSelectedId(undefined);
@@ -109,8 +100,8 @@ const ConfigurationTab: React.FC<ConfigurationTabProps> = ({ projectId }) => {
             item={selectedItem}
             version={total - selectedIndex}
             projectId={projectId}
-            prodItemId={prodItem?.id}
-            prodVersion={prodVersion}
+            versions={allRows}
+            totalVersions={total}
             onEdit={() =>
               setEditItem({
                 item: selectedItem,

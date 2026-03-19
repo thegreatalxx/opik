@@ -4,19 +4,45 @@ import { formatNumericData } from "@/lib/utils";
 export const AGENT_CONFIGURATION_METADATA_KEY = "agent_configuration";
 export const AGENT_CONFIGURATION_PROD_ENV_NAME = "prod";
 
-export const isProdTag = (tag: string) => /^prod(uction)?$/i.test(tag);
+export enum AgentConfigurationBasicStage {
+  DEV = "dev",
+  STAGING = "staging",
+  PROD = "prod",
+}
+
+export const DEFAULT_STAGE_OPTIONS = [
+  AgentConfigurationBasicStage.DEV,
+  AgentConfigurationBasicStage.STAGING,
+  AgentConfigurationBasicStage.PROD,
+];
+
+export const isProdTag = (tag: string) =>
+  tag == AgentConfigurationBasicStage.PROD;
+
+export const isBasicStage = (tag: string) =>
+  DEFAULT_STAGE_OPTIONS.some((s) => s === tag.toLowerCase());
+
+export const isStageTag = (tag: string, stage: string) =>
+  tag.toLowerCase() === stage.toLowerCase();
+
+export const BASIC_STAGE_ORDER = [
+  AgentConfigurationBasicStage.PROD,
+  AgentConfigurationBasicStage.STAGING,
+  AgentConfigurationBasicStage.DEV,
+];
 
 export const sortTags = (tags: string[]) => [
-  ...tags.filter(isProdTag),
-  ...tags.filter((t) => !isProdTag(t)),
+  ...BASIC_STAGE_ORDER.filter((stage) =>
+    tags.some((t) => t.toLowerCase() === stage),
+  ),
+  ...tags.filter((t) => !isBasicStage(t)),
 ];
 
 export const formatBlueprintValue = (v: BlueprintValue): string => {
   switch (v.type) {
     case BlueprintValueType.INT:
     case BlueprintValueType.FLOAT: {
-      const num = Number(v.value);
-      return isNaN(num) ? v.value : formatNumericData(num);
+      return v.value;
     }
     case BlueprintValueType.BOOLEAN:
       return v.value === "true" ? "true" : "false";
