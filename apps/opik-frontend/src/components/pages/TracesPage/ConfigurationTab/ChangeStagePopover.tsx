@@ -106,14 +106,12 @@ const ChangeStagePopover: React.FC<ChangeStagePopoverProps> = ({
   return (
     <>
       <Popover open={open} onOpenChange={setOpen}>
-        <TooltipWrapper content="Each stage can only be assigned to one version at a time">
-          <PopoverTrigger asChild>
-            <Button size="xs" variant="outline" onClick={resetAndOpen}>
-              <Tags className="mr-1.5 size-3.5 text-primary" />
-              Change stage
-            </Button>
-          </PopoverTrigger>
-        </TooltipWrapper>
+        <PopoverTrigger asChild>
+          <Button size="xs" variant="outline" onClick={resetAndOpen}>
+            <Tags className="mr-1.5 size-3.5 text-primary" />
+            Change stage
+          </Button>
+        </PopoverTrigger>
         <PopoverContent align="end" className="w-56 p-3">
           <p className="comet-body-xs-accented mb-1 text-light-slate">
             Default stages
