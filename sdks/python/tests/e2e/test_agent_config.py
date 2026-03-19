@@ -153,7 +153,11 @@ def test_prompt_field_and_trace_metadata__happyflow(
     run()
     opik.flush_tracker()
 
-    expected_meta = {"blueprint_id": ANY_BUT_NONE, "values": ANY_DICT}
+    expected_meta = {
+        "_blueprint_id": ANY_BUT_NONE,
+        "blueprint_version": ANY_BUT_NONE,
+        "values": ANY_DICT,
+    }
     verifiers.verify_trace(
         opik_client=opik_client,
         trace_id=id_storage["trace_id"],

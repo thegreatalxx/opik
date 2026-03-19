@@ -29,6 +29,7 @@ class SharedConfigCache:
     def __init__(self, ttl_seconds: int = DEFAULT_TTL_SECONDS) -> None:
         self._lock = threading.RLock()
         self.blueprint_id: typing.Optional[str] = None
+        self.blueprint_version: typing.Optional[str] = None
         self.values: typing.Dict[str, typing.Any] = {}
         self._registered_field_types: typing.Dict[str, typing.Any] = {}
         self._ttl_seconds = ttl_seconds
@@ -59,6 +60,7 @@ class SharedConfigCache:
         new_values = dict(blueprint._values)
         with self._lock:
             self.blueprint_id = blueprint.id
+            self.blueprint_version = blueprint.name
             self.values = new_values
             self._last_fetch = time.monotonic()
 

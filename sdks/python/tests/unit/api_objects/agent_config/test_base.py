@@ -665,6 +665,7 @@ class TestMetadataInjection:
 
         bp = AgentBlueprintPublic(
             id="bp-1",
+            name="v3",
             type="blueprint",
             values=[
                 AgentConfigValuePublic(key="MyConfig.temp", type="float", value="0.7"),
@@ -684,7 +685,8 @@ class TestMetadataInjection:
             mock_call.assert_called_once()
             payload = mock_call.call_args.kwargs["metadata"]
             assert "agent_configuration" in payload
-            assert payload["agent_configuration"]["blueprint_id"] == "bp-1"
+            assert payload["agent_configuration"]["_blueprint_id"] == "bp-1"
+            assert payload["agent_configuration"]["blueprint_version"] == "v3"
             assert "MyConfig.temp" in payload["agent_configuration"]["values"]
 
     def test_no_active_trace_or_span__no_exception(
@@ -749,6 +751,61 @@ class TestMetadataInjection:
             _ = live.temp
 
         mock_trace.assert_called_once()
+
+    def test_metadata_keys__blueprint_id_prefixed_and_version_from_name(
+        self, mock_rest_client, mock_opik_client
+    ):
+        class MyConfig(AgentConfig):
+            lr: float
+
+        bp = AgentBlueprintPublic(
+            id="bp-42",
+            name="v7",
+            type="blueprint",
+            values=[
+                AgentConfigValuePublic(key="MyConfig.lr", type="float", value="0.01"),
+            ],
+        )
+        live = _make_live_instance(
+            mock_rest_client, mock_opik_client, MyConfig(lr=0.0), bp
+        )
+
+        with (
+            mock.patch("opik.opik_context.update_current_trace") as mock_trace,
+            mock.patch("opik.opik_context.update_current_span"),
+        ):
+            _ = live.lr
+
+        ac = mock_trace.call_args.kwargs["metadata"]["agent_configuration"]
+        assert "blueprint_id" not in ac
+        assert ac["_blueprint_id"] == "bp-42"
+        assert ac["blueprint_version"] == "v7"
+
+    def test_metadata__blueprint_version_none_when_name_absent(
+        self, mock_rest_client, mock_opik_client
+    ):
+        class MyConfig(AgentConfig):
+            lr: float
+
+        bp = AgentBlueprintPublic(
+            id="bp-99",
+            type="blueprint",
+            values=[
+                AgentConfigValuePublic(key="MyConfig.lr", type="float", value="0.5"),
+            ],
+        )
+        live = _make_live_instance(
+            mock_rest_client, mock_opik_client, MyConfig(lr=0.0), bp
+        )
+
+        with (
+            mock.patch("opik.opik_context.update_current_trace") as mock_trace,
+            mock.patch("opik.opik_context.update_current_span"),
+        ):
+            _ = live.lr
+
+        ac = mock_trace.call_args.kwargs["metadata"]["agent_configuration"]
+        assert ac["blueprint_version"] is None
 
 
 # ---------------------------------------------------------------------------

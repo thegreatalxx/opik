@@ -28,6 +28,7 @@ class _OpikState:
     mask_id: typing.Optional[str] = None
     manager: typing.Any = None
     blueprint_id: typing.Optional[str] = None
+    blueprint_version: typing.Optional[str] = None
     envs: typing.Optional[typing.List[str]] = None
     is_fallback: bool = True
     mask_mismatch_warned: bool = False
@@ -142,10 +143,12 @@ class AgentConfig:
                 stacklevel=2,
             )
         instance_cache = cache_mod.get_cached_config(project, state.env, state.mask_id)
+        state.blueprint_id = instance_cache.blueprint_id
+        state.blueprint_version = instance_cache.blueprint_version
         state.is_fallback = instance_cache.blueprint_id is None
         prefixed_key = type(self).__field_metadata__[attr].prefixed_key
         value = instance_cache.values.get(prefixed_key, _MISSING)
-        self._inject_trace_metadata(attr, value=value, shared_cache=instance_cache)
+        self._inject_trace_metadata(attr, value=value)
         return value if value is not _MISSING else object.__getattribute__(self, attr)
 
     def _extract_fields_with_values(self) -> typing.Dict[str, tuple]:
@@ -198,6 +201,7 @@ class AgentConfig:
 
         self._state.manager = manager
         self._state.blueprint_id = bp.id
+        self._state.blueprint_version = bp.name
         self._state.envs = bp.envs
         self._state.is_fallback = False
         return bp.name or ""
@@ -283,6 +287,7 @@ class AgentConfig:
         state.mask_id = mask_id
         state.manager = manager
         state.blueprint_id = bp.id
+        state.blueprint_version = bp.name
         state.envs = bp.envs
         state.is_fallback = False
 
@@ -293,17 +298,11 @@ class AgentConfig:
 
         return instance
 
-    def _inject_trace_metadata(
-        self,
-        attr: str,
-        value: typing.Any = _MISSING,
-        *,
-        shared_cache: typing.Optional[cache_mod.SharedConfigCache] = None,
-    ) -> None:
+    def _inject_trace_metadata(self, attr: str, value: typing.Any = _MISSING) -> None:
         from opik import exceptions, opik_context
 
         try:
-            metadata = self._build_trace_metadata(attr, value, shared_cache)
+            metadata = self._build_trace_metadata(attr, value)
             payload = {"agent_configuration": metadata}
             opik_context.update_current_trace(metadata=payload)
             opik_context.update_current_span(metadata=payload)
@@ -316,30 +315,17 @@ class AgentConfig:
         self,
         attr: str,
         value: typing.Any,
-        shared_cache: typing.Optional[cache_mod.SharedConfigCache],
     ) -> typing.Dict[str, typing.Any]:
         state = self._state
-        project = typing.cast(
-            str, state.project
-        )  # guarded by _resolve_field caller chain
-        resolved_cache = (
-            shared_cache
-            if shared_cache is not None
-            else cache_mod.get_cached_config(project, state.env, state.mask_id)
-        )
-
         config_field = type(self).__field_metadata__[attr]
-        if value is _MISSING:
-            value = resolved_cache.values.get(config_field.prefixed_key, _MISSING)
-
         values = (
             {config_field.prefixed_key: _build_field_info(config_field, value)}
             if value is not _MISSING
             else {}
         )
-
         result: typing.Dict[str, typing.Any] = {
-            "blueprint_id": resolved_cache.blueprint_id,
+            "_blueprint_id": state.blueprint_id,
+            "blueprint_version": state.blueprint_version,
         }
         if state.mask_id is not None:
             result["_mask_id"] = state.mask_id
