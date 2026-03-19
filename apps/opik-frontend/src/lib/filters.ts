@@ -1,6 +1,7 @@
 import uniqid from "uniqid";
 import flatten from "lodash/flatten";
 import { Filter } from "@/types/filters";
+import { DatasetItemColumn } from "@/types/datasets";
 import {
   COLUMN_DATA_ID,
   COLUMN_TYPE,
@@ -255,6 +256,31 @@ export const mapDynamicColumnTypesToColumnType = (
   }
 
   return COLUMN_TYPE.string;
+};
+
+/**
+ * Build filter column definitions from dataset columns.
+ * Maps each column to a filter with "data." prefix and appends a tags filter.
+ */
+export const buildDatasetFilterColumns = (
+  datasetColumns: DatasetItemColumn[],
+  includeId = false,
+) => {
+  const dataFilterColumns = datasetColumns.map((c) => ({
+    id: `${COLUMN_DATA_ID}.${c.name}`,
+    label: c.name,
+    type: COLUMN_TYPE.string,
+  }));
+  return [
+    ...(includeId ? [{ id: "id", label: "ID", type: COLUMN_TYPE.string }] : []),
+    ...dataFilterColumns,
+    {
+      id: "tags",
+      label: "Tags",
+      type: COLUMN_TYPE.list,
+      iconType: "tags" as const,
+    },
+  ];
 };
 
 /**

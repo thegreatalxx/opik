@@ -34,8 +34,10 @@ import { FeatureToggleKeys } from "@/types/feature-toggles";
 import { usePermissions } from "@/contexts/PermissionsContext";
 import { Dataset, DatasetItemColumn } from "@/types/datasets";
 import { Filters } from "@/types/filters";
-import { COLUMN_DATA_ID, COLUMN_TYPE } from "@/types/shared";
-import { transformDataColumnFilters } from "@/lib/filters";
+import {
+  buildDatasetFilterColumns,
+  transformDataColumnFilters,
+} from "@/lib/filters";
 import { PLAYGROUND_PROJECT_NAME } from "@/constants/shared";
 import { parseDatasetVersionKey } from "@/utils/datasetVersionStorage";
 
@@ -165,22 +167,10 @@ const RunOnDatasetDialog: React.FC<RunOnDatasetDialogProps> = ({
   const isDatasetEmpty =
     !isLoadingDatasetItems && !!plainDatasetId && datasetItemsData?.total === 0;
 
-  const filtersColumnData = useMemo(() => {
-    const dataFilterColumns = datasetColumns.map((c) => ({
-      id: `${COLUMN_DATA_ID}.${c.name}`,
-      label: c.name,
-      type: COLUMN_TYPE.string,
-    }));
-    return [
-      ...dataFilterColumns,
-      {
-        id: "tags",
-        label: "Tags",
-        type: COLUMN_TYPE.list,
-        iconType: "tags" as const,
-      },
-    ];
-  }, [datasetColumns]);
+  const filtersColumnData = useMemo(
+    () => buildDatasetFilterColumns(datasetColumns),
+    [datasetColumns],
+  );
 
   const {
     data: playgroundProject,
