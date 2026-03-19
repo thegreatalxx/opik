@@ -964,8 +964,6 @@ export const TracesSpansTab: React.FC<TracesSpansTabProps> = ({
                         row.metadata as Record<string, unknown>
                       )?.[AGENT_CONFIGURATION_METADATA_KEY];
 
-
-
                       if (!isAgentConfigurationMetadata(agentConfig))
                         return undefined;
                       const version = versionMap[agentConfig.blueprint_id];

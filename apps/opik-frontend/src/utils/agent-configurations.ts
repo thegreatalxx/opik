@@ -1,5 +1,4 @@
 import { BlueprintValue, BlueprintValueType } from "@/types/agent-configs";
-import { formatNumericData } from "@/lib/utils";
 
 export const AGENT_CONFIGURATION_METADATA_KEY = "agent_configuration";
 export const AGENT_CONFIGURATION_PROD_ENV_NAME = "prod";
