@@ -36,13 +36,15 @@ public final class ExperimentSearchCriteriaBinder {
             List<FilterStrategy> filterStrategies,
             boolean bindEntityType) {
 
-        // Bind basic criteria
-        Optional.ofNullable(criteria.datasetId())
-                .ifPresent(datasetId -> statement.bind("dataset_id", datasetId));
+        // Bind basic criteria — dataset_id singular is consolidated into dataset_ids
+        var resolvedDatasetIds = Optional.ofNullable(criteria.datasetIds())
+                .orElseGet(() -> Optional.ofNullable(criteria.datasetId())
+                        .map(List::of)
+                        .orElse(null));
+        Optional.ofNullable(resolvedDatasetIds)
+                .ifPresent(datasetIds -> statement.bind("dataset_ids", datasetIds.toArray(UUID[]::new)));
         Optional.ofNullable(criteria.name())
                 .ifPresent(name -> statement.bind("name", name));
-        Optional.ofNullable(criteria.datasetIds())
-                .ifPresent(datasetIds -> statement.bind("dataset_ids", datasetIds.toArray(UUID[]::new)));
         Optional.ofNullable(criteria.promptId())
                 .ifPresent(promptId -> statement.bind("prompt_ids", List.of(promptId).toArray(UUID[]::new)));
         Optional.ofNullable(criteria.projectId())

@@ -8,9 +8,7 @@ import java.util.UUID;
 @Builder(toBuilder = true)
 public record AggregationBranchCountsCriteria(
         Set<UUID> experimentIds,
-        UUID datasetId,
-        UUID id,
-        Set<UUID> idsList) {
+        UUID datasetId) {
 
     public static AggregationBranchCountsCriteria empty() {
         return AggregationBranchCountsCriteria.builder().build();

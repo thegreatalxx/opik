@@ -245,7 +245,6 @@ class ExperimentDAO {
                     SELECT *
                     FROM experiments
                     WHERE workspace_id = :workspace_id
-                    <if(dataset_id)> AND dataset_id = :dataset_id <endif>
                     <if(dataset_ids)> AND dataset_id IN :dataset_ids <endif>
                     <if(id)> AND id = :id <endif>
                     <if(ids_list)> AND id IN :ids_list <endif>
@@ -797,7 +796,6 @@ class ExperimentDAO {
                     SELECT *
                     FROM experiments
                     WHERE workspace_id = :workspace_id
-                    <if(dataset_id)> AND dataset_id = :dataset_id <endif>
                     <if(dataset_ids)> AND dataset_id IN :dataset_ids <endif>
                     <if(experiment_ids)> AND id IN :experiment_ids <endif>
                     ORDER BY (workspace_id, dataset_id, id) DESC, last_updated_at DESC
@@ -1170,7 +1168,6 @@ class ExperimentDAO {
                     SELECT *
                     FROM experiments
                     WHERE workspace_id = :workspace_id
-                    <if(dataset_id)> AND dataset_id = :dataset_id <endif>
                     <if(dataset_ids)> AND dataset_id IN :dataset_ids <endif>
                     <if(experiment_ids)> AND id IN :experiment_ids <endif>
                     ORDER BY (workspace_id, dataset_id, id) DESC, last_updated_at DESC
@@ -1809,7 +1806,7 @@ class ExperimentDAO {
     Mono<Experiment> getById(@NonNull UUID id) {
         log.info("Getting experiment by id '{}'", id);
         var limit = 1;
-        var aggregationCriteria = AggregationBranchCountsCriteria.builder().id(id).build();
+        var aggregationCriteria = AggregationBranchCountsCriteria.builder().experimentIds(Set.of(id)).build();
 
         return getAggregationBranchCounts(aggregationCriteria)
                 .flatMap(counts -> {
@@ -1838,7 +1835,7 @@ class ExperimentDAO {
         log.info("Getting experiment by ids '{}'", ids);
 
         var aggregationCriteria = AggregationBranchCountsCriteria.builder()
-                .idsList(ids)
+                .experimentIds(ids)
                 .build();
 
         return getAggregationBranchCounts(aggregationCriteria)
@@ -2150,12 +2147,14 @@ class ExperimentDAO {
 
     private ST newFindTemplate(String query, ExperimentSearchCriteria criteria, String queryName, String workspaceId) {
         var template = getSTWithLogComment(query, queryName, workspaceId, "");
-        Optional.ofNullable(criteria.datasetId())
-                .ifPresent(datasetId -> template.add("dataset_id", datasetId));
+        var resolvedDatasetIds = Optional.ofNullable(criteria.datasetIds())
+                .orElseGet(() -> Optional.ofNullable(criteria.datasetId())
+                        .map(List::of)
+                        .orElse(null));
+        Optional.ofNullable(resolvedDatasetIds)
+                .ifPresent(datasetIds -> template.add("dataset_ids", datasetIds));
         Optional.ofNullable(criteria.name())
                 .ifPresent(name -> template.add("name", name));
-        Optional.ofNullable(criteria.datasetIds())
-                .ifPresent(datasetIds -> template.add("dataset_ids", datasetIds));
         Optional.ofNullable(criteria.promptId())
                 .ifPresent(promptId -> template.add("prompt_ids", promptId));
         Optional.ofNullable(criteria.projectId())
@@ -2499,13 +2498,14 @@ class ExperimentDAO {
                 .flatMap(connection -> {
                     var template = TemplateUtils.newST(SELECT_TARGET_PROJECTS);
 
-                    Optional.ofNullable(criteria.datasetId())
-                            .ifPresent(datasetId -> template.add("dataset_id", datasetId));
+                    var resolvedDatasetIds = Optional.ofNullable(criteria.datasetIds())
+                            .orElseGet(() -> Optional.ofNullable(criteria.datasetId())
+                                    .map(List::of)
+                                    .orElse(null));
+                    Optional.ofNullable(resolvedDatasetIds)
+                            .ifPresent(datasetIds -> template.add("dataset_ids", datasetIds));
                     Optional.ofNullable(criteria.name())
                             .ifPresent(name -> template.add("name", name));
-                    Optional.ofNullable(criteria.datasetIds())
-                            .filter(CollectionUtils::isNotEmpty)
-                            .ifPresent(datasetIds -> template.add("dataset_ids", datasetIds));
                     Optional.ofNullable(criteria.promptId())
                             .ifPresent(promptId -> template.add("prompt_ids", promptId));
                     Optional.ofNullable(criteria.optimizationId())
@@ -2528,13 +2528,11 @@ class ExperimentDAO {
                     var statement = connection.createStatement(query);
 
                     // Bind the same criteria as the main query
-                    Optional.ofNullable(criteria.datasetId())
-                            .ifPresent(datasetId -> statement.bind("dataset_id", datasetId));
+                    Optional.ofNullable(resolvedDatasetIds)
+                            .ifPresent(datasetIds -> statement.bind("dataset_ids",
+                                    datasetIds.toArray(UUID[]::new)));
                     Optional.ofNullable(criteria.name())
                             .ifPresent(name -> statement.bind("name", name));
-                    Optional.ofNullable(criteria.datasetIds())
-                            .filter(CollectionUtils::isNotEmpty)
-                            .ifPresent(datasetIds -> statement.bind("dataset_ids", datasetIds.toArray(UUID[]::new)));
                     Optional.ofNullable(criteria.promptId())
                             .ifPresent(
                                     promptId -> statement.bind("prompt_ids", List.of(promptId).toArray(UUID[]::new)));

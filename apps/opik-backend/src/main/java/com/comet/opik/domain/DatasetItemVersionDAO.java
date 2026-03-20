@@ -1060,7 +1060,11 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
                 WHERE entity_type = 'trace'
                   AND workspace_id = :workspace_id
                   <if(has_target_projects)>AND project_id IN :target_project_ids<endif>
-                  AND entity_id IN (SELECT trace_id FROM experiment_items_final)
+                  AND entity_id IN (
+                    SELECT trace_id FROM experiment_items_final
+                    UNION ALL
+                    SELECT trace_id FROM experiment_item_aggr_trace_scope
+                  )
                 GROUP BY entity_id
             )
             , dataset_items_aggr_resolved AS (

@@ -114,7 +114,6 @@ class OptimizationDAOImpl implements OptimizationDAO {
                     SELECT *
                     FROM optimizations
                     WHERE workspace_id = :workspace_id
-                    <if(dataset_id)>AND dataset_id = :dataset_id <endif>
                     <if(dataset_ids)>AND dataset_id IN :dataset_ids <endif>
                     <if(id)>AND id = :id <endif>
                     ORDER BY (workspace_id, dataset_id, id) DESC, last_updated_at DESC
@@ -385,7 +384,6 @@ class OptimizationDAOImpl implements OptimizationDAO {
                     SELECT *
                     FROM optimizations
                     WHERE workspace_id = :workspace_id
-                    <if(dataset_id)>AND dataset_id = :dataset_id <endif>
                     <if(dataset_ids)>AND dataset_id IN :dataset_ids <endif>
                     <if(id)>AND id = :id <endif>
                     ORDER BY (workspace_id, dataset_id, id) DESC, last_updated_at DESC

@@ -146,10 +146,8 @@ class OptimizationServiceImpl implements OptimizationService {
 
         // If an explicit dataset_id filter was already set, intersect with name-resolved IDs
         var existingIds = searchCriteria.datasetIds();
-        if (existingIds != null && !existingIds.isEmpty()) {
-            var intersection = resolvedIds.stream()
-                    .filter(existingIds::contains)
-                    .toList();
+        if (CollectionUtils.isNotEmpty(existingIds)) {
+            var intersection = CollectionUtils.intersection(resolvedIds, existingIds).stream().toList();
             if (intersection.isEmpty()) {
                 return null;
             }

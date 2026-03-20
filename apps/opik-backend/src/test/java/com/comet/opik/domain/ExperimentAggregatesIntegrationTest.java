@@ -495,8 +495,8 @@ class ExperimentAggregatesIntegrationTest {
                 .as("datasetVersionSummary is not stored in aggregates")
                 .isNull();
         assertThat(experimentFromAggregates.datasetItemCount())
-                .as("datasetItemCount is not stored in aggregates")
-                .isNull();
+                .as("datasetItemCount is stored in aggregates since migration 000071")
+                .isEqualTo((long) rawExperiment.traceCount());
     }
 
     @ParameterizedTest(name = "Group by {0}")
