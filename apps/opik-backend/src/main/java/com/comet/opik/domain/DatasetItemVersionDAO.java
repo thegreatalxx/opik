@@ -664,28 +664,18 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
     private static final String SELECT_EXPERIMENT_ITEMS_OUTPUT_COLUMNS = """
             WITH experiments_resolved AS (
                 SELECT DISTINCT
-                    div.dataset_item_id AS stable_id,
-                    div.id AS row_id
-                FROM experiments e
-                INNER JOIN dataset_item_versions div
-                    ON div.dataset_id = :datasetId
-                    AND div.workspace_id = :workspace_id
-                    AND div.dataset_version_id = e.dataset_version_id
-                WHERE e.workspace_id = :workspace_id
-                <if(experiment_ids)>AND e.id IN :experiment_ids<endif>
-                ORDER BY (div.workspace_id, div.dataset_id, div.dataset_version_id, div.id) DESC, div.last_updated_at DESC
-                LIMIT 1 BY div.id
+                    id
+                FROM experiments
+                WHERE workspace_id = :workspace_id
+                AND dataset_id = :datasetId
+                <if(experiment_ids)>AND id IN :experiment_ids<endif>
             ),
             experiment_items_scope AS (
-                SELECT
-                    trace_id,
-                    dataset_item_id
-                FROM experiment_items
-                WHERE workspace_id = :workspace_id
-                AND dataset_item_id IN (SELECT arrayJoin([stable_id, row_id]) FROM experiments_resolved)
-                <if(experiment_ids)>AND experiment_id IN :experiment_ids<endif>
-                ORDER BY id DESC, last_updated_at DESC
-                LIMIT 1 BY id
+                SELECT DISTINCT
+                    ei.trace_id
+                FROM experiment_items ei
+                WHERE ei.workspace_id = :workspace_id
+                <if(experiment_ids)>AND ei.experiment_id IN (SELECT id FROM experiments_resolved)<endif>
             )
             SELECT
                 mapFromArrays(
