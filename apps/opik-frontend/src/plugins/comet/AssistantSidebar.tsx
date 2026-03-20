@@ -24,12 +24,14 @@ const DEV_BASE_URL =
   import.meta.env.VITE_ASSISTANT_SIDEBAR_URL;
 
 const OLLIE_BRIDGE_VERSION = 1;
-const PROD_BASE = "/ollie";
+const PROD_BASE =
+  import.meta.env.VITE_OLLIE_CDN_URL || "https://cdn.comet.ml/ollie";
 const FAILURE_COOLDOWN_MS = 5 * 60 * 1000;
 const FAILURE_KEY = "ollie_load_failure_ts";
 
 interface OllieManifest {
   js: string;
+  css?: string;
 }
 
 interface AssistantSidebarProps {
@@ -45,6 +47,7 @@ const loadScript = (src: string): Promise<void> =>
     const script = document.createElement("script");
     script.src = src;
     script.async = true;
+    script.crossOrigin = "anonymous";
     script.onload = () => resolve();
     script.onerror = () => reject(new Error(`Failed to load script: ${src}`));
     document.head.appendChild(script);

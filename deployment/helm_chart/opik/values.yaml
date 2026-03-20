@@ -463,13 +463,13 @@ component:
         - "'self'"
         - "'unsafe-inline'"
         - "'unsafe-eval'"
-        # Add external services here, e.g.:
-        # - "https://cdn.example.com"
+        - "https://cdn.comet.ml"
       # Styles allowed to load
       style-src:
         - "'self'"
         - "'unsafe-inline'"
         - "https://fonts.googleapis.com"
+        - "https://cdn.comet.ml"
       # Images allowed to load
       img-src:
         - "'self'"
@@ -495,8 +495,7 @@ component:
         - "ws:"
         - "wss:"
         - "https:"
-        # Add external API endpoints here, e.g.:
-        # - "https://api.example.com"
+        - "https://cdn.comet.ml"
       # Objects/plugins (Flash, Java, etc.)
       object-src:
         - "'none'"
