@@ -131,7 +131,8 @@ public class FiltersFactory {
     }
 
     private Filter toValidAndDecoded(Filter filter) {
-        if (filter.field().getType() != FieldType.STRING) {
+        if (filter.field().getType() != FieldType.STRING
+                && filter.field().getType() != FieldType.STRING_EXACT) {
             // don't decode value for string fields as it is already decoded during JSON deserialization
             try {
                 filter = filter.build(URLDecoder.decode(filter.value(), StandardCharsets.UTF_8));
