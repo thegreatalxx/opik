@@ -585,8 +585,7 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
                 )
                 <endif>
                 <if(dataset_item_filters)>
-                AND (ei.dataset_item_id IN (SELECT id FROM dataset_items_resolved WHERE <dataset_item_filters>)
-                     OR ei.dataset_item_id IN (SELECT row_id FROM dataset_items_resolved WHERE <dataset_item_filters>))
+                AND ei.dataset_item_id IN (SELECT arrayJoin([id, row_id]) FROM dataset_items_resolved WHERE <dataset_item_filters>)
                 <endif>
             	ORDER BY id DESC, last_updated_at DESC
             ), dataset_items_agg_resolved AS (
@@ -622,8 +621,7 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
                 <if(feedback_scores_filters_agg)> AND <feedback_scores_filters_agg> <endif>
                 <if(feedback_scores_empty_filters_agg)> AND <feedback_scores_empty_filters_agg> <endif>
                 <if(dataset_item_filters)>
-                AND (eia.dataset_item_id IN (SELECT id FROM dataset_items_agg_resolved WHERE <dataset_item_filters>)
-                     OR eia.dataset_item_id IN (SELECT dataset_item_id FROM dataset_items_agg_resolved WHERE <dataset_item_filters>))
+                AND eia.dataset_item_id IN (SELECT arrayJoin([id, dataset_item_id]) FROM dataset_items_agg_resolved WHERE <dataset_item_filters>)
                 <endif>
             )
             SELECT COUNT(DISTINCT di_id) AS count
@@ -667,7 +665,7 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
             WITH experiments_resolved AS (
                 SELECT DISTINCT
                     div.dataset_item_id AS stable_id,
-                    div.dataset_version_id
+                    div.id AS row_id
                 FROM experiments e
                 INNER JOIN dataset_item_versions div
                     ON div.dataset_id = :datasetId
@@ -684,8 +682,7 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
                     dataset_item_id
                 FROM experiment_items
                 WHERE workspace_id = :workspace_id
-                AND (dataset_item_id IN (SELECT stable_id FROM experiments_resolved)
-                     OR dataset_item_id IN (SELECT id FROM dataset_item_versions WHERE workspace_id = :workspace_id AND dataset_id = :datasetId AND id IN (SELECT dataset_item_id FROM experiment_items WHERE workspace_id = :workspace_id <if(experiment_ids)>AND experiment_id IN :experiment_ids<endif>)))
+                AND dataset_item_id IN (SELECT arrayJoin([stable_id, row_id]) FROM experiments_resolved)
                 <if(experiment_ids)>AND experiment_id IN :experiment_ids<endif>
                 ORDER BY id DESC, last_updated_at DESC
                 LIMIT 1 BY id
@@ -994,8 +991,7 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
                 )
                 <endif>
                 <if(dataset_item_filters)>
-                AND (ei.dataset_item_id IN (SELECT id FROM dataset_items_resolved WHERE <dataset_item_filters>)
-                     OR ei.dataset_item_id IN (SELECT row_id FROM dataset_items_resolved WHERE <dataset_item_filters>))
+                AND ei.dataset_item_id IN (SELECT arrayJoin([id, row_id]) FROM dataset_items_resolved WHERE <dataset_item_filters>)
                 <endif>
             )
             , comments_final AS (
@@ -1152,8 +1148,7 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
                     <if(feedback_scores_filters_agg)> AND <feedback_scores_filters_agg> <endif>
                     <if(feedback_scores_empty_filters_agg)> AND <feedback_scores_empty_filters_agg> <endif>
                     <if(dataset_item_filters)>
-                    AND (eia.dataset_item_id IN (SELECT id FROM dataset_items_aggr_resolved WHERE <dataset_item_filters>)
-                     OR eia.dataset_item_id IN (SELECT dataset_item_id FROM dataset_items_aggr_resolved WHERE <dataset_item_filters>))
+                    AND eia.dataset_item_id IN (SELECT arrayJoin([id, dataset_item_id]) FROM dataset_items_aggr_resolved WHERE <dataset_item_filters>)
                     <endif>
                 ) ei
                 LEFT JOIN dataset_items_aggr_resolved AS di ON (di.id = ei.dataset_item_id OR di.dataset_item_id = ei.dataset_item_id)
@@ -1973,8 +1968,8 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
                 )
                 <endif>
                 <if(dataset_item_filters)>
-                AND (ei.dataset_item_id IN (
-                    SELECT id
+                AND ei.dataset_item_id IN (
+                    SELECT arrayJoin([id, row_id])
                     FROM (
                         SELECT
                             div_dedup.dataset_item_id AS id,
@@ -2002,36 +1997,7 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
                         LIMIT 1 BY dataset_item_id
                     ) AS versioned
                     WHERE <dataset_item_filters>
-                ) OR ei.dataset_item_id IN (
-                    SELECT row_id
-                    FROM (
-                        SELECT
-                            div_dedup.dataset_item_id AS id,
-                            div_dedup.id AS row_id,
-                            div_dedup.data AS data,
-                            div_dedup.source AS source,
-                            div_dedup.trace_id AS trace_id,
-                            div_dedup.span_id AS span_id,
-                            div_dedup.tags AS tags,
-                            div_dedup.created_at AS created_at,
-                            div_dedup.last_updated_at AS last_updated_at,
-                            div_dedup.created_by AS created_by,
-                            div_dedup.last_updated_by AS last_updated_by,
-                            div_dedup.dataset_version_id AS dataset_version_id
-                        FROM (
-                            SELECT *
-                            FROM dataset_item_versions
-                            WHERE workspace_id = :workspace_id
-                            AND dataset_id = :datasetId
-                            AND dataset_version_id IN (SELECT resolved_version_id FROM experiments_resolved)
-                            ORDER BY (workspace_id, dataset_id, dataset_version_id, id) DESC, last_updated_at DESC
-                            LIMIT 1 BY id
-                        ) AS div_dedup
-                        ORDER BY last_updated_at DESC
-                        LIMIT 1 BY dataset_item_id
-                    ) AS versioned
-                    WHERE <dataset_item_filters>
-                ))
+                )
                 <endif>
             ), item_agg AS (
                 SELECT
