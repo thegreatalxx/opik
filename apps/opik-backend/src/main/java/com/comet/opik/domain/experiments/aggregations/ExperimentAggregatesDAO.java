@@ -211,7 +211,6 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
                 ORDER BY (workspace_id, dataset_id, id) DESC, last_updated_at DESC
                 LIMIT 1 BY workspace_id, dataset_id, id
             )
-            WHERE 1=1
             SETTINGS log_comment = '<log_comment>'
             ;
             """;
@@ -724,7 +723,6 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
                 ORDER BY (workspace_id, project_id, id) DESC, last_updated_at DESC
                 LIMIT 1 BY workspace_id, project_id, id
             )
-            WHERE 1=1
             SETTINGS log_comment = '<log_comment>'
             ;
             """;
@@ -1250,7 +1248,7 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
                         div.workspace_id
                     FROM dataset_item_versions div
                     INNER JOIN (
-                        SELECT *
+                        SELECT id, workspace_id, dataset_id, dataset_version_id
                         FROM experiment_aggregates
                         WHERE workspace_id = :workspace_id
                         ORDER BY (workspace_id, dataset_id, id) DESC, last_updated_at DESC
@@ -1275,7 +1273,7 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
                 LIMIT 1 BY workspace_id, experiment_id, id
             ) eia
             INNER JOIN (
-                SELECT *
+                SELECT id, workspace_id
                 FROM experiment_aggregates
                 WHERE workspace_id = :workspace_id
                 ORDER BY (workspace_id, dataset_id, id) DESC, last_updated_at DESC
@@ -1342,7 +1340,7 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
                         div.workspace_id
                     FROM dataset_item_versions div
                     INNER JOIN (
-                        SELECT *
+                        SELECT id, workspace_id, dataset_id, dataset_version_id
                         FROM experiment_aggregates
                         WHERE workspace_id = :workspace_id
                         ORDER BY (workspace_id, dataset_id, id) DESC, last_updated_at DESC
@@ -1396,7 +1394,7 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
                 LIMIT 1 BY workspace_id, experiment_id, id
             ) eia
             INNER JOIN (
-                SELECT *
+                SELECT id, workspace_id
                 FROM experiment_aggregates
                 WHERE workspace_id = :workspace_id
                 ORDER BY (workspace_id, dataset_id, id) DESC, last_updated_at DESC
@@ -2571,11 +2569,7 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
     private ST buildCountTemplate(ExperimentSearchCriteria criteria, String workspaceId) {
         var template = getSTWithLogComment(FIND_COUNT_FROM_AGGREGATES, "count_experiments_from_aggregates",
                 workspaceId, "");
-        var resolvedDatasetIds = Optional.ofNullable(criteria.datasetIds())
-                .orElseGet(() -> Optional.ofNullable(criteria.datasetId())
-                        .map(List::of)
-                        .orElse(null));
-        Optional.ofNullable(resolvedDatasetIds)
+        Optional.ofNullable(criteria.resolveDatasetIds())
                 .ifPresent(datasetIds -> template.add("dataset_ids", datasetIds));
         Optional.ofNullable(criteria.name())
                 .ifPresent(name -> template.add("name", name));
