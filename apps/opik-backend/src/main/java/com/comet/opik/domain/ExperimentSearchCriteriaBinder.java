@@ -37,11 +37,7 @@ public final class ExperimentSearchCriteriaBinder {
             boolean bindEntityType) {
 
         // Bind basic criteria — dataset_id singular is consolidated into dataset_ids
-        var resolvedDatasetIds = Optional.ofNullable(criteria.datasetIds())
-                .orElseGet(() -> Optional.ofNullable(criteria.datasetId())
-                        .map(List::of)
-                        .orElse(null));
-        Optional.ofNullable(resolvedDatasetIds)
+        Optional.ofNullable(criteria.resolveDatasetIds())
                 .ifPresent(datasetIds -> statement.bind("dataset_ids", datasetIds.toArray(UUID[]::new)));
         Optional.ofNullable(criteria.name())
                 .ifPresent(name -> statement.bind("name", name));

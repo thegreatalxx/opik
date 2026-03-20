@@ -4,6 +4,7 @@ import com.comet.opik.api.Dataset;
 import com.comet.opik.api.DatasetItem;
 import com.comet.opik.api.DatasetItemBatch;
 import com.comet.opik.api.DatasetItemSource;
+import com.comet.opik.api.EvaluationMethod;
 import com.comet.opik.api.Experiment;
 import com.comet.opik.api.ExperimentGroupAggregationsResponse;
 import com.comet.opik.api.ExperimentGroupCriteria;
@@ -13,6 +14,7 @@ import com.comet.opik.api.ExperimentSearchCriteria;
 import com.comet.opik.api.ExperimentType;
 import com.comet.opik.api.FeedbackScoreItem.FeedbackScoreBatchItem;
 import com.comet.opik.api.Project;
+import com.comet.opik.api.RunStatus;
 import com.comet.opik.api.ScoreSource;
 import com.comet.opik.api.Span;
 import com.comet.opik.api.Trace;
@@ -2072,6 +2074,102 @@ class ExperimentAggregatesIntegrationTest {
                 Arguments.of("usage.completion_tokens", com.comet.opik.api.sorting.Direction.DESC),
                 Arguments.of("output.result", com.comet.opik.api.sorting.Direction.ASC),
                 Arguments.of("output.result", com.comet.opik.api.sorting.Direction.DESC));
+    }
+
+    @Test
+    @DisplayName("Compare endpoint returns assertion results for aggregated experiments")
+    void compareEndpoint__aggregatedExperimentWithAssertions__thenReturnAssertionResults() {
+        var workspaceName = UUID.randomUUID().toString();
+        var apiKey = UUID.randomUUID().toString();
+        var workspaceId = UUID.randomUUID().toString();
+        mockTargetWorkspace(apiKey, workspaceName, workspaceId);
+
+        var project = createProject(apiKey, workspaceName);
+        var dataset = createDataset(apiKey, workspaceName);
+
+        var datasetItem = factory.manufacturePojo(DatasetItem.class).toBuilder()
+                .datasetId(dataset.id())
+                .traceId(null)
+                .experimentItems(null)
+                .spanId(null)
+                .source(DatasetItemSource.SDK)
+                .build();
+        datasetResourceClient.createDatasetItems(
+                DatasetItemBatch.builder()
+                        .datasetId(dataset.id())
+                        .items(List.of(datasetItem))
+                        .build(),
+                workspaceName, apiKey);
+
+        var experiment = experimentResourceClient.createPartialExperiment()
+                .datasetId(dataset.id())
+                .datasetName(dataset.name())
+                .evaluationMethod(EvaluationMethod.EVALUATION_SUITE)
+                .optimizationId(null)
+                .build();
+        experimentResourceClient.create(experiment, apiKey, workspaceName);
+
+        var trace = factory.manufacturePojo(Trace.class).toBuilder()
+                .projectName(project.name())
+                .usage(null)
+                .visibilityMode(null)
+                .build();
+        traceResourceClient.batchCreateTraces(List.of(trace), apiKey, workspaceName);
+
+        var experimentItem = ExperimentItem.builder()
+                .experimentId(experiment.id())
+                .datasetItemId(datasetItem.id())
+                .traceId(trace.id())
+                .build();
+        experimentResourceClient.createExperimentItem(Set.of(experimentItem), apiKey, workspaceName);
+
+        // Create assertion scores via feedback scores API (routed to assertion_results table)
+        var assertionScores = List.of(
+                (FeedbackScoreBatchItem) factory.manufacturePojo(FeedbackScoreBatchItem.class).toBuilder()
+                        .id(trace.id())
+                        .projectName(project.name())
+                        .name("Should link to docs")
+                        .categoryName("suite_assertion")
+                        .value(BigDecimal.ONE)
+                        .reason("Links found")
+                        .source(ScoreSource.SDK)
+                        .build(),
+                (FeedbackScoreBatchItem) factory.manufacturePojo(FeedbackScoreBatchItem.class).toBuilder()
+                        .id(trace.id())
+                        .projectName(project.name())
+                        .name("Should be concise")
+                        .categoryName("suite_assertion")
+                        .value(BigDecimal.ZERO)
+                        .reason("Too long")
+                        .source(ScoreSource.SDK)
+                        .build());
+        traceResourceClient.feedbackScores(assertionScores, apiKey, workspaceName);
+
+        // Populate aggregations so the experiment goes through the aggregated path
+        experimentAggregatesService.populateAggregations(experiment.id())
+                .contextWrite(ctx -> ctx
+                        .put(RequestContext.USER_NAME, USER)
+                        .put(RequestContext.WORKSPACE_ID, workspaceId))
+                .block();
+
+        // Query compare endpoint — this uses DatasetItemVersionDAO with aggregated branch
+        var actualPage = datasetResourceClient.getDatasetItemsWithExperimentItems(
+                dataset.id(), List.of(experiment.id()), apiKey, workspaceName);
+
+        assertThat(actualPage.content()).hasSize(1);
+        var actualDatasetItem = actualPage.content().getFirst();
+        assertThat(actualDatasetItem.experimentItems()).hasSize(1);
+
+        var actualExpItem = actualDatasetItem.experimentItems().getFirst();
+        assertThat(actualExpItem.experimentId()).isEqualTo(experiment.id());
+
+        assertThat(actualExpItem.assertionResults())
+                .as("Aggregated experiment items must include assertion results from assertion_results table")
+                .isNotNull()
+                .hasSize(2);
+        assertThat(actualExpItem.status())
+                .as("Status should be FAILED because one assertion has value=0")
+                .isEqualTo(RunStatus.FAILED);
     }
 
 }

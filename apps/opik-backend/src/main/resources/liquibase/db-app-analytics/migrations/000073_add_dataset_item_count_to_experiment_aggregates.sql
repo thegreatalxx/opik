@@ -1,5 +1,5 @@
 --liquibase formatted sql
---changeset itamarg:000071_add_dataset_item_count_to_experiment_aggregates
+--changeset itamarg:000073_add_dataset_item_count_to_experiment_aggregates
 --comment: Add dataset_item_count column to experiment_aggregates table for storing pre-aggregated dataset item counts
 
 ALTER TABLE ${ANALYTICS_DB_DATABASE_NAME}.experiment_aggregates ON CLUSTER '{cluster}'

@@ -8,6 +8,7 @@ import lombok.NonNull;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
@@ -16,4 +17,15 @@ public record ExperimentSearchCriteria(String name, UUID datasetId, @NonNull Ent
         boolean datasetDeleted, Collection<UUID> datasetIds, UUID promptId, List<SortingField> sortingFields,
         UUID optimizationId, Set<ExperimentType> types, List<? extends Filter> filters,
         Set<UUID> experimentIds, UUID projectId, boolean projectDeleted) {
+
+    /**
+     * Resolves dataset IDs by preferring the plural {@code datasetIds} field,
+     * falling back to wrapping the singular {@code datasetId} in a list.
+     */
+    public Collection<UUID> resolveDatasetIds() {
+        return Optional.ofNullable(datasetIds)
+                .orElseGet(() -> Optional.ofNullable(datasetId)
+                        .map(List::of)
+                        .orElse(null));
+    }
 }

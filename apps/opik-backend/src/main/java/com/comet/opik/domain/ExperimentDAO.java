@@ -90,7 +90,6 @@ class ExperimentDAO {
      * Used to reduce traces, spans, and feedback_scores table scans.
      */
     private record TargetProjectsCriteria(
-            UUID datasetId,
             String name,
             Collection<UUID> datasetIds,
             UUID promptId,
@@ -102,7 +101,6 @@ class ExperimentDAO {
 
         static TargetProjectsCriteria from(ExperimentGroupCriteria criteria) {
             return new TargetProjectsCriteria(
-                    null,
                     criteria.name(),
                     null,
                     null,
@@ -115,9 +113,8 @@ class ExperimentDAO {
 
         static TargetProjectsCriteria from(ExperimentSearchCriteria criteria) {
             return new TargetProjectsCriteria(
-                    criteria.datasetId(),
                     criteria.name(),
-                    criteria.datasetIds(),
+                    criteria.resolveDatasetIds(),
                     criteria.promptId(),
                     criteria.optimizationId(),
                     criteria.types(),
@@ -2147,11 +2144,7 @@ class ExperimentDAO {
 
     private ST newFindTemplate(String query, ExperimentSearchCriteria criteria, String queryName, String workspaceId) {
         var template = getSTWithLogComment(query, queryName, workspaceId, "");
-        var resolvedDatasetIds = Optional.ofNullable(criteria.datasetIds())
-                .orElseGet(() -> Optional.ofNullable(criteria.datasetId())
-                        .map(List::of)
-                        .orElse(null));
-        Optional.ofNullable(resolvedDatasetIds)
+        Optional.ofNullable(criteria.resolveDatasetIds())
                 .ifPresent(datasetIds -> template.add("dataset_ids", datasetIds));
         Optional.ofNullable(criteria.name())
                 .ifPresent(name -> template.add("name", name));
@@ -2498,11 +2491,7 @@ class ExperimentDAO {
                 .flatMap(connection -> {
                     var template = TemplateUtils.newST(SELECT_TARGET_PROJECTS);
 
-                    var resolvedDatasetIds = Optional.ofNullable(criteria.datasetIds())
-                            .orElseGet(() -> Optional.ofNullable(criteria.datasetId())
-                                    .map(List::of)
-                                    .orElse(null));
-                    Optional.ofNullable(resolvedDatasetIds)
+                    Optional.ofNullable(criteria.datasetIds())
                             .ifPresent(datasetIds -> template.add("dataset_ids", datasetIds));
                     Optional.ofNullable(criteria.name())
                             .ifPresent(name -> template.add("name", name));
@@ -2528,7 +2517,7 @@ class ExperimentDAO {
                     var statement = connection.createStatement(query);
 
                     // Bind the same criteria as the main query
-                    Optional.ofNullable(resolvedDatasetIds)
+                    Optional.ofNullable(criteria.datasetIds())
                             .ifPresent(datasetIds -> statement.bind("dataset_ids",
                                     datasetIds.toArray(UUID[]::new)));
                     Optional.ofNullable(criteria.name())
