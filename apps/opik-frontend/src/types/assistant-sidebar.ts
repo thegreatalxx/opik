@@ -15,6 +15,13 @@ export interface BridgeContext {
 /** Host → Sidebar events */
 export interface HostEventMap {
   "context:changed": BridgeContext;
+  "runner:paired": {
+    pairingCode: string;
+    runnerId: string;
+    expiresInSeconds: number;
+  };
+  "runner:pair-failed": Record<string, never>;
+  "runner:connected": { runnerId: string };
 }
 
 /** Sidebar → Host events */
@@ -22,6 +29,7 @@ export interface SidebarEventMap {
   navigate: { path: string };
   notification: { message: string; type: NotificationType };
   "sidebar:resized": { width: number };
+  "runner:pair": { projectId: string };
 }
 
 export interface AssistantSidebarBridge {
