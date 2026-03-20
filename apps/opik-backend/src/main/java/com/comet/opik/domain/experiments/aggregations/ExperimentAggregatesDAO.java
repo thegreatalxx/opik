@@ -1164,6 +1164,8 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
                     ORDER BY (div.workspace_id, div.dataset_id, div.dataset_version_id, div.id) DESC, div.last_updated_at DESC
                     LIMIT 1 BY div.id
                 ) AS div_dedup
+                ORDER BY div_dedup.last_updated_at DESC
+                LIMIT 1 BY div_dedup.dataset_item_id
             )
             SELECT COUNT(DISTINCT eia.dataset_item_id) as count
             FROM experiment_item_aggregates eia FINAL
@@ -1238,6 +1240,8 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
                     ORDER BY (div.workspace_id, div.dataset_id, div.dataset_version_id, div.id) DESC, div.last_updated_at DESC
                     LIMIT 1 BY div.id
                 ) AS div_dedup
+                ORDER BY div_dedup.last_updated_at DESC
+                LIMIT 1 BY div_dedup.dataset_item_id
             )
             SELECT
                 di.id AS id,

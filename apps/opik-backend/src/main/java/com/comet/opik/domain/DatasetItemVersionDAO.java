@@ -601,12 +601,17 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
                     div_dedup.last_updated_at AS last_updated_at,
                     div_dedup.created_by AS created_by,
                     div_dedup.last_updated_by AS last_updated_by
-                FROM dataset_item_versions as div_dedup
-                WHERE workspace_id = :workspace_id
-                AND dataset_id = :datasetId
-                AND dataset_version_id IN (SELECT resolved_dataset_version_id FROM experiment_aggregated_scope_ids)
-                ORDER BY (workspace_id, dataset_id, dataset_version_id, id) DESC, last_updated_at DESC
-                LIMIT 1 BY id
+                FROM (
+                    SELECT *
+                    FROM dataset_item_versions
+                    WHERE workspace_id = :workspace_id
+                    AND dataset_id = :datasetId
+                    AND dataset_version_id IN (SELECT resolved_dataset_version_id FROM experiment_aggregated_scope_ids)
+                    ORDER BY (workspace_id, dataset_id, dataset_version_id, id) DESC, last_updated_at DESC
+                    LIMIT 1 BY id
+                ) AS div_dedup
+                ORDER BY last_updated_at DESC
+                LIMIT 1 BY dataset_item_id
             ), item_agg_count AS (
                 SELECT
                     eia.id,
@@ -1034,12 +1039,17 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
                     div_dedup.last_updated_at AS item_last_updated_at,
                     div_dedup.created_by AS item_created_by,
                     div_dedup.last_updated_by AS item_last_updated_by
-                FROM dataset_item_versions as div_dedup
-                WHERE workspace_id = :workspace_id
-                AND dataset_id  = :datasetId
-                AND dataset_version_id IN (SELECT resolved_dataset_version_id FROM experiment_aggregated_scope_ids)
-                ORDER BY (workspace_id, dataset_id, dataset_version_id, id) DESC, last_updated_at DESC
-                LIMIT 1 BY id
+                FROM (
+                    SELECT *
+                    FROM dataset_item_versions
+                    WHERE workspace_id = :workspace_id
+                    AND dataset_id  = :datasetId
+                    AND dataset_version_id IN (SELECT resolved_dataset_version_id FROM experiment_aggregated_scope_ids)
+                    ORDER BY (workspace_id, dataset_id, dataset_version_id, id) DESC, last_updated_at DESC
+                    LIMIT 1 BY id
+                ) AS div_dedup
+                ORDER BY last_updated_at DESC
+                LIMIT 1 BY dataset_item_id
             )
             <if(push_top_limit)>
             , top_dataset_items AS (

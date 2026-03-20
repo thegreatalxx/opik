@@ -714,10 +714,6 @@ class DatasetItemServiceImpl implements DatasetItemService {
                 : "Updated " + count + " items";
     }
 
-    /**
-     * Validates that all item mappings belong to the same dataset.
-     * Throws BadRequestException if items span multiple datasets.
-     */
     @WithSpan
     public Flux<DatasetItem> getItems(@NonNull String workspaceId, @NonNull DatasetItemStreamRequest request,
             @NonNull List<DatasetItemFilter> filters, Visibility visibility) {
@@ -1392,7 +1388,7 @@ class DatasetItemServiceImpl implements DatasetItemService {
 
             // Prepare added items (synchronous - no merging needed)
             List<DatasetItem> addedItems = prepareAddedItems(changes, datasetId);
-            Set<UUID> deletedRowIds = changes.deletedIds() != null ? changes.deletedIds() : Set.of();
+            Set<UUID> deletedIds = changes.deletedIds() != null ? changes.deletedIds() : Set.of();
 
             List<DatasetItemEdit> editedItemEdits = changes.editedItems() != null ? changes.editedItems() : List.of();
             Set<UUID> editedDatasetItemIds = editedItemEdits.stream()
@@ -1438,7 +1434,7 @@ class DatasetItemServiceImpl implements DatasetItemService {
                 // Apply delta for added items + copy unchanged (exclude edited + deleted)
                 return editedCountMono
                         .flatMap(editedCount -> versionDao.applyDelta(datasetId, baseVersionId, newVersionId,
-                                addedItemsWithIds, List.of(), deletedRowIds, unchangedUuids,
+                                addedItemsWithIds, List.of(), deletedIds, unchangedUuids,
                                 editedDatasetItemIds)
                                 .map(otherCount -> editedCount + otherCount))
                         .flatMap(itemsTotal -> {
