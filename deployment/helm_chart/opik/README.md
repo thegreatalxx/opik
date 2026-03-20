@@ -2,7 +2,7 @@
 
 A Helm chart for Comet Opik
 
-![Version: 1.10.42](https://img.shields.io/badge/Version-1.10.42-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 1.10.42](https://img.shields.io/badge/AppVersion-1.10.42-informational?style=flat-square)
+![Version: 1.10.43](https://img.shields.io/badge/Version-1.10.43-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 1.10.43](https://img.shields.io/badge/AppVersion-1.10.43-informational?style=flat-square)
 [![Artifact Hub](https://img.shields.io/endpoint?url=https://artifacthub.io/badge/repository/opik)](https://artifacthub.io/packages/search?repo=opik)
 
 # Run Comet Opik with Helm
@@ -317,6 +317,7 @@ Call opik api on http://localhost:5173/api
 | component.frontend.contentSecurityPolicy.connect-src[1] | string | `"ws:"` |  |
 | component.frontend.contentSecurityPolicy.connect-src[2] | string | `"wss:"` |  |
 | component.frontend.contentSecurityPolicy.connect-src[3] | string | `"https:"` |  |
+| component.frontend.contentSecurityPolicy.connect-src[4] | string | `"https://cdn.comet.ml"` |  |
 | component.frontend.contentSecurityPolicy.default-src[0] | string | `"'self'"` |  |
 | component.frontend.contentSecurityPolicy.font-src[0] | string | `"'self'"` |  |
 | component.frontend.contentSecurityPolicy.font-src[1] | string | `"data:"` |  |
@@ -338,9 +339,11 @@ Call opik api on http://localhost:5173/api
 | component.frontend.contentSecurityPolicy.script-src[0] | string | `"'self'"` |  |
 | component.frontend.contentSecurityPolicy.script-src[1] | string | `"'unsafe-inline'"` |  |
 | component.frontend.contentSecurityPolicy.script-src[2] | string | `"'unsafe-eval'"` |  |
+| component.frontend.contentSecurityPolicy.script-src[3] | string | `"https://cdn.comet.ml"` |  |
 | component.frontend.contentSecurityPolicy.style-src[0] | string | `"'self'"` |  |
 | component.frontend.contentSecurityPolicy.style-src[1] | string | `"'unsafe-inline'"` |  |
 | component.frontend.contentSecurityPolicy.style-src[2] | string | `"https://fonts.googleapis.com"` |  |
+| component.frontend.contentSecurityPolicy.style-src[3] | string | `"https://cdn.comet.ml"` |  |
 | component.frontend.contentSecurityPolicy.worker-src[0] | string | `"'self'"` |  |
 | component.frontend.contentSecurityPolicy.worker-src[1] | string | `"blob:"` |  |
 | component.frontend.enabled | bool | `true` |  |
