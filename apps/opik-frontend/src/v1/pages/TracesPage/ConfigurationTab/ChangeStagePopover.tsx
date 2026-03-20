@@ -162,7 +162,7 @@ const ChangeStagePopover: React.FC<ChangeStagePopoverProps> = ({
           <div className="mt-2 flex items-center gap-1.5">
             <Input
               dimension="sm"
-              placeholder="Add custom env"
+              placeholder="Add custom environment"
               value={customValue}
               onChange={(e) => setCustomValue(e.target.value)}
               onKeyDown={(e) => {
