@@ -35,8 +35,6 @@ import static com.comet.opik.infrastructure.db.TransactionTemplateAsync.READ_ONL
 @Singleton
 public class RetentionPolicyService {
 
-    private static final int BUFFER_DAYS = 3;
-
     private final TransactionTemplate template;
     private final TraceDAO traceDAO;
     private final SpanDAO spanDAO;
@@ -112,7 +110,7 @@ public class RetentionPolicyService {
                 .atStartOfDay(ZoneOffset.UTC)
                 .toInstant();
         UUID cutoffId = uuidMapper.toLowerBound(cutoff);
-        UUID lowerBound = uuidMapper.toLowerBound(cutoff.minus(BUFFER_DAYS, ChronoUnit.DAYS));
+        UUID lowerBound = uuidMapper.toLowerBound(cutoff.minus(config.getSlidingWindowDays(), ChronoUnit.DAYS));
 
         // Split rules into applyToPast=true and applyToPast=false
         var applyToPastRules = rules.stream()

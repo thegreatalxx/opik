@@ -574,6 +574,7 @@ retention:
   enabled: ${RETENTION_ENABLED:-false}
   executionsPerDay: ${RETENTION_EXECUTIONS_PER_DAY:-48}
   workspaceBatchSize: ${RETENTION_WORKSPACE_BATCH_SIZE:-1000}
+  slidingWindowDays: ${RETENTION_SLIDING_WINDOW_DAYS:-3}
   lockTimeoutSeconds: ${RETENTION_LOCK_TIMEOUT_SECONDS:-1800}
 
 # LLM providers client configuration

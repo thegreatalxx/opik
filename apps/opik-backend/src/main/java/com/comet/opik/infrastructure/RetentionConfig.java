@@ -22,6 +22,10 @@ public class RetentionConfig {
     @Valid @JsonProperty
     @Min(1) @Max(10000) private int workspaceBatchSize = 1000;
 
+    /** Size of the sliding window (days) processed per run. Covers missed executions. */
+    @JsonProperty
+    @Min(0) @Max(30) private int slidingWindowDays = 3;
+
     /** Max time (seconds) the job can hold the distributed lock. */
     @Valid @JsonProperty
     @Min(1) @Max(7200) private int lockTimeoutSeconds = 1800;
