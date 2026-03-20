@@ -102,7 +102,9 @@ const AgentConfigurationTab: React.FC<AgentConfigurationTabProps> = ({
         )}
       </div>
       <Separator />
-      <BlueprintValuesList values={values} />
+      <div className="px-1.5">
+        <BlueprintValuesList values={values} />
+      </div>
     </div>
   );
 };
