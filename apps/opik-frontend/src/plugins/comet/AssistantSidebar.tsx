@@ -1,4 +1,10 @@
-import React, { useCallback, useEffect, useMemo, useRef } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useParams, useRouter } from "@tanstack/react-router";
 import { useIsFeatureEnabled } from "@/components/feature-toggles-provider";
 import { FeatureToggleKeys } from "@/types/feature-toggles";
@@ -10,6 +16,8 @@ import {
 import { useUserApiKey, useActiveWorkspaceName } from "@/store/AppStore";
 import useWorkspace from "@/plugins/comet/useWorkspace";
 import useProjectById from "@/api/projects/useProjectById";
+import useLocalRunnerPairMutation from "@/api/local-runners/useLocalRunnerPairMutation";
+import useLocalRunnerById from "@/api/local-runners/useLocalRunnerById";
 
 const DEV_BASE_URL =
   import.meta.env.VITE_OLLIE_BASE_URL ||
@@ -90,36 +98,58 @@ async function loadProdAssets(): Promise<void> {
   }
 }
 
-type ContextChangedListener = (data: HostEventMap["context:changed"]) => void;
+type HostListeners = {
+  [K in keyof HostEventMap]: Set<(data: HostEventMap[K]) => void>;
+};
+
+function createHostListeners(): HostListeners {
+  return {
+    "context:changed": new Set(),
+    "runner:paired": new Set(),
+    "runner:pair-failed": new Set(),
+    "runner:connected": new Set(),
+  };
+}
 
 const createBridge = (
   onWidthChangeRef: React.MutableRefObject<(w: number) => void>,
   navigateRef: React.MutableRefObject<(path: string) => void>,
+  onRunnerPairRef: React.MutableRefObject<(projectId: string) => void>,
   contextRef: React.MutableRefObject<BridgeContext>,
-  listenersRef: React.MutableRefObject<Set<ContextChangedListener>>,
+  listenersRef: React.MutableRefObject<HostListeners>,
 ): AssistantSidebarBridge => ({
   version: 1,
   getContext: () => contextRef.current,
   subscribe: (event, callback) => {
-    if (event === "context:changed") {
-      const listener = callback as ContextChangedListener;
-      listenersRef.current.add(listener);
-      return () => {
-        listenersRef.current.delete(listener);
-      };
-    }
-    return () => {};
+    const set = listenersRef.current[event] as Set<typeof callback>;
+    set.add(callback);
+    return () => {
+      set.delete(callback);
+    };
   },
   emit: (event, data) => {
     if (event === "sidebar:resized") {
       onWidthChangeRef.current((data as { width: number }).width);
     } else if (event === "navigate") {
       navigateRef.current((data as { path: string }).path);
+    } else if (event === "runner:pair") {
+      onRunnerPairRef.current((data as { projectId: string }).projectId);
     } else if (IS_DEV) {
       console.warn(`[OllieBridge] Unhandled sidebar event: "${event}"`, data);
     }
   },
 });
+
+/** Emit a host event to all subscribed sidebar listeners. */
+function emitHostEvent<E extends keyof HostEventMap>(
+  listenersRef: React.MutableRefObject<HostListeners>,
+  event: E,
+  data: HostEventMap[E],
+) {
+  for (const listener of listenersRef.current[event]) {
+    (listener as (d: HostEventMap[E]) => void)(data);
+  }
+}
 
 // --- Suspense resource (module singleton) ---
 let status: "idle" | "pending" | "resolved" | "rejected" = "idle";
@@ -219,16 +249,81 @@ const AssistantSidebarContent: React.FC<AssistantSidebarProps> = ({
     router.navigate({ to: fullPath });
   };
 
-  const listenersRef = useRef<Set<ContextChangedListener>>(new Set());
+  // --- Runner pairing ---
+  const pairMutation = useLocalRunnerPairMutation();
+  const [pollingRunnerId, setPollingRunnerId] = useState<string | null>(null);
+
+  const listenersRef = useRef<HostListeners>(createHostListeners());
+
+  const onRunnerPairRef = useRef((projectId: string) => {
+    pairMutation.reset();
+    pairMutation.mutate(
+      { projectId },
+      {
+        onSuccess: (data) => {
+          setPollingRunnerId(data.runner_id);
+          emitHostEvent(listenersRef, "runner:paired", {
+            pairingCode: data.pairing_code,
+            runnerId: data.runner_id,
+            expiresInSeconds: data.expires_in_seconds,
+          });
+        },
+        onError: () => {
+          emitHostEvent(listenersRef, "runner:pair-failed", {});
+        },
+      },
+    );
+  });
+  onRunnerPairRef.current = (projectId: string) => {
+    pairMutation.reset();
+    pairMutation.mutate(
+      { projectId },
+      {
+        onSuccess: (data) => {
+          setPollingRunnerId(data.runner_id);
+          emitHostEvent(listenersRef, "runner:paired", {
+            pairingCode: data.pairing_code,
+            runnerId: data.runner_id,
+            expiresInSeconds: data.expires_in_seconds,
+          });
+        },
+        onError: () => {
+          emitHostEvent(listenersRef, "runner:pair-failed", {});
+        },
+      },
+    );
+  };
+
+  const { data: runnerData } = useLocalRunnerById(
+    { runnerId: pollingRunnerId! },
+    {
+      enabled: !!pollingRunnerId,
+      refetchInterval: pollingRunnerId ? 3000 : false,
+    },
+  );
+
+  useEffect(() => {
+    if (runnerData?.status === "connected" && pollingRunnerId) {
+      emitHostEvent(listenersRef, "runner:connected", {
+        runnerId: pollingRunnerId,
+      });
+      setPollingRunnerId(null);
+    }
+  }, [runnerData?.status, pollingRunnerId]);
+
   const bridgeRef = useRef(
-    createBridge(onWidthChangeRef, navigateRef, contextRef, listenersRef),
+    createBridge(
+      onWidthChangeRef,
+      navigateRef,
+      onRunnerPairRef,
+      contextRef,
+      listenersRef,
+    ),
   );
   const mountedElRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    for (const listener of listenersRef.current) {
-      listener(context);
-    }
+    emitHostEvent(listenersRef, "context:changed", context);
   }, [context]);
 
   const containerRef = useCallback((el: HTMLDivElement | null) => {
