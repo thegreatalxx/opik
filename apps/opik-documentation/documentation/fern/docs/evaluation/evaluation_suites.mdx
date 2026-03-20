@@ -1,0 +1,407 @@
+---
+headline: Evaluation Suites | Opik Documentation
+og:description: Create reusable test suites with natural-language assertions to evaluate
+  LLM applications across prompt iterations.
+og:site_name: Opik Documentation
+og:title: Evaluation Suites - Reusable LLM Test Suites
+subtitle: Build reusable test suites with assertions to systematically evaluate and
+  compare LLM application behavior across iterations
+title: Evaluation Suites
+---
+
+Evaluation Suites let you define a reusable set of test cases with natural-language assertions and run them against different versions of your LLM application. Instead of writing custom scoring metrics, you describe expected behaviors in plain English and an LLM judge checks each one automatically.
+
+This is useful when you want to:
+
+- **Iterate on prompts** and prove that a new version is better than the old one
+- **Catch regressions** by re-running the same test cases after changes
+- **Set pass/fail thresholds** with execution policies (e.g., "run 3 times, pass if 2 out of 3 succeed")
+
+<Tip>
+  Evaluation Suites are designed for assertion-based testing of LLM outputs. If
+  you need metric-based evaluation (hallucination scores, context precision,
+  etc.), see the [Evaluate your agent](/evaluation/evaluate_your_llm) guide
+  instead.
+</Tip>
+
+## Key concepts
+
+An Evaluation Suite has three main components:
+
+1. **Test items**: Input data for your LLM application (e.g., questions with context)
+2. **Assertions**: Natural-language descriptions of expected behavior, checked by an LLM judge (e.g., "The response is concise")
+3. **Execution policy**: Controls how many times each item is run and how many runs must pass
+
+Assertions can be defined at two levels:
+- **Suite-level assertions** apply to every test item
+- **Item-level assertions** apply only to a specific test item (in addition to suite-level ones)
+
+## Quick start
+
+This example creates a suite, adds test cases, and runs an evaluation:
+
+```python
+import opik
+
+opik_client = opik.Opik()
+
+# 1. Create a suite with assertions that apply to all items
+suite = opik_client.get_or_create_evaluation_suite(
+    name="my-qa-bot-tests",
+    assertions=[
+        "The response directly addresses the user's question",
+        "The response is grounded in the provided context",
+        "The response is concise (3 sentences or fewer)",
+    ],
+)
+
+# 2. Add test cases
+suite.add_items([
+    {
+        "data": {
+            "question": "How do I create a new project?",
+            "context": "Go to the Dashboard and click 'New Project'. Enter a name and select a region.",
+        },
+    },
+    {
+        "data": {
+            "question": "What are the pricing tiers?",
+            "context": "We offer Free ($0/month), Pro ($29/month), and Enterprise (custom pricing).",
+        },
+    },
+])
+
+# 3. Define the task function
+def my_llm_task(item):
+    # Call your LLM application here
+    answer = call_my_llm(question=item["question"], context=item["context"])
+    return {"input": item, "output": answer}
+
+# 4. Run the evaluation
+result = suite.run(task=my_llm_task)
+```
+
+After the run completes, Opik displays a summary in the console and saves a detailed JSON report file:
+
+```
+ My QA Bot Tests (2 items, 2 runs)
+ View results in Opik dashboard
+ View local detailed report file
+
+ Total time:        00:00:12
+ Number of items:   2 (2 runs)
+ Suite result:      PASSED
+ Items passed:      2/2
+ Pass rate:         100%
+```
+
+## Creating a suite
+
+Use the Opik client to create or retrieve a suite. If the suite already exists, it is returned with any updated assertions or policies applied.
+
+```python
+import opik
+
+opik_client = opik.Opik()
+
+suite = opik_client.get_or_create_evaluation_suite(
+    name="my-test-suite",
+    description="Tests for the customer support bot",
+    assertions=[
+        "The response is polite and professional",
+        "The response does not contain made-up information",
+    ],
+    execution_policy={
+        "runs_per_item": 3,
+        "pass_threshold": 2,
+    },
+    tags=["support-bot", "v2"],
+)
+```
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `name` | `str` | Name of the suite (used as identifier) |
+| `description` | `str` | Optional description |
+| `assertions` | `list[str]` | Suite-level assertions checked for every item |
+| `execution_policy` | `dict` | Controls `runs_per_item` and `pass_threshold` |
+| `tags` | `list[str]` | Optional tags for organizing suites |
+
+## Adding test items
+
+### Batch add
+
+Use `add_items()` to add multiple test cases efficiently in a single operation:
+
+```python
+suite.add_items([
+    {
+        "data": {
+            "question": "How do I reset my API key?",
+            "context": "Navigate to Settings > API Keys > Regenerate.",
+        },
+    },
+    {
+        "data": {
+            "question": "What is the upload limit?",
+            "context": "Pro plan: 5GB per file. Free plan: 500MB per file.",
+        },
+    },
+])
+```
+
+### Single item with custom assertions
+
+Use `add_item()` when you need item-specific assertions that go beyond the suite-level ones:
+
+```python
+suite.add_item(
+    data={
+        "question": "Can I use this with Kubernetes?",
+        "context": "We support Docker containers and serverless functions.",
+    },
+    assertions=[
+        "The response does NOT claim Kubernetes is supported",
+        "The response acknowledges that the information is not available",
+    ],
+)
+```
+
+Item-level assertions are checked **in addition to** the suite-level assertions.
+
+### Item-level execution policy
+
+You can override the execution policy for individual items that need more rigorous testing:
+
+```python
+suite.add_item(
+    data={"question": "Is my account compromised?", "context": "..."},
+    assertions=["Response treats the concern with urgency"],
+    execution_policy={"runs_per_item": 5, "pass_threshold": 4},
+)
+```
+
+## Running the suite
+
+The `run()` method executes every test item through your task function, then uses an LLM judge to check each assertion.
+
+### Task function
+
+The task function receives the item's `data` dict and must return a dict with `input` and `output` keys:
+
+```python
+def my_task(item):
+    response = call_my_llm(item["question"], context=item["context"])
+    return {
+        "input": item,
+        "output": response,
+    }
+
+result = suite.run(task=my_task)
+```
+
+<Note>
+  The `input` key should contain the data that was sent to your LLM, and
+  `output` should contain the LLM's response. Both are stored in the experiment
+  for review.
+</Note>
+
+### Run parameters
+
+```python
+result = suite.run(
+    task=my_task,
+    experiment_name="prompt-v2-test",
+    project_name="my-project",
+    model="gpt-4o",
+    worker_threads=8,
+    verbose=2,
+)
+```
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `task` | `callable` | required | Function that processes each item |
+| `experiment_name` | `str` | auto-generated | Name for the experiment |
+| `experiment_name_prefix` | `str` | `None` | Prefix for auto-generated names |
+| `project_name` | `str` | `None` | Project to associate the experiment with |
+| `model` | `str` | `None` | Model for the LLM judge (defaults to gpt-4o-mini) |
+| `worker_threads` | `int` | `16` | Threads for parallel execution |
+| `verbose` | `int` | `2` | `0`=silent, `1`=summary, `2`=detailed |
+| `experiment_config` | `dict` | `None` | Config metadata stored with the experiment |
+| `prompts` | `list` | `None` | Prompt objects to associate with the experiment |
+| `experiment_tags` | `list[str]` | `None` | Tags for the experiment |
+
+## Working with results
+
+The `run()` method returns an `EvaluationSuiteResult` object:
+
+```python
+result = suite.run(task=my_task)
+
+# Overall pass/fail
+print(result.all_items_passed)  # True/False
+print(result.pass_rate)         # 0.0 to 1.0
+
+# Counts
+print(result.items_passed)      # e.g. 4
+print(result.items_total)       # e.g. 5
+
+# Per-item results
+for item_id, item_result in result.item_results.items():
+    print(f"Item {item_id}: {'PASS' if item_result.passed else 'FAIL'}")
+    print(f"  Runs passed: {item_result.runs_passed}/{item_result.runs_total}")
+
+# Export as dict
+report = result.to_dict()
+```
+
+### JSON report file
+
+By default, each run saves a structured JSON report under `opik_evaluation_suite_reports/`. The report contains full details for every item, run, and assertion:
+
+```json
+{
+  "suite_passed": false,
+  "items_passed": 4,
+  "items_total": 5,
+  "pass_rate": 0.8,
+  "experiment_id": "exp-abc123",
+  "experiment_name": "prompt-v2-test",
+  "suite_name": "my-qa-bot-tests",
+  "total_time_seconds": 12.345,
+  "items": [
+    {
+      "dataset_item_id": "item-1",
+      "passed": true,
+      "runs_passed": 2,
+      "execution_policy": {"runs_per_item": 3, "pass_threshold": 2},
+      "runs": [
+        {
+          "trial_id": 0,
+          "passed": true,
+          "input": {"question": "..."},
+          "output": "...",
+          "assertions": [
+            {"name": "Is concise", "passed": true, "value": 1},
+            {"name": "Is grounded", "passed": true, "value": 1}
+          ]
+        }
+      ]
+    }
+  ]
+}
+```
+
+## Comparing prompt versions
+
+A common workflow is running the same suite against different prompt versions to measure improvement:
+
+```python
+import opik
+from opik.integrations.openai import track_openai
+from openai import OpenAI
+
+openai_client = track_openai(OpenAI())
+
+PROMPT_V1 = "You are a helpful assistant. Answer in detail."
+PROMPT_V2 = "You are a concise assistant. Answer in 2-3 sentences max."
+
+def make_task(system_prompt):
+    def task(item):
+        response = openai_client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": item["question"]},
+            ],
+        )
+        return {
+            "input": item,
+            "output": response.choices[0].message.content,
+        }
+    return task
+
+opik_client = opik.Opik()
+suite = opik_client.get_or_create_evaluation_suite(
+    name="qa-bot-regression",
+    assertions=["Response is concise", "Response is accurate"],
+)
+
+# Add test cases (only needed once)
+suite.add_items([
+    {"data": {"question": "What is your refund policy?"}},
+    {"data": {"question": "How do I upgrade my plan?"}},
+])
+
+# Run both versions
+result_v1 = suite.run(task=make_task(PROMPT_V1), experiment_name="v1-verbose")
+result_v2 = suite.run(task=make_task(PROMPT_V2), experiment_name="v2-concise")
+
+print(f"v1 pass rate: {result_v1.pass_rate:.0%}")
+print(f"v2 pass rate: {result_v2.pass_rate:.0%}")
+```
+
+Each run creates a separate experiment in Opik, making it easy to compare results side by side in the dashboard.
+
+## Execution policies
+
+Execution policies control how many times each item is run and how many runs must pass for the item to be considered passing.
+
+| Field | Default | Description |
+|-------|---------|-------------|
+| `runs_per_item` | `1` | Number of times to run each item |
+| `pass_threshold` | `1` | Minimum number of passing runs required |
+
+This is useful for non-deterministic LLM outputs where a single run might not be representative:
+
+```python
+# Suite-level policy: run each item 3 times, pass if at least 2 succeed
+suite = opik_client.get_or_create_evaluation_suite(
+    name="flaky-output-tests",
+    assertions=["Response follows the expected format"],
+    execution_policy={"runs_per_item": 3, "pass_threshold": 2},
+)
+```
+
+**Pass/fail logic:**
+- A **run** passes if all its assertions pass
+- An **item** passes if `runs_passed >= pass_threshold`
+- The **suite** passes if all items pass
+
+## Managing suites
+
+### Update suite configuration
+
+```python
+suite.update(
+    assertions=["Updated assertion 1", "Updated assertion 2"],
+    execution_policy={"runs_per_item": 5, "pass_threshold": 3},
+    tags=["updated", "v3"],
+)
+```
+
+### Inspect suite contents
+
+```python
+# List all items
+items = suite.get_items()
+for item in items:
+    print(f"Item {item['id']}: {item['data']}")
+    print(f"  Assertions: {item['assertions']}")
+
+# Get suite-level assertions
+assertions = suite.get_assertions()
+
+# Get execution policy
+policy = suite.get_execution_policy()
+```
+
+### Delete items
+
+```python
+items = suite.get_items()
+suite.delete_items([items[0]["id"]])
+```
