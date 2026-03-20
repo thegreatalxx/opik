@@ -6,7 +6,7 @@ import React, {
   useState,
 } from "react";
 import { useParams, useRouter } from "@tanstack/react-router";
-import { useIsFeatureEnabled } from "@/components/feature-toggles-provider";
+import { useIsFeatureEnabled } from "@/v1/feature-toggles-provider";
 import { FeatureToggleKeys } from "@/types/feature-toggles";
 import {
   AssistantSidebarBridge,
