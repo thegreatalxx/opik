@@ -19,6 +19,8 @@ import com.comet.opik.api.DatasetLastOptimizationCreated;
 import com.comet.opik.api.DatasetType;
 import com.comet.opik.api.DatasetUpdate;
 import com.comet.opik.api.EvaluationMethod;
+import com.comet.opik.api.EvaluatorItem;
+import com.comet.opik.api.EvaluatorType;
 import com.comet.opik.api.ExecutionPolicy;
 import com.comet.opik.api.Experiment;
 import com.comet.opik.api.ExperimentItem;
@@ -1493,6 +1495,58 @@ class DatasetsResourceTest {
 
             var id = createAndAssert(dataset);
             getAndAssertEquals(id, dataset, TEST_WORKSPACE, API_KEY);
+        }
+
+        @Test
+        @DisplayName("when evaluators and executionPolicy are provided, then create initial version with them")
+        void create__whenEvaluatorsProvided__thenCreateInitialVersionWithEvaluators() {
+            var evaluators = List.of(
+                    EvaluatorItem.builder()
+                            .name(UUID.randomUUID().toString())
+                            .type(EvaluatorType.LLM_JUDGE)
+                            .config(JsonUtils.getJsonNodeFromString("{\"model\":\"gpt-4\"}"))
+                            .build(),
+                    EvaluatorItem.builder()
+                            .name(UUID.randomUUID().toString())
+                            .type(EvaluatorType.CODE_METRIC)
+                            .config(JsonUtils.getJsonNodeFromString("{\"threshold\":0.5}"))
+                            .build());
+
+            var executionPolicy = ExecutionPolicy.builder()
+                    .runsPerItem(3)
+                    .passThreshold(2)
+                    .build();
+
+            var dataset = buildDataset().toBuilder()
+                    .id(null)
+                    .type(DatasetType.EVALUATION_SUITE)
+                    .evaluators(evaluators)
+                    .executionPolicy(executionPolicy)
+                    .build();
+
+            var id = createAndAssert(dataset);
+
+            var versionsPage = datasetResourceClient.listVersions(id, API_KEY, TEST_WORKSPACE);
+            assertThat(versionsPage.content()).hasSize(1);
+
+            var version = versionsPage.content().getFirst();
+            assertThat(version.evaluators()).hasSize(2);
+            assertThat(version.evaluators()).usingRecursiveFieldByFieldElementComparator()
+                    .containsExactlyInAnyOrderElementsOf(evaluators);
+            assertThat(version.executionPolicy()).isEqualTo(executionPolicy);
+        }
+
+        @Test
+        @DisplayName("when no evaluators provided, then no initial version is created")
+        void create__whenNoEvaluatorsProvided__thenNoInitialVersionCreated() {
+            var dataset = buildDataset().toBuilder()
+                    .id(null)
+                    .build();
+
+            var id = createAndAssert(dataset);
+
+            var versionsPage = datasetResourceClient.listVersions(id, API_KEY, TEST_WORKSPACE);
+            assertThat(versionsPage.content()).isEmpty();
         }
 
         @Test

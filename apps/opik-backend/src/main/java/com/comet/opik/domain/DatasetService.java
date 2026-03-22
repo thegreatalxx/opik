@@ -132,6 +132,7 @@ class DatasetServiceImpl implements DatasetService {
     private final @NonNull EventBus eventBus;
     private final @NonNull FeatureFlags featureFlags;
     private final @NonNull ProjectService projectService;
+    private final @NonNull DatasetVersionService datasetVersionService;
 
     private static String formatDatasetAlreadyExistsMessage(String datasetName) {
         return "Dataset already exists with name '%s'".formatted(datasetName);
@@ -162,7 +163,7 @@ class DatasetServiceImpl implements DatasetService {
 
         projectService.validateProjectIdExists(newDataset.projectId(), workspaceId);
 
-        return template.inTransaction(WRITE, handle -> {
+        Dataset savedDataset = template.inTransaction(WRITE, handle -> {
             var dao = handle.attach(DatasetDAO.class);
 
             try {
@@ -178,6 +179,18 @@ class DatasetServiceImpl implements DatasetService {
                 }
             }
         });
+
+        if (CollectionUtils.isNotEmpty(dataset.evaluators()) || dataset.executionPolicy() != null) {
+            datasetVersionService.createVersionFromDelta(
+                    savedDataset.id(), idGenerator.generateId(),
+                    0, null,
+                    null, null,
+                    dataset.evaluators(), dataset.executionPolicy(),
+                    false, null,
+                    workspaceId, userName);
+        }
+
+        return savedDataset;
     }
 
     @Override

@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.PropertyNamingStrategies;
 import com.fasterxml.jackson.databind.annotation.JsonNaming;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.annotation.Nullable;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
@@ -34,6 +35,10 @@ public record Dataset(
         @JsonView({Dataset.View.Public.class, Dataset.View.Write.class}) Set<String> tags,
         @JsonView({Dataset.View.Public.class,
                 Dataset.View.Write.class}) @Pattern(regexp = NULL_OR_NOT_BLANK, message = "must not be blank") @Size(max = 255, message = "cannot exceed 255 characters") String description,
+        @JsonView({
+                Dataset.View.Write.class}) @Valid @Nullable @Schema(description = "Optional evaluators for the initial dataset version. Only used during creation.") List<@Valid EvaluatorItem> evaluators,
+        @JsonView({
+                Dataset.View.Write.class}) @Valid @Nullable @Schema(description = "Optional execution policy for the initial dataset version. Only used during creation.") ExecutionPolicy executionPolicy,
         @JsonView({Dataset.View.Public.class}) @Schema(accessMode = Schema.AccessMode.READ_ONLY) Instant createdAt,
         @JsonView({Dataset.View.Public.class}) @Schema(accessMode = Schema.AccessMode.READ_ONLY) String createdBy,
         @JsonView({Dataset.View.Public.class}) @Schema(accessMode = Schema.AccessMode.READ_ONLY) Instant lastUpdatedAt,

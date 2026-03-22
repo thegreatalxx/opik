@@ -59,12 +59,18 @@ public class DatasetResourceClient {
     private final String baseURI;
 
     public static Dataset buildDataset(PodamFactory factory) {
-        return factory.manufacturePojo(Dataset.class).toBuilder().projectId(null).projectName(null).build();
+        return factory.manufacturePojo(Dataset.class).toBuilder()
+                .projectId(null).projectName(null)
+                .evaluators(null).executionPolicy(null)
+                .build();
     }
 
     public static List<Dataset> buildDatasetList(PodamFactory factory) {
         return PodamFactoryUtils.manufacturePojoList(factory, Dataset.class).stream()
-                .map(dataset -> dataset.toBuilder().projectId(null).projectName(null).build())
+                .map(dataset -> dataset.toBuilder()
+                        .projectId(null).projectName(null)
+                        .evaluators(null).executionPolicy(null)
+                        .build())
                 .toList();
     }
 
