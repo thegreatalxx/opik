@@ -163,12 +163,24 @@ class DatasetServiceImpl implements DatasetService {
 
         projectService.validateProjectIdExists(newDataset.projectId(), workspaceId);
 
-        Dataset savedDataset = template.inTransaction(WRITE, handle -> {
+        return template.inTransaction(WRITE, handle -> {
             var dao = handle.attach(DatasetDAO.class);
 
             try {
                 dao.save(newDataset, workspaceId);
-                return dao.findById(newDataset.id(), workspaceId).orElseThrow();
+                var savedDataset = dao.findById(newDataset.id(), workspaceId).orElseThrow();
+
+                if (CollectionUtils.isNotEmpty(dataset.evaluators()) || dataset.executionPolicy() != null) {
+                    datasetVersionService.createVersionFromDelta(
+                            savedDataset.id(), idGenerator.generateId(),
+                            0, null,
+                            null, null,
+                            dataset.evaluators(), dataset.executionPolicy(),
+                            false, null,
+                            workspaceId, userName);
+                }
+
+                return savedDataset;
             } catch (UnableToExecuteStatementException e) {
                 if (e.getCause() instanceof SQLIntegrityConstraintViolationException) {
                     String message = formatDatasetAlreadyExistsMessage(dataset.name());
@@ -179,18 +191,6 @@ class DatasetServiceImpl implements DatasetService {
                 }
             }
         });
-
-        if (CollectionUtils.isNotEmpty(dataset.evaluators()) || dataset.executionPolicy() != null) {
-            datasetVersionService.createVersionFromDelta(
-                    savedDataset.id(), idGenerator.generateId(),
-                    0, null,
-                    null, null,
-                    dataset.evaluators(), dataset.executionPolicy(),
-                    false, null,
-                    workspaceId, userName);
-        }
-
-        return savedDataset;
     }
 
     @Override
