@@ -111,7 +111,7 @@ const InsightsViewSelector: React.FC<InsightsViewSelectorProps> = ({
   const { mutate: deleteMutate } = useInsightsViewBatchDeleteMutation();
 
   const processedFilters = useMemo(() => {
-    return [...generateDashboardTypeFilter(DASHBOARD_TYPE.MULTI_PROJECT)];
+    return generateDashboardTypeFilter(DASHBOARD_TYPE.MULTI_PROJECT);
   }, []);
 
   const { data: dashboardsData } = useInsightsViewsList(
