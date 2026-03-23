@@ -1120,8 +1120,8 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
     private static final String SELECT_DATASET_ITEM_VERSIONS_WITH_EXPERIMENT_ITEMS_COUNT = """
             WITH dataset_item_versions_resolved AS (
                 SELECT
-                    div_dedup.id AS id,
-                    div_dedup.dataset_item_id AS dataset_item_id,
+                    div_dedup.dataset_item_id AS id,
+                    div_dedup.id AS row_id,
                     div_dedup.dataset_id AS dataset_id,
                     div_dedup.data AS data,
                     div_dedup.source AS source,
@@ -1170,7 +1170,7 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
             SELECT COUNT(DISTINCT eia.dataset_item_id) as count
             FROM experiment_item_aggregates eia FINAL
             INNER JOIN experiment_aggregates ea FINAL ON ea.id = eia.experiment_id
-            LEFT JOIN dataset_item_versions_resolved AS di ON (di.id = eia.dataset_item_id OR di.dataset_item_id = eia.dataset_item_id)
+            LEFT JOIN dataset_item_versions_resolved AS di ON (di.id = eia.dataset_item_id OR di.row_id = eia.dataset_item_id)
             WHERE eia.workspace_id = :workspace_id
             <if(experiment_ids)>AND eia.experiment_id IN :experiment_ids<endif>
             <if(has_target_projects)>AND eia.project_id IN :target_project_ids<endif>
@@ -1194,8 +1194,8 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
     private static final String SELECT_DATASET_ITEM_VERSIONS_WITH_EXPERIMENT_ITEMS = """
             WITH dataset_item_versions_resolved AS (
                 SELECT
-                    div_dedup.id AS id,
-                    div_dedup.dataset_item_id AS dataset_item_id,
+                    div_dedup.dataset_item_id AS id,
+                    div_dedup.id AS row_id,
                     div_dedup.dataset_id AS dataset_id,
                     div_dedup.data AS data,
                     div_dedup.source AS source,
@@ -1245,7 +1245,7 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
             )
             SELECT
                 di.id AS id,
-                di.dataset_item_id AS dataset_item_id,
+                di.id AS dataset_item_id,
                 di.dataset_id AS dataset_id,
                 di.data AS data,
                 di.description AS description,
@@ -1275,7 +1275,7 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
                 )) AS experiment_items_array
             FROM experiment_item_aggregates eia FINAL
             INNER JOIN experiment_aggregates ea FINAL ON ea.id = eia.experiment_id
-            LEFT JOIN dataset_item_versions_resolved AS di ON (di.id = eia.dataset_item_id OR di.dataset_item_id = eia.dataset_item_id)
+            LEFT JOIN dataset_item_versions_resolved AS di ON (di.id = eia.dataset_item_id OR di.row_id = eia.dataset_item_id)
             WHERE eia.workspace_id = :workspace_id
             <if(experiment_ids)>AND eia.experiment_id IN :experiment_ids<endif>
             <if(has_target_projects)>AND eia.project_id IN :target_project_ids<endif>
@@ -1292,7 +1292,7 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
                 OR multiSearchAnyCaseInsensitive(toString(COALESCE(di.data, map())), :searchTerms)
             )
             <endif>
-            GROUP BY di.id, di.dataset_item_id, di.dataset_id, di.data, di.description, di.source, di.trace_id, di.span_id, di.tags,
+            GROUP BY di.id, di.dataset_id, di.data, di.description, di.source, di.trace_id, di.span_id, di.tags,
                      di.evaluators, di.execution_policy, di.item_created_at, di.item_last_updated_at,
                      di.item_created_by, di.item_last_updated_by
             ORDER BY di.id DESC

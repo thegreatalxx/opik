@@ -590,8 +590,8 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
             	ORDER BY id DESC, last_updated_at DESC
             ), dataset_items_agg_resolved AS (
                 SELECT
-                    div_dedup.id AS id,
-                    div_dedup.dataset_item_id AS dataset_item_id,
+                    div_dedup.dataset_item_id AS id,
+                    div_dedup.id AS row_id,
                     div_dedup.data AS data,
                     div_dedup.source AS source,
                     div_dedup.trace_id AS trace_id,
@@ -626,7 +626,7 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
                 <if(feedback_scores_filters_agg)> AND <feedback_scores_filters_agg> <endif>
                 <if(feedback_scores_empty_filters_agg)> AND <feedback_scores_empty_filters_agg> <endif>
                 <if(dataset_item_filters)>
-                AND eia.dataset_item_id IN (SELECT arrayJoin([id, dataset_item_id]) FROM dataset_items_agg_resolved WHERE <dataset_item_filters>)
+                AND eia.dataset_item_id IN (SELECT arrayJoin([id, row_id]) FROM dataset_items_agg_resolved WHERE <dataset_item_filters>)
                 <endif>
             )
             SELECT COUNT(DISTINCT di_id) AS count
@@ -635,7 +635,7 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
                 SELECT eia.dataset_item_id AS di_id
                 FROM item_agg_count AS eia
                 <if(search)>
-                LEFT JOIN dataset_items_agg_resolved di ON (di.id = eia.dataset_item_id OR di.dataset_item_id = eia.dataset_item_id)
+                LEFT JOIN dataset_items_agg_resolved di ON (di.id = eia.dataset_item_id OR di.row_id = eia.dataset_item_id)
                 WHERE multiSearchAnyCaseInsensitive(toString(COALESCE(di.data, map())), :searchTerms) OR multiSearchAnyCaseInsensitive(toString(eia.input), :searchTerms) OR multiSearchAnyCaseInsensitive(toString(eia.output), :searchTerms)
                 <endif>
                 <endif>
@@ -1025,8 +1025,8 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
             )
             , dataset_items_aggr_resolved AS (
                 SELECT
-                    div_dedup.id AS id,
-                    div_dedup.dataset_item_id AS dataset_item_id,
+                    div_dedup.dataset_item_id AS id,
+                    div_dedup.id AS row_id,
                     div_dedup.data AS data,
                     div_dedup.description AS description,
                     div_dedup.source AS source,
@@ -1056,7 +1056,7 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
                 SELECT eia_t.dataset_item_id
                 FROM experiment_item_aggregates AS eia_t FINAL
                 <if(push_top_needs_div)>
-                LEFT JOIN dataset_items_aggr_resolved AS di_t ON (di_t.id = eia_t.dataset_item_id OR di_t.dataset_item_id = eia_t.dataset_item_id)
+                LEFT JOIN dataset_items_aggr_resolved AS di_t ON (di_t.id = eia_t.dataset_item_id OR di_t.row_id = eia_t.dataset_item_id)
                 <endif>
                 WHERE eia_t.workspace_id = :workspace_id
                 AND eia_t.experiment_id IN (SELECT id FROM experiment_aggregated_scope_ids)
@@ -1148,10 +1148,10 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
                     <if(feedback_scores_filters_agg)> AND <feedback_scores_filters_agg> <endif>
                     <if(feedback_scores_empty_filters_agg)> AND <feedback_scores_empty_filters_agg> <endif>
                     <if(dataset_item_filters)>
-                    AND eia.dataset_item_id IN (SELECT arrayJoin([id, dataset_item_id]) FROM dataset_items_aggr_resolved WHERE <dataset_item_filters>)
+                    AND eia.dataset_item_id IN (SELECT arrayJoin([id, row_id]) FROM dataset_items_aggr_resolved WHERE <dataset_item_filters>)
                     <endif>
                 ) ei
-                LEFT JOIN dataset_items_aggr_resolved AS di ON (di.id = ei.dataset_item_id OR di.dataset_item_id = ei.dataset_item_id)
+                LEFT JOIN dataset_items_aggr_resolved AS di ON (di.id = ei.dataset_item_id OR di.row_id = ei.dataset_item_id)
                 LEFT JOIN assertion_results_per_trace AS arp ON ei.trace_id = arp.entity_id
                 GROUP BY
                     ei.dataset_item_id,
@@ -2017,11 +2017,11 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
                 <if(feedback_scores_empty_filters_agg)> AND <feedback_scores_empty_filters_agg> <endif>
                 <if(dataset_item_filters)>
                 AND eia.dataset_item_id IN (
-                    SELECT arrayJoin([id, dataset_item_id])
+                    SELECT arrayJoin([id, row_id])
                     FROM (
                         SELECT
-                            div_dedup.id AS id,
-                            div_dedup.dataset_item_id AS dataset_item_id,
+                            div_dedup.dataset_item_id AS id,
+                            div_dedup.id AS row_id,
                             div_dedup.data AS data,
                             div_dedup.source AS source,
                             div_dedup.trace_id AS trace_id,
