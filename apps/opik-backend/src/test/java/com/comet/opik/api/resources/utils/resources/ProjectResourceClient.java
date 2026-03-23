@@ -136,6 +136,30 @@ public class ProjectResourceClient {
         }
     }
 
+    public Response callCreateProject(Project project, String apiKey, String workspaceName) {
+        return client.target(RESOURCE_PATH.formatted(baseURI))
+                .request()
+                .header(HttpHeaders.AUTHORIZATION, apiKey)
+                .header(RequestContext.WORKSPACE_HEADER, workspaceName)
+                .post(Entity.json(project));
+    }
+
+    public Response callFindProjects(String apiKey, String workspaceName) {
+        return client.target(RESOURCE_PATH.formatted(baseURI))
+                .request()
+                .header(HttpHeaders.AUTHORIZATION, apiKey)
+                .header(RequestContext.WORKSPACE_HEADER, workspaceName)
+                .get();
+    }
+
+    public Response callGetProjectById(UUID id, String apiKey, String workspaceName) {
+        return client.target(RESOURCE_PATH.formatted(baseURI) + "/" + id)
+                .request()
+                .header(HttpHeaders.AUTHORIZATION, apiKey)
+                .header(RequestContext.WORKSPACE_HEADER, workspaceName)
+                .get();
+    }
+
     public ProjectStatsSummary getProjectStatsSummary(String projectName, @NonNull String apiKey,
             @NonNull String workspaceName) {
         WebTarget webTarget = client.target(RESOURCE_PATH.formatted(baseURI))

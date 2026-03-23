@@ -88,6 +88,7 @@ public class ProjectsResource {
             @ApiResponse(responseCode = "200", description = "Project resource", content = @Content(schema = @Schema(implementation = ProjectPage.class)))
     })
     @JsonView({View.Public.class})
+    @RequiredPermissions(WorkspaceUserPermission.PROJECT_DATA_VIEW)
     public Response find(
             @QueryParam("page") @Min(1) @DefaultValue("1") int page,
             @QueryParam("size") @Min(1) @DefaultValue(PAGE_SIZE) int size,
@@ -114,6 +115,7 @@ public class ProjectsResource {
     @Operation(operationId = "getProjectById", summary = "Get project by id", description = "Get project by id", responses = {
             @ApiResponse(responseCode = "200", description = "Project resource", content = @Content(schema = @Schema(implementation = Project.class)))})
     @JsonView({View.Public.class})
+    @RequiredPermissions(WorkspaceUserPermission.PROJECT_DATA_VIEW)
     public Response getById(@PathParam("id") UUID id) {
 
         String workspaceId = requestContext.get().getWorkspaceId();
@@ -135,6 +137,7 @@ public class ProjectsResource {
             @ApiResponse(responseCode = "400", description = "Bad Request", content = @Content(schema = @Schema(implementation = ErrorMessage.class)))
     })
     @RateLimited
+    @RequiredPermissions(WorkspaceUserPermission.PROJECT_CREATE)
     public Response create(
             @RequestBody(content = @Content(schema = @Schema(implementation = Project.class))) @JsonView(View.Write.class) @Valid Project project,
             @Context UriInfo uriInfo) {
@@ -199,6 +202,7 @@ public class ProjectsResource {
             @ApiResponse(responseCode = "404", description = "Not Found", content = @Content(schema = @Schema(implementation = ErrorMessage.class)))
     })
     @JsonView({View.Detailed.class})
+    @RequiredPermissions(WorkspaceUserPermission.PROJECT_DATA_VIEW)
     public Response retrieveProject(
             @RequestBody(content = @Content(schema = @Schema(implementation = ProjectRetrieve.class))) @Valid ProjectRetrieve retrieve) {
         String workspaceId = requestContext.get().getWorkspaceId();
@@ -232,6 +236,7 @@ public class ProjectsResource {
             @ApiResponse(responseCode = "404", description = "Not Found", content = @Content(schema = @Schema(implementation = ErrorMessage.class)))
     })
     @JsonView({View.Public.class})
+    @RequiredPermissions(WorkspaceUserPermission.PROJECT_DATA_VIEW)
     public Response getProjectMetrics(
             @PathParam("id") UUID projectId,
             @RequestBody(content = @Content(schema = @Schema(implementation = ProjectMetricRequest.class))) @Valid ProjectMetricRequest request) {
@@ -260,6 +265,7 @@ public class ProjectsResource {
     @Operation(operationId = "findFeedbackScoreNamesByProjectIds", summary = "Find Feedback Score names By Project Ids", description = "Find Feedback Score names By Project Ids", responses = {
             @ApiResponse(responseCode = "200", description = "Feedback Scores resource", content = @Content(schema = @Schema(implementation = FeedbackScoreNames.class)))
     })
+    @RequiredPermissions(WorkspaceUserPermission.PROJECT_DATA_VIEW)
     public Response findFeedbackScoreNames(
             @QueryParam("project_ids") String projectIdsQueryParam) {
 
@@ -293,6 +299,7 @@ public class ProjectsResource {
     @Operation(operationId = "getProjectStats", summary = "Get Project Stats", description = "Get Project Stats", responses = {
             @ApiResponse(responseCode = "200", description = "Project Stats", content = @Content(schema = @Schema(implementation = ProjectStatsSummary.class))),
     })
+    @RequiredPermissions(WorkspaceUserPermission.PROJECT_DATA_VIEW)
     public Response getProjectStats(
             @QueryParam("page") @Min(1) @DefaultValue("1") int page,
             @QueryParam("size") @Min(1) @DefaultValue(PAGE_SIZE) int size,
@@ -320,6 +327,7 @@ public class ProjectsResource {
     @Operation(operationId = "findTokenUsageNames", summary = "Find Token Usage names", description = "Find Token Usage names", responses = {
             @ApiResponse(responseCode = "200", description = "Token Usage names resource", content = @Content(schema = @Schema(implementation = TokenUsageNames.class)))
     })
+    @RequiredPermissions(WorkspaceUserPermission.PROJECT_DATA_VIEW)
     public Response findTokenUsageNames(@PathParam("id") UUID projectId) {
 
         String workspaceId = requestContext.get().getWorkspaceId();

@@ -293,6 +293,35 @@ class ProjectsResourceTest {
                             .withRequestBody(matchingJsonPath("$.requiredPermissions[0]",
                                     equalTo(WorkspaceUserPermission.PROJECT_DELETE.getValue()))));
         }
+
+        @Test
+        @DisplayName("Create project returns 403 when permission is denied")
+        void createProjectReturnsForbiddenWhenPermissionDenied() {
+            String apiKey = UUID.randomUUID().toString();
+            String workspaceName = "test-workspace-" + UUID.randomUUID();
+
+            AuthTestUtils.mockTargetWorkspaceDenyPermission(wireMock.server(), apiKey, workspaceName,
+                    WorkspaceUserPermission.PROJECT_CREATE.getValue());
+
+            try (var response = projectResourceClient.callCreateProject(
+                    factory.manufacturePojo(Project.class), apiKey, workspaceName)) {
+                assertThat(response.getStatus()).isEqualTo(HttpStatus.SC_FORBIDDEN);
+            }
+        }
+
+        @Test
+        @DisplayName("Find projects returns 403 when permission is denied")
+        void findProjectsReturnsForbiddenWhenPermissionDenied() {
+            String apiKey = UUID.randomUUID().toString();
+            String workspaceName = "test-workspace-" + UUID.randomUUID();
+
+            AuthTestUtils.mockTargetWorkspaceDenyPermission(wireMock.server(), apiKey, workspaceName,
+                    WorkspaceUserPermission.PROJECT_DATA_VIEW.getValue());
+
+            try (var response = projectResourceClient.callFindProjects(apiKey, workspaceName)) {
+                assertThat(response.getStatus()).isEqualTo(HttpStatus.SC_FORBIDDEN);
+            }
+        }
     }
 
     @Nested
