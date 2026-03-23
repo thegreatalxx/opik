@@ -58,6 +58,26 @@ public class AgentConfigsResourceClient {
         }
     }
 
+    public UUID updateAgentConfig(AgentConfigCreate request, String apiKey,
+            String workspaceName, int expectedStatus) {
+        try (var actualResponse = client.target(BLUEPRINTS_PATH.formatted(baseURI))
+                .request()
+                .accept(MediaType.APPLICATION_JSON_TYPE)
+                .header(HttpHeaders.AUTHORIZATION, apiKey)
+                .header(WORKSPACE_HEADER, workspaceName)
+                .method("PATCH", Entity.json(request))) {
+
+            assertThat(actualResponse.getStatusInfo().getStatusCode()).isEqualTo(expectedStatus);
+
+            if (expectedStatus == HttpStatus.SC_OK) {
+                var blueprint = actualResponse.readEntity(AgentBlueprint.class);
+                return blueprint.id();
+            }
+
+            return null;
+        }
+    }
+
     public Response createAgentConfigWithResponse(AgentConfigCreate request, String apiKey,
             String workspaceName) {
         return client.target(BLUEPRINTS_PATH.formatted(baseURI))

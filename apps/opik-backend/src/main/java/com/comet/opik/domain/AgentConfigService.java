@@ -3,6 +3,7 @@ package com.comet.opik.domain;
 import com.comet.opik.api.AgentConfigCreate;
 import com.comet.opik.api.AgentConfigEnvUpdate;
 import com.comet.opik.api.Project;
+import com.comet.opik.api.error.ErrorMessage;
 import com.comet.opik.infrastructure.lock.LockService;
 import com.comet.opik.utils.WorkspaceUtils;
 import com.google.inject.ImplementedBy;
@@ -11,6 +12,7 @@ import jakarta.inject.Provider;
 import jakarta.inject.Singleton;
 import jakarta.ws.rs.BadRequestException;
 import jakarta.ws.rs.NotFoundException;
+import jakarta.ws.rs.core.Response;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -31,7 +33,9 @@ import static com.comet.opik.utils.AsyncUtils.setRequestContext;
 @ImplementedBy(AgentConfigServiceImpl.class)
 public interface AgentConfigService {
 
-    AgentBlueprint createOrUpdateConfig(AgentConfigCreate request);
+    AgentBlueprint createConfig(AgentConfigCreate request);
+
+    AgentBlueprint updateConfig(AgentConfigCreate request);
 
     AgentBlueprint getLatestBlueprint(UUID projectId, UUID maskId);
 
@@ -65,6 +69,7 @@ public interface AgentConfigService {
 class AgentConfigServiceImpl implements AgentConfigService {
 
     private static final String BLUEPRINT_LOCK = "agent_blueprint";
+    private static final String ENV_LOCK_FORMAT = "agent_env_%s_%s";
 
     private final @NonNull Provider<com.comet.opik.infrastructure.auth.RequestContext> requestContext;
     private final @NonNull IdGenerator idGenerator;
@@ -73,11 +78,11 @@ class AgentConfigServiceImpl implements AgentConfigService {
     private final @NonNull LockService lockService;
 
     @Override
-    public AgentBlueprint createOrUpdateConfig(@NonNull AgentConfigCreate request) {
+    public AgentBlueprint createConfig(@NonNull AgentConfigCreate request) {
         String workspaceId = requestContext.get().getWorkspaceId();
         String userName = requestContext.get().getUserName();
 
-        log.info("Creating or updating optimizer config for workspace '{}'", workspaceId);
+        log.info("Creating optimizer config for workspace '{}'", workspaceId);
 
         UUID projectId = resolveProjectId(request, workspaceId, userName);
 
@@ -86,9 +91,46 @@ class AgentConfigServiceImpl implements AgentConfigService {
                 Mono.fromCallable(() -> transactionTemplate.inTransaction(WRITE, handle -> {
                     AgentConfigDAO dao = handle.attach(AgentConfigDAO.class);
 
-                    UUID configId = getOrCreateConfig(dao, request, projectId, workspaceId, userName);
+                    AgentConfig existingConfig = dao.getConfigByProjectId(workspaceId, projectId);
+                    if (existingConfig != null) {
+                        throw new BadRequestException(
+                                "Config already exists for project '%s'. Use PATCH to add blueprints."
+                                        .formatted(projectId));
+                    }
+
+                    UUID configId = Objects.requireNonNullElseGet(request.id(), idGenerator::generateId);
+                    log.info("Creating new config '{}' for project '{}' in workspace '{}'",
+                            configId, projectId, workspaceId);
+                    dao.insertConfig(configId, workspaceId, projectId, userName, userName);
 
                     return createBlueprint(dao, request, configId, projectId, workspaceId, userName);
+                }))).block();
+    }
+
+    @Override
+    public AgentBlueprint updateConfig(@NonNull AgentConfigCreate request) {
+        String workspaceId = requestContext.get().getWorkspaceId();
+        String userName = requestContext.get().getUserName();
+
+        log.info("Updating optimizer config for workspace '{}'", workspaceId);
+
+        UUID projectId = resolveProjectId(request, workspaceId, userName);
+
+        return lockService.executeWithLock(
+                new LockService.Lock(workspaceId, BLUEPRINT_LOCK),
+                Mono.fromCallable(() -> transactionTemplate.inTransaction(WRITE, handle -> {
+                    AgentConfigDAO dao = handle.attach(AgentConfigDAO.class);
+
+                    AgentConfig existingConfig = dao.getConfigByProjectId(workspaceId, projectId);
+                    if (existingConfig == null) {
+                        throw new NotFoundException(Response.status(Response.Status.NOT_FOUND)
+                                .entity(new ErrorMessage(List.of(
+                                        "No config found for project '%s'. Use POST to create one first."
+                                                .formatted(projectId))))
+                                .build());
+                    }
+
+                    return createBlueprint(dao, request, existingConfig.id(), projectId, workspaceId, userName);
                 }))).block();
     }
 
@@ -104,28 +146,6 @@ class AgentConfigServiceImpl implements AgentConfigService {
                 .contextWrite(ctx -> setRequestContext(ctx, userName, workspaceId));
 
         return projectMono.block().id();
-    }
-
-    private UUID getOrCreateConfig(
-            AgentConfigDAO dao,
-            AgentConfigCreate request,
-            UUID projectId,
-            String workspaceId,
-            String userName) {
-
-        AgentConfig existingConfig = dao.getConfigByProjectId(workspaceId, projectId);
-
-        if (existingConfig != null) {
-            return existingConfig.id();
-        }
-
-        UUID configId = Objects.requireNonNullElseGet(request.id(), idGenerator::generateId);
-
-        log.info("Creating new config '{}' for project '{}' in workspace '{}'", configId, projectId, workspaceId);
-
-        dao.insertConfig(configId, workspaceId, projectId, userName, userName);
-
-        return configId;
     }
 
     private AgentBlueprint createBlueprint(
@@ -407,14 +427,16 @@ class AgentConfigServiceImpl implements AgentConfigService {
         log.info("Creating or updating {} environments for project '{}' in workspace '{}'",
                 request.envs().size(), projectId, workspaceId);
 
-        transactionTemplate.inTransaction(WRITE, handle -> {
-            AgentConfigDAO dao = handle.attach(AgentConfigDAO.class);
+        lockService.executeWithLock(
+                new LockService.Lock(ENV_LOCK_FORMAT.formatted(workspaceId, projectId)),
+                Mono.fromCallable(() -> transactionTemplate.inTransaction(WRITE, handle -> {
+                    AgentConfigDAO dao = handle.attach(AgentConfigDAO.class);
 
-            validateBlueprintReferences(dao, workspaceId, projectId, request.envs());
-            upsertEnvs(dao, workspaceId, projectId, userName, request.envs());
+                    validateBlueprintReferences(dao, workspaceId, projectId, request.envs());
+                    upsertEnvs(dao, workspaceId, projectId, userName, request.envs());
 
-            return null;
-        });
+                    return null;
+                }))).block();
     }
 
     @Override
@@ -426,19 +448,21 @@ class AgentConfigServiceImpl implements AgentConfigService {
         log.info("Setting environment '{}' to blueprint '{}' for project '{}' in workspace '{}'",
                 envName, blueprintName, projectId, workspaceId);
 
-        transactionTemplate.inTransaction(WRITE, handle -> {
-            AgentConfigDAO dao = handle.attach(AgentConfigDAO.class);
+        lockService.executeWithLock(
+                new LockService.Lock(ENV_LOCK_FORMAT.formatted(workspaceId, projectId)),
+                Mono.fromCallable(() -> transactionTemplate.inTransaction(WRITE, handle -> {
+                    AgentConfigDAO dao = handle.attach(AgentConfigDAO.class);
 
-            AgentBlueprint blueprint = requireBlueprintByName(dao, workspaceId, projectId, blueprintName);
+                    AgentBlueprint blueprint = requireBlueprintByName(dao, workspaceId, projectId, blueprintName);
 
-            upsertEnvs(dao, workspaceId, projectId, userName,
-                    List.of(AgentConfigEnv.builder()
-                            .envName(envName)
-                            .blueprintId(blueprint.id())
-                            .build()));
+                    upsertEnvs(dao, workspaceId, projectId, userName,
+                            List.of(AgentConfigEnv.builder()
+                                    .envName(envName)
+                                    .blueprintId(blueprint.id())
+                                    .build()));
 
-            return null;
-        });
+                    return null;
+                }))).block();
     }
 
     private void upsertEnvs(AgentConfigDAO dao, String workspaceId, UUID projectId, String userName,

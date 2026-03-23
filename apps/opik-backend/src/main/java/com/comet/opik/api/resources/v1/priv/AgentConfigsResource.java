@@ -26,6 +26,7 @@ import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.DELETE;
 import jakarta.ws.rs.DefaultValue;
 import jakarta.ws.rs.GET;
+import jakarta.ws.rs.PATCH;
 import jakarta.ws.rs.POST;
 import jakarta.ws.rs.PUT;
 import jakarta.ws.rs.Path;
@@ -58,21 +59,21 @@ public class AgentConfigsResource {
     @POST
     @Path("/blueprints")
     @JsonView(AgentConfig.View.Write.class)
-    @Operation(operationId = "createAgentConfig", summary = "Create optimizer config or add blueprint", description = "Creates a new optimizer config with initial blueprint, or adds a new blueprint to existing config", responses = {
+    @Operation(operationId = "createAgentConfig", summary = "Create optimizer config with initial blueprint", description = "Creates a new optimizer config with initial blueprint. Fails if the project already has a config.", responses = {
             @ApiResponse(responseCode = "201", description = "Created", headers = {
                     @Header(name = "Location", required = true, example = "${basePath}/v1/private/agent-configs/blueprints/{blueprint_id}", schema = @Schema(implementation = String.class))}),
-            @ApiResponse(responseCode = "400", description = "Bad Request", content = @Content(schema = @Schema(implementation = ErrorMessage.class))),
+            @ApiResponse(responseCode = "400", description = "Bad Request (config already exists)", content = @Content(schema = @Schema(implementation = ErrorMessage.class))),
             @ApiResponse(responseCode = "401", description = "Unauthorized", content = @Content(schema = @Schema(implementation = ErrorMessage.class)))
     })
     public Response createAgentConfig(
             @RequestBody(content = @Content(schema = @Schema(implementation = AgentConfigCreate.class))) @NotNull @Valid AgentConfigCreate request,
             @Context UriInfo uriInfo) {
 
-        log.info("Creating blueprint for project '{}'", request.projectName());
+        log.info("Creating config for project '{}'", request.projectName());
 
-        AgentBlueprint createdBlueprint = agentConfigService.createOrUpdateConfig(request);
+        AgentBlueprint createdBlueprint = agentConfigService.createConfig(request);
 
-        log.info("Created blueprint '{}' for project '{}'", createdBlueprint.id(), request.projectName());
+        log.info("Created config with blueprint '{}' for project '{}'", createdBlueprint.id(), request.projectName());
 
         URI location = uriInfo.getAbsolutePathBuilder()
                 .path(createdBlueprint.id().toString())
@@ -81,6 +82,26 @@ public class AgentConfigsResource {
         return Response.created(location)
                 .entity(createdBlueprint)
                 .build();
+    }
+
+    @PATCH
+    @Path("/blueprints")
+    @JsonView(AgentConfig.View.Write.class)
+    @Operation(operationId = "updateAgentConfig", summary = "Add blueprint to existing config", description = "Adds a new blueprint to an existing optimizer config. Fails if the project has no config yet.", responses = {
+            @ApiResponse(responseCode = "200", description = "Blueprint added", content = @Content(schema = @Schema(implementation = AgentBlueprint.class))),
+            @ApiResponse(responseCode = "404", description = "Not Found (no config for project)", content = @Content(schema = @Schema(implementation = ErrorMessage.class))),
+            @ApiResponse(responseCode = "401", description = "Unauthorized", content = @Content(schema = @Schema(implementation = ErrorMessage.class)))
+    })
+    public Response updateAgentConfig(
+            @RequestBody(content = @Content(schema = @Schema(implementation = AgentConfigCreate.class))) @NotNull @Valid AgentConfigCreate request) {
+
+        log.info("Adding blueprint to config for project '{}'", request.projectName());
+
+        AgentBlueprint blueprint = agentConfigService.updateConfig(request);
+
+        log.info("Added blueprint '{}' to config for project '{}'", blueprint.id(), request.projectName());
+
+        return Response.ok(blueprint).build();
     }
 
     @GET
