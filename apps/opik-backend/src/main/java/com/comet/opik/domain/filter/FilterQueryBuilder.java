@@ -104,6 +104,8 @@ public class FilterQueryBuilder {
     private static final String DATA_ANALYTICS_DB = "data";
     private static final String FULL_DATA_ANALYTICS_DB = "toString(data)";
     private static final String SOURCE_DB = "source";
+    private static final String SOURCE_UNKNOWN_VALUE = "unknown";
+    private static final String SOURCE_SDK_VALUE = "sdk";
     private static final String TRACE_ID_DB = "trace_id";
     private static final String SPAN_ID_DB = "span_id";
     public static final String ANNOTATION_QUEUE_IDS_ANALYTICS_DB = "taqi.annotation_queue_ids";
@@ -318,6 +320,7 @@ public class FilterQueryBuilder {
                     .put(TraceField.EXPERIMENT_ID, EXPERIMENT_ID_DB)
                     .put(TraceField.CREATED_AT, CREATED_AT_DB)
                     .put(TraceField.LAST_UPDATED_AT, LAST_UPDATED_AT_DB)
+                    .put(TraceField.SOURCE, SOURCE_DB)
                     .build());
 
     private static final Map<TraceThreadField, String> TRACE_THREAD_FIELDS_MAP = new EnumMap<>(
@@ -362,6 +365,7 @@ public class FilterQueryBuilder {
                     .put(SpanField.ERROR_TYPE, ERROR_TYPE_DB)
                     .put(SpanField.TYPE, TYPE_ANALYTICS_DB)
                     .put(SpanField.TRACE_ID, TRACE_ID_DB)
+                    .put(SpanField.SOURCE, SOURCE_DB)
                     .build());
 
     private static final Map<ExperimentField, String> EXPERIMENT_FIELDS_MAP = new EnumMap<>(
@@ -536,7 +540,8 @@ public class FilterQueryBuilder {
                 TraceField.GUARDRAILS,
                 TraceField.VISIBILITY_MODE,
                 TraceField.ERROR_INFO,
-                TraceField.ERROR_TYPE));
+                TraceField.ERROR_TYPE,
+                TraceField.SOURCE));
 
         map.put(FilterStrategy.EXPERIMENT_AGGREGATION, Set.of(
                 TraceField.EXPERIMENT_ID));
@@ -574,7 +579,8 @@ public class FilterQueryBuilder {
                 SpanField.ERROR_INFO,
                 SpanField.ERROR_TYPE,
                 SpanField.TYPE,
-                SpanField.TRACE_ID));
+                SpanField.TRACE_ID,
+                SpanField.SOURCE));
 
         map.put(FilterStrategy.FEEDBACK_SCORES, Set.of(
                 TraceField.FEEDBACK_SCORES,
@@ -916,7 +922,17 @@ public class FilterQueryBuilder {
 
     private static String toAnalyticsDbFilter(Filter filter, int i, FilterStrategy filterStrategy) {
         var template = toAnalyticsDbOperator(filter, filterStrategy);
-        var formattedTemplate = template.formatted(getAnalyticsDbField(filter.field(), filterStrategy, i), i);
+        var dbField = getAnalyticsDbField(filter.field(), filterStrategy, i);
+        var formattedTemplate = template.formatted(dbField, i);
+
+        // Legacy traces/spans have source = 'unknown' (created before source tracking was added).
+        // When filtering source = 'sdk', include them since SDK was the predominant ingestion path.
+        if ((filter.field() == TraceField.SOURCE || filter.field() == SpanField.SOURCE)
+                && filter.operator() == Operator.EQUAL
+                && SOURCE_SDK_VALUE.equals(filter.value())) {
+            return "(%s = :filter%d OR %s = '%s')".formatted(SOURCE_DB, i, SOURCE_DB, SOURCE_UNKNOWN_VALUE);
+        }
+
         return "(%s)".formatted(formattedTemplate);
     }
 

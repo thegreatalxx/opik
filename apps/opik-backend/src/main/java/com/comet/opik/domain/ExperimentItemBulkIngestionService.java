@@ -8,6 +8,7 @@ import com.comet.opik.api.Span;
 import com.comet.opik.api.SpanBatch;
 import com.comet.opik.api.Trace;
 import com.comet.opik.api.TraceBatch;
+import com.comet.opik.api.TraceSource;
 import com.comet.opik.api.VisibilityMode;
 import com.comet.opik.infrastructure.auth.RequestContext;
 import com.comet.opik.utils.RetryUtils;
@@ -199,6 +200,7 @@ class ExperimentItemBulkIngestionServiceImpl implements ExperimentItemBulkIngest
                         .startTime(now)
                         .endTime(now)
                         .visibilityMode(VisibilityMode.HIDDEN)
+                        .source(TraceSource.EXPERIMENT)
                         .build();
             } else {
                 trace = item.trace();

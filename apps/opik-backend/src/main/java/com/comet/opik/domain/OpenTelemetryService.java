@@ -3,6 +3,7 @@ package com.comet.opik.domain;
 import com.comet.opik.api.Project;
 import com.comet.opik.api.SpanBatch;
 import com.comet.opik.api.Trace;
+import com.comet.opik.api.TraceSource;
 import com.comet.opik.domain.mapping.OpenTelemetryMappingRuleFactory;
 import com.comet.opik.infrastructure.OpenTelemetryConfig;
 import com.comet.opik.infrastructure.auth.RequestContext;
@@ -157,7 +158,8 @@ class OpenTelemetryServiceImpl implements OpenTelemetryService {
                             .duration(rootSpan.duration())
                             .input(rootSpan.input())
                             .output(rootSpan.output())
-                            .metadata(rootSpan.metadata());
+                            .metadata(rootSpan.metadata())
+                            .source(TraceSource.SDK);
 
                     if (StringUtils.isNotBlank(threadId)) {
                         traceBuilder.threadId(threadId);

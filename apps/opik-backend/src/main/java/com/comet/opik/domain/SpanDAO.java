@@ -5,6 +5,7 @@ import com.comet.opik.api.ProjectStats;
 import com.comet.opik.api.Span;
 import com.comet.opik.api.SpanUpdate;
 import com.comet.opik.api.SpansCountResponse;
+import com.comet.opik.api.TraceSource;
 import com.comet.opik.api.sorting.SortableFields;
 import com.comet.opik.api.sorting.SortingField;
 import com.comet.opik.api.sorting.SpanSortingFactory;
@@ -112,7 +113,8 @@ class SpanDAO {
                 truncation_threshold,
                 input_slim,
                 output_slim,
-                ttft
+                ttft,
+                source
             )
             SETTINGS log_comment = '<log_comment>'
             FORMAT Values
@@ -143,7 +145,8 @@ class SpanDAO {
                         :truncation_threshold<item.index>,
                         :input_slim<item.index>,
                         :output_slim<item.index>,
-                        :ttft<item.index>
+                        :ttft<item.index>,
+                        if(:source<item.index> IS NULL, 'unknown', :source<item.index>)
                     )
                     <if(item.hasNext)>,<endif>
                 }>
@@ -182,7 +185,8 @@ class SpanDAO {
                 truncation_threshold,
                 input_slim,
                 output_slim,
-                ttft
+                ttft,
+                source
             )
             SELECT
                 new_span.id as id,
@@ -279,7 +283,11 @@ class SpanDAO {
                 multiIf(
                     isNotNull(old_span.ttft), old_span.ttft,
                     new_span.ttft
-                ) as ttft
+                ) as ttft,
+                multiIf(
+                    notEquals(old_span.source, 'unknown'), old_span.source,
+                    new_span.source
+                ) as source
             FROM (
                 SELECT
                     :id as id,
@@ -307,7 +315,8 @@ class SpanDAO {
                     :truncation_threshold as truncation_threshold,
                     :input_slim as input_slim,
                     :output_slim as output_slim,
-                    :ttft as ttft
+                    :ttft as ttft,
+                    if(:source IS NULL, 'unknown', :source) as source
             ) as new_span
             LEFT JOIN (
                 SELECT
@@ -354,7 +363,8 @@ class SpanDAO {
             	truncation_threshold,
             	input_slim,
             	output_slim,
-            	ttft
+            	ttft,
+            	source
             )
             SELECT
             	id,
@@ -382,7 +392,8 @@ class SpanDAO {
                 :truncation_threshold,
                 <if(input)> :input_slim <else> input_slim <endif> as input_slim,
                 <if(output)> :output_slim <else> output_slim <endif> as output_slim,
-                <if(ttft)> :ttft <else> ttft <endif> as ttft
+                <if(ttft)> :ttft <else> ttft <endif> as ttft,
+                source
             FROM spans
             WHERE id = :id
             AND workspace_id = :workspace_id
@@ -406,7 +417,7 @@ class SpanDAO {
             INSERT INTO spans (
                 id, project_id, workspace_id, trace_id, parent_span_id, name, type,
                 start_time, end_time, input, output, metadata, model, provider, total_estimated_cost, total_estimated_cost_version, tags, usage, error_info, created_at,
-                created_by, last_updated_by, truncation_threshold, input_slim, output_slim, ttft
+                created_by, last_updated_by, truncation_threshold, input_slim, output_slim, ttft, source
             )
             SELECT
                 new_span.id as id,
@@ -519,7 +530,11 @@ class SpanDAO {
                     isNotNull(new_span.ttft), new_span.ttft,
                     isNotNull(old_span.ttft), old_span.ttft,
                     new_span.ttft
-                ) as ttft
+                ) as ttft,
+                multiIf(
+                    notEquals(old_span.source, 'unknown'), old_span.source,
+                    new_span.source
+                ) as source
             FROM (
                 SELECT
                     :id as id,
@@ -547,7 +562,8 @@ class SpanDAO {
                     :truncation_threshold as truncation_threshold,
                     <if(input)> :input_slim <else> '' <endif> as input_slim,
                     <if(output)> :output_slim <else> '' <endif> as output_slim,
-                    <if(ttft)> :ttft <else> null <endif> as ttft
+                    <if(ttft)> :ttft <else> null <endif> as ttft,
+                    if(:source IS NULL, 'unknown', :source) as source
             ) as new_span
             LEFT JOIN (
                 SELECT
@@ -1471,7 +1487,8 @@ class SpanDAO {
                 truncation_threshold,
                 input_slim,
                 output_slim,
-                ttft
+                ttft,
+                source
             )
             SELECT
                 s.id,
@@ -1502,7 +1519,8 @@ class SpanDAO {
                         :truncation_threshold,
                         <if(input)> :input_slim <else> s.input_slim <endif> as input_slim,
                         <if(output)> :output_slim <else> s.output_slim <endif> as output_slim,
-                        <if(ttft)> :ttft <else> s.ttft <endif> as ttft
+                        <if(ttft)> :ttft <else> s.ttft <endif> as ttft,
+                        s.source
                     FROM spans s
                     WHERE s.id IN :ids AND s.workspace_id = :workspace_id
                     ORDER BY (s.workspace_id, s.project_id, s.trace_id, s.parent_span_id, s.id) DESC, s.last_updated_at DESC
@@ -1614,6 +1632,12 @@ class SpanDAO {
                     statement.bindNull("ttft" + i, Double.class);
                 }
 
+                if (span.source() != null) {
+                    statement.bind("source" + i, span.source().getValue());
+                } else {
+                    statement.bindNull("source" + i, String.class);
+                }
+
                 i++;
             }
 
@@ -1692,6 +1716,12 @@ class SpanDAO {
                 statement.bind("ttft", span.ttft());
             } else {
                 statement.bindNull("ttft", Double.class);
+            }
+
+            if (span.source() != null) {
+                statement.bind("source", span.source().getValue());
+            } else {
+                statement.bindNull("source", String.class);
             }
 
             bindUserNameAndWorkspace(statement, userName, workspaceId);
@@ -2134,6 +2164,10 @@ class SpanDAO {
                         getValue(exclude, SpanField.LAST_UPDATED_BY, row, "last_updated_by", String.class))
                 .duration(getValue(exclude, SpanField.DURATION, row, "duration", Double.class))
                 .ttft(getValue(exclude, SpanField.TTFT, row, "ttft", Double.class))
+                .source(Optional.ofNullable(
+                        getValue(exclude, SpanField.SOURCE, row, "source", String.class))
+                        .flatMap(TraceSource::fromString)
+                        .orElse(null))
                 .build();
     }
 
