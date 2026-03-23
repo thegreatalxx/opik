@@ -393,7 +393,7 @@ class SpanDAO {
                 <if(input)> :input_slim <else> input_slim <endif> as input_slim,
                 <if(output)> :output_slim <else> output_slim <endif> as output_slim,
                 <if(ttft)> :ttft <else> ttft <endif> as ttft,
-                source
+                <if(source)> :source <else> source <endif> as source
             FROM spans
             WHERE id = :id
             AND workspace_id = :workspace_id
@@ -1771,7 +1771,12 @@ class SpanDAO {
                     }
 
                     bindUpdateParams(spanUpdate, statement, false);
-                    statement.bindNull("source", String.class);
+
+                    if (spanUpdate.source() != null) {
+                        statement.bind("source", spanUpdate.source().getValue());
+                    } else {
+                        statement.bindNull("source", String.class);
+                    }
 
                     bindUserNameAndWorkspace(statement, userName, workspaceId);
 
@@ -1873,6 +1878,9 @@ class SpanDAO {
 
         Optional.ofNullable(spanUpdate.ttft())
                 .ifPresent(ttft -> statement.bind("ttft", ttft));
+
+        Optional.ofNullable(spanUpdate.source())
+                .ifPresent(source -> statement.bind("source", source.getValue()));
     }
 
     private ST newUpdateTemplate(SpanUpdate spanUpdate, String sql, boolean isManualCostExist, String queryName,
@@ -1912,6 +1920,8 @@ class SpanDAO {
         }
         Optional.ofNullable(spanUpdate.ttft())
                 .ifPresent(ttft -> template.add("ttft", ttft));
+        Optional.ofNullable(spanUpdate.source())
+                .ifPresent(source -> template.add("source", source.getValue()));
         return template;
     }
 

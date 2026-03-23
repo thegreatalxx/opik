@@ -3308,6 +3308,7 @@ class TracesResourceTest {
                     .errorInfo(traceUpdate.errorInfo())
                     .threadId(traceUpdate.threadId())
                     .ttft(traceUpdate.ttft())
+                    .source(traceUpdate.source())
                     .build();
             traceResourceClient.updateTrace(id, traceUpdate, API_KEY, TEST_WORKSPACE);
 
@@ -3334,6 +3335,9 @@ class TracesResourceTest {
                     .build();
             traceResourceClient.createTrace(newTrace, API_KEY, TEST_WORKSPACE);
 
+            // The update arrives first and sets source; when the create arrives, the existing non-unknown
+            // source is preserved (INSERT SQL: if old.source != 'unknown', keep old.source)
+            var effectiveSource = traceUpdate.source() != null ? traceUpdate.source() : newTrace.source();
             var expectedTrace = newTrace.toBuilder()
                     .name(traceUpdate.name())
                     .endTime(traceUpdate.endTime())
@@ -3346,6 +3350,7 @@ class TracesResourceTest {
                             newTrace.startTime(), traceUpdate.endTime()))
                     .threadId(traceUpdate.threadId())
                     .ttft(traceUpdate.ttft())
+                    .source(effectiveSource)
                     .build();
             getAndAssert(expectedTrace, null, API_KEY, TEST_WORKSPACE);
         }
@@ -3418,6 +3423,7 @@ class TracesResourceTest {
                             trace.startTime(), traceUpdate.endTime()))
                     .threadId(traceUpdate.threadId())
                     .ttft(traceUpdate.ttft())
+                    .source(traceUpdate.source())
                     .build();
             getAndAssert(expectedTrace, null, API_KEY, TEST_WORKSPACE);
         }
@@ -3621,6 +3627,7 @@ class TracesResourceTest {
                     .duration(DurationUtils.getDurationInMillisWithSubMilliPrecision(trace.startTime(),
                             traceUpdate.endTime()))
                     .ttft(traceUpdate.ttft())
+                    .source(traceUpdate.source())
                     .build();
             getAndAssert(updatedTrace, projectId, API_KEY, TEST_WORKSPACE);
         }

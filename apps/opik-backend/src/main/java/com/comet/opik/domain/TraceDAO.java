@@ -370,7 +370,7 @@ class TraceDAOImpl implements TraceDAO {
                 <if(input)> :input_slim <else> input_slim <endif> as input_slim,
                 <if(output)> :output_slim <else> output_slim <endif> as output_slim,
                 <if(ttft)> :ttft <else> ttft <endif> as ttft,
-                source
+                <if(source)> :source <else> source <endif> as source
             FROM traces
             WHERE id = :id
             AND workspace_id = :workspace_id
@@ -2686,6 +2686,9 @@ class TraceDAOImpl implements TraceDAO {
         Optional.ofNullable(traceUpdate.ttft())
                 .ifPresent(ttft -> statement.bind("ttft", ttft));
 
+        Optional.ofNullable(traceUpdate.source())
+                .ifPresent(source -> statement.bind("source", source.getValue()));
+
         TruncationUtils.bindTruncationThreshold(statement, "truncation_threshold", configuration);
     }
 
@@ -2720,6 +2723,9 @@ class TraceDAOImpl implements TraceDAO {
 
         Optional.ofNullable(traceUpdate.ttft())
                 .ifPresent(ttft -> template.add("ttft", ttft));
+
+        Optional.ofNullable(traceUpdate.source())
+                .ifPresent(source -> template.add("source", source.getValue()));
 
         return template;
     }
@@ -3051,7 +3057,12 @@ class TraceDAOImpl implements TraceDAO {
 
             bindUserNameAndWorkspace(statement, userName, workspaceId);
             bindUpdateParams(traceUpdate, statement);
-            statement.bindNull("source", String.class);
+
+            if (traceUpdate.source() != null) {
+                statement.bind("source", traceUpdate.source().getValue());
+            } else {
+                statement.bindNull("source", String.class);
+            }
 
             Segment segment = startSegment("traces", "Clickhouse", "insert_partial");
 
