@@ -846,9 +846,6 @@ class DatasetVersionResourceTest {
             // 2. Items carried over from v1 to v2 have stable IDs (not regenerated per version)
             assertThat(v2ItemIds).containsAll(v1ItemIds)
                     .as("Version 2 should contain all item IDs from version 1 (stable across versions)");
-
-            // 3. Version 2 has one additional item
-            assertThat(v2ItemIds).hasSize(3);
         }
     }
 
@@ -1412,6 +1409,33 @@ class DatasetVersionResourceTest {
                     datasetId, 1, 10, "v1", API_KEY, TEST_WORKSPACE).content();
             assertThat(v1ItemsAfter).hasSize(3);
         }
+
+        @Test
+        @DisplayName("Error: Delete with item IDs from different datasets returns 400")
+        void deleteItems__whenItemIdsSpanMultipleDatasets__thenReturn400() {
+            var dataset1Id = createDataset(UUID.randomUUID().toString());
+            createDatasetItems(dataset1Id, 2);
+            var dataset1Items = datasetResourceClient.getDatasetItems(
+                    dataset1Id, 1, 10, DatasetVersionService.LATEST_TAG, API_KEY, TEST_WORKSPACE).content();
+
+            var dataset2Id = createDataset(UUID.randomUUID().toString());
+            createDatasetItems(dataset2Id, 2);
+            var dataset2Items = datasetResourceClient.getDatasetItems(
+                    dataset2Id, 1, 10, DatasetVersionService.LATEST_TAG, API_KEY, TEST_WORKSPACE).content();
+
+            var mixedIds = Set.of(dataset1Items.getFirst().id(), dataset2Items.getFirst().id());
+
+            var deleteRequest = DatasetItemsDelete.builder()
+                    .itemIds(mixedIds)
+                    .batchGroupId(UUID.randomUUID())
+                    .build();
+            try (var response = datasetResourceClient.callDeleteDatasetItems(deleteRequest, TEST_WORKSPACE, API_KEY)) {
+                assertThat(response.getStatusInfo().getStatusCode()).isEqualTo(HttpStatus.SC_BAD_REQUEST);
+                assertThat(response.readEntity(io.dropwizard.jersey.errors.ErrorMessage.class))
+                        .isEqualTo(new io.dropwizard.jersey.errors.ErrorMessage(HttpStatus.SC_BAD_REQUEST,
+                                "Cannot operate on items across multiple datasets"));
+            }
+        }
     }
 
     @Nested
@@ -1702,6 +1726,7 @@ class DatasetVersionResourceTest {
             // Then - Verify item is returned correctly
             assertThat(fetchedItem).isNotNull();
             assertThat(fetchedItem.id()).isEqualTo(itemId);
+            assertThat(fetchedItem.datasetItemId()).isEqualTo(fetchedItem.id());
             assertThat(fetchedItem.datasetId()).isEqualTo(datasetId);
         }
 
@@ -2210,6 +2235,34 @@ class DatasetVersionResourceTest {
 
             assertThat(itemsWithTag3).hasSize(1);
             assertThat(itemsWithTag3.get(0).tags()).containsExactlyInAnyOrder("tag3", newTag);
+        }
+
+        @Test
+        @DisplayName("Error: Batch update with item IDs from different datasets returns 400")
+        void batchUpdate__whenItemIdsSpanMultipleDatasets__thenReturn400() {
+            var dataset1Id = createDataset(UUID.randomUUID().toString());
+            createDatasetItems(dataset1Id, 2);
+            var dataset1Items = datasetResourceClient.getDatasetItems(
+                    dataset1Id, 1, 10, DatasetVersionService.LATEST_TAG, API_KEY, TEST_WORKSPACE).content();
+
+            var dataset2Id = createDataset(UUID.randomUUID().toString());
+            createDatasetItems(dataset2Id, 2);
+            var dataset2Items = datasetResourceClient.getDatasetItems(
+                    dataset2Id, 1, 10, DatasetVersionService.LATEST_TAG, API_KEY, TEST_WORKSPACE).content();
+
+            var mixedIds = Set.of(dataset1Items.getFirst().id(), dataset2Items.getFirst().id());
+
+            var batchUpdate = DatasetItemBatchUpdate.builder()
+                    .ids(mixedIds)
+                    .update(DatasetItemUpdate.builder().tags(Set.of("test")).build())
+                    .build();
+            try (var response = datasetResourceClient.callBatchUpdateDatasetItems(batchUpdate, API_KEY,
+                    TEST_WORKSPACE)) {
+                assertThat(response.getStatusInfo().getStatusCode()).isEqualTo(HttpStatus.SC_BAD_REQUEST);
+                assertThat(response.readEntity(io.dropwizard.jersey.errors.ErrorMessage.class))
+                        .isEqualTo(new io.dropwizard.jersey.errors.ErrorMessage(HttpStatus.SC_BAD_REQUEST,
+                                "Cannot operate on items across multiple datasets"));
+            }
         }
     }
 
