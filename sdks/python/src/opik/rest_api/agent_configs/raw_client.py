@@ -36,7 +36,7 @@ class RawAgentConfigsClient:
         request_options: typing.Optional[RequestOptions] = None,
     ) -> HttpResponse[None]:
         """
-        Creates a new optimizer config with initial blueprint, or adds a new blueprint to existing config
+        Creates a new optimizer config with initial blueprint. Fails if the project already has a config.
 
         Parameters
         ----------
@@ -91,6 +91,93 @@ class RawAgentConfigsClient:
                 )
             if _response.status_code == 401:
                 raise UnauthorizedError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        typing.Optional[typing.Any],
+                        parse_obj_as(
+                            type_=typing.Optional[typing.Any],  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            _response_json = _response.json()
+        except JSONDecodeError:
+            raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
+        raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
+
+    def update_agent_config(
+        self,
+        *,
+        blueprint: AgentBlueprintWrite,
+        project_id: typing.Optional[str] = OMIT,
+        project_name: typing.Optional[str] = OMIT,
+        id: typing.Optional[str] = OMIT,
+        request_options: typing.Optional[RequestOptions] = None,
+    ) -> HttpResponse[AgentBlueprintWrite]:
+        """
+        Adds a new blueprint to an existing optimizer config. Fails if the project has no config yet.
+
+        Parameters
+        ----------
+        blueprint : AgentBlueprintWrite
+
+        project_id : typing.Optional[str]
+            Project ID. Either project_id or project_name must be provided
+
+        project_name : typing.Optional[str]
+            Project name. Either project_id or project_name must be provided
+
+        id : typing.Optional[str]
+            Agent config ID. Generated automatically if not provided
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        HttpResponse[AgentBlueprintWrite]
+            Blueprint added
+        """
+        _response = self._client_wrapper.httpx_client.request(
+            "v1/private/agent-configs/blueprints",
+            method="PATCH",
+            json={
+                "project_id": project_id,
+                "project_name": project_name,
+                "id": id,
+                "blueprint": convert_and_respect_annotation_metadata(
+                    object_=blueprint, annotation=AgentBlueprintWrite, direction="write"
+                ),
+            },
+            headers={
+                "content-type": "application/json",
+            },
+            request_options=request_options,
+            omit=OMIT,
+        )
+        try:
+            if 200 <= _response.status_code < 300:
+                _data = typing.cast(
+                    AgentBlueprintWrite,
+                    parse_obj_as(
+                        type_=AgentBlueprintWrite,  # type: ignore
+                        object_=_response.json(),
+                    ),
+                )
+                return HttpResponse(response=_response, data=_data)
+            if _response.status_code == 401:
+                raise UnauthorizedError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        typing.Optional[typing.Any],
+                        parse_obj_as(
+                            type_=typing.Optional[typing.Any],  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            if _response.status_code == 404:
+                raise NotFoundError(
                     headers=dict(_response.headers),
                     body=typing.cast(
                         typing.Optional[typing.Any],
@@ -714,7 +801,7 @@ class AsyncRawAgentConfigsClient:
         request_options: typing.Optional[RequestOptions] = None,
     ) -> AsyncHttpResponse[None]:
         """
-        Creates a new optimizer config with initial blueprint, or adds a new blueprint to existing config
+        Creates a new optimizer config with initial blueprint. Fails if the project already has a config.
 
         Parameters
         ----------
@@ -769,6 +856,93 @@ class AsyncRawAgentConfigsClient:
                 )
             if _response.status_code == 401:
                 raise UnauthorizedError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        typing.Optional[typing.Any],
+                        parse_obj_as(
+                            type_=typing.Optional[typing.Any],  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            _response_json = _response.json()
+        except JSONDecodeError:
+            raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
+        raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
+
+    async def update_agent_config(
+        self,
+        *,
+        blueprint: AgentBlueprintWrite,
+        project_id: typing.Optional[str] = OMIT,
+        project_name: typing.Optional[str] = OMIT,
+        id: typing.Optional[str] = OMIT,
+        request_options: typing.Optional[RequestOptions] = None,
+    ) -> AsyncHttpResponse[AgentBlueprintWrite]:
+        """
+        Adds a new blueprint to an existing optimizer config. Fails if the project has no config yet.
+
+        Parameters
+        ----------
+        blueprint : AgentBlueprintWrite
+
+        project_id : typing.Optional[str]
+            Project ID. Either project_id or project_name must be provided
+
+        project_name : typing.Optional[str]
+            Project name. Either project_id or project_name must be provided
+
+        id : typing.Optional[str]
+            Agent config ID. Generated automatically if not provided
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        AsyncHttpResponse[AgentBlueprintWrite]
+            Blueprint added
+        """
+        _response = await self._client_wrapper.httpx_client.request(
+            "v1/private/agent-configs/blueprints",
+            method="PATCH",
+            json={
+                "project_id": project_id,
+                "project_name": project_name,
+                "id": id,
+                "blueprint": convert_and_respect_annotation_metadata(
+                    object_=blueprint, annotation=AgentBlueprintWrite, direction="write"
+                ),
+            },
+            headers={
+                "content-type": "application/json",
+            },
+            request_options=request_options,
+            omit=OMIT,
+        )
+        try:
+            if 200 <= _response.status_code < 300:
+                _data = typing.cast(
+                    AgentBlueprintWrite,
+                    parse_obj_as(
+                        type_=AgentBlueprintWrite,  # type: ignore
+                        object_=_response.json(),
+                    ),
+                )
+                return AsyncHttpResponse(response=_response, data=_data)
+            if _response.status_code == 401:
+                raise UnauthorizedError(
+                    headers=dict(_response.headers),
+                    body=typing.cast(
+                        typing.Optional[typing.Any],
+                        parse_obj_as(
+                            type_=typing.Optional[typing.Any],  # type: ignore
+                            object_=_response.json(),
+                        ),
+                    ),
+                )
+            if _response.status_code == 404:
+                raise NotFoundError(
                     headers=dict(_response.headers),
                     body=typing.cast(
                         typing.Optional[typing.Any],
