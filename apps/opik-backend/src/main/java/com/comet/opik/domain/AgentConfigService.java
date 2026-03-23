@@ -103,7 +103,16 @@ class AgentConfigServiceImpl implements AgentConfigService {
                             configId, projectId, workspaceId);
                     dao.insertConfig(configId, workspaceId, projectId, userName, userName);
 
-                    return createBlueprint(dao, request, configId, projectId, workspaceId, userName);
+                    AgentBlueprint blueprint = createBlueprint(dao, request, configId, projectId, workspaceId,
+                            userName);
+
+                    upsertEnvs(dao, workspaceId, projectId, userName,
+                            List.of(AgentConfigEnv.builder()
+                                    .envName("prod")
+                                    .blueprintId(blueprint.id())
+                                    .build()));
+
+                    return blueprint;
                 }))).block();
     }
 

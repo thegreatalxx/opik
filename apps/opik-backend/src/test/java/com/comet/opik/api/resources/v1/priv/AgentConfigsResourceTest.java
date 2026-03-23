@@ -169,8 +169,13 @@ class AgentConfigsResourceTest {
                     .blueprint(blueprint)
                     .build();
 
-            agentConfigsResourceClient.createAgentConfig(request, API_KEY,
+            var blueprintId = agentConfigsResourceClient.createAgentConfig(request, API_KEY,
                     TEST_WORKSPACE, HttpStatus.SC_CREATED);
+
+            var prodBlueprint = agentConfigsResourceClient.getBlueprintByEnv("prod", projectId, null, API_KEY,
+                    TEST_WORKSPACE, HttpStatus.SC_OK);
+            assertThat(prodBlueprint).isNotNull();
+            assertThat(prodBlueprint.id()).isEqualTo(blueprintId);
         }
 
         @ParameterizedTest
