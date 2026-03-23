@@ -4,17 +4,17 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
 const hotkeyDisplayVariants = cva(
-  "group inline-flex items-center justify-center rounded-md",
+  "inline-flex items-center justify-center rounded-md opacity-90",
   {
     variants: {
       variant: {
-        default:
-          "border border-input dark:border-border dark:bg-input dark:text-foreground-secondary dark:group-disabled:text-muted-gray",
+        default: "bg-black/20",
         outline:
           "border border-input bg-background dark:border-border dark:bg-input dark:text-foreground-secondary dark:group-disabled:text-muted-gray",
       },
       size: {
         default: "h-8 min-w-8 px-2",
+        xs: "h-[18px] min-w-4 rounded px-[3px] text-xs",
         sm: "h-6 min-w-6 rounded-md px-1.5",
         lg: "h-10 min-w-10 rounded-md px-3",
       },
