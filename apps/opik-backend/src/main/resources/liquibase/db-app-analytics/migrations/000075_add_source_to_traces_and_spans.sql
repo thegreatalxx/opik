@@ -5,12 +5,14 @@
 ALTER TABLE ${ANALYTICS_DB_DATABASE_NAME}.traces ON CLUSTER '{cluster}'
     ADD COLUMN IF NOT EXISTS source Enum8('unknown' = 0, 'sdk' = 1, 'experiment' = 2, 'playground' = 3, 'optimization' = 4) DEFAULT 'unknown';
 
+-- Index to speed up filtering traces by source (used in source = EQUAL filter queries)
 ALTER TABLE ${ANALYTICS_DB_DATABASE_NAME}.traces ON CLUSTER '{cluster}'
     ADD INDEX IF NOT EXISTS idx_traces_source source TYPE minmax GRANULARITY 1;
 
 ALTER TABLE ${ANALYTICS_DB_DATABASE_NAME}.spans ON CLUSTER '{cluster}'
     ADD COLUMN IF NOT EXISTS source Enum8('unknown' = 0, 'sdk' = 1, 'experiment' = 2, 'playground' = 3, 'optimization' = 4) DEFAULT 'unknown';
 
+-- Index to speed up filtering spans by source (used in source = EQUAL filter queries)
 ALTER TABLE ${ANALYTICS_DB_DATABASE_NAME}.spans ON CLUSTER '{cluster}'
     ADD INDEX IF NOT EXISTS idx_spans_source source TYPE minmax GRANULARITY 1;
 

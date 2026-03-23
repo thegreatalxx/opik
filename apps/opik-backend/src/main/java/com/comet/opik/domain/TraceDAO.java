@@ -3051,6 +3051,7 @@ class TraceDAOImpl implements TraceDAO {
 
             bindUserNameAndWorkspace(statement, userName, workspaceId);
             bindUpdateParams(traceUpdate, statement);
+            statement.bindNull("source", String.class);
 
             Segment segment = startSegment("traces", "Clickhouse", "insert_partial");
 

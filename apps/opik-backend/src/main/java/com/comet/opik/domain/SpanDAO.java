@@ -1771,6 +1771,7 @@ class SpanDAO {
                     }
 
                     bindUpdateParams(spanUpdate, statement, false);
+                    statement.bindNull("source", String.class);
 
                     bindUserNameAndWorkspace(statement, userName, workspaceId);
 

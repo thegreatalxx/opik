@@ -142,7 +142,7 @@ class TracesResourceSourceTest {
         }
 
         @Test
-        @DisplayName("Create trace with invalid source returns 422")
+        @DisplayName("Create trace with invalid source returns 400")
         void createTraceWithInvalidSourceReturns422() {
             var body = """
                     {
@@ -178,12 +178,16 @@ class TracesResourceSourceTest {
             var matchingTrace = factory.manufacturePojo(Trace.class).toBuilder()
                     .projectName(projectName)
                     .source(source)
+                    .usage(null)
+                    .feedbackScores(null)
                     .build();
 
             var otherSource = source == TraceSource.SDK ? TraceSource.EXPERIMENT : TraceSource.SDK;
             var nonMatchingTrace = factory.manufacturePojo(Trace.class).toBuilder()
                     .projectName(projectName)
                     .source(otherSource)
+                    .usage(null)
+                    .feedbackScores(null)
                     .build();
 
             traceResourceClient.createTrace(matchingTrace, API_KEY, TEST_WORKSPACE);
@@ -198,11 +202,7 @@ class TracesResourceSourceTest {
             var page = traceResourceClient.getTraces(projectName, null, API_KEY, TEST_WORKSPACE,
                     filters, List.of(), 10, Map.of());
 
-            assertThat(page.content())
-                    .isNotEmpty()
-                    .allSatisfy(t -> assertThat(t.source()).isIn(source, null));
-            assertThat(page.content())
-                    .noneMatch(t -> t.source() == otherSource);
+            TraceAssertions.assertTraces(page.content(), List.of(matchingTrace), List.of(nonMatchingTrace), USER);
         }
 
         @Test

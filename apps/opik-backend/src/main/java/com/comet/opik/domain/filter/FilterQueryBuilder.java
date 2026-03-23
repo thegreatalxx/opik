@@ -930,7 +930,7 @@ public class FilterQueryBuilder {
         if ((filter.field() == TraceField.SOURCE || filter.field() == SpanField.SOURCE)
                 && filter.operator() == Operator.EQUAL
                 && SOURCE_SDK_VALUE.equals(filter.value())) {
-            return "(%s = :filter%d OR %s = '%s')".formatted(SOURCE_DB, i, SOURCE_DB, SOURCE_UNKNOWN_VALUE);
+            return "(%s = :filter%d OR %s = '%s')".formatted(dbField, i, dbField, SOURCE_UNKNOWN_VALUE);
         }
 
         return "(%s)".formatted(formattedTemplate);

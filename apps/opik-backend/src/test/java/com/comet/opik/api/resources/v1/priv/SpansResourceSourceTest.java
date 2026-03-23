@@ -200,6 +200,8 @@ class SpansResourceSourceTest {
                     .projectName(projectName)
                     .traceId(traceId)
                     .source(source)
+                    .usage(null)
+                    .feedbackScores(null)
                     .build();
 
             var otherSource = source == TraceSource.SDK ? TraceSource.EXPERIMENT : TraceSource.SDK;
@@ -207,6 +209,8 @@ class SpansResourceSourceTest {
                     .projectName(projectName)
                     .traceId(traceId)
                     .source(otherSource)
+                    .usage(null)
+                    .feedbackScores(null)
                     .build();
 
             spanResourceClient.createSpan(matchingSpan, API_KEY, TEST_WORKSPACE);
@@ -221,11 +225,7 @@ class SpansResourceSourceTest {
             var page = spanResourceClient.findSpans(TEST_WORKSPACE, API_KEY, projectName, null, 1, 10,
                     null, null, filters, List.of(), List.of());
 
-            assertThat(page.content())
-                    .isNotEmpty()
-                    .allSatisfy(s -> assertThat(s.source()).isIn(source, null));
-            assertThat(page.content())
-                    .noneMatch(s -> s.source() == otherSource);
+            SpanAssertions.assertSpan(page.content(), List.of(matchingSpan), List.of(nonMatchingSpan), USER);
         }
 
         @Test
