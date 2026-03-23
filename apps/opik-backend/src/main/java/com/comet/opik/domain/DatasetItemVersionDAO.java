@@ -2017,10 +2017,11 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
                 <if(feedback_scores_empty_filters_agg)> AND <feedback_scores_empty_filters_agg> <endif>
                 <if(dataset_item_filters)>
                 AND eia.dataset_item_id IN (
-                    SELECT id
+                    SELECT arrayJoin([id, dataset_item_id])
                     FROM (
                         SELECT
                             div_dedup.id AS id,
+                            div_dedup.dataset_item_id AS dataset_item_id,
                             div_dedup.data AS data,
                             div_dedup.source AS source,
                             div_dedup.trace_id AS trace_id,
@@ -2035,6 +2036,8 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
                             ORDER BY (workspace_id, dataset_id, dataset_version_id, id) DESC, last_updated_at DESC
                             LIMIT 1 BY id
                         ) AS div_dedup
+                        ORDER BY last_updated_at DESC
+                        LIMIT 1 BY dataset_item_id
                     ) AS versioned
                     WHERE <dataset_item_filters>
                 )
