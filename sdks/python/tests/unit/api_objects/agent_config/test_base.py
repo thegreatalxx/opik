@@ -262,36 +262,6 @@ class TestCreateAgentConfigVersion:
         mock_rest_client.agent_configs.create_agent_config.assert_not_called()
         assert result == "v2"
 
-    def test_first_blueprint__auto_tagged_as_prod(
-        self, mock_rest_client, mock_opik_client
-    ):
-        class MyConfig(AgentConfig):
-            temp: float
-
-        cfg = MyConfig(temp=0.7)
-
-        mock_rest_client.agent_configs.get_blueprint_by_id.return_value = (
-            AgentBlueprintPublic(
-                id="bp-1",
-                name="v1",
-                type="blueprint",
-                values=[
-                    AgentConfigValuePublic(
-                        key="MyConfig.temp", type="float", value="0.7"
-                    ),
-                ],
-            )
-        )
-
-        mock_opik_client.create_agent_config_version(cfg)
-
-        mock_rest_client.agent_configs.create_or_update_envs.assert_called_once()
-        call_kwargs = (
-            mock_rest_client.agent_configs.create_or_update_envs.call_args.kwargs
-        )
-        assert call_kwargs["envs"][0].env_name == "prod"
-        assert call_kwargs["envs"][0].blueprint_id == "bp-1"
-
     def test_subsequent_blueprint__not_auto_tagged_as_prod(
         self, mock_rest_client, mock_opik_client
     ):

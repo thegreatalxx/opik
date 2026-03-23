@@ -197,7 +197,6 @@ class AgentConfig:
                     description=description,
                     field_types=field_types,
                 )
-                manager.tag_blueprint_with_env(env="prod", blueprint_id=bp.id)
             except rest_api_core.ApiError as e:
                 if e.status_code != 400:
                     raise
