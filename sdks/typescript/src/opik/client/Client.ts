@@ -53,6 +53,19 @@ import {
   ThreadsAnnotationQueue,
 } from "@/annotation-queue";
 import { AgentConfig } from "@/agent-config";
+import {
+  getSchemaPrefix,
+  serializeFields,
+  deserializeToShape,
+  matchesBlueprint,
+} from "@/agent-config/typeHelpers";
+import {
+  createTypedAgentConfig,
+  type TypedAgentConfig,
+} from "@/agent-config/TypedAgentConfig";
+import { getActiveConfigMask } from "@/agent-config/configContext";
+import { trackStorage } from "@/decorators/track";
+import { z } from "zod";
 
 interface TraceData extends Omit<ITrace, "startTime"> {
   startTime?: Date;
@@ -1660,6 +1673,186 @@ export class OpikClient {
   public getAgentConfig = (options?: { projectName?: string }): AgentConfig => {
     const projectName = options?.projectName ?? this.config.projectName;
     return new AgentConfig(projectName, this);
+  };
+
+  public createAgentConfigVersion = async <
+    S extends z.ZodObject<z.ZodRawShape>,
+  >(
+    schema: S,
+    values: z.infer<S>,
+    options?: { projectName?: string; description?: string }
+  ): Promise<string> => {
+    const prefix = getSchemaPrefix(schema);
+    const projectName = options?.projectName ?? this.config.projectName;
+    const agentConfig = new AgentConfig(projectName, this);
+
+    const serialized = serializeFields(schema, values as Record<string, unknown>, prefix);
+    const valuesMap = Object.fromEntries(
+      serialized.map((v) => [v.key, v.value])
+    );
+
+    const latest = await agentConfig.getBlueprint();
+
+    if (latest && matchesBlueprint(schema, values as Record<string, unknown>, latest, prefix)) {
+      return latest.name ?? latest.id;
+    }
+
+    let blueprint;
+    if (latest) {
+      blueprint = await agentConfig.updateBlueprint({
+        values: valuesMap as Record<string, string>,
+        description: options?.description,
+      });
+    } else {
+      try {
+        blueprint = await agentConfig.createBlueprint({
+          values: valuesMap as Record<string, string>,
+          description: options?.description,
+        });
+      } catch (error) {
+        if (error instanceof OpikApiError && error.statusCode === 400) {
+          const refetched = await agentConfig.getBlueprint();
+          if (refetched && matchesBlueprint(schema, values as Record<string, unknown>, refetched, prefix)) {
+            return refetched.name ?? refetched.id;
+          }
+          blueprint = await agentConfig.updateBlueprint({
+            values: valuesMap as Record<string, string>,
+            description: options?.description,
+          });
+        } else {
+          throw error;
+        }
+      }
+    }
+
+    return blueprint.name ?? blueprint.id;
+  };
+
+  public createAgentConfig = async <S extends z.ZodObject<z.ZodRawShape>>(
+    schema: S,
+    values: z.infer<S>,
+    options?: { projectName?: string; description?: string }
+  ): Promise<TypedAgentConfig<z.infer<S>>> => {
+    const prefix = getSchemaPrefix(schema);
+    const projectName = options?.projectName ?? this.config.projectName;
+    const { extractFieldMetadata } = await import("@/agent-config/typeHelpers");
+    const fieldMeta = extractFieldMetadata(schema, prefix);
+
+    const agentConfig = new AgentConfig(projectName, this);
+    const blueprint = await agentConfig.getBlueprint();
+
+    const resolvedValues = blueprint
+      ? deserializeToShape(
+          schema,
+          Object.fromEntries(
+            blueprint.keys().map((k) => [k, blueprint.getRawEntry(k)!])
+          ),
+          prefix,
+          values as z.infer<S>
+        )
+      : (values as z.infer<S>);
+
+    return createTypedAgentConfig({
+      schema,
+      values: resolvedValues,
+      fieldMeta,
+      blueprintId: blueprint?.id,
+      blueprintVersion: blueprint?.name,
+      envs: blueprint?.envs,
+      isFallback: !blueprint,
+      deployTo: async (env: string) => {
+        if (!blueprint) throw new Error("Cannot deploy fallback config");
+        await agentConfig.tagBlueprintWithEnv(blueprint.id, env);
+      },
+    });
+  };
+
+  public getAgentConfigVersion = async <
+    S extends z.ZodObject<z.ZodRawShape>,
+  >(
+    schema: S,
+    options: {
+      fallback: z.infer<S>;
+      projectName?: string;
+      env?: string;
+      latest?: boolean;
+      version?: string;
+    }
+  ): Promise<TypedAgentConfig<z.infer<S>>> => {
+    const prefix = getSchemaPrefix(schema);
+    const projectName = options.projectName ?? this.config.projectName;
+
+    if (!trackStorage.getStore()) {
+      throw new Error(
+        "getAgentConfigVersion() must be called inside a track() function"
+      );
+    }
+
+    const maskId = getActiveConfigMask() ?? undefined;
+    const agentConfig = new AgentConfig(projectName, this);
+
+    const { extractFieldMetadata } = await import("@/agent-config/typeHelpers");
+    const fieldMeta = extractFieldMetadata(schema, prefix);
+
+    let blueprint = null;
+    try {
+      if (options.latest) {
+        blueprint = await agentConfig.getBlueprint({ maskId });
+      } else if (options.version) {
+        blueprint = await agentConfig.getBlueprint({ name: options.version, maskId });
+      } else {
+        const env = options.env ?? "prod";
+        blueprint = await agentConfig.getBlueprint({ env, maskId });
+      }
+    } catch (error) {
+      if (error instanceof OpikApiError && error.statusCode === 404) {
+        blueprint = null;
+      } else {
+        logger.error("Failed to fetch agent config from backend, using fallback", { error });
+        return createTypedAgentConfig({
+          schema,
+          values: options.fallback,
+          fieldMeta,
+          blueprintId: undefined,
+          blueprintVersion: undefined,
+          envs: undefined,
+          isFallback: true,
+          deployTo: async () => {
+            throw new Error("Cannot deploy fallback config");
+          },
+        });
+      }
+    }
+
+    if (!blueprint) {
+      throw new Error(
+        `No agent config found for project "${projectName}" with the specified selector`
+      );
+    }
+
+    const rawValuesMap = Object.fromEntries(
+      blueprint.keys().map((key) => [key, blueprint!.getRawEntry(key)!])
+    );
+
+    const resolvedValues = deserializeToShape(
+      schema,
+      rawValuesMap,
+      prefix,
+      options.fallback
+    );
+
+    return createTypedAgentConfig({
+      schema,
+      values: resolvedValues,
+      fieldMeta,
+      blueprintId: blueprint.id,
+      blueprintVersion: blueprint.name,
+      envs: blueprint.envs,
+      isFallback: false,
+      deployTo: async (env: string) => {
+        await agentConfig.tagBlueprintWithEnv(blueprint!.id, env);
+      },
+    });
   };
 
   public updatePromptVersionTags = async (

@@ -17,6 +17,7 @@ export interface CreateBlueprintOptions {
 
 export interface GetBlueprintOptions {
   id?: string;
+  name?: string;
   env?: string;
   maskId?: string;
 }
@@ -144,7 +145,7 @@ export class AgentConfig {
   async getBlueprint(
     options: GetBlueprintOptions = {}
   ): Promise<Blueprint | null> {
-    const { id, env, maskId } = options;
+    const { id, name, env, maskId } = options;
 
     try {
       let response: OpikApi.AgentBlueprintPublic;
@@ -156,6 +157,16 @@ export class AgentConfig {
         response = await this.opik.api.agentConfigs.getBlueprintById(id, {
           maskId,
         });
+      } else if (name) {
+        const projectId = await this.getProjectId();
+        logger.debug(
+          `Getting blueprint by name "${name}" for project "${this.projectName}"`
+        );
+        response = await this.opik.api.agentConfigs.getBlueprintByName(
+          projectId,
+          name,
+          { maskId }
+        );
       } else if (env) {
         const projectId = await this.getProjectId();
         logger.debug(

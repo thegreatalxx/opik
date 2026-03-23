@@ -1,6 +1,8 @@
 import { BasePrompt } from "@/prompt/BasePrompt";
 import { PromptVersion } from "@/prompt/PromptVersion";
 import type * as OpikApi from "@/rest_api/api";
+import { z } from "zod";
+import type { Blueprint } from "./Blueprint";
 
 export type SupportedValue =
   | string
@@ -11,46 +13,133 @@ export type SupportedValue =
   | unknown[]
   | Record<string, unknown>;
 
-export function inferBackendType(
-  value: SupportedValue
-): OpikApi.AgentConfigValueWriteType {
-  if (typeof value === "boolean") return "boolean";
-  if (typeof value === "number") {
-    return Number.isInteger(value) ? "integer" : "float";
-  }
-  if (typeof value === "string") return "string";
-  if (value instanceof BasePrompt) return "prompt";
-  if (value instanceof PromptVersion) return "prompt_commit";
-  if (Array.isArray(value)) return "string";
-  if (typeof value === "object" && value !== null) return "string";
-  throw new TypeError(`Unsupported value type: ${typeof value}`);
+export interface FieldMeta {
+  prefixedKey: string;
+  backendType: string;
+  description?: string;
+  isOptional: boolean;
 }
 
-export function serializeValue(value: SupportedValue): string {
-  if (typeof value === "boolean") return value ? "true" : "false";
-  if (typeof value === "number") {
-    if (!Number.isFinite(value)) {
+export function getSchemaPrefix(schema: z.ZodObject<z.ZodRawShape>): string {
+  const prefix = schema._def.description;
+  if (!prefix) {
+    throw new TypeError(
+      "Schema must have a .describe() name — e.g. z.object({...}).describe('MyConfig')"
+    );
+  }
+  return prefix;
+}
+
+function unwrapZodType(zodField: z.ZodTypeAny): {
+  inner: z.ZodTypeAny;
+  isOptional: boolean;
+} {
+  let inner = zodField;
+  let isOptional = false;
+
+  if (inner instanceof z.ZodOptional || inner instanceof z.ZodNullable) {
+    inner = (inner as z.ZodOptional<z.ZodTypeAny>).unwrap();
+    isOptional = true;
+  }
+
+  return { inner, isOptional };
+}
+
+export function zodTypeToBackendType(zodField: z.ZodTypeAny): string {
+  const { inner } = unwrapZodType(zodField);
+
+  if (inner instanceof z.ZodString) return "string";
+  if (inner instanceof z.ZodBoolean) return "boolean";
+  if (inner instanceof z.ZodNumber) {
+    const checks: Array<{ kind: string }> =
+      (inner._def as { checks?: Array<{ kind: string }> }).checks ?? [];
+    return checks.some((c) => c.kind === "int") ? "integer" : "float";
+  }
+  if (inner instanceof z.ZodArray) return "string";
+  if (inner instanceof z.ZodRecord) return "string";
+  if (inner instanceof z.ZodObject) return "string";
+
+  throw new TypeError(`Unsupported Zod type: ${inner.constructor.name}`);
+}
+
+export function extractFieldMetadata(
+  schema: z.ZodObject<z.ZodRawShape>,
+  prefix: string
+): Map<string, FieldMeta> {
+  const result = new Map<string, FieldMeta>();
+
+  for (const [fieldName, zodField] of Object.entries(schema.shape)) {
+    const field = zodField as z.ZodTypeAny;
+    const { isOptional } = unwrapZodType(field);
+    const backendType = zodTypeToBackendType(field);
+    const description = field._def.description as string | undefined;
+
+    result.set(fieldName, {
+      prefixedKey: `${prefix}.${fieldName}`,
+      backendType,
+      description,
+      isOptional: isOptional || field.isOptional(),
+    });
+  }
+
+  return result;
+}
+
+export function serializeValue(value: SupportedValue, backendType?: string): string {
+  const type = backendType ?? inferBackendType(value);
+
+  if (type === "boolean") return (value as boolean) ? "true" : "false";
+  if (type === "integer" || type === "float") {
+    if (!Number.isFinite(value as number)) {
       throw new TypeError(`Cannot serialize non-finite number: ${value}`);
     }
     return String(value);
   }
-  if (typeof value === "string") return value;
-  if (value instanceof BasePrompt) {
-    if (!value.commit) {
+  if (type === "string") {
+    if (Array.isArray(value) || (typeof value === "object" && value !== null)) {
+      return JSON.stringify(value);
+    }
+    return value as string;
+  }
+  if (type === "prompt") {
+    const prompt = value as BasePrompt;
+    if (!prompt.commit) {
       throw new TypeError("Cannot serialize prompt without a commit");
     }
-    return value.commit;
+    return prompt.commit;
   }
-  if (value instanceof PromptVersion) return value.commit;
-  if (Array.isArray(value) || (typeof value === "object" && value !== null)) {
-    return JSON.stringify(value);
+  if (type === "prompt_commit") {
+    return (value as PromptVersion).commit;
   }
-  throw new TypeError(`Unsupported value type: ${typeof value}`);
+  throw new TypeError(`Unsupported backend type: ${type}`);
+}
+
+export function serializeFields(
+  schema: z.ZodObject<z.ZodRawShape>,
+  values: Record<string, unknown>,
+  prefix: string
+): OpikApi.AgentConfigValueWrite[] {
+  const fieldMeta = extractFieldMetadata(schema, prefix);
+  const result: OpikApi.AgentConfigValueWrite[] = [];
+
+  for (const [fieldName, meta] of fieldMeta.entries()) {
+    const value = values[fieldName];
+    if (value === null || value === undefined) continue;
+
+    result.push({
+      key: meta.prefixedKey,
+      value: serializeValue(value as SupportedValue, meta.backendType),
+      type: meta.backendType as OpikApi.AgentConfigValueWriteType,
+      description: meta.description,
+    });
+  }
+
+  return result;
 }
 
 export function deserializeValue(
   value: string | null | undefined,
-  backendType: OpikApi.AgentConfigValuePublicType
+  backendType: OpikApi.AgentConfigValuePublicType | string
 ): string | number | boolean | null {
   if (value === null || value === undefined) return null;
   switch (backendType) {
@@ -67,4 +156,66 @@ export function deserializeValue(
     default:
       return value;
   }
+}
+
+export function deserializeToShape<S extends z.ZodObject<z.ZodRawShape>>(
+  schema: S,
+  blueprintValues: Record<string, { value?: string | null; type: string }>,
+  prefix: string,
+  fallback: z.infer<S>
+): z.infer<S> {
+  const fieldMeta = extractFieldMetadata(schema, prefix);
+  const result: Record<string, unknown> = {};
+
+  for (const [fieldName, meta] of fieldMeta.entries()) {
+    const entry = blueprintValues[meta.prefixedKey];
+    if (entry !== undefined) {
+      result[fieldName] = deserializeValue(
+        entry.value,
+        entry.type ?? meta.backendType
+      );
+    } else {
+      result[fieldName] = (fallback as Record<string, unknown>)[fieldName];
+    }
+  }
+
+  return result as z.infer<S>;
+}
+
+export function matchesBlueprint(
+  schema: z.ZodObject<z.ZodRawShape>,
+  values: Record<string, unknown>,
+  blueprint: Blueprint,
+  prefix: string
+): boolean {
+  const fieldMeta = extractFieldMetadata(schema, prefix);
+
+  for (const [fieldName, meta] of fieldMeta.entries()) {
+    const localValue = values[fieldName];
+    if (localValue === null || localValue === undefined) continue;
+
+    const serialized = serializeValue(localValue as SupportedValue, meta.backendType);
+    const blueprintRaw = blueprint.getRawValue(meta.prefixedKey);
+
+    if (blueprintRaw === undefined) return false;
+    if (blueprintRaw !== serialized) return false;
+  }
+
+  return true;
+}
+
+// Legacy value-sniffing helpers — kept for AgentConfig.ts backward-compat
+export function inferBackendType(
+  value: SupportedValue
+): OpikApi.AgentConfigValueWriteType {
+  if (typeof value === "boolean") return "boolean";
+  if (typeof value === "number") {
+    return Number.isInteger(value) ? "integer" : "float";
+  }
+  if (typeof value === "string") return "string";
+  if (value instanceof BasePrompt) return "prompt";
+  if (value instanceof PromptVersion) return "prompt_commit";
+  if (Array.isArray(value)) return "string";
+  if (typeof value === "object" && value !== null) return "string";
+  throw new TypeError(`Unsupported value type: ${typeof value}`);
 }
