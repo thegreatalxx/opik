@@ -136,7 +136,15 @@ export function serializeFields(
 
   for (const [fieldName, meta] of fieldMeta.entries()) {
     const value = values[fieldName];
-    if (value === null || value === undefined) continue;
+    if (value === null || value === undefined) {
+      result.push({
+        key: meta.prefixedKey,
+        value: undefined,
+        type: "string" as OpikApi.AgentConfigValueWriteType,
+        description: meta.description,
+      });
+      continue;
+    }
 
     result.push({
       key: meta.prefixedKey,

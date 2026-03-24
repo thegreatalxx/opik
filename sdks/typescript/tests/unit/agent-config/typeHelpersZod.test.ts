@@ -142,9 +142,11 @@ describe("serializeFields", () => {
     );
   });
 
-  it("skips null/undefined optional fields", () => {
+  it("sends null value for undefined optional fields (matching Python behaviour)", () => {
     const result = serializeFields(schema, { temperature: 0.5, model: "m", enabled: false, hint: undefined }, "Cfg");
-    expect(result.find((v) => v.key === "Cfg.hint")).toBeUndefined();
+    expect(result.find((v) => v.key === "Cfg.hint")).toEqual(
+      expect.objectContaining({ key: "Cfg.hint", value: undefined, type: "string" })
+    );
   });
 });
 
