@@ -1,5 +1,6 @@
 package com.comet.opik.api;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonValue;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
@@ -27,6 +28,7 @@ public enum TraceSource {
     @JsonValue
     private final String value;
 
+    @JsonCreator
     public static Optional<TraceSource> fromString(String value) {
         return Arrays.stream(TraceSource.values())
                 .filter(v -> v.getValue().equals(value))
