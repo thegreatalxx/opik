@@ -64,6 +64,10 @@ import {
   type TypedAgentConfig,
 } from "@/agent-config/TypedAgentConfig";
 import { getActiveConfigMask } from "@/agent-config/configContext";
+import {
+  getCachedBlueprint,
+  initBlueprintCacheEntry,
+} from "@/agent-config/blueprintCache";
 import { trackStorage } from "@/decorators/track";
 import { z } from "zod";
 
@@ -1795,34 +1799,55 @@ export class OpikClient {
     const { extractFieldMetadata } = await import("@/agent-config/typeHelpers");
     const fieldMeta = extractFieldMetadata(schema, prefix);
 
+    // effectiveEnv is null for `latest` and `version` lookups (no env tag involved)
+    const effectiveEnv = options.latest || options.version
+      ? null
+      : (options.env ?? "prod");
+
+    const cacheEntry = getCachedBlueprint(projectName, effectiveEnv, maskId ?? null);
+
     let blueprint = null;
-    try {
-      if (options.latest) {
-        blueprint = await agentConfig.getBlueprint({ maskId });
-      } else if (options.version) {
-        blueprint = await agentConfig.getBlueprint({ name: options.version, maskId });
-      } else {
-        const env = options.env ?? "prod";
-        blueprint = await agentConfig.getBlueprint({ env, maskId });
+
+    if (cacheEntry.isStale()) {
+      try {
+        if (options.latest) {
+          blueprint = await agentConfig.getBlueprint({ maskId });
+        } else if (options.version) {
+          blueprint = await agentConfig.getBlueprint({ name: options.version, maskId });
+        } else {
+          blueprint = await agentConfig.getBlueprint({ env: effectiveEnv!, maskId });
+        }
+      } catch (error) {
+        if (error instanceof OpikApiError && error.statusCode === 404) {
+          blueprint = null;
+        } else {
+          logger.error("Failed to fetch agent config from backend, using fallback", { error });
+          return createTypedAgentConfig({
+            schema,
+            values: options.fallback,
+            fieldMeta,
+            blueprintId: undefined,
+            blueprintVersion: undefined,
+            envs: undefined,
+            isFallback: true,
+            deployTo: async () => {
+              throw new Error("Cannot deploy fallback config");
+            },
+          });
+        }
       }
-    } catch (error) {
-      if (error instanceof OpikApiError && error.statusCode === 404) {
-        blueprint = null;
-      } else {
-        logger.error("Failed to fetch agent config from backend, using fallback", { error });
-        return createTypedAgentConfig({
-          schema,
-          values: options.fallback,
-          fieldMeta,
-          blueprintId: undefined,
-          blueprintVersion: undefined,
-          envs: undefined,
-          isFallback: true,
-          deployTo: async () => {
-            throw new Error("Cannot deploy fallback config");
-          },
-        });
-      }
+
+      // Register refresh callback for non-pinned, non-mask lookups
+      const refreshCallback =
+        maskId === undefined && !options.version
+          ? options.latest
+            ? () => agentConfig.getBlueprint({ maskId: undefined })
+            : () => agentConfig.getBlueprint({ env: effectiveEnv!, maskId: undefined })
+          : null;
+
+      initBlueprintCacheEntry(projectName, effectiveEnv, maskId ?? null, blueprint, refreshCallback);
+    } else {
+      blueprint = cacheEntry.getBlueprint();
     }
 
     if (!blueprint) {
