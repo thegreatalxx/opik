@@ -36,6 +36,7 @@ const DEFAULT_STATE: FeatureToggles = {
   [FeatureToggleKeys.CUSTOMLLM_PROVIDER_ENABLED]: false,
   [FeatureToggleKeys.OLLAMA_PROVIDER_ENABLED]: false,
   [FeatureToggleKeys.COLLABORATORS_TAB_ENABLED]: false,
+  [FeatureToggleKeys.AGENT_CONFIGURATION_ENABLED]: false,
 };
 
 const initialState: FeatureTogglesState = {
@@ -50,7 +51,7 @@ const FeatureTogglesProviderContext =
 export function FeatureTogglesProvider({ children }: FeatureTogglesProps) {
   const workspaceName = useAppStore((state) => state.activeWorkspaceName);
   const [features, setFeatures] = useState<FeatureToggles>(DEFAULT_STATE);
-  const { data } = useFeatureToggle({
+  const { data, isFetched } = useFeatureToggle({
     workspaceName,
   });
 
@@ -60,13 +61,20 @@ export function FeatureTogglesProvider({ children }: FeatureTogglesProps) {
     }
   }, [data]);
 
+  const currentFeatures = data ?? features;
+
   const value = useMemo(() => {
     return {
-      features,
+      features: currentFeatures,
       setFeatures,
-      isFeatureEnabled: (feature: FeatureToggleKeys) => features[feature],
+      isFeatureEnabled: (feature: FeatureToggleKeys) =>
+        currentFeatures[feature],
     };
-  }, [features]);
+  }, [currentFeatures]);
+
+  if (!isFetched) {
+    return null;
+  }
 
   return (
     <FeatureTogglesProviderContext.Provider value={value}>
