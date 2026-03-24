@@ -42,7 +42,7 @@ import Loader from "@/shared/Loader/Loader";
 import ExplainerCallout from "@/shared/ExplainerCallout/ExplainerCallout";
 import useAppStore from "@/store/AppStore";
 import { Experiment, ExperimentsCompare } from "@/types/datasets";
-import { useDatasetIdFromCompareExperimentsURL } from "@/hooks/useDatasetIdFromCompareExperimentsURL";
+import { useDatasetIdFromCompareExperimentsURL } from "@/v2/pages/CompareExperimentsPage/useDatasetIdFromCompareExperimentsURL";
 import { useTruncationEnabled } from "@/contexts/server-sync-provider";
 import {
   convertColumnDataToColumn,
@@ -533,9 +533,10 @@ const ExperimentItemsTab: React.FunctionComponent<ExperimentItemsTabProps> = ({
         c === COLUMN_SELECT_ID
           ? false
           : selectedColumns.includes(c) ||
-            (DEFAULT_COLUMN_PINNING.left || []).includes(c),
+            (DEFAULT_COLUMN_PINNING.left || []).includes(c) ||
+            (columnPinning.right || []).includes(c),
       );
-  }, [columns, selectedColumns]);
+  }, [columns, selectedColumns, columnPinning]);
 
   const filterColumns = useMemo(() => {
     return [
