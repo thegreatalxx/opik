@@ -78,7 +78,7 @@ describe.skipIf(!shouldRunApiTests)(
 
 
         // Publish v1
-        const v1Name = await client.createAgentConfigVersion(
+        const v1Name = await client.createAgentConfig(
           MyConfig,
           verifiedSchema,
           { projectName }
@@ -87,7 +87,7 @@ describe.skipIf(!shouldRunApiTests)(
         expect(v1Name.length).toBeGreaterThan(0);
 
         // Dedup: same values → same version name, no new history entry
-        const v1Again = await client.createAgentConfigVersion(
+        const v1Again = await client.createAgentConfig(
           MyConfig,
           verifiedSchema,
           { projectName }
@@ -96,7 +96,7 @@ describe.skipIf(!shouldRunApiTests)(
         expect(await getBlueprintHistoryLength(client, projectName)).toBe(1);
 
         // New values → new version
-        const v2Name = await client.createAgentConfigVersion(
+        const v2Name = await client.createAgentConfig(
           MyConfig,
           { temperature: 0.8, model: "gpt-4", hint: "use chain-of-thought" },
           { projectName }
@@ -164,12 +164,12 @@ describe.skipIf(!shouldRunApiTests)(
           .describe("ConfigB");
 
         // First publish of each schema
-        await client.createAgentConfigVersion(
+        await client.createAgentConfig(
           ConfigA,
           { temperature: 0.5, model: "gpt-4" },
           { projectName }
         );
-        const vAfterB = await client.createAgentConfigVersion(
+        const vAfterB = await client.createAgentConfig(
           ConfigB,
           { retries: 3 },
           { projectName }
@@ -177,7 +177,7 @@ describe.skipIf(!shouldRunApiTests)(
 
         // Re-publishing ConfigA with same values: blueprint now also has ConfigB keys,
         // but ConfigA values are unchanged → should be a no-op
-        const vAAgain = await client.createAgentConfigVersion(
+        const vAAgain = await client.createAgentConfig(
           ConfigA,
           { temperature: 0.5, model: "gpt-4" },
           { projectName }
@@ -204,7 +204,7 @@ describe.skipIf(!shouldRunApiTests)(
           })
           .describe("TraceSchema");
 
-        await client.createAgentConfigVersion(
+        await client.createAgentConfig(
           Schema,
           { temperature: 0.7, model: "gpt-4" },
           { projectName }
@@ -272,7 +272,7 @@ describe.skipIf(!shouldRunApiTests)(
           .object({ temperature: z.number(), model: z.string() })
           .describe("MyConfig");
 
-        await client.createAgentConfigVersion(
+        await client.createAgentConfig(
           MyConfig,
           { temperature: 0.5, model: "gpt-4" },
           { projectName }
@@ -348,7 +348,7 @@ describe.skipIf(!shouldRunApiTests)(
 
       const Schema = z.object({ x: z.number() }).describe("FallbackSchema");
 
-      await client.createAgentConfigVersion(Schema, { x: 42 }, { projectName });
+      await client.createAgentConfig(Schema, { x: 42 }, { projectName });
 
       const run = track(async () => {
         return client.getAgentConfigVersion(Schema, {
@@ -382,7 +382,7 @@ describe.skipIf(!shouldRunApiTests)(
         });
         expect(storedPrompt.commit).toBeDefined();
 
-        const versionName = await client.createAgentConfigVersion(
+        const versionName = await client.createAgentConfig(
           MyConfig,
           { model: "gpt-4", system_prompt: storedPrompt },
           { projectName }
@@ -418,7 +418,7 @@ describe.skipIf(!shouldRunApiTests)(
         .object({ temperature: z.number() })
         .describe("MetaSchema");
 
-      const versionName = await client.createAgentConfigVersion(
+      const versionName = await client.createAgentConfig(
         Schema,
         { temperature: 0.3 },
         { projectName }

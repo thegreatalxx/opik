@@ -1679,7 +1679,7 @@ export class OpikClient {
     return new AgentConfig(projectName, this);
   };
 
-  public createAgentConfigVersion = async <
+  public createAgentConfig = async <
     S extends z.ZodObject<z.ZodRawShape>,
   >(
     schema: S,
@@ -1730,46 +1730,6 @@ export class OpikClient {
     }
 
     return blueprint.name ?? blueprint.id;
-  };
-
-  public createAgentConfig = async <S extends z.ZodObject<z.ZodRawShape>>(
-    schema: S,
-    values: z.infer<S>,
-    options?: { projectName?: string; description?: string }
-  ): Promise<TypedAgentConfig<z.infer<S>>> => {
-    const prefix = getSchemaPrefix(schema);
-    const projectName = options?.projectName ?? this.config.projectName;
-    const { extractFieldMetadata } = await import("@/agent-config/typeHelpers");
-    const fieldMeta = extractFieldMetadata(schema, prefix);
-
-    const agentConfig = new AgentConfig(projectName, this);
-    const blueprint = await agentConfig.getBlueprint();
-
-    const resolvedValues = blueprint
-      ? deserializeToShape(
-          schema,
-          Object.fromEntries(
-            blueprint.keys().map((k) => [k, blueprint.getRawEntry(k)!])
-          ),
-          prefix,
-          values as z.infer<S>,
-          blueprint.values
-        )
-      : (values as z.infer<S>);
-
-    return createTypedAgentConfig({
-      schema,
-      values: resolvedValues,
-      fieldMeta,
-      blueprintId: blueprint?.id,
-      blueprintVersion: blueprint?.name,
-      envs: blueprint?.envs,
-      isFallback: !blueprint,
-      deployTo: async (env: string) => {
-        if (!blueprint) throw new Error("Cannot deploy fallback config");
-        await agentConfig.tagBlueprintWithEnv(blueprint.id, env);
-      },
-    });
   };
 
   public getAgentConfigVersion = async <
