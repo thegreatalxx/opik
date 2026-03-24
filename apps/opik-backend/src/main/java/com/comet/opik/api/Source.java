@@ -37,4 +37,20 @@ public enum Source {
                 .filter(v -> v.getValue().equals(value))
                 .findFirst();
     }
+
+    /**
+     * Returns the additional DB value to include alongside the given filter value in equality
+     * filters, to capture legacy rows that predate source tracking.
+     * <p>
+     * Only {@code sdk} includes legacy {@code unknown} rows, since SDK was the predominant
+     * ingestion path before source tracking was introduced. Playground, experiment, and other
+     * sources did not exist at that time, so unknown rows must not be attributed to them.
+     * </p>
+     */
+    public static Optional<String> legacyFallbackDbValue(String filterValue) {
+        if (SDK.getValue().equals(filterValue)) {
+            return Optional.of(UNKNOWN_VALUE);
+        }
+        return Optional.empty();
+    }
 }

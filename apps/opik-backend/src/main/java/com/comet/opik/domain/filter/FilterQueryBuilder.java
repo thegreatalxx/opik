@@ -924,12 +924,11 @@ public class FilterQueryBuilder {
         var dbField = getAnalyticsDbField(filter.field(), filterStrategy, i);
         var formattedTemplate = template.formatted(dbField, i);
 
-        // Legacy traces/spans have source = 'unknown' (created before source tracking was added).
-        // When filtering source = 'sdk', include them since SDK was the predominant ingestion path.
         if ((filter.field() == TraceField.SOURCE || filter.field() == SpanField.SOURCE)
-                && filter.operator() == Operator.EQUAL
-                && Source.SDK.getValue().equals(filter.value())) {
-            return "(%s = :filter%d OR %s = '%s')".formatted(dbField, i, dbField, Source.UNKNOWN_VALUE);
+                && filter.operator() == Operator.EQUAL) {
+            return Source.legacyFallbackDbValue(filter.value())
+                    .map(fallback -> "(%s = :filter%d OR %s = '%s')".formatted(dbField, i, dbField, fallback))
+                    .orElse("(%s)".formatted(formattedTemplate));
         }
 
         return "(%s)".formatted(formattedTemplate);
