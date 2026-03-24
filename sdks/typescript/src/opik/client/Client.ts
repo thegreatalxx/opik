@@ -1700,7 +1700,7 @@ export class OpikClient {
    * Must be called inside a `track()` function — it automatically attaches the resolved
    * config metadata to the active trace.
    *
-   * Resolution order (first match wins):
+   * Exactly one of the following selectors must be provided (they are mutually exclusive):
    * - `options.version` — fetches the named version exactly
    * - `options.latest` — fetches the most recently published version
    * - `options.env` — fetches the version pinned to that environment label (default: `"prod"`)
@@ -1746,6 +1746,13 @@ export class OpikClient {
     if (!trackStorage.getStore()) {
       throw new Error(
         "getAgentConfigVersion() must be called inside a track() function"
+      );
+    }
+
+    const selectorCount = [options.latest, options.version !== undefined, options.env !== undefined].filter(Boolean).length;
+    if (selectorCount > 1) {
+      throw new Error(
+        "Only one of 'latest', 'version', or 'env' may be specified in getAgentConfigVersion()."
       );
     }
 

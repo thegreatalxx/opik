@@ -1,8 +1,10 @@
+import { z } from "zod";
 import { Opik } from "opik";
 import { MockInstance } from "vitest";
 import { AgentConfigManager, Blueprint } from "@/agent-config";
 import { OpikApiError } from "@/rest_api";
 import * as OpikApi from "@/rest_api/api";
+import { trackStorage } from "@/decorators/track";
 import {
   mockAPIFunction,
   createMockHttpResponsePromise,
@@ -364,5 +366,45 @@ describe("Blueprint value object", () => {
     await expect(
       Blueprint.fromApiResponse({ type: "blueprint", values: [] })
     ).rejects.toThrow("missing required field 'id'");
+  });
+});
+
+describe("getAgentConfigVersion option exclusivity", () => {
+  const schema = z.object({ model: z.string() }).describe("Cfg");
+  let client: Opik;
+
+  beforeEach(() => {
+    client = new Opik({ projectName: "test-project" });
+  });
+
+  function callInsideTrack(opts: { fallback: { model: string }; projectName?: string; env?: string; latest?: boolean; version?: string }) {
+    return trackStorage.run(
+      { span: { update: vi.fn() }, trace: { update: vi.fn() } } as unknown as Parameters<typeof trackStorage.run>[0],
+      () => client.getAgentConfigVersion(schema, opts)
+    );
+  }
+
+  it("should throw when both latest and version are specified", async () => {
+    await expect(
+      callInsideTrack({ fallback: { model: "gpt-4" }, latest: true, version: "v1" })
+    ).rejects.toThrow("Only one of 'latest', 'version', or 'env'");
+  });
+
+  it("should throw when both latest and env are specified", async () => {
+    await expect(
+      callInsideTrack({ fallback: { model: "gpt-4" }, latest: true, env: "prod" })
+    ).rejects.toThrow("Only one of 'latest', 'version', or 'env'");
+  });
+
+  it("should throw when both version and env are specified", async () => {
+    await expect(
+      callInsideTrack({ fallback: { model: "gpt-4" }, version: "v1", env: "prod" })
+    ).rejects.toThrow("Only one of 'latest', 'version', or 'env'");
+  });
+
+  it("should throw when all three are specified", async () => {
+    await expect(
+      callInsideTrack({ fallback: { model: "gpt-4" }, latest: true, version: "v1", env: "prod" })
+    ).rejects.toThrow("Only one of 'latest', 'version', or 'env'");
   });
 });
