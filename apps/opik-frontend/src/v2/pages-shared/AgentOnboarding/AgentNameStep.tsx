@@ -8,15 +8,19 @@ import {
 } from "./AgentOnboardingContext";
 import AgentOnboardingCard from "./AgentOnboardingCard";
 
+const MIN_AGENT_NAME_LENGTH = 3;
+
 const AgentNameStep: React.FC = () => {
   const { goToStep, agentName } = useAgentOnboarding();
   const [name, setName] = useState(agentName);
 
   const trimmedName = name.trim();
+  const isValid = trimmedName.length >= MIN_AGENT_NAME_LENGTH;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!trimmedName) return;
+    if (!isValid) return;
+    // Will transition to CONNECT_AGENT once that step is implemented
     goToStep(AGENT_ONBOARDING_STEPS.DONE, { agentName: trimmedName });
   };
 
@@ -28,7 +32,7 @@ const AgentNameStep: React.FC = () => {
         footer={
           <Button
             type="submit"
-            disabled={!trimmedName}
+            disabled={!isValid}
             id="onboarding-agent-name-continue"
             data-fs-element="onboarding-agent-name-continue"
           >
