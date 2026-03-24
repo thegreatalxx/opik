@@ -19,6 +19,7 @@ import com.comet.opik.api.filter.SpanField;
 import com.comet.opik.api.filter.TraceField;
 import com.comet.opik.api.filter.TraceThreadField;
 import com.comet.opik.api.sorting.SortingField;
+import com.comet.opik.api.TraceSource;
 import com.google.common.collect.ImmutableMap;
 import io.r2dbc.spi.Statement;
 import lombok.NonNull;
@@ -104,8 +105,6 @@ public class FilterQueryBuilder {
     private static final String DATA_ANALYTICS_DB = "data";
     private static final String FULL_DATA_ANALYTICS_DB = "toString(data)";
     private static final String SOURCE_DB = "source";
-    private static final String SOURCE_UNKNOWN_VALUE = "unknown";
-    private static final String SOURCE_SDK_VALUE = "sdk";
     private static final String TRACE_ID_DB = "trace_id";
     private static final String SPAN_ID_DB = "span_id";
     public static final String ANNOTATION_QUEUE_IDS_ANALYTICS_DB = "taqi.annotation_queue_ids";
@@ -929,8 +928,8 @@ public class FilterQueryBuilder {
         // When filtering source = 'sdk', include them since SDK was the predominant ingestion path.
         if ((filter.field() == TraceField.SOURCE || filter.field() == SpanField.SOURCE)
                 && filter.operator() == Operator.EQUAL
-                && SOURCE_SDK_VALUE.equals(filter.value())) {
-            return "(%s = :filter%d OR %s = '%s')".formatted(dbField, i, dbField, SOURCE_UNKNOWN_VALUE);
+                && TraceSource.SDK.getValue().equals(filter.value())) {
+            return "(%s = :filter%d OR %s = '%s')".formatted(dbField, i, dbField, TraceSource.UNKNOWN_VALUE);
         }
 
         return "(%s)".formatted(formattedTemplate);

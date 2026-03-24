@@ -146,7 +146,7 @@ class SpanDAO {
                         :input_slim<item.index>,
                         :output_slim<item.index>,
                         :ttft<item.index>,
-                        if(:source<item.index> IS NULL, 'unknown', :source<item.index>)
+                        :source<item.index>
                     )
                     <if(item.hasNext)>,<endif>
                 }>
@@ -316,7 +316,7 @@ class SpanDAO {
                     :input_slim as input_slim,
                     :output_slim as output_slim,
                     :ttft as ttft,
-                    if(:source IS NULL, 'unknown', :source) as source
+                    :source as source
             ) as new_span
             LEFT JOIN (
                 SELECT
@@ -563,7 +563,7 @@ class SpanDAO {
                     <if(input)> :input_slim <else> '' <endif> as input_slim,
                     <if(output)> :output_slim <else> '' <endif> as output_slim,
                     <if(ttft)> :ttft <else> null <endif> as ttft,
-                    if(:source IS NULL, 'unknown', :source) as source
+                    :source as source
             ) as new_span
             LEFT JOIN (
                 SELECT

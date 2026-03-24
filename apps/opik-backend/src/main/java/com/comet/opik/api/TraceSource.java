@@ -25,6 +25,9 @@ public enum TraceSource {
     OPTIMIZATION("optimization"),
     ;
 
+    /** The ClickHouse storage value for rows that predate source tracking. Not an ingestion option. */
+    public static final String UNKNOWN_VALUE = "unknown";
+
     @JsonValue
     private final String value;
 
