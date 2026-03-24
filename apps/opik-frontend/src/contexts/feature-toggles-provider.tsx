@@ -50,7 +50,7 @@ const FeatureTogglesProviderContext =
 export function FeatureTogglesProvider({ children }: FeatureTogglesProps) {
   const workspaceName = useAppStore((state) => state.activeWorkspaceName);
   const [features, setFeatures] = useState<FeatureToggles>(DEFAULT_STATE);
-  const { data, isFetched } = useFeatureToggle({
+  const { data } = useFeatureToggle({
     workspaceName,
   });
 
@@ -70,10 +70,6 @@ export function FeatureTogglesProvider({ children }: FeatureTogglesProps) {
         currentFeatures[feature],
     };
   }, [currentFeatures]);
-
-  if (!isFetched) {
-    return null;
-  }
 
   return (
     <FeatureTogglesProviderContext.Provider value={value}>
