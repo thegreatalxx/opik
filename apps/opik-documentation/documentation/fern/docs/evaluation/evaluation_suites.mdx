@@ -1,0 +1,274 @@
+---
+headline: Evaluation Suites | Opik Documentation
+og:description: Create reusable test suites with natural-language assertions to evaluate
+  AI agents and LLM-powered applications across iterations.
+og:site_name: Opik Documentation
+og:title: Evaluation Suites - Reusable Test Suites for AI Agents
+subtitle: Build reusable test suites with assertions to systematically evaluate and
+  compare AI agent behavior across iterations
+title: Evaluation Suites
+---
+
+Evaluation Suites let you define a reusable set of test cases with natural-language assertions and run them against different versions of your AI agent or LLM-powered application. Instead of writing custom scoring metrics, you describe expected behaviors in natural language and an LLM judge checks each one automatically.
+
+This is useful when you want to:
+
+- **Validate agent behavior** end-to-end with natural-language assertions
+- **Iterate on prompts or agent logic** and prove that a new version is better
+- **Catch regressions** by re-running the same test cases after changes
+- **Set pass/fail thresholds** with execution policies (e.g., "run 3 times, pass if 2 out of 3 succeed")
+
+<Tip>
+  Evaluation Suites are designed for assertion-based testing of any AI agent or
+  LLM-powered application — from simple prompt chains to complex multi-step
+  agents.
+</Tip>
+
+## Key concepts
+
+An Evaluation Suite has three main components:
+
+1. **Test items**: Input data for your agent (e.g., questions with context, user scenarios)
+2. **Assertions**: Natural-language descriptions of expected behavior, checked by an LLM judge (e.g., "The response is concise")
+3. **Execution policy**: Controls how many times each item is run and how many runs must pass
+
+Assertions can be defined at two levels:
+- **Suite-level assertions** apply to every test item
+- **Item-level assertions** apply only to a specific test item (in addition to suite-level ones)
+
+## Walkthrough: iterating on a Q&A bot
+
+Let's walk through a realistic scenario. You're building a Q&A bot and want to prove that a stricter prompt (v2) performs better than your initial verbose prompt (v1).
+
+### Step 1 — Create a suite
+
+Define the quality bars you care about as suite-level assertions:
+
+```python
+import opik
+
+opik_client = opik.Opik()
+
+suite = opik_client.get_or_create_evaluation_suite(
+    name="acme-cloud-qa",
+    assertions=[
+        "The response is grounded in the provided documentation context",
+        "The response directly addresses the user's question",
+        "The response is concise (3 sentences or fewer)",
+    ],
+    execution_policy={"runs_per_item": 2, "pass_threshold": 2},
+)
+```
+
+### Step 2 — Add test cases
+
+```python
+suite.add_items([
+    {
+        "data": {
+            "question": "How do I create a new project?",
+            "context": "To create a new project, go to the Dashboard and click 'New Project'.",
+        },
+    },
+    {
+        "data": {
+            "question": "What are the pricing tiers?",
+            "context": "Free ($0/month, 1GB), Pro ($29/month, 100GB), Enterprise (custom).",
+        },
+    },
+    {
+        "data": {
+            "question": "Can I use this with Kubernetes?",
+            "context": "We support Docker containers and serverless functions.",
+        },
+        "assertions": [
+            "The response does NOT claim Kubernetes is supported",
+            "The response acknowledges that the information is not available",
+        ],
+        "execution_policy": {"runs_per_item": 3, "pass_threshold": 2},
+    },
+])
+```
+
+Item-level assertions are checked **in addition to** the suite-level assertions. You can also override the execution policy per item (see [Execution policies](#execution-policies)).
+
+### Step 3 — Define the task
+
+The task function receives each item's `data` dict and must return a dict with `input` and `output` keys:
+
+```python
+from openai import OpenAI
+from opik.integrations.openai import track_openai
+
+openai_client = track_openai(OpenAI())
+
+def make_task(system_prompt):
+    def task(item):
+        response = openai_client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": f"Question: {item['question']}\n\nContext:\n{item['context']}"},
+            ],
+        )
+        return {"input": item, "output": response.choices[0].message.content}
+    return task
+```
+
+<Note>
+  The `input` should contain only the data your agent actually received when
+  generating its response. The LLM judge uses `input` and `output` to evaluate
+  assertions — if you accidentally include fields like `expected_answer` in
+  `input`, the judge may use them to pass assertions that should fail.
+</Note>
+
+### Step 4 — Run v1, then v2
+
+```python
+PROMPT_V1 = "You are a helpful assistant. Be as detailed as possible."
+PROMPT_V2 = "You are a concise assistant. Answer based ONLY on the provided context."
+
+result_v1 = suite.run(task=make_task(PROMPT_V1))
+result_v2 = suite.run(task=make_task(PROMPT_V2))
+
+print(f"v1 pass rate: {result_v1.pass_rate:.0%}")
+print(f"v2 pass rate: {result_v2.pass_rate:.0%}")
+```
+
+Each run displays a summary in the console and saves a detailed JSON report file under `opik_evaluation_suite_reports/`. The report contains per-item and per-assertion results including failure reasons, making it a useful input for coding assistants that can read it to understand what went wrong and suggest fixes.
+
+<Frame caption="Terminal output after running the evaluation suite">
+  <img src="/img/evaluation/terminal_eval_output.png" />
+</Frame>
+
+Each run creates a separate experiment in Opik, making it easy to compare results in the dashboard:
+
+<Frame caption="Experiment items with pass/fail results per test case">
+  <img src="/img/evaluation/passed_eval_suite.png" />
+</Frame>
+
+Clicking into a failed item shows the assertion detail — which assertions passed, which failed, and why:
+
+<Frame caption="Assertion detail for a failed item showing pass/fail reasons from the LLM judge">
+  <img src="/img/evaluation/failed_eval_run.png" />
+</Frame>
+
+## Execution policies
+
+Execution policies control how many times each item is run and how many must pass.
+
+```python
+suite = opik_client.get_or_create_evaluation_suite(
+    name="flaky-output-tests",
+    assertions=["Response follows the expected format"],
+    execution_policy={"runs_per_item": 3, "pass_threshold": 2},
+)
+```
+
+**Pass/fail logic:**
+- A **run** passes if all its assertions pass
+- An **item** passes if `runs_passed >= pass_threshold`
+- The **pass rate** is the ratio of passed items to total items (`items_passed / items_total`). A pass rate of `1.0` means every item passed; `0.0` means none did
+
+You can also override the policy for individual items:
+
+```python
+suite.add_item(
+    data={"question": "Is my account compromised?", "context": "..."},
+    assertions=["Response treats the concern with urgency"],
+    execution_policy={"runs_per_item": 5, "pass_threshold": 4},
+)
+```
+
+## Managing suites
+
+```python
+# Update assertions or policy
+suite.update(
+    assertions=["Updated assertion 1", "Updated assertion 2"],
+    execution_policy={"runs_per_item": 5, "pass_threshold": 3},
+)
+
+# Inspect
+items = suite.get_items()
+assertions = suite.get_assertions()
+policy = suite.get_execution_policy()
+
+# Delete items
+suite.delete_items([items[0]["id"]])
+```
+
+## Full example
+
+The complete walkthrough as a runnable script:
+
+```python
+import opik
+from openai import OpenAI
+from opik.integrations.openai import track_openai
+
+openai_client = track_openai(OpenAI())
+
+# Step 1 — Create a suite
+opik_client = opik.Opik()
+
+suite = opik_client.get_or_create_evaluation_suite(
+    name="acme-cloud-qa",
+    assertions=[
+        "The response is grounded in the provided documentation context",
+        "The response directly addresses the user's question",
+        "The response is concise (3 sentences or fewer)",
+    ],
+    execution_policy={"runs_per_item": 2, "pass_threshold": 2},
+)
+
+# Step 2 — Add test cases
+suite.add_items([
+    {
+        "data": {
+            "question": "How do I create a new project?",
+            "context": "To create a new project, go to the Dashboard and click 'New Project'.",
+        },
+    },
+    {
+        "data": {
+            "question": "What are the pricing tiers?",
+            "context": "Free ($0/month, 1GB), Pro ($29/month, 100GB), Enterprise (custom).",
+        },
+    },
+    {
+        "data": {
+            "question": "Can I use this with Kubernetes?",
+            "context": "We support Docker containers and serverless functions.",
+        },
+        "assertions": [
+            "The response does NOT claim Kubernetes is supported",
+            "The response acknowledges that the information is not available",
+        ],
+        "execution_policy": {"runs_per_item": 3, "pass_threshold": 2},
+    },
+])
+
+# Step 3 — Define the task
+def make_task(system_prompt):
+    def task(item):
+        response = openai_client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": f"Question: {item['question']}\n\nContext:\n{item['context']}"},
+            ],
+        )
+        return {"input": item, "output": response.choices[0].message.content}
+    return task
+
+# Step 4 — Run v1, then v2
+PROMPT_V1 = "You are a helpful assistant. Be as detailed as possible."
+PROMPT_V2 = "You are a concise assistant. Answer based ONLY on the provided context."
+
+result_v1 = suite.run(task=make_task(PROMPT_V1))
+result_v2 = suite.run(task=make_task(PROMPT_V2))
+
+print(f"\nv1 pass rate: {result_v1.pass_rate:.0%}")
+print(f"v2 pass rate: {result_v2.pass_rate:.0%}")
+```

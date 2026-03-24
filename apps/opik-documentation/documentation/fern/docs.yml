@@ -191,6 +191,9 @@ navigation:
           - page: Evaluate multi-turn agents
             path: docs/evaluation/evaluate_multi_turn_agents.mdx
             slug: evaluate_multi_turn_agents
+          - page: Evaluation Suites
+            path: docs/evaluation/evaluation_suites.mdx
+            slug: evaluation_suites
           - page: Manually logging experiments
             path: docs/evaluation/log_experiments_with_rest_api.mdx
             slug: log_experiments_with_rest_api
