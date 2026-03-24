@@ -24,7 +24,7 @@ import { Separator } from "@/ui/separator";
 import useDatasetById from "@/api/datasets/useDatasetById";
 import useDatasetUpdateMutation from "@/api/datasets/useDatasetUpdateMutation";
 import useDatasetVersionsList from "@/api/datasets/useDatasetVersionsList";
-import { useSuiteIdFromURL } from "@/hooks/useSuiteIdFromURL";
+import { useSuiteIdFromURL } from "@/v2/pages-shared/evaluation-suites/useSuiteIdFromURL";
 import { useClampedIntegerInput } from "@/hooks/useClampedIntegerInput";
 import {
   useSuiteAssertions,
@@ -128,7 +128,7 @@ const SettingsForm: React.FC<SettingsFormProps> = ({
                   <Label>Description</Label>
                   <FormControl>
                     <TextareaAutosize
-                      placeholder="Dataset description"
+                      placeholder="Evaluation suite description"
                       className={cn(TEXT_AREA_CLASSES, "min-h-0 resize-none")}
                       minRows={2}
                       maxRows={6}
