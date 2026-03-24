@@ -203,7 +203,9 @@ class ExperimentItemBulkIngestionServiceImpl implements ExperimentItemBulkIngest
                         .source(TraceSource.EXPERIMENT)
                         .build();
             } else {
-                trace = item.trace();
+                trace = item.trace().toBuilder()
+                        .source(TraceSource.EXPERIMENT)
+                        .build();
             }
 
             traces.add(trace);
@@ -222,7 +224,11 @@ class ExperimentItemBulkIngestionServiceImpl implements ExperimentItemBulkIngest
             experimentItems.add(build);
 
             if (CollectionUtils.isNotEmpty(item.spans())) {
-                spans.addAll(item.spans());
+                List<Span> experimentSpans = item.spans().stream()
+                        .map(span -> span.toBuilder().source(TraceSource.EXPERIMENT).build())
+                        .toList();
+
+                spans.addAll(experimentSpans);
             }
 
             if (CollectionUtils.isNotEmpty(item.feedbackScores())) {
