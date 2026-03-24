@@ -52,17 +52,14 @@ import {
   TracesAnnotationQueue,
   ThreadsAnnotationQueue,
 } from "@/annotation-queue";
-import { AgentConfig } from "@/agent-config";
+import { AgentConfigManager } from "@/agent-config";
 import {
   getSchemaPrefix,
   serializeFields,
   deserializeToShape,
   matchesBlueprint,
 } from "@/agent-config/typeHelpers";
-import {
-  createTypedAgentConfig,
-  type TypedAgentConfig,
-} from "@/agent-config/TypedAgentConfig";
+import { createTypedAgentConfig, type AgentConfig } from "@/agent-config/AgentConfig";
 import { getActiveConfigMask } from "@/agent-config/configContext";
 import {
   getCachedBlueprint,
@@ -1627,58 +1624,24 @@ export class OpikClient {
   };
 
   /**
-   * Updates tags for one or more prompt versions in a single batch operation.
+   * Publishes a typed agent config version to Opik. If an identical version already exists
+   * it is reused; otherwise a new version is created (or the existing config is updated).
    *
-   * @param versionIds - Array of prompt version IDs to update
-   * @param options - Update options
-   * @param options.tags - Tags to set or merge:
-   *   - `[]`: Clear all tags (when mergeTags is false or unspecified)
-   *   - `['tag1', 'tag2']`: Set or merge tags (based on mergeTags)
-   * @param options.mergeTags - If true, adds new tags to existing tags (union). If false, replaces all existing tags (default: false)
-   * @returns Promise that resolves when update is complete
-   * @throws OpikApiError if update fails
+   * Call this once at agent startup — before running inferences — to ensure the config
+   * is registered and can be retrieved by `getAgentConfigVersion()`.
    *
-   * @example
-   * ```typescript
-   * // Replace tags on multiple versions (default behavior)
-   * await client.updatePromptVersionTags(["version-id-1", "version-id-2"], {
-   *   tags: ["production", "v2"]
-   * });
-   *
-   * // Merge new tags with existing tags
-   * await client.updatePromptVersionTags(["version-id-1"], {
-   *   tags: ["hotfix"],
-   *   mergeTags: true
-   * });
-   *
-   * // Clear all tags
-   * await client.updatePromptVersionTags(["version-id-1"], {
-   *   tags: []
-   * });
-   * ```
-   */
-  /**
-   * Returns an AgentConfig instance scoped to the given project.
-   * Use it to create blueprints, masks, and manage environment labels.
-   *
-   * @param options.projectName - Project name (defaults to client's configured project)
-   * @returns AgentConfig domain object
+   * @param schema - Zod object schema that describes the config shape
+   * @param values - Typed config values that conform to the schema
+   * @param options.projectName - Project to publish under (defaults to client's configured project)
+   * @param options.description - Optional human-readable description for this version
+   * @returns The version name (or ID) of the published config
    *
    * @example
    * ```typescript
-   * const agentConfig = client.getAgentConfig();
-   * const blueprint = await agentConfig.createBlueprint({
-   *   values: { temperature: "0.8", model: "gpt-4" },
-   *   description: "Initial config",
-   * });
-   * console.log(blueprint.values); // { temperature: "0.8", model: "gpt-4" }
+   * const MyConfig = z.object({ model: z.string(), temperature: z.number() }).describe("MyConfig");
+   * await client.createAgentConfig(MyConfig, { model: "gpt-4o", temperature: 0.7 });
    * ```
    */
-  public getAgentConfig = (options?: { projectName?: string }): AgentConfig => {
-    const projectName = options?.projectName ?? this.config.projectName;
-    return new AgentConfig(projectName, this);
-  };
-
   public createAgentConfig = async <
     S extends z.ZodObject<z.ZodRawShape>,
   >(
@@ -1688,7 +1651,7 @@ export class OpikClient {
   ): Promise<string> => {
     const prefix = getSchemaPrefix(schema);
     const projectName = options?.projectName ?? this.config.projectName;
-    const agentConfig = new AgentConfig(projectName, this);
+    const agentConfig = new AgentConfigManager(projectName, this);
 
     const serialized = serializeFields(schema, values as Record<string, unknown>, prefix);
 
@@ -1732,6 +1695,39 @@ export class OpikClient {
     return blueprint.name ?? blueprint.id;
   };
 
+  /**
+   * Retrieves a typed agent config version and returns it as an `AgentConfig<T>` object.
+   * Must be called inside a `track()` function — it automatically attaches the resolved
+   * config metadata to the active trace.
+   *
+   * Resolution order (first match wins):
+   * - `options.version` — fetches the named version exactly
+   * - `options.latest` — fetches the most recently published version
+   * - `options.env` — fetches the version pinned to that environment label (default: `"prod"`)
+   *
+   * If the remote config cannot be fetched, `options.fallback` is returned as an
+   * `AgentConfig<T>` with `isFallback: true`.
+   *
+   * @param schema - Zod object schema that describes the config shape (must have a `.describe()` name)
+   * @param options.fallback - Values to use when no remote config is available
+   * @param options.projectName - Project to fetch from (defaults to client's configured project)
+   * @param options.env - Environment label to resolve (default: `"prod"`)
+   * @param options.latest - If true, fetch the most recently published version regardless of env
+   * @param options.version - Fetch a specific named version
+   * @returns Typed `AgentConfig<T>` with the resolved values and blueprint metadata
+   *
+   * @example
+   * ```typescript
+   * const MyConfig = z.object({ model: z.string(), temperature: z.number() }).describe("MyConfig");
+   *
+   * const result = await track({ name: "my-agent" }, async () => {
+   *   const config = await client.getAgentConfigVersion(MyConfig, {
+   *     fallback: { model: "gpt-4o-mini", temperature: 0.5 },
+   *   });
+   *   return callLLM(config.model, config.temperature);
+   * });
+   * ```
+   */
   public getAgentConfigVersion = async <
     S extends z.ZodObject<z.ZodRawShape>,
   >(
@@ -1743,7 +1739,7 @@ export class OpikClient {
       latest?: boolean;
       version?: string;
     }
-  ): Promise<TypedAgentConfig<z.infer<S>>> => {
+  ): Promise<AgentConfig<z.infer<S>>> => {
     const prefix = getSchemaPrefix(schema);
     const projectName = options.projectName ?? this.config.projectName;
 
@@ -1754,7 +1750,7 @@ export class OpikClient {
     }
 
     const maskId = getActiveConfigMask() ?? undefined;
-    const agentConfig = new AgentConfig(projectName, this);
+    const agentConfig = new AgentConfigManager(projectName, this);
 
     const { extractFieldMetadata } = await import("@/agent-config/typeHelpers");
     const fieldMeta = extractFieldMetadata(schema, prefix);
@@ -1842,6 +1838,37 @@ export class OpikClient {
     });
   };
 
+  /**
+   * Updates tags for one or more prompt versions in a single batch operation.
+   *
+   * @param versionIds - Array of prompt version IDs to update
+   * @param options - Update options
+   * @param options.tags - Tags to set or merge:
+   *   - `[]`: Clear all tags (when mergeTags is false or unspecified)
+   *   - `['tag1', 'tag2']`: Set or merge tags (based on mergeTags)
+   * @param options.mergeTags - If true, adds new tags to existing tags (union). If false, replaces all existing tags (default: false)
+   * @returns Promise that resolves when update is complete
+   * @throws OpikApiError if update fails
+   *
+   * @example
+   * ```typescript
+   * // Replace tags on multiple versions (default behavior)
+   * await client.updatePromptVersionTags(["version-id-1", "version-id-2"], {
+   *   tags: ["production", "v2"]
+   * });
+   *
+   * // Merge new tags with existing tags
+   * await client.updatePromptVersionTags(["version-id-1"], {
+   *   tags: ["hotfix"],
+   *   mergeTags: true
+   * });
+   *
+   * // Clear all tags
+   * await client.updatePromptVersionTags(["version-id-1"], {
+   *   tags: []
+   * });
+   * ```
+   */
   public updatePromptVersionTags = async (
     versionIds: string[],
     options?: {

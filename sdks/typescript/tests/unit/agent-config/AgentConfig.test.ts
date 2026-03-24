@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { trackStorage } from "@/decorators/track";
-import { createTypedAgentConfig } from "@/agent-config/TypedAgentConfig";
+import { createTypedAgentConfig } from "@/agent-config/AgentConfig";
 import { extractFieldMetadata } from "@/agent-config/typeHelpers";
 
 const schema = z
@@ -26,7 +26,7 @@ function makeConfig(overrides?: Partial<Parameters<typeof createTypedAgentConfig
   });
 }
 
-describe("TypedAgentConfig", () => {
+describe("AgentConfig", () => {
   it("exposes typed values", () => {
     const cfg = makeConfig();
     expect(cfg.temperature).toBe(0.5);

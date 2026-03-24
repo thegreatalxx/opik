@@ -1,6 +1,6 @@
 import { Opik } from "opik";
 import { MockInstance } from "vitest";
-import { AgentConfig, Blueprint } from "@/agent-config";
+import { AgentConfigManager, Blueprint } from "@/agent-config";
 import { OpikApiError } from "@/rest_api";
 import * as OpikApi from "@/rest_api/api";
 import {
@@ -23,27 +23,8 @@ const mockBlueprintResponse: OpikApi.AgentBlueprintPublic = {
   ],
 };
 
-describe("OpikClient agent config operations", () => {
-  let client: Opik;
 
-  beforeEach(() => {
-    client = new Opik({ projectName: "test-project" });
-  });
-
-  describe("getAgentConfig", () => {
-    it("should return an AgentConfig instance for the default project", () => {
-      const agentConfig = client.getAgentConfig();
-      expect(agentConfig).toBeInstanceOf(AgentConfig);
-    });
-
-    it("should return an AgentConfig instance for the specified project", () => {
-      const agentConfig = client.getAgentConfig({ projectName: "my-project" });
-      expect(agentConfig).toBeInstanceOf(AgentConfig);
-    });
-  });
-});
-
-describe("AgentConfig domain object", () => {
+describe("AgentConfigManager", () => {
   let client: Opik;
   let createAgentConfigSpy: MockInstance<
     typeof client.api.agentConfigs.createAgentConfig
@@ -119,9 +100,9 @@ describe("AgentConfig domain object", () => {
 
   describe("createBlueprint", () => {
     it("should call createAgentConfig (POST) then getBlueprintById and return a Blueprint", async () => {
-      const agentConfig = client.getAgentConfig();
+      const manager = new AgentConfigManager("test-project", client);
 
-      const blueprint = await agentConfig.createBlueprint({
+      const blueprint = await manager.createBlueprint({
         values: { temperature: "0.8", model: "gpt-4" },
         description: "Test blueprint",
       });
@@ -144,8 +125,8 @@ describe("AgentConfig domain object", () => {
     });
 
     it("should infer types when creating blueprint with native values", async () => {
-      const agentConfig = client.getAgentConfig();
-      await agentConfig.createBlueprint({
+      const manager = new AgentConfigManager("test-project", client);
+      await manager.createBlueprint({
         values: { temperature: 0.8, maxTokens: 100, stream: true, model: "gpt-4" },
       });
 
@@ -161,8 +142,8 @@ describe("AgentConfig domain object", () => {
     });
 
     it("should use a client-side generated UUID in the POST body", async () => {
-      const agentConfig = client.getAgentConfig();
-      await agentConfig.createBlueprint({ values: { key: "val" } });
+      const manager = new AgentConfigManager("test-project", client);
+      await manager.createBlueprint({ values: { key: "val" } });
 
       const createCall = createAgentConfigSpy.mock.calls[0][0];
       expect(createCall.id).toBeDefined();
@@ -176,9 +157,9 @@ describe("AgentConfig domain object", () => {
 
   describe("updateBlueprint", () => {
     it("should call updateAgentConfig (PATCH) then getBlueprintById and return a Blueprint", async () => {
-      const agentConfig = client.getAgentConfig();
+      const manager = new AgentConfigManager("test-project", client);
 
-      const blueprint = await agentConfig.updateBlueprint({
+      const blueprint = await manager.updateBlueprint({
         values: { temperature: 0.9, model: "gpt-4o" },
         description: "Updated blueprint",
       });
@@ -200,8 +181,8 @@ describe("AgentConfig domain object", () => {
     });
 
     it("should use a client-side generated UUID in the PATCH body", async () => {
-      const agentConfig = client.getAgentConfig();
-      await agentConfig.updateBlueprint({ values: { key: "val" } });
+      const manager = new AgentConfigManager("test-project", client);
+      await manager.updateBlueprint({ values: { key: "val" } });
 
       const updateCall = updateAgentConfigSpy.mock.calls[0][0];
       expect(updateCall.blueprint.id).toBeDefined();
@@ -214,8 +195,8 @@ describe("AgentConfig domain object", () => {
 
   describe("createMask", () => {
     it("should call updateAgentConfig (PATCH) with type=mask and return the mask ID", async () => {
-      const agentConfig = client.getAgentConfig();
-      const maskId = await agentConfig.createMask({
+      const manager = new AgentConfigManager("test-project", client);
+      const maskId = await manager.createMask({
         values: { temperature: "0.5" },
         description: "A/B variant",
       });
@@ -231,8 +212,8 @@ describe("AgentConfig domain object", () => {
     });
 
     it("should infer types for mask values", async () => {
-      const agentConfig = client.getAgentConfig();
-      await agentConfig.createMask({
+      const manager = new AgentConfigManager("test-project", client);
+      await manager.createMask({
         values: { temperature: 0.5 },
       });
 
@@ -247,8 +228,8 @@ describe("AgentConfig domain object", () => {
 
   describe("getBlueprint", () => {
     it("should call getLatestBlueprint when no options provided", async () => {
-      const agentConfig = client.getAgentConfig();
-      const blueprint = await agentConfig.getBlueprint();
+      const manager = new AgentConfigManager("test-project", client);
+      const blueprint = await manager.getBlueprint();
 
       expect(retrieveProjectSpy).toHaveBeenCalledOnce();
       expect(getLatestBlueprintSpy).toHaveBeenCalledWith(
@@ -259,8 +240,8 @@ describe("AgentConfig domain object", () => {
     });
 
     it("should call getBlueprintById when id is provided", async () => {
-      const agentConfig = client.getAgentConfig();
-      const blueprint = await agentConfig.getBlueprint({ id: "blueprint-id-1" });
+      const manager = new AgentConfigManager("test-project", client);
+      const blueprint = await manager.getBlueprint({ id: "blueprint-id-1" });
 
       expect(retrieveProjectSpy).not.toHaveBeenCalled();
       expect(getBlueprintByIdSpy).toHaveBeenCalledWith(
@@ -272,8 +253,8 @@ describe("AgentConfig domain object", () => {
     });
 
     it("should call getBlueprintByEnv when env is provided", async () => {
-      const agentConfig = client.getAgentConfig();
-      const blueprint = await agentConfig.getBlueprint({ env: "production" });
+      const manager = new AgentConfigManager("test-project", client);
+      const blueprint = await manager.getBlueprint({ env: "production" });
 
       expect(retrieveProjectSpy).toHaveBeenCalledOnce();
       expect(getBlueprintByEnvSpy).toHaveBeenCalledWith(
@@ -285,8 +266,8 @@ describe("AgentConfig domain object", () => {
     });
 
     it("should pass maskId to the underlying API call", async () => {
-      const agentConfig = client.getAgentConfig();
-      await agentConfig.getBlueprint({ id: "bp-1", maskId: "mask-xyz" });
+      const manager = new AgentConfigManager("test-project", client);
+      await manager.getBlueprint({ id: "bp-1", maskId: "mask-xyz" });
 
       expect(getBlueprintByIdSpy).toHaveBeenCalledWith(
         "bp-1",
@@ -299,8 +280,8 @@ describe("AgentConfig domain object", () => {
         throw new OpikApiError({ message: "Not found", statusCode: 404 });
       });
 
-      const agentConfig = client.getAgentConfig();
-      const result = await agentConfig.getBlueprint({ id: "nonexistent" });
+      const manager = new AgentConfigManager("test-project", client);
+      const result = await manager.getBlueprint({ id: "nonexistent" });
       expect(result).toBeNull();
     });
 
@@ -309,16 +290,16 @@ describe("AgentConfig domain object", () => {
         throw new OpikApiError({ message: "Not found", statusCode: 404 });
       });
 
-      const agentConfig = client.getAgentConfig();
-      const result = await agentConfig.getBlueprint();
+      const manager = new AgentConfigManager("test-project", client);
+      const result = await manager.getBlueprint();
       expect(result).toBeNull();
     });
   });
 
   describe("tagBlueprintWithEnv", () => {
     it("should call createOrUpdateEnvs with correct payload", async () => {
-      const agentConfig = client.getAgentConfig();
-      await agentConfig.tagBlueprintWithEnv("blueprint-id-1", "production");
+      const manager = new AgentConfigManager("test-project", client);
+      await manager.tagBlueprintWithEnv("blueprint-id-1", "production");
 
       expect(retrieveProjectSpy).toHaveBeenCalledOnce();
       expect(createOrUpdateEnvsSpy).toHaveBeenCalledWith({

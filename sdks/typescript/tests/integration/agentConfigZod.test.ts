@@ -6,6 +6,7 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { z } from "zod";
 import { Opik, track, agentConfigContext, Prompt } from "@/index";
+import { AgentConfigManager } from "@/agent-config";
 import { getTrackContext } from "@/decorators/track";
 import {
   shouldRunIntegrationTests,
@@ -281,8 +282,8 @@ describe.skipIf(!shouldRunApiTests)(
           { projectName }
         );
 
-        // Create mask via low-level AgentConfig API
-        const agentConfigLow = client.getAgentConfig({ projectName });
+        // Create mask via AgentConfigManager low-level API
+        const agentConfigLow = new AgentConfigManager(projectName, client);
         const maskId = await agentConfigLow.createMask({
           values: { "MyConfig.temperature": 0.9 },
         });
