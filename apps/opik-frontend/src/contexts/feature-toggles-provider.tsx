@@ -60,16 +60,13 @@ export function FeatureTogglesProvider({ children }: FeatureTogglesProps) {
     }
   }, [data]);
 
-  const currentFeatures = data ?? features;
-
   const value = useMemo(() => {
     return {
-      features: currentFeatures,
+      features,
       setFeatures,
-      isFeatureEnabled: (feature: FeatureToggleKeys) =>
-        currentFeatures[feature],
+      isFeatureEnabled: (feature: FeatureToggleKeys) => features[feature],
     };
-  }, [currentFeatures]);
+  }, [features]);
 
   return (
     <FeatureTogglesProviderContext.Provider value={value}>
