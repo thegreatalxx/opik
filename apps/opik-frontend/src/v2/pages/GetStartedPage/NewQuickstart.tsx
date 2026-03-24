@@ -1,11 +1,20 @@
 import React, { useEffect } from "react";
+import { Navigate } from "@tanstack/react-router";
 import { IntegrationExplorer } from "@/v2/pages-shared/onboarding/IntegrationExplorer";
 import OnboardingOverlay from "@/v2/pages-shared/OnboardingOverlay/OnboardingOverlay";
+import AgentOnboardingOverlay from "@/v2/pages-shared/AgentOnboarding/AgentOnboardingOverlay";
 import {
   ONBOARDING_STEP_FINISHED,
   ONBOARDING_STEP_KEY,
 } from "@/v2/pages-shared/OnboardingOverlay/OnboardingOverlayContext";
+import {
+  AGENT_ONBOARDING_KEY,
+  AGENT_ONBOARDING_STEPS,
+} from "@/v2/pages-shared/AgentOnboarding/AgentOnboardingContext";
+import { useIsFeatureEnabled } from "@/contexts/feature-toggles-provider";
+import { FeatureToggleKeys } from "@/types/feature-toggles";
 import useLocalStorageState from "use-local-storage-state";
+import useAppStore from "@/store/AppStore";
 import posthog from "posthog-js";
 
 export interface NewQuickstartProps {
@@ -16,9 +25,21 @@ const NewQuickstart: React.FunctionComponent<NewQuickstartProps> = ({
   shouldSkipQuestions = false,
 }) => {
   const [currentOnboardingStep] = useLocalStorageState(ONBOARDING_STEP_KEY);
+  const [agentOnboardingState] = useLocalStorageState<{
+    step: unknown;
+  }>(AGENT_ONBOARDING_KEY);
 
-  const showIntegrationList =
-    currentOnboardingStep === ONBOARDING_STEP_FINISHED || shouldSkipQuestions;
+  const isAgentConfigEnabled = useIsFeatureEnabled(
+    FeatureToggleKeys.AGENT_CONFIGURATION_ENABLED,
+  );
+
+  console.log("[NewQuickstart] isAgentConfigEnabled:", isAgentConfigEnabled);
+
+  const isOnboardingDone = isAgentConfigEnabled
+    ? agentOnboardingState?.step === AGENT_ONBOARDING_STEPS.DONE
+    : currentOnboardingStep === ONBOARDING_STEP_FINISHED;
+
+  const showIntegrationList = isOnboardingDone || shouldSkipQuestions;
 
   // Update URL hash when showing integration list
   // This allows FullStory and PostHog to distinguish this step by URL
@@ -42,7 +63,19 @@ const NewQuickstart: React.FunctionComponent<NewQuickstartProps> = ({
   }, [showIntegrationList]);
 
   if (!showIntegrationList) {
+    if (isAgentConfigEnabled) {
+      return <AgentOnboardingOverlay />;
+    }
     return <OnboardingOverlay />;
+  }
+
+  if (isAgentConfigEnabled) {
+    return (
+      <Navigate
+        to="/$workspaceName/home"
+        params={{ workspaceName: useAppStore.getState().activeWorkspaceName }}
+      />
+    );
   }
 
   return (
