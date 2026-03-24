@@ -4179,7 +4179,7 @@ class SpansResourceTest {
             try (var response = client.target("%s/v1/private/spans".formatted(baseURI))
                     .request()
                     .accept(MediaType.APPLICATION_JSON_TYPE)
-                    .header(jakarta.ws.rs.core.HttpHeaders.AUTHORIZATION, API_KEY)
+                    .header(HttpHeaders.AUTHORIZATION, API_KEY)
                     .header(WORKSPACE_HEADER, TEST_WORKSPACE)
                     .post(Entity.json(body))) {
 
