@@ -23,12 +23,6 @@ const NewQuickstart: React.FunctionComponent = () => {
     !isAgentConfigEnabled ||
     agentOnboardingState?.step === AGENT_ONBOARDING_STEPS.DONE;
 
-  console.log(
-    "Agent Onboarding State:",
-    isAgentConfigEnabled,
-    agentOnboardingState,
-  );
-
   if (!isOnboardingDone) {
     return <AgentOnboardingOverlay />;
   }
