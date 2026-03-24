@@ -12,6 +12,7 @@ export const AGENT_ONBOARDING_KEY = "agent-onboarding";
 
 export const AGENT_ONBOARDING_STEPS = {
   AGENT_NAME: "agent-name",
+  CONNECT_AGENT: "connect-agent",
   DONE: "done",
 } as const;
 
