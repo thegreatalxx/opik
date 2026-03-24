@@ -20,7 +20,7 @@ import com.comet.opik.api.Visibility;
 import com.comet.opik.api.attachment.AttachmentInfo;
 import com.comet.opik.api.attachment.EntityType;
 import com.comet.opik.api.error.ErrorMessage;
-import com.comet.opik.api.TraceSource;
+import com.comet.opik.api.Source;
 import com.comet.opik.api.filter.Operator;
 import com.comet.opik.api.filter.SpanField;
 import com.comet.opik.api.filter.SpanFilter;
@@ -4117,9 +4117,9 @@ class SpansResourceTest {
     class CreateSpanWithSource {
 
         @ParameterizedTest
-        @EnumSource(TraceSource.class)
+        @EnumSource(Source.class)
         @DisplayName("Create span with each valid source and verify it is stored")
-        void createSpanWithSource(TraceSource source) {
+        void createSpanWithSource(Source source) {
             var trace = podamFactory.manufacturePojo(Trace.class).toBuilder()
                     .projectName(DEFAULT_PROJECT)
                     .build();
@@ -4193,9 +4193,9 @@ class SpansResourceTest {
     class FilterSpansBySource {
 
         @ParameterizedTest
-        @EnumSource(TraceSource.class)
+        @EnumSource(Source.class)
         @DisplayName("Filter spans by source EQUAL returns only matching spans")
-        void filterSpansBySourceEqual(TraceSource source) {
+        void filterSpansBySourceEqual(Source source) {
             var projectName = "span-source-filter-test-" + UUID.randomUUID();
             var trace = podamFactory.manufacturePojo(Trace.class).toBuilder()
                     .projectName(projectName)
@@ -4210,7 +4210,7 @@ class SpansResourceTest {
                     .feedbackScores(null)
                     .build();
 
-            var otherSource = source == TraceSource.SDK ? TraceSource.EXPERIMENT : TraceSource.SDK;
+            var otherSource = source == Source.SDK ? Source.EXPERIMENT : Source.SDK;
             var nonMatchingSpan = podamFactory.manufacturePojo(Span.class).toBuilder()
                     .projectName(projectName)
                     .traceId(traceId)
@@ -4246,7 +4246,7 @@ class SpansResourceTest {
             var sdkSpan = podamFactory.manufacturePojo(Span.class).toBuilder()
                     .projectName(projectName)
                     .traceId(traceId)
-                    .source(TraceSource.SDK)
+                    .source(Source.SDK)
                     .usage(null)
                     .feedbackScores(null)
                     .build();
@@ -4262,7 +4262,7 @@ class SpansResourceTest {
             var experimentSpan = podamFactory.manufacturePojo(Span.class).toBuilder()
                     .projectName(projectName)
                     .traceId(traceId)
-                    .source(TraceSource.EXPERIMENT)
+                    .source(Source.EXPERIMENT)
                     .usage(null)
                     .feedbackScores(null)
                     .build();
@@ -4274,7 +4274,7 @@ class SpansResourceTest {
             var filters = List.of(SpanFilter.builder()
                     .field(SpanField.SOURCE)
                     .operator(Operator.EQUAL)
-                    .value(TraceSource.SDK.getValue())
+                    .value(Source.SDK.getValue())
                     .build());
 
             var page = spanResourceClient.findSpans(TEST_WORKSPACE, API_KEY, projectName, null, 1, 10,

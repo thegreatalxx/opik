@@ -5,7 +5,7 @@ import com.comet.opik.api.ProjectStats;
 import com.comet.opik.api.Span;
 import com.comet.opik.api.SpanUpdate;
 import com.comet.opik.api.SpansCountResponse;
-import com.comet.opik.api.TraceSource;
+import com.comet.opik.api.Source;
 import com.comet.opik.api.sorting.SortableFields;
 import com.comet.opik.api.sorting.SortingField;
 import com.comet.opik.api.sorting.SpanSortingFactory;
@@ -2177,7 +2177,7 @@ class SpanDAO {
                 .ttft(getValue(exclude, SpanField.TTFT, row, "ttft", Double.class))
                 .source(Optional.ofNullable(
                         getValue(exclude, SpanField.SOURCE, row, "source", String.class))
-                        .flatMap(TraceSource::fromString)
+                        .flatMap(Source::fromString)
                         .orElse(null))
                 .build();
     }

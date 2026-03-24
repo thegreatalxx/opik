@@ -19,7 +19,7 @@ import com.comet.opik.api.filter.SpanField;
 import com.comet.opik.api.filter.TraceField;
 import com.comet.opik.api.filter.TraceThreadField;
 import com.comet.opik.api.sorting.SortingField;
-import com.comet.opik.api.TraceSource;
+import com.comet.opik.api.Source;
 import com.google.common.collect.ImmutableMap;
 import io.r2dbc.spi.Statement;
 import lombok.NonNull;
@@ -928,8 +928,8 @@ public class FilterQueryBuilder {
         // When filtering source = 'sdk', include them since SDK was the predominant ingestion path.
         if ((filter.field() == TraceField.SOURCE || filter.field() == SpanField.SOURCE)
                 && filter.operator() == Operator.EQUAL
-                && TraceSource.SDK.getValue().equals(filter.value())) {
-            return "(%s = :filter%d OR %s = '%s')".formatted(dbField, i, dbField, TraceSource.UNKNOWN_VALUE);
+                && Source.SDK.getValue().equals(filter.value())) {
+            return "(%s = :filter%d OR %s = '%s')".formatted(dbField, i, dbField, Source.UNKNOWN_VALUE);
         }
 
         return "(%s)".formatted(formattedTemplate);

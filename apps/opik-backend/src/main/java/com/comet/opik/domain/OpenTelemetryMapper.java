@@ -1,7 +1,7 @@
 package com.comet.opik.domain;
 
 import com.comet.opik.api.Span.SpanBuilder;
-import com.comet.opik.api.TraceSource;
+import com.comet.opik.api.Source;
 import com.comet.opik.domain.mapping.OpenTelemetryMappingRuleFactory;
 import com.comet.opik.utils.JsonUtils;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -66,7 +66,7 @@ public class OpenTelemetryMapper {
                 .parentSpanId(opikParentSpanId)
                 .name(otelSpan.getName())
                 .type(SpanType.general)
-                .source(TraceSource.SDK)
+                .source(Source.SDK)
                 .startTime(Instant.ofEpochMilli(startTimeMs))
                 .endTime(Instant.ofEpochMilli(endTimeMs));
 

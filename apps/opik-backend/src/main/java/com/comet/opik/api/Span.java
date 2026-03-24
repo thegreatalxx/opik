@@ -83,7 +83,7 @@ public record Span(
         @JsonView({Span.View.Public.class, Span.View.Write.class,
                 ExperimentItemBulkUpload.View.ExperimentItemBulkWriteView.class}) @Schema(description = "Time to first token in milliseconds") @PositiveOrZero Double ttft,
         @JsonView({Span.View.Public.class, Span.View.Write.class,
-                ExperimentItemBulkUpload.View.ExperimentItemBulkWriteView.class}) TraceSource source){
+                ExperimentItemBulkUpload.View.ExperimentItemBulkWriteView.class}) Source source){
 
     @Builder(toBuilder = true)
     public record SpanPage(

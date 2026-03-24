@@ -8,7 +8,7 @@ import com.comet.opik.api.GuardrailsValidation;
 import com.comet.opik.api.ProjectStats;
 import com.comet.opik.api.Trace;
 import com.comet.opik.api.TraceDetails;
-import com.comet.opik.api.TraceSource;
+import com.comet.opik.api.Source;
 import com.comet.opik.api.TraceThread;
 import com.comet.opik.api.TraceThreadStatus;
 import com.comet.opik.api.TraceUpdate;
@@ -2968,7 +2968,7 @@ class TraceDAOImpl implements TraceDAO {
                         .orElse(null))
                 .source(Optional.ofNullable(
                         getValue(exclude, Trace.TraceField.SOURCE, row, "source", String.class))
-                        .flatMap(TraceSource::fromString)
+                        .flatMap(Source::fromString)
                         .orElse(null))
                 .experiment(mapExperiment(exclude, row))
                 .build();

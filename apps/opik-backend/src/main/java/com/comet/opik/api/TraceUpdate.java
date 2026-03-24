@@ -37,5 +37,5 @@ public record TraceUpdate(
         ErrorInfo errorInfo,
         String threadId,
         @PositiveOrZero Double ttft,
-        TraceSource source) implements TagUpdatable {
+        Source source) implements TagUpdatable {
 }

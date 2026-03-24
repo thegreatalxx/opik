@@ -9,7 +9,7 @@ import java.util.Arrays;
 import java.util.Optional;
 
 /**
- * The origin of a trace, set at creation time.
+ * The origin of a trace or span, set at creation time.
  * <p>
  * The {@code unknown} value (Enum8 = 0) is the ClickHouse DEFAULT for rows that predate this field.
  * It is intentionally absent from this enum so it cannot be explicitly ingested via the API.
@@ -17,7 +17,7 @@ import java.util.Optional;
  **/
 @Getter
 @RequiredArgsConstructor
-public enum TraceSource {
+public enum Source {
 
     SDK("sdk"),
     EXPERIMENT("experiment"),
@@ -32,8 +32,8 @@ public enum TraceSource {
     private final String value;
 
     @JsonCreator
-    public static Optional<TraceSource> fromString(String value) {
-        return Arrays.stream(TraceSource.values())
+    public static Optional<Source> fromString(String value) {
+        return Arrays.stream(Source.values())
                 .filter(v -> v.getValue().equals(value))
                 .findFirst();
     }

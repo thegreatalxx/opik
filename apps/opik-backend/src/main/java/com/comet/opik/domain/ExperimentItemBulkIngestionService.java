@@ -8,7 +8,7 @@ import com.comet.opik.api.Span;
 import com.comet.opik.api.SpanBatch;
 import com.comet.opik.api.Trace;
 import com.comet.opik.api.TraceBatch;
-import com.comet.opik.api.TraceSource;
+import com.comet.opik.api.Source;
 import com.comet.opik.api.VisibilityMode;
 import com.comet.opik.infrastructure.auth.RequestContext;
 import com.comet.opik.utils.RetryUtils;
@@ -200,11 +200,11 @@ class ExperimentItemBulkIngestionServiceImpl implements ExperimentItemBulkIngest
                         .startTime(now)
                         .endTime(now)
                         .visibilityMode(VisibilityMode.HIDDEN)
-                        .source(TraceSource.EXPERIMENT)
+                        .source(Source.EXPERIMENT)
                         .build();
             } else {
                 trace = item.trace().toBuilder()
-                        .source(TraceSource.EXPERIMENT)
+                        .source(Source.EXPERIMENT)
                         .build();
             }
 
@@ -225,7 +225,7 @@ class ExperimentItemBulkIngestionServiceImpl implements ExperimentItemBulkIngest
 
             if (CollectionUtils.isNotEmpty(item.spans())) {
                 List<Span> experimentSpans = item.spans().stream()
-                        .map(span -> span.toBuilder().source(TraceSource.EXPERIMENT).build())
+                        .map(span -> span.toBuilder().source(Source.EXPERIMENT).build())
                         .toList();
 
                 spans.addAll(experimentSpans);

@@ -25,7 +25,7 @@ import com.comet.opik.api.TraceThreadBatchUpdate;
 import com.comet.opik.api.TraceThreadIdentifier;
 import com.comet.opik.api.TraceThreadStatus;
 import com.comet.opik.api.TraceThreadUpdate;
-import com.comet.opik.api.TraceSource;
+import com.comet.opik.api.Source;
 import com.comet.opik.api.TraceUpdate;
 import com.comet.opik.api.Visibility;
 import com.comet.opik.api.VisibilityMode;
@@ -6965,9 +6965,9 @@ class TracesResourceTest {
     class CreateTraceWithSource {
 
         @ParameterizedTest
-        @EnumSource(TraceSource.class)
+        @EnumSource(Source.class)
         @DisplayName("Create trace with each valid source and verify it is stored")
-        void createTraceWithSource(TraceSource source) {
+        void createTraceWithSource(Source source) {
             var trace = factory.manufacturePojo(Trace.class).toBuilder()
                     .projectName(DEFAULT_PROJECT)
                     .source(source)
@@ -7022,9 +7022,9 @@ class TracesResourceTest {
     class FilterTracesBySource {
 
         @ParameterizedTest
-        @EnumSource(TraceSource.class)
+        @EnumSource(Source.class)
         @DisplayName("Filter traces by source EQUAL returns only matching traces")
-        void filterTracesBySourceEqual(TraceSource source) {
+        void filterTracesBySourceEqual(Source source) {
             var projectName = "source-filter-test-" + UUID.randomUUID();
 
             var matchingTrace = factory.manufacturePojo(Trace.class).toBuilder()
@@ -7034,7 +7034,7 @@ class TracesResourceTest {
                     .feedbackScores(null)
                     .build();
 
-            var otherSource = source == TraceSource.SDK ? TraceSource.EXPERIMENT : TraceSource.SDK;
+            var otherSource = source == Source.SDK ? Source.EXPERIMENT : Source.SDK;
             var nonMatchingTrace = factory.manufacturePojo(Trace.class).toBuilder()
                     .projectName(projectName)
                     .source(otherSource)
@@ -7064,7 +7064,7 @@ class TracesResourceTest {
 
             var sdkTrace = factory.manufacturePojo(Trace.class).toBuilder()
                     .projectName(projectName)
-                    .source(TraceSource.SDK)
+                    .source(Source.SDK)
                     .usage(null)
                     .feedbackScores(null)
                     .build();
@@ -7078,7 +7078,7 @@ class TracesResourceTest {
 
             var experimentTrace = factory.manufacturePojo(Trace.class).toBuilder()
                     .projectName(projectName)
-                    .source(TraceSource.EXPERIMENT)
+                    .source(Source.EXPERIMENT)
                     .usage(null)
                     .feedbackScores(null)
                     .build();
@@ -7090,7 +7090,7 @@ class TracesResourceTest {
             var filters = List.of(TraceFilter.builder()
                     .field(TraceField.SOURCE)
                     .operator(Operator.EQUAL)
-                    .value(TraceSource.SDK.getValue())
+                    .value(Source.SDK.getValue())
                     .build());
 
             var page = traceResourceClient.getTraces(projectName, null, API_KEY, TEST_WORKSPACE,

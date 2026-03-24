@@ -48,5 +48,5 @@ public record SpanUpdate(
         @DecimalMin("0.0") BigDecimal totalEstimatedCost,
         ErrorInfo errorInfo,
         @PositiveOrZero Double ttft,
-        TraceSource source) implements TagUpdatable {
+        Source source) implements TagUpdatable {
 }
