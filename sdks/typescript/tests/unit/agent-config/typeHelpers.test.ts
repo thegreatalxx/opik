@@ -1,7 +1,9 @@
+import { z } from "zod";
 import {
   inferBackendType,
   serializeValue,
   deserializeValue,
+  getSchemaPrefix,
 } from "@/agent-config/typeHelpers";
 import { BasePrompt } from "@/prompt/BasePrompt";
 import { PromptVersion } from "@/prompt/PromptVersion";
@@ -163,6 +165,18 @@ describe("deserializeValue", () => {
 
   it("should return prompt_commit values as strings (commit hash)", () => {
     expect(deserializeValue("abc123de", "prompt_commit")).toBe("abc123de");
+  });
+});
+
+describe("getSchemaPrefix", () => {
+  it("throws TypeError when schema is missing .describe()", () => {
+    const Schema = z.object({ x: z.number() });
+    expect(() => getSchemaPrefix(Schema)).toThrow(TypeError);
+  });
+
+  it("returns the schema description as prefix", () => {
+    const Schema = z.object({ x: z.number() }).describe("MyConfig");
+    expect(getSchemaPrefix(Schema)).toBe("MyConfig");
   });
 });
 

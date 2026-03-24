@@ -6,6 +6,7 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { z } from "zod";
 import { Opik, track, agentConfigContext, Prompt } from "@/index";
+import { getTrackContext } from "@/decorators/track";
 import {
   shouldRunIntegrationTests,
   getIntegrationTestStatus,
@@ -117,6 +118,8 @@ describe.skipIf(!shouldRunApiTests)(
         expect(latest.model).toBe("gpt-4");
         expect(latest.hint).toBe("use chain-of-thought");
         expect(latest.isFallback).toBe(false);
+        expect(latest.blueprintId).toBeDefined();
+        expect(latest.blueprintVersion).toBe(v2Name);
 
         // Retrieve by version name (v1)
         const fetchByName = track(async () => {
@@ -224,7 +227,7 @@ describe.skipIf(!shouldRunApiTests)(
           void cfg.temperature;
           void cfg.model;
 
-          const ctx = (await import("@/decorators/track")).getTrackContext();
+          const ctx = getTrackContext();
           traceId = ctx?.trace?.data?.id;
           spanId = ctx?.span?.data?.id;
 
@@ -255,7 +258,7 @@ describe.skipIf(!shouldRunApiTests)(
         const agentMeta = meta?.agent_configuration as Record<string, unknown>;
         expect(agentMeta._blueprint_id).toBeDefined();
         expect(agentMeta.blueprint_version).toBeDefined();
-        expect(agentMeta.values).toBeDefined();
+        expect(agentMeta.values).toEqual({ temperature: 0.7, model: "gpt-4" });
       },
       60_000
     );
@@ -325,22 +328,7 @@ describe.skipIf(!shouldRunApiTests)(
       ).rejects.toThrow(/track\(\)/);
     });
 
-    // ─── Test 6: getAgentConfigVersion throws without .describe() ───
-
-    it("should throw when schema is missing .describe()", async () => {
-      const Schema = z.object({ x: z.number() });
-
-      const run = track(async () => {
-        await client.getAgentConfigVersion(Schema as z.ZodObject<z.ZodRawShape>, {
-          fallback: { x: 0 },
-          latest: true,
-        });
-      });
-
-      await expect(run()).rejects.toThrow(TypeError);
-    });
-
-    // ─── Test 7: fallback returned when no blueprint found ───
+    // ─── Test 6: throws when no blueprint exists for the requested env ───
 
     it("should throw when no blueprint exists for the given env", async () => {
       const projectName = uniqueProject();
@@ -361,7 +349,7 @@ describe.skipIf(!shouldRunApiTests)(
       await expect(run()).rejects.toThrow();
     });
 
-    // ─── Test 9: Prompt field stored and retrieved ───
+    // ─── Test 7: Prompt field stored and retrieved ───
 
     it(
       "should store a Prompt in config and retrieve it as a Prompt instance",
@@ -407,37 +395,5 @@ describe.skipIf(!shouldRunApiTests)(
       },
       60_000
     );
-
-    // ─── Test 8: TypedAgentConfig meta properties ───
-
-    it("should expose blueprintId, blueprintVersion, envs and isFallback", async () => {
-      const projectName = uniqueProject();
-      projectsToCleanup.push(projectName);
-
-      const Schema = z
-        .object({ temperature: z.number() })
-        .describe("MetaSchema");
-
-      const versionName = await client.createAgentConfig(
-        Schema,
-        { temperature: 0.3 },
-        { projectName }
-      );
-
-      const run = track(async () => {
-        return client.getAgentConfigVersion(Schema, {
-          fallback: { temperature: 0 },
-          projectName,
-          latest: true,
-        });
-      });
-
-      const cfg = await run();
-      expect(cfg.blueprintId).toBeDefined();
-      expect(cfg.blueprintVersion).toBe(versionName);
-      expect(cfg.isFallback).toBe(false);
-    },
-    30_000
-  );
   }
 );
