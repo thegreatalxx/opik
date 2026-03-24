@@ -1,4 +1,6 @@
 import { BasePrompt } from "@/prompt/BasePrompt";
+import { Prompt } from "@/prompt/Prompt";
+import { ChatPrompt } from "@/prompt/ChatPrompt";
 import { PromptVersion } from "@/prompt/PromptVersion";
 import type * as OpikApi from "@/rest_api/api";
 import { z } from "zod";
@@ -58,6 +60,16 @@ export function zodTypeToBackendType(zodField: z.ZodTypeAny): string {
   if (inner instanceof z.ZodArray) return "string";
   if (inner instanceof z.ZodRecord) return "string";
   if (inner instanceof z.ZodObject) return "string";
+  if (inner instanceof z.ZodEffects) {
+    // z.instanceof() doesn't store the class in _def; detect via sentinel parse
+    const sentinel = Object.create(null);
+    Object.setPrototypeOf(sentinel, Prompt.prototype);
+    if (inner.safeParse(sentinel).success) return "prompt";
+    Object.setPrototypeOf(sentinel, ChatPrompt.prototype);
+    if (inner.safeParse(sentinel).success) return "prompt";
+    Object.setPrototypeOf(sentinel, PromptVersion.prototype);
+    if (inner.safeParse(sentinel).success) return "prompt_commit";
+  }
 
   throw new TypeError(`Unsupported Zod type: ${inner.constructor.name}`);
 }
@@ -162,7 +174,8 @@ export function deserializeToShape<S extends z.ZodObject<z.ZodRawShape>>(
   schema: S,
   blueprintValues: Record<string, { value?: string | null; type: string }>,
   prefix: string,
-  fallback: z.infer<S>
+  fallback: z.infer<S>,
+  resolvedValues?: Record<string, unknown>
 ): z.infer<S> {
   const fieldMeta = extractFieldMetadata(schema, prefix);
   const result: Record<string, unknown> = {};
@@ -170,10 +183,17 @@ export function deserializeToShape<S extends z.ZodObject<z.ZodRawShape>>(
   for (const [fieldName, meta] of fieldMeta.entries()) {
     const entry = blueprintValues[meta.prefixedKey];
     if (entry !== undefined) {
-      result[fieldName] = deserializeValue(
-        entry.value,
-        entry.type ?? meta.backendType
-      );
+      if (
+        (meta.backendType === "prompt" || meta.backendType === "prompt_commit") &&
+        resolvedValues
+      ) {
+        result[fieldName] = resolvedValues[meta.prefixedKey];
+      } else {
+        result[fieldName] = deserializeValue(
+          entry.value,
+          entry.type ?? meta.backendType
+        );
+      }
     } else {
       result[fieldName] = (fallback as Record<string, unknown>)[fieldName];
     }

@@ -12,6 +12,7 @@ import {
 
 export interface CreateBlueprintOptions {
   values: Record<string, SupportedValue>;
+  serializedValues?: OpikApi.AgentConfigValueWrite[];
   description?: string;
 }
 
@@ -61,7 +62,7 @@ export class AgentConfig {
    */
   async createBlueprint(options: CreateBlueprintOptions): Promise<Blueprint> {
     const id = generateId();
-    const values = this.buildBlueprintValues(options.values);
+    const values = options.serializedValues ?? this.buildBlueprintValues(options.values);
 
     logger.debug(`Creating blueprint for project "${this.projectName}"`);
 
@@ -87,7 +88,7 @@ export class AgentConfig {
    */
   async updateBlueprint(options: CreateBlueprintOptions): Promise<Blueprint> {
     const id = generateId();
-    const values = this.buildBlueprintValues(options.values);
+    const values = options.serializedValues ?? this.buildBlueprintValues(options.values);
 
     logger.debug(`Updating blueprint for project "${this.projectName}"`);
 

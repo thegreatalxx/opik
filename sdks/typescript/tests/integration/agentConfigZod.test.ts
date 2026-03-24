@@ -5,7 +5,7 @@
  */
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { z } from "zod";
-import { Opik, track, agentConfigContext } from "@/index";
+import { Opik, track, agentConfigContext, Prompt } from "@/index";
 import {
   shouldRunIntegrationTests,
   getIntegrationTestStatus,
@@ -360,6 +360,53 @@ describe.skipIf(!shouldRunApiTests)(
 
       await expect(run()).rejects.toThrow();
     });
+
+    // ─── Test 9: Prompt field stored and retrieved ───
+
+    it(
+      "should store a Prompt in config and retrieve it as a Prompt instance",
+      async () => {
+        const projectName = uniqueProject();
+        projectsToCleanup.push(projectName);
+
+        const MyConfig = z
+          .object({
+            model: z.string(),
+            system_prompt: z.instanceof(Prompt).describe("System prompt for the agent"),
+          })
+          .describe("PromptConfig");
+
+        const storedPrompt = await client.createPrompt({
+          name: `${projectName}-system`,
+          prompt: "You are a helpful assistant. Think step by step.",
+        });
+        expect(storedPrompt.commit).toBeDefined();
+
+        const versionName = await client.createAgentConfigVersion(
+          MyConfig,
+          { model: "gpt-4", system_prompt: storedPrompt },
+          { projectName }
+        );
+        expect(typeof versionName).toBe("string");
+
+        const run = track(async () => {
+          return client.getAgentConfigVersion(MyConfig, {
+            fallback: { model: "fallback", system_prompt: storedPrompt },
+            projectName,
+            latest: true,
+          });
+        });
+        const cfg = await run();
+
+        expect(cfg.model).toBe("gpt-4");
+        expect(cfg.system_prompt).toBeInstanceOf(Prompt);
+        expect((cfg.system_prompt as Prompt).commit).toBe(storedPrompt.commit);
+        expect((cfg.system_prompt as Prompt).prompt).toBe(
+          "You are a helpful assistant. Think step by step."
+        );
+      },
+      60_000
+    );
 
     // ─── Test 8: TypedAgentConfig meta properties ───
 

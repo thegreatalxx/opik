@@ -1687,9 +1687,6 @@ export class OpikClient {
     const agentConfig = new AgentConfig(projectName, this);
 
     const serialized = serializeFields(schema, values as Record<string, unknown>, prefix);
-    const valuesMap = Object.fromEntries(
-      serialized.map((v) => [v.key, v.value])
-    );
 
     const latest = await agentConfig.getBlueprint();
 
@@ -1700,13 +1697,15 @@ export class OpikClient {
     let blueprint;
     if (latest) {
       blueprint = await agentConfig.updateBlueprint({
-        values: valuesMap as Record<string, string>,
+        values: {},
+        serializedValues: serialized,
         description: options?.description,
       });
     } else {
       try {
         blueprint = await agentConfig.createBlueprint({
-          values: valuesMap as Record<string, string>,
+          values: {},
+          serializedValues: serialized,
           description: options?.description,
         });
       } catch (error) {
@@ -1716,7 +1715,8 @@ export class OpikClient {
             return refetched.name ?? refetched.id;
           }
           blueprint = await agentConfig.updateBlueprint({
-            values: valuesMap as Record<string, string>,
+            values: {},
+            serializedValues: serialized,
             description: options?.description,
           });
         } else {
@@ -1748,7 +1748,8 @@ export class OpikClient {
             blueprint.keys().map((k) => [k, blueprint.getRawEntry(k)!])
           ),
           prefix,
-          values as z.infer<S>
+          values as z.infer<S>,
+          blueprint.values
         )
       : (values as z.infer<S>);
 
@@ -1838,7 +1839,8 @@ export class OpikClient {
       schema,
       rawValuesMap,
       prefix,
-      options.fallback
+      options.fallback,
+      blueprint.values
     );
 
     return createTypedAgentConfig({
