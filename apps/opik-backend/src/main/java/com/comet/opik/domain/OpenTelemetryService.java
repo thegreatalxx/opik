@@ -1,9 +1,9 @@
 package com.comet.opik.domain;
 
 import com.comet.opik.api.Project;
+import com.comet.opik.api.Source;
 import com.comet.opik.api.SpanBatch;
 import com.comet.opik.api.Trace;
-import com.comet.opik.api.Source;
 import com.comet.opik.domain.mapping.OpenTelemetryMappingRuleFactory;
 import com.comet.opik.infrastructure.OpenTelemetryConfig;
 import com.comet.opik.infrastructure.auth.RequestContext;

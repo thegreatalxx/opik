@@ -2,10 +2,10 @@ package com.comet.opik.domain;
 
 import com.comet.opik.api.BiInformationResponse;
 import com.comet.opik.api.ProjectStats;
+import com.comet.opik.api.Source;
 import com.comet.opik.api.Span;
 import com.comet.opik.api.SpanUpdate;
 import com.comet.opik.api.SpansCountResponse;
-import com.comet.opik.api.Source;
 import com.comet.opik.api.sorting.SortableFields;
 import com.comet.opik.api.sorting.SortingField;
 import com.comet.opik.api.sorting.SpanSortingFactory;

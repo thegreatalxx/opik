@@ -19,7 +19,6 @@ import com.comet.opik.api.filter.SpanField;
 import com.comet.opik.api.filter.TraceField;
 import com.comet.opik.api.filter.TraceThreadField;
 import com.comet.opik.api.sorting.SortingField;
-import com.comet.opik.api.Source;
 import com.google.common.collect.ImmutableMap;
 import io.r2dbc.spi.Statement;
 import lombok.NonNull;
@@ -924,14 +923,18 @@ public class FilterQueryBuilder {
         var dbField = getAnalyticsDbField(filter.field(), filterStrategy, i);
         var formattedTemplate = template.formatted(dbField, i);
 
-        if ((filter.field() == TraceField.SOURCE || filter.field() == SpanField.SOURCE)
-                && filter.operator() == Operator.EQUAL) {
-            return Source.legacyFallbackDbValue(filter.value())
-                    .map(fallback -> "(%s = :filter%d OR %s = '%s')".formatted(dbField, i, dbField, fallback))
-                    .orElse("(%s)".formatted(formattedTemplate));
-        }
+        return filter.field().legacyFallbackDbValue(filter.value())
+                .map(fallback -> buildWithLegacyFallback(filter.operator(), dbField, i, fallback, formattedTemplate))
+                .orElse("(%s)".formatted(formattedTemplate));
+    }
 
-        return "(%s)".formatted(formattedTemplate);
+    private static String buildWithLegacyFallback(
+            Operator operator, String dbField, int i, String fallback, String formattedTemplate) {
+        return switch (operator) {
+            case EQUAL -> "(%s = :filter%d OR %s = '%s')".formatted(dbField, i, dbField, fallback);
+            case NOT_EQUAL -> "(%s != :filter%d AND %s != '%s')".formatted(dbField, i, dbField, fallback);
+            default -> "(%s)".formatted(formattedTemplate);
+        };
     }
 
     private static String getAnalyticsDbField(Field field, FilterStrategy filterStrategy, int i) {
