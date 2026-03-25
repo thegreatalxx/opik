@@ -14,7 +14,9 @@ const ConfigurationVersionCell = <TData,>(
   if (!value) return null;
 
   return (
-    <ConfigurationVersionTag version={value.version} maskId={value.maskId} />
+    <div className="px-2">
+      <ConfigurationVersionTag version={value.version} maskId={value.maskId} />
+    </div>
   );
 };
 

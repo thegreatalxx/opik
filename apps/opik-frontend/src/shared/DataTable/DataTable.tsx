@@ -58,6 +58,8 @@ declare module "@tanstack/react-table" {
     columnsStatistic?: ColumnsStatistic;
     rowHeight: ROW_HEIGHT;
     rowHeightStyle: React.CSSProperties;
+    hideHeaderIcons?: boolean;
+    cellBorders?: boolean;
     onCommentsReply?: (row: TData, idx?: number) => void;
     aggregationMap?: Record<string, unknown>;
     enableUserFeedbackEditing?: boolean;
@@ -398,6 +400,7 @@ const DataTable = <TData, TValue>({
       <DataTableTooltipContext>
         <Table
           ref={tableRef}
+          className={cn(table.options.meta?.cellBorders && "comet-cell-borders")}
           style={{
             ...(!autoWidth && { minWidth: table.getTotalSize() }),
             ...(tableHeight && { "--data-table-height": `${tableHeight}px` }),
