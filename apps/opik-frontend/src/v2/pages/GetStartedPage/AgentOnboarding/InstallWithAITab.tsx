@@ -1,25 +1,37 @@
-import React from "react";
-import { LoaderCircle } from "lucide-react";
+import React, { useEffect } from "react";
+import { Check, LoaderCircle } from "lucide-react";
 import { useAgentOnboarding } from "./AgentOnboardingContext";
 import { useUserApiKey } from "@/store/AppStore";
-import { buildDocsUrl, maskAPIKey } from "@/lib/utils";
+import {
+  buildDocsUrl,
+  maskAPIKey,
+  MASKED_API_KEY_PLACEHOLDER,
+} from "@/lib/utils";
 import CopyButton from "@/shared/CopyButton/CopyButton";
+import useProjectByName from "@/api/projects/useProjectByName";
+import useTracesList from "@/api/traces/useTracesList";
 import claudeCodeLogo from "/images/integrations/claude_code.svg";
 import codexLogo from "/images/integrations/codex.svg";
 import cursorLogo from "/images/integrations/cursor.svg";
 
 const INSTALL_COMMAND = "npx skills add comet-ml/opik-skills -g";
+const TRACE_POLL_INTERVAL = 5000;
 
 const TimelineStep: React.FC<{
   number?: number;
   isLast?: boolean;
+  completed?: boolean;
   children: React.ReactNode;
-}> = ({ number, isLast, children }) => (
+}> = ({ number, isLast, completed, children }) => (
   <div className="flex gap-3">
     <div className="flex flex-col items-center">
       {number != null ? (
         <div className="flex size-5 shrink-0 items-center justify-center rounded-full border border-border text-[10px] font-medium text-muted-slate">
           {number}
+        </div>
+      ) : completed ? (
+        <div className="flex size-5 shrink-0 items-center justify-center rounded-full bg-primary">
+          <Check className="size-3 text-primary-foreground" />
         </div>
       ) : (
         <div className="flex size-5 shrink-0 items-center justify-center">
@@ -53,11 +65,45 @@ const CodeBlockWithHeader: React.FC<{
   </div>
 );
 
-const InstallWithAITab: React.FC = () => {
+interface InstallWithAITabProps {
+  onTraceReceived?: (traceId: string) => void;
+}
+
+const InstallWithAITab: React.FC<InstallWithAITabProps> = ({
+  onTraceReceived,
+}) => {
   const { agentName } = useAgentOnboarding();
   const apiKey = useUserApiKey();
 
-  const fallbackApiKey = "opk-***-your-api-key";
+  const { data: project } = useProjectByName(
+    { projectName: agentName },
+    { enabled: !!agentName },
+  );
+
+  const { data: tracesData } = useTracesList(
+    {
+      projectId: project?.id ?? "",
+      page: 1,
+      size: 1,
+      sorting: [{ id: "created_at", desc: false }],
+    },
+    {
+      enabled: !!project?.id,
+      refetchInterval: (query) =>
+        query.state.data?.total ? false : TRACE_POLL_INTERVAL,
+    },
+  );
+
+  const firstTrace = tracesData?.content?.[0];
+  const traceReceived = !!firstTrace;
+
+  useEffect(() => {
+    if (firstTrace && onTraceReceived) {
+      onTraceReceived(firstTrace.id);
+    }
+  }, [firstTrace, onTraceReceived]);
+
+  const fallbackApiKey = MASKED_API_KEY_PLACEHOLDER;
 
   const buildPrompt = (key: string) =>
     `Instrument my agent with Opik, use project name "${agentName}" and API key "${key}".`;
@@ -115,23 +161,27 @@ const InstallWithAITab: React.FC = () => {
           </div>
         </TimelineStep>
 
-        <TimelineStep isLast>
+        <TimelineStep isLast completed={traceReceived}>
           <div className="flex flex-col gap-1">
             <h4 className="comet-body-s-accented text-primary">
-              Waiting for first trace…
+              {traceReceived
+                ? "First trace received!"
+                : "Waiting for first trace…"}
             </h4>
-            <p className="comet-body-xs text-muted-slate">
-              Connect your agent to Opik for observability, evaluation and
-              optimization.{" "}
-              <a
-                href={buildDocsUrl("/faq#troubleshooting")}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="underline"
-              >
-                Why isn&apos;t my trace showing?
-              </a>
-            </p>
+            {!traceReceived && (
+              <p className="comet-body-xs text-muted-slate">
+                Connect your agent to Opik for observability, evaluation and
+                optimization.{" "}
+                <a
+                  href={buildDocsUrl("/faq#troubleshooting")}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline"
+                >
+                  Why isn&apos;t my trace showing?
+                </a>
+              </p>
+            )}
           </div>
         </TimelineStep>
       </div>

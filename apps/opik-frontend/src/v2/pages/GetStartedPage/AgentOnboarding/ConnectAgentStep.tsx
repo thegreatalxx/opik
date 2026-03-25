@@ -1,8 +1,11 @@
-import React, { useState } from "react";
-import { ChevronLeft, ChevronsRight, MonitorPlay, Undo2 } from "lucide-react";
+import React, { useCallback, useState } from "react";
+import { ArrowRight, ChevronsRight, MonitorPlay, Undo2 } from "lucide-react";
+import { useNavigate } from "@tanstack/react-router";
 import { Button } from "@/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/ui/tabs";
 import Slack from "@/icons/slack.svg?react";
+import useAppStore from "@/store/AppStore";
+import useProjectByName from "@/api/projects/useProjectByName";
 import {
   useAgentOnboarding,
   AGENT_ONBOARDING_STEPS,
@@ -19,10 +22,37 @@ import {
 
 const ConnectAgentStep: React.FC = () => {
   const { goToStep, agentName } = useAgentOnboarding();
+  const navigate = useNavigate();
+  const workspaceName = useAppStore((state) => state.activeWorkspaceName);
   const [activeTab, setActiveTab] = useState("install-with-ai");
   const [selectedIntegrationId, setSelectedIntegrationId] = useState<
     string | null
   >(null);
+  const [firstTraceId, setFirstTraceId] = useState<string | null>(null);
+
+  const { data: project } = useProjectByName(
+    { projectName: agentName },
+    { enabled: !!agentName },
+  );
+
+  const handleTraceReceived = useCallback((traceId: string) => {
+    setFirstTraceId(traceId);
+  }, []);
+
+  const handleViewTraces = () => {
+    goToStep(AGENT_ONBOARDING_STEPS.DONE, { agentName });
+
+    if (project?.id) {
+      navigate({
+        to: "/$workspaceName/projects/$projectId/traces",
+        params: { workspaceName, projectId: project.id },
+        search: {
+          ...(firstTraceId && { trace: firstTraceId }),
+          traces_sorting: [{ id: "created_at", desc: false }],
+        },
+      });
+    }
+  };
 
   const selectedIntegration = selectedIntegrationId
     ? INTEGRATIONS.find((i) => i.id === selectedIntegrationId)
@@ -31,10 +61,6 @@ const ConnectAgentStep: React.FC = () => {
   const handleTabChange = (value: string) => {
     setActiveTab(value);
     setSelectedIntegrationId(null);
-  };
-
-  const handleBack = () => {
-    goToStep(AGENT_ONBOARDING_STEPS.AGENT_NAME, { agentName });
   };
 
   const handleSkip = () => {
@@ -112,17 +138,16 @@ const ConnectAgentStep: React.FC = () => {
       description="Follow these steps to start sending traces to Opik."
       showFooterSeparator
       footer={
-        <>
+        firstTraceId ? (
           <Button
-            variant="link"
-            onClick={handleBack}
-            className="comet-body-s mr-auto text-muted-slate"
-            id="onboarding-step2-back"
-            data-fs-element="onboarding-step2-back"
+            onClick={handleViewTraces}
+            id="onboarding-step2-view-traces"
+            data-fs-element="onboarding-step2-view-traces"
           >
-            <ChevronLeft className="size-3.5" />
-            Back
+            View traces & start optimizing
+            <ArrowRight className="size-3.5" />
           </Button>
+        ) : (
           <Button
             variant="link"
             onClick={handleSkip}
@@ -133,7 +158,7 @@ const ConnectAgentStep: React.FC = () => {
             Skip for now
             <ChevronsRight className="size-3.5" />
           </Button>
-        </>
+        )
       }
     >
       <Tabs value={activeTab} onValueChange={handleTabChange}>
@@ -147,7 +172,7 @@ const ConnectAgentStep: React.FC = () => {
         </TabsList>
 
         <TabsContent value="install-with-ai">
-          <InstallWithAITab />
+          <InstallWithAITab onTraceReceived={handleTraceReceived} />
         </TabsContent>
 
         <TabsContent value="manual-integration">

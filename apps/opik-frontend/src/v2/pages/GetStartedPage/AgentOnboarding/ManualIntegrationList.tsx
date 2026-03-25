@@ -7,6 +7,7 @@ import IntegrationCard from "@/v2/pages-shared/onboarding/IntegrationExplorer/co
 import CopyButton from "@/shared/CopyButton/CopyButton";
 import { useAgentOnboarding } from "./AgentOnboardingContext";
 import { useUserApiKey } from "@/store/AppStore";
+import { maskAPIKey, MASKED_API_KEY_PLACEHOLDER } from "@/lib/utils";
 import {
   INTEGRATION_CATEGORIES,
   getIntegrationsByCategory,
@@ -63,7 +64,7 @@ const ManualIntegrationList: React.FC<ManualIntegrationListProps> = ({
           <span className="comet-body-s-accented px-0.5 pb-0.5">API key</span>
           <div className="flex items-center gap-1 rounded border bg-primary-foreground px-2 py-1">
             <code className="comet-body-xs text-muted-slate">
-              opk-***-your-api-key
+              {apiKey ? maskAPIKey(apiKey) : MASKED_API_KEY_PLACEHOLDER}
             </code>
             <CopyButton
               text={apiKey || ""}
