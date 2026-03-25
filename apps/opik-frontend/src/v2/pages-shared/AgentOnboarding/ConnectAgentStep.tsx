@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { ChevronLeft, ChevronsRight } from "lucide-react";
 import { Button } from "@/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/ui/tabs";
 import {
@@ -49,6 +50,7 @@ const ConnectAgentStep: React.FC = () => {
             id="onboarding-step2-back"
             data-fs-element="onboarding-step2-back"
           >
+            <ChevronLeft className="size-3.5" />
             Back
           </Button>
           <Button
@@ -59,6 +61,7 @@ const ConnectAgentStep: React.FC = () => {
             data-fs-element="onboarding-step2-skip"
           >
             Skip for now
+            <ChevronsRight className="size-3.5" />
           </Button>
         </>
       }
