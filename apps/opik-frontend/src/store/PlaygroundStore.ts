@@ -144,7 +144,7 @@ const usePlaygroundStore = create<PlaygroundStore>()(
       outputMap: {},
       datasetVariables: [],
       providerValidationTrigger: 0,
-      selectedRuleIds: null,
+      selectedRuleIds: [],
       createdExperiments: [],
       isRunning: false,
       datasetFilters: [],

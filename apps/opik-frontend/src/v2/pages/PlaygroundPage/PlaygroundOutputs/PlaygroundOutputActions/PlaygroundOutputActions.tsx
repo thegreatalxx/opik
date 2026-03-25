@@ -380,15 +380,10 @@ const PlaygroundOutputActions = ({
     );
   };
 
-  // Set default to "all selected" when dataset is selected and rules are available
   useEffect(() => {
     if (!datasetId) {
-      // Reset to null when dataset is deselected
-      setSelectedRuleIds(null);
+      setSelectedRuleIds([]);
     }
-    // Note: We don't automatically normalize [] to null because [] is a valid state
-    // meaning "none selected". Users should be able to explicitly deselect all items.
-    // null = all selected (default), [] = none selected, [id1, id2] = specific rules selected
   }, [datasetId, setSelectedRuleIds]);
 
   useEffect(() => {
