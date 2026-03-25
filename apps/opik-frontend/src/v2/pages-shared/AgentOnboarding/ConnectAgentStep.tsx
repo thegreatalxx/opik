@@ -37,14 +37,15 @@ const ConnectAgentStep: React.FC = () => {
 
   return (
     <AgentOnboardingCard
-      title="Connect your agent to Opik"
+      title={`Connect ${agentName} to Opik`}
       description="Follow these steps to start sending traces to Opik."
+      showFooterSeparator
       footer={
         <>
           <Button
             variant="link"
             onClick={handleBack}
-            className="text-muted-slate"
+            className="mr-auto text-muted-slate"
             id="onboarding-step2-back"
             data-fs-element="onboarding-step2-back"
           >
