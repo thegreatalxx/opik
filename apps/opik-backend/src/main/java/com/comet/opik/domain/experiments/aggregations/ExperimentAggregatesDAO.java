@@ -1165,6 +1165,7 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
             FROM experiment_item_aggregates eia FINAL
             INNER JOIN experiment_aggregates ea FINAL ON ea.id = eia.experiment_id
             LEFT JOIN dataset_item_versions_resolved AS di ON (di.id = eia.dataset_item_id OR di.row_id = eia.dataset_item_id)
+                AND di.dataset_version_id = COALESCE(nullIf(ea.dataset_version_id, ''), :version_id)
             WHERE eia.workspace_id = :workspace_id
             <if(experiment_ids)>AND eia.experiment_id IN :experiment_ids<endif>
             <if(has_target_projects)>AND eia.project_id IN :target_project_ids<endif>
@@ -1268,6 +1269,7 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
             FROM experiment_item_aggregates eia FINAL
             INNER JOIN experiment_aggregates ea FINAL ON ea.id = eia.experiment_id
             LEFT JOIN dataset_item_versions_resolved AS di ON (di.id = eia.dataset_item_id OR di.row_id = eia.dataset_item_id)
+                AND di.dataset_version_id = COALESCE(nullIf(ea.dataset_version_id, ''), :version_id)
             WHERE eia.workspace_id = :workspace_id
             <if(experiment_ids)>AND eia.experiment_id IN :experiment_ids<endif>
             <if(has_target_projects)>AND eia.project_id IN :target_project_ids<endif>
