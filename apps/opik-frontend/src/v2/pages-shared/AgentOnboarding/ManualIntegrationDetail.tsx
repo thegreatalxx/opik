@@ -1,6 +1,5 @@
 import React from "react";
-import { Undo2, ExternalLink } from "lucide-react";
-import { Button } from "@/ui/button";
+import { ExternalLink } from "lucide-react";
 import { Separator } from "@/ui/separator";
 import CodeHighlighter from "@/shared/CodeHighlighter/CodeHighlighter";
 import { IntegrationStep } from "@/v2/pages-shared/onboarding/IntegrationExplorer/components/IntegrationStep";
@@ -12,12 +11,10 @@ import { INSTALL_OPIK_SECTION_TITLE } from "@/constants/shared";
 
 type ManualIntegrationDetailProps = {
   integration: Integration;
-  onBack: () => void;
 };
 
 const ManualIntegrationDetail: React.FC<ManualIntegrationDetailProps> = ({
   integration,
-  onBack,
 }) => {
   const workspaceName = useAppStore((state) => state.activeWorkspaceName);
   const apiKey = useUserApiKey();
@@ -39,18 +36,6 @@ const ManualIntegrationDetail: React.FC<ManualIntegrationDetailProps> = ({
 
   return (
     <div className="flex flex-col gap-4">
-      <Button
-        variant="outline"
-        size="xs"
-        onClick={onBack}
-        className="w-fit"
-        id="onboarding-integration-back"
-        data-fs-element="OnboardingIntegrationBack"
-      >
-        <Undo2 className="mr-1 size-3" />
-        Back to integrations
-      </Button>
-
       <div className="flex flex-col gap-1.5">
         <h3 className="comet-title-xs">
           Integrate Opik with {integration.title}
@@ -104,7 +89,6 @@ const ManualIntegrationDetail: React.FC<ManualIntegrationDetailProps> = ({
         title="Need some help?"
         description="Get help from your team or ours. Choose the option that works best for you."
       >
-        <HelpLinks.InviteDev />
         <HelpLinks.Slack />
         <HelpLinks.WatchTutorial />
       </HelpLinks>
