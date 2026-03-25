@@ -43,8 +43,7 @@ const TracesTabRedirect = () => {
       navigate({
         to: `/$workspaceName/projects/$projectId${suffix}`,
         params: { workspaceName, projectId },
-        search:
-          Object.keys(mergedSearch).length > 0 ? mergedSearch : undefined,
+        search: Object.keys(mergedSearch).length > 0 ? mergedSearch : undefined,
         replace: true,
       });
     };
