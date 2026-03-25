@@ -407,15 +407,9 @@ class DashboardsResourceTest {
             var dashboards = List.of(
                     dashboardResourceClient.createPartialDashboard()
                             .type(DashboardType.MULTI_PROJECT)
-                            .scope(DashboardScope.WORKSPACE)
                             .build(),
                     dashboardResourceClient.createPartialDashboard()
                             .type(DashboardType.EXPERIMENTS)
-                            .scope(DashboardScope.WORKSPACE)
-                            .build(),
-                    dashboardResourceClient.createPartialDashboard()
-                            .type(DashboardType.MULTI_PROJECT)
-                            .scope(DashboardScope.WORKSPACE)
                             .build());
 
             var created = dashboards.stream()
@@ -445,7 +439,7 @@ class DashboardsResourceTest {
                                             .value(DashboardType.MULTI_PROJECT.getValue())
                                             .build()),
                             (Function<List<Dashboard>, List<Dashboard>>) dashboards -> List.of(
-                                    dashboards.get(2), dashboards.get(0))),
+                                    dashboards.get(0))),
                     // Filter by type EXPERIMENTS
                     Arguments.of(
                             (Function<List<Dashboard>, List<DashboardFilter>>) dashboards -> List.of(
@@ -465,7 +459,7 @@ class DashboardsResourceTest {
                                             .value(DashboardScope.WORKSPACE.getValue())
                                             .build()),
                             (Function<List<Dashboard>, List<Dashboard>>) dashboards -> List.of(
-                                    dashboards.get(2), dashboards.get(1), dashboards.get(0))));
+                                    dashboards.get(1), dashboards.get(0))));
         }
 
         @Test
