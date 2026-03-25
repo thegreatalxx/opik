@@ -16,9 +16,9 @@ const DataTableColumnResizer = <TData,>({
   )
     return null;
 
-  const hasStatistic = Boolean(
-    header.getContext().table.options.meta?.columnsStatistic,
-  );
+  const tableMeta = header.getContext().table.options.meta;
+  const hasStatistic = Boolean(tableMeta?.columnsStatistic);
+  const hasCellBorders = Boolean(tableMeta?.cellBorders);
 
   const isMultiRow = header.column.depth > 0;
   const isLastInGroup =
@@ -41,15 +41,17 @@ const DataTableColumnResizer = <TData,>({
           : "-right-1 w-[9px] justify-center",
       )}
     >
-      <div
-        className={cn(
-          "absolute top-2 h-7 w-px bg-border",
-          isMultiRow && "top-3 h-6",
-          hasStatistic && "h-10",
-          isLastInGroup && "-top-2 h-11",
-          isLastInGroup && hasStatistic && "h-14",
-        )}
-      ></div>
+      {!hasCellBorders && (
+        <div
+          className={cn(
+            "absolute top-2 h-7 w-px bg-border",
+            isMultiRow && "top-3 h-6",
+            hasStatistic && "h-10",
+            isLastInGroup && "-top-2 h-11",
+            isLastInGroup && hasStatistic && "h-14",
+          )}
+        />
+      )}
       <div className="absolute inset-y-0 w-px bg-transparent transition-colors group-hover:bg-gray-600 group-active:bg-blue-600"></div>
     </div>
   );

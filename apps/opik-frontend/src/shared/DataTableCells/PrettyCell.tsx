@@ -11,6 +11,7 @@ import { useTruncationEnabled } from "@/contexts/server-sync-provider";
 
 type CustomMeta = {
   fieldType: "input" | "output";
+  colorIndicator?: boolean;
 };
 
 const MAX_DATA_LENGTH_KEY = "pretty-cell-data-length-limit";
@@ -22,7 +23,7 @@ const PrettyCell = <TData,>(context: CellContext<TData, string | object>) => {
     defaultValue: MAX_DATA_LENGTH,
   });
   const { custom } = context.column.columnDef.meta ?? {};
-  const { fieldType = "input" } = (custom ?? {}) as CustomMeta;
+  const { fieldType = "input", colorIndicator = false } = (custom ?? {}) as CustomMeta;
   const value = context.getValue() as string | object | undefined | null;
 
   const displayMessage = useMemo(() => {
@@ -69,11 +70,23 @@ const PrettyCell = <TData,>(context: CellContext<TData, string | object>) => {
     );
   }, [isSmall, displayMessage]);
 
+  const indicatorColor = colorIndicator
+    ? fieldType === "input"
+      ? "var(--color-green)"
+      : "var(--color-primary)"
+    : null;
+
   return (
     <CellWrapper
       metadata={context.column.columnDef.meta}
       tableMetadata={context.table.options.meta}
     >
+      {indicatorColor && (
+        <div
+          className="mr-2 shrink-0 self-stretch rounded-full"
+          style={{ width: 3, backgroundColor: indicatorColor }}
+        />
+      )}
       {content}
     </CellWrapper>
   );
