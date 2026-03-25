@@ -56,7 +56,8 @@ public interface FeedbackScoreDAO {
 
     Mono<List<String>> getSpanFeedbackScoreNames(UUID projectId, SpanType type);
 
-    Mono<List<FeedbackScoreNames.ScoreName>> getExperimentsFeedbackScoreNames(Set<UUID> experimentIds);
+    Mono<List<FeedbackScoreNames.ScoreName>> getExperimentsFeedbackScoreNames(Set<UUID> experimentIds,
+            @Nullable UUID projectId);
 
     Mono<List<String>> getProjectsFeedbackScoreNames(Set<UUID> projectIds);
 
@@ -509,15 +510,18 @@ class FeedbackScoreDAOImpl implements FeedbackScoreDAO {
 
     @Override
     @WithSpan
-    public Mono<List<FeedbackScoreNames.ScoreName>> getExperimentsFeedbackScoreNames(Set<UUID> experimentIds) {
+    public Mono<List<FeedbackScoreNames.ScoreName>> getExperimentsFeedbackScoreNames(Set<UUID> experimentIds,
+            @Nullable UUID projectId) {
         return asyncTemplate.nonTransaction(connection -> makeMonoContextAware((userName, workspaceId) -> {
             var template = getSTWithLogComment(SELECT_FEEDBACK_SCORE_NAMES, "get_experiments_feedback_score_names",
-                    workspaceId, experimentIds.size());
-            bindTemplateParam(null, experimentIds, template);
+                    workspaceId, experimentIds != null ? experimentIds.size() : 0);
+
+            List<UUID> projectIds = projectId == null ? List.of() : List.of(projectId);
+            bindTemplateParam(projectIds, experimentIds, template);
 
             var statement = connection.createStatement(template.render())
                     .bind("workspace_id", workspaceId);
-            bindStatementParam(null, experimentIds, statement, EntityType.TRACE);
+            bindStatementParam(projectIds, experimentIds, statement, EntityType.TRACE);
 
             return Flux.from(statement.execute())
                     .flatMap(result -> result.map((row, rowMetadata) -> FeedbackScoreNames.ScoreName.builder()
