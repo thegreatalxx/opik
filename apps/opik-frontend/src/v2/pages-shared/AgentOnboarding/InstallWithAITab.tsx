@@ -2,7 +2,7 @@ import React from "react";
 import { LoaderCircle } from "lucide-react";
 import { useAgentOnboarding } from "./AgentOnboardingContext";
 import { useUserApiKey } from "@/store/AppStore";
-import { buildDocsUrl } from "@/lib/utils";
+import { buildDocsUrl, maskAPIKey } from "@/lib/utils";
 import CopyButton from "@/shared/CopyButton/CopyButton";
 import claudeCodeLogo from "/images/integrations/claude_code.svg";
 import codexLogo from "/images/integrations/codex.svg";
@@ -57,9 +57,15 @@ const InstallWithAITab: React.FC = () => {
   const { agentName } = useAgentOnboarding();
   const apiKey = useUserApiKey();
 
-  const promptText = `Instrument my agent with Opik, use project name "${agentName}" and API key "${
-    apiKey || "opk-***-your-api-key"
-  }".`;
+  const fallbackApiKey = "opk-***-your-api-key";
+
+  const buildPrompt = (key: string) =>
+    `Instrument my agent with Opik, use project name "${agentName}" and API key "${key}".`;
+
+  const promptText = buildPrompt(apiKey || fallbackApiKey);
+  const displayPromptText = buildPrompt(
+    apiKey ? maskAPIKey(apiKey) : fallbackApiKey,
+  );
 
   return (
     <div className="flex flex-col gap-4">
@@ -103,7 +109,7 @@ const InstallWithAITab: React.FC = () => {
             </p>
             <CodeBlockWithHeader
               title="Prompt"
-              code={promptText}
+              code={displayPromptText}
               copyText={promptText}
             />
           </div>
