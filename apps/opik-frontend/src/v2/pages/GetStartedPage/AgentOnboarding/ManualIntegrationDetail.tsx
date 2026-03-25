@@ -1,7 +1,9 @@
 import React from "react";
 import { ExternalLink } from "lucide-react";
+import { Separator } from "@/ui/separator";
 import CodeHighlighter from "@/shared/CodeHighlighter/CodeHighlighter";
 import { IntegrationStep } from "@/v2/pages-shared/onboarding/IntegrationExplorer/components/IntegrationStep";
+import HelpLinks from "@/v2/pages-shared/onboarding/IntegrationExplorer/components/HelpLinks";
 import useAppStore, { useUserApiKey } from "@/store/AppStore";
 import { putConfigInCode } from "@/lib/formatCodeSnippets";
 import { Integration } from "@/constants/integrations";
@@ -80,6 +82,16 @@ const ManualIntegrationDetail: React.FC<ManualIntegrationDetailProps> = ({
           highlightedLines={lines}
         />
       </IntegrationStep>
+
+      <Separator />
+
+      <HelpLinks
+        title="Need some help?"
+        description="Get help from your team or ours. Choose the option that works best for you."
+      >
+        <HelpLinks.Slack />
+        <HelpLinks.WatchTutorial />
+      </HelpLinks>
     </div>
   );
 };
