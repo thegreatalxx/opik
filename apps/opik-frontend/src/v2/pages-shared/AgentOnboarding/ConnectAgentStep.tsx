@@ -46,7 +46,7 @@ const ConnectAgentStep: React.FC = () => {
           <Button
             variant="link"
             onClick={handleBack}
-            className="mr-auto text-muted-slate"
+            className="comet-body-s mr-auto text-muted-slate"
             id="onboarding-step2-back"
             data-fs-element="onboarding-step2-back"
           >
@@ -56,7 +56,7 @@ const ConnectAgentStep: React.FC = () => {
           <Button
             variant="link"
             onClick={handleSkip}
-            className="text-muted-slate"
+            className="comet-body-s text-muted-slate"
             id="onboarding-step2-skip"
             data-fs-element="onboarding-step2-skip"
           >

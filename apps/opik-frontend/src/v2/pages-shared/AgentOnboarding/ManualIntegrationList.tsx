@@ -43,9 +43,11 @@ const ManualIntegrationList: React.FC<ManualIntegrationListProps> = ({
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-col gap-3">
-        <div className="flex items-center justify-between gap-2">
-          <span className="comet-body-s-accented">Project name</span>
+      <div className="flex gap-3">
+        <div className="flex flex-1 flex-col gap-1">
+          <span className="comet-body-s-accented px-0.5 pb-0.5">
+            Project name
+          </span>
           <div className="flex items-center gap-1 rounded border bg-primary-foreground px-2 py-1">
             <code className="comet-body-xs text-muted-slate">{agentName}</code>
             <CopyButton
@@ -53,11 +55,12 @@ const ManualIntegrationList: React.FC<ManualIntegrationListProps> = ({
               message="Project name copied"
               tooltipText="Copy project name"
               size="icon-3xs"
+              className="ml-auto"
             />
           </div>
         </div>
-        <div className="flex items-center justify-between gap-2">
-          <span className="comet-body-s-accented">API key</span>
+        <div className="flex flex-1 flex-col gap-1">
+          <span className="comet-body-s-accented px-0.5 pb-0.5">API key</span>
           <div className="flex items-center gap-1 rounded border bg-primary-foreground px-2 py-1">
             <code className="comet-body-xs text-muted-slate">
               opk-***-your-api-key
@@ -67,6 +70,7 @@ const ManualIntegrationList: React.FC<ManualIntegrationListProps> = ({
               message="API key copied"
               tooltipText="Copy API key"
               size="icon-3xs"
+              className="ml-auto"
             />
           </div>
         </div>
@@ -82,26 +86,29 @@ const ManualIntegrationList: React.FC<ManualIntegrationListProps> = ({
         </TabsList>
 
         <TabsContent value={activeCategory}>
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <div className="grid grid-cols-4 gap-2">
             {integrations.map((integration) => (
-              <IntegrationCard
-                key={integration.id}
-                title={integration.title}
-                icon={
-                  <img
-                    alt={integration.title}
-                    src={
-                      themeMode === THEME_MODE.DARK && integration.whiteIcon
-                        ? integration.whiteIcon
-                        : integration.icon
-                    }
-                    className="size-[32px] shrink-0"
-                  />
-                }
-                onClick={() => onSelectIntegration(integration.id)}
-                id={`onboarding-integration-card-${integration.id}`}
-                data-fs-element={`OnboardingIntegrationCard-${integration.id}`}
-              />
+              <div key={integration.id} title={integration.title}>
+                <IntegrationCard
+                  title={integration.title}
+                  icon={
+                    <img
+                      alt={integration.title}
+                      src={
+                        themeMode === THEME_MODE.DARK && integration.whiteIcon
+                          ? integration.whiteIcon
+                          : integration.icon
+                      }
+                      className="size-4 shrink-0"
+                    />
+                  }
+                  className="h-8 gap-1 overflow-hidden p-[0.375rem_0.5rem] [&>div:last-child]:min-w-0 [&_h3]:truncate"
+                  iconClassName="min-w-0"
+                  onClick={() => onSelectIntegration(integration.id)}
+                  id={`onboarding-integration-card-${integration.id}`}
+                  data-fs-element={`OnboardingIntegrationCard-${integration.id}`}
+                />
+              </div>
             ))}
 
             <a
@@ -115,10 +122,12 @@ const ManualIntegrationList: React.FC<ManualIntegrationListProps> = ({
               <IntegrationCard
                 title="View all"
                 icon={
-                  <div className="flex size-[32px] items-center justify-center rounded-lg bg-primary/10">
-                    <BookOpen className="size-4 text-primary" />
+                  <div className="flex size-4 items-center justify-center rounded bg-primary/10">
+                    <BookOpen className="size-3 text-primary" />
                   </div>
                 }
+                className="h-8 gap-1 overflow-hidden p-[0.375rem_0.5rem] [&>div:last-child]:min-w-0 [&_h3]:truncate"
+                iconClassName="min-w-0"
                 id="onboarding-integration-view-all"
                 data-fs-element="OnboardingIntegrationViewAll"
               />
