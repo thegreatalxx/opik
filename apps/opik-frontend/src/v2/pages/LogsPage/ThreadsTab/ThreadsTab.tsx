@@ -92,6 +92,7 @@ const SHARED_COLUMNS: ColumnData<Thread>[] = [
     cell: PrettyCell as never,
     customMeta: {
       fieldType: "input",
+      colorIndicator: true,
     },
   },
   {
@@ -102,6 +103,7 @@ const SHARED_COLUMNS: ColumnData<Thread>[] = [
     cell: PrettyCell as never,
     customMeta: {
       fieldType: "output",
+      colorIndicator: true,
     },
   },
   {
@@ -124,7 +126,6 @@ const SHARED_COLUMNS: ColumnData<Thread>[] = [
     id: "tags",
     label: "Tags",
     type: COLUMN_TYPE.list,
-    iconType: "tags",
     cell: ListCell as never,
   },
   {
@@ -549,6 +550,8 @@ export const ThreadsTab: React.FC<ThreadsTabProps> = ({
       projectId,
       projectName,
       enableUserFeedbackEditing: true,
+      hideHeaderIcons: true,
+      cellBorders: true,
     }),
     [projectId, projectName],
   );

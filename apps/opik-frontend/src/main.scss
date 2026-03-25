@@ -730,6 +730,10 @@
     z-index: 10;
   }
 
+  [data-header-stuck] & thead[data-sticky-vertical] {
+    box-shadow: 0 4px 8px -2px hsl(var(--border) / 0.6);
+  }
+
   td:first-child [data-cell-wrapper="true"],
   th:first-child [data-header-wrapper="true"] {
     padding-left: 24px;
@@ -738,6 +742,20 @@
   td:last-child [data-cell-wrapper="true"],
   th:last-child [data-header-wrapper="true"] {
     padding-right: 24px;
+  }
+}
+
+.comet-cell-borders {
+  td,
+  th {
+    border-right: 1px solid hsl(var(--border));
+  }
+
+  td:last-child,
+  th:last-child,
+  // Pinned cells use box-shadow for their border (see getCommonPinningStyles)
+  .comet-pinned-cell {
+    border-right: none;
   }
 }
 
