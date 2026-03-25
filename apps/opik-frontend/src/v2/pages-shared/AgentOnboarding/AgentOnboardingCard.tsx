@@ -23,9 +23,11 @@ const AgentOnboardingCard: React.FC<AgentOnboardingCardProps> = ({
             <p className="comet-body-s text-muted-slate">{description}</p>
           )}
         </div>
-        <div className="py-4">{children}</div>
+        <div className="max-h-[calc(100vh-320px)] overflow-y-auto py-4">
+          {children}
+        </div>
         <Separator />
-        <div className="flex justify-end pt-4">{footer}</div>
+        <div className="flex justify-between pt-4">{footer}</div>
       </div>
     </div>
   );
