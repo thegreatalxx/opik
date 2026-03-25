@@ -534,8 +534,6 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
                     ORDER BY (workspace_id, dataset_id, dataset_version_id, id) DESC, last_updated_at DESC
                     LIMIT 1 BY id
                 ) AS div_dedup
-                ORDER BY last_updated_at DESC
-                LIMIT 1 BY dataset_item_id
             )
             , experiment_items_final AS (
             	SELECT *
@@ -610,8 +608,6 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
                     ORDER BY (workspace_id, dataset_id, dataset_version_id, id) DESC, last_updated_at DESC
                     LIMIT 1 BY id
                 ) AS div_dedup
-                ORDER BY last_updated_at DESC
-                LIMIT 1 BY dataset_item_id
             ), item_agg_count AS (
                 SELECT
                     eia.id,
@@ -812,8 +808,6 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
                     ORDER BY (workspace_id, dataset_id, dataset_version_id, id) DESC, last_updated_at DESC
                     LIMIT 1 BY id
                 ) AS div_dedup
-                ORDER BY item_last_updated_at DESC
-                LIMIT 1 BY dataset_item_id
             ),
             feedback_scores_combined_raw AS (
                 SELECT
@@ -1048,8 +1042,6 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
                     ORDER BY (workspace_id, dataset_id, dataset_version_id, id) DESC, last_updated_at DESC
                     LIMIT 1 BY id
                 ) AS div_dedup
-                ORDER BY last_updated_at DESC
-                LIMIT 1 BY dataset_item_id
             )
             <if(push_top_limit)>
             , top_dataset_items AS (
@@ -1927,8 +1919,6 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
                         ORDER BY (div.workspace_id, div.dataset_id, div.dataset_version_id, div.id) DESC, div.last_updated_at DESC
                         LIMIT 1 BY div.id
                     ) div_dedup
-                    ORDER BY div_dedup.last_updated_at DESC
-                    LIMIT 1 BY div_dedup.dataset_item_id
                 ) dibv ON (dibv.dataset_item_id = ei.dataset_item_id OR dibv.row_id = ei.dataset_item_id)
                 <if(experiment_item_filters)>
                 AND ei.trace_id IN (
@@ -1993,8 +1983,6 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
                             ORDER BY (workspace_id, dataset_id, dataset_version_id, id) DESC, last_updated_at DESC
                             LIMIT 1 BY id
                         ) AS div_dedup
-                        ORDER BY last_updated_at DESC
-                        LIMIT 1 BY dataset_item_id
                     ) AS versioned
                     WHERE <dataset_item_filters>
                 )
@@ -2036,8 +2024,6 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
                             ORDER BY (workspace_id, dataset_id, dataset_version_id, id) DESC, last_updated_at DESC
                             LIMIT 1 BY id
                         ) AS div_dedup
-                        ORDER BY last_updated_at DESC
-                        LIMIT 1 BY dataset_item_id
                     ) AS versioned
                     WHERE <dataset_item_filters>
                 )
