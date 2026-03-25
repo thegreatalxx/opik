@@ -550,7 +550,6 @@ export const ThreadsTab: React.FC<ThreadsTabProps> = ({
       projectId,
       projectName,
       enableUserFeedbackEditing: true,
-      hideHeaderIcons: true,
       cellBorders: true,
     }),
     [projectId, projectName],

@@ -875,7 +875,6 @@ export const TracesSpansTab: React.FC<TracesSpansTabProps> = ({
         handleRowClick(row, DetailsActionSection.Comments);
       },
       enableUserFeedbackEditing: true,
-      hideHeaderIcons: true,
       cellBorders: true,
     }),
     [handleRowClick],
