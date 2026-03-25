@@ -1630,7 +1630,7 @@ export class OpikClient {
    * Call this once at agent startup — before running inferences — to ensure the config
    * is registered and can be retrieved by `getAgentConfigVersion()`.
    *
-   * @param schema - Zod object schema that describes the config shape
+   * @param schema - Zod object schema that describes the config shape (must have a `.describe()` name)
    * @param values - Typed config values that conform to the schema
    * @param options.projectName - Project to publish under (defaults to client's configured project)
    * @param options.description - Optional human-readable description for this version

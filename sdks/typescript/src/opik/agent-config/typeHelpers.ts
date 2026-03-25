@@ -20,6 +20,7 @@ export interface FieldMeta {
   backendType: string;
   description?: string;
   isOptional: boolean;
+  isJsonEncoded: boolean;
 }
 
 export function getSchemaPrefix(schema: z.ZodObject<z.ZodRawShape>): string {
@@ -61,7 +62,9 @@ export function zodTypeToBackendType(zodField: z.ZodTypeAny): string {
   if (inner instanceof z.ZodRecord) return "string";
   if (inner instanceof z.ZodObject) return "string";
   if (inner instanceof z.ZodEffects) {
-    // z.instanceof() doesn't store the class in _def; detect via sentinel parse
+    // Only z.instanceof(Prompt/PromptVersion) is supported. Other ZodEffects (transforms,
+    // refines) are intentionally unsupported — map the underlying field to a primitive type
+    // before using it in an AgentConfig schema.
     const sentinel = Object.create(null);
     Object.setPrototypeOf(sentinel, Prompt.prototype);
     if (inner.safeParse(sentinel).success) return "prompt";
@@ -71,6 +74,9 @@ export function zodTypeToBackendType(zodField: z.ZodTypeAny): string {
     if (inner.safeParse(sentinel).success) return "prompt_commit";
   }
 
+  // Only a fixed set of Zod primitives are supported in AgentConfig schemas.
+  // Unsupported types (z.union, z.enum, z.transform, etc.) must be mapped to a
+  // supported primitive before use.
   throw new TypeError(`Unsupported Zod type: ${inner.constructor.name}`);
 }
 
@@ -82,15 +88,20 @@ export function extractFieldMetadata(
 
   for (const [fieldName, zodField] of Object.entries(schema.shape)) {
     const field = zodField as z.ZodTypeAny;
-    const { isOptional } = unwrapZodType(field);
+    const { inner, isOptional } = unwrapZodType(field);
     const backendType = zodTypeToBackendType(field);
     const description = field._def.description as string | undefined;
+    const isJsonEncoded =
+      inner instanceof z.ZodArray ||
+      inner instanceof z.ZodRecord ||
+      inner instanceof z.ZodObject;
 
     result.set(fieldName, {
       prefixedKey: `${prefix}.${fieldName}`,
       backendType,
       description,
       isOptional: isOptional || field.isOptional(),
+      isJsonEncoded,
     });
   }
 
@@ -197,10 +208,9 @@ export function deserializeToShape<S extends z.ZodObject<z.ZodRawShape>>(
       ) {
         result[fieldName] = resolvedValues[meta.prefixedKey];
       } else {
-        result[fieldName] = deserializeValue(
-          entry.value,
-          entry.type ?? meta.backendType
-        );
+        const raw = deserializeValue(entry.value, entry.type ?? meta.backendType);
+        result[fieldName] =
+          meta.isJsonEncoded && typeof raw === "string" ? JSON.parse(raw) : raw;
       }
     } else {
       result[fieldName] = (fallback as Record<string, unknown>)[fieldName];
@@ -220,11 +230,15 @@ export function matchesBlueprint(
 
   for (const [fieldName, meta] of fieldMeta.entries()) {
     const localValue = values[fieldName];
-    if (localValue === null || localValue === undefined) continue;
-
-    const serialized = serializeValue(localValue as SupportedValue, meta.backendType);
     const blueprintRaw = blueprint.getRawValue(meta.prefixedKey);
 
+    if (localValue === null || localValue === undefined) {
+      // null/undefined local → expect the blueprint entry to also be absent/null
+      if (blueprintRaw !== undefined) return false;
+      continue;
+    }
+
+    const serialized = serializeValue(localValue as SupportedValue, meta.backendType);
     if (blueprintRaw === undefined) return false;
     if (blueprintRaw !== serialized) return false;
   }

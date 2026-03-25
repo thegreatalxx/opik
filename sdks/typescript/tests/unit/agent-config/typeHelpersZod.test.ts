@@ -142,7 +142,7 @@ describe("serializeFields", () => {
     );
   });
 
-  it("sends null value for undefined optional fields (matching Python behaviour)", () => {
+  it("omits value for undefined optional fields", () => {
     const result = serializeFields(schema, { temperature: 0.5, model: "m", enabled: false, hint: undefined }, "Cfg");
     expect(result.find((v) => v.key === "Cfg.hint")).toEqual(
       expect.objectContaining({ key: "Cfg.hint", value: undefined, type: "string" })
@@ -171,6 +171,35 @@ describe("deserializeToShape", () => {
     const bp = { "Cfg.temperature": { value: "0.7", type: "float" } };
     const result = deserializeToShape(schema, bp, "Cfg", { temperature: 0, model: "fallback" });
     expect(result.model).toBe("fallback");
+  });
+
+  describe("array/object round-trip", () => {
+    it("round-trips a z.array field through serialize → deserialize", () => {
+      const s = z.object({ tags: z.array(z.string()) }).describe("Cfg");
+      const values = { tags: ["a", "b", "c"] };
+      const serialized = serializeFields(s, values, "Cfg");
+      const bp = Object.fromEntries(serialized.map((e) => [e.key, { value: e.value, type: e.type }]));
+      const result = deserializeToShape(s, bp, "Cfg", { tags: [] });
+      expect(result.tags).toEqual(["a", "b", "c"]);
+    });
+
+    it("round-trips a nested array of objects", () => {
+      const s = z.object({ items: z.array(z.object({ id: z.number() })) }).describe("Cfg");
+      const values = { items: [{ id: 1 }, { id: 2 }] };
+      const serialized = serializeFields(s, values, "Cfg");
+      const bp = Object.fromEntries(serialized.map((e) => [e.key, { value: e.value, type: e.type }]));
+      const result = deserializeToShape(s, bp, "Cfg", { items: [] });
+      expect(result.items).toEqual([{ id: 1 }, { id: 2 }]);
+    });
+
+    it("round-trips a z.record field", () => {
+      const s = z.object({ meta: z.record(z.string()) }).describe("Cfg");
+      const values = { meta: { foo: "bar", baz: "qux" } };
+      const serialized = serializeFields(s, values, "Cfg");
+      const bp = Object.fromEntries(serialized.map((e) => [e.key, { value: e.value, type: e.type }]));
+      const result = deserializeToShape(s, bp, "Cfg", { meta: {} });
+      expect(result.meta).toEqual({ foo: "bar", baz: "qux" });
+    });
   });
 });
 
@@ -203,5 +232,26 @@ describe("matchesBlueprint", () => {
       { key: "Cfg.temperature", value: "0.5", type: "float" },
     ]);
     expect(matchesBlueprint(schema, { temperature: 0.5, model: "gpt-4" }, bp, "Cfg")).toBe(false);
+  });
+
+  describe("null/undefined optional fields", () => {
+    const schemaWithOptional = z
+      .object({ temperature: z.number(), hint: z.string().optional() })
+      .describe("Cfg");
+
+    it("returns true when local null matches absent blueprint entry", () => {
+      const bp = makeBlueprintWithRawValues([
+        { key: "Cfg.temperature", value: "0.5", type: "float" },
+      ]);
+      expect(matchesBlueprint(schemaWithOptional, { temperature: 0.5, hint: undefined }, bp, "Cfg")).toBe(true);
+    });
+
+    it("returns false when local null differs from a stored blueprint value", () => {
+      const bp = makeBlueprintWithRawValues([
+        { key: "Cfg.temperature", value: "0.5", type: "float" },
+        { key: "Cfg.hint", value: "some-hint", type: "string" },
+      ]);
+      expect(matchesBlueprint(schemaWithOptional, { temperature: 0.5, hint: undefined }, bp, "Cfg")).toBe(false);
+    });
   });
 });
