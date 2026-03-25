@@ -1793,6 +1793,7 @@ export class OpikClient {
             blueprintVersion: undefined,
             envs: undefined,
             isFallback: true,
+            maskId,
             deployTo: async () => {
               throw new Error("Cannot deploy fallback config");
             },
@@ -1839,6 +1840,7 @@ export class OpikClient {
       blueprintVersion: blueprint.name,
       envs: blueprint.envs,
       isFallback: false,
+      maskId,
       deployTo: async (env: string) => {
         await agentConfig.tagBlueprintWithEnv(blueprint!.id, env);
       },

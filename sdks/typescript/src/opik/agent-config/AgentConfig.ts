@@ -28,6 +28,7 @@ export interface AgentConfigOptions<S extends z.ZodObject<z.ZodRawShape>> {
   blueprintVersion: string | undefined;
   envs: string[] | undefined;
   isFallback: boolean;
+  maskId: string | undefined;
   deployTo: (env: string) => Promise<void>;
 }
 
@@ -42,6 +43,7 @@ export function createTypedAgentConfig<S extends z.ZodObject<z.ZodRawShape>>(
     blueprintVersion,
     envs,
     isFallback,
+    maskId,
     deployTo,
   } = options;
 
@@ -69,6 +71,7 @@ export function createTypedAgentConfig<S extends z.ZodObject<z.ZodRawShape>>(
         injectTraceMetadata({
           blueprintId,
           blueprintVersion,
+          maskId,
           fieldMeta,
           values: values as Record<string, unknown>,
         });
@@ -84,13 +87,14 @@ export function createTypedAgentConfig<S extends z.ZodObject<z.ZodRawShape>>(
 function injectTraceMetadata(opts: {
   blueprintId: string | undefined;
   blueprintVersion: string | undefined;
+  maskId: string | undefined;
   fieldMeta: Map<string, FieldMeta>;
   values: Record<string, unknown>;
 }): void {
   const ctx = getTrackContext();
   if (!ctx) return;
 
-  const { blueprintId, blueprintVersion, fieldMeta, values } = opts;
+  const { blueprintId, blueprintVersion, maskId, fieldMeta, values } = opts;
 
   const valuesMetadata: Record<
     string,
@@ -105,13 +109,15 @@ function injectTraceMetadata(opts: {
     };
   }
 
-  const metadata = {
-    agent_configuration: {
-      _blueprint_id: blueprintId,
-      blueprint_version: blueprintVersion,
-      values: valuesMetadata,
-    },
+  const agentConfiguration: Record<string, unknown> = {
+    _blueprint_id: blueprintId,
+    blueprint_version: blueprintVersion,
+    values: valuesMetadata,
   };
+  if (maskId !== undefined) {
+    agentConfiguration["_mask_id"] = maskId;
+  }
+  const metadata = { agent_configuration: agentConfiguration };
 
   ctx.span.update({ metadata });
   ctx.trace.update({ metadata });
