@@ -36,6 +36,44 @@ const ConnectAgentStep: React.FC = () => {
     goToStep(AGENT_ONBOARDING_STEPS.DONE, { agentName });
   };
 
+  if (selectedIntegration) {
+    return (
+      <AgentOnboardingCard
+        title=""
+        showFooterSeparator
+        footer={
+          <>
+            <Button
+              variant="link"
+              onClick={handleBack}
+              className="comet-body-s mr-auto text-muted-slate"
+              id="onboarding-step2-back"
+              data-fs-element="onboarding-step2-back"
+            >
+              <ChevronLeft className="size-3.5" />
+              Back
+            </Button>
+            <Button
+              variant="link"
+              onClick={handleSkip}
+              className="comet-body-s text-muted-slate"
+              id="onboarding-step2-skip"
+              data-fs-element="onboarding-step2-skip"
+            >
+              Skip for now
+              <ChevronsRight className="size-3.5" />
+            </Button>
+          </>
+        }
+      >
+        <ManualIntegrationDetail
+          integration={selectedIntegration}
+          onBack={() => setSelectedIntegrationId(null)}
+        />
+      </AgentOnboardingCard>
+    );
+  }
+
   return (
     <AgentOnboardingCard
       title={`Connect ${agentName} to Opik`}
@@ -81,16 +119,9 @@ const ConnectAgentStep: React.FC = () => {
         </TabsContent>
 
         <TabsContent value="manual-integration">
-          {selectedIntegration ? (
-            <ManualIntegrationDetail
-              integration={selectedIntegration}
-              onBack={() => setSelectedIntegrationId(null)}
-            />
-          ) : (
-            <ManualIntegrationList
-              onSelectIntegration={setSelectedIntegrationId}
-            />
-          )}
+          <ManualIntegrationList
+            onSelectIntegration={setSelectedIntegrationId}
+          />
         </TabsContent>
       </Tabs>
     </AgentOnboardingCard>
