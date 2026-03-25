@@ -67,9 +67,10 @@ export class BlueprintCacheRegistry {
   getOrCreate(
     projectName: string,
     env: string | null,
-    maskId: string | null
+    maskId: string | null,
+    version: string | null = null
   ): CacheEntry {
-    const key = `${projectName}::${env ?? ""}::${maskId ?? ""}`;
+    const key = `${projectName}::${env ?? ""}::${maskId ?? ""}::${version ?? ""}`;
     let entry = this._entries.get(key);
     if (!entry) {
       entry = new CacheEntry(getTtlSeconds());
@@ -119,9 +120,10 @@ export function getGlobalBlueprintRegistry(): BlueprintCacheRegistry {
 export function getCachedBlueprint(
   projectName: string,
   env: string | null,
-  maskId: string | null
+  maskId: string | null,
+  version: string | null = null
 ): CacheEntry {
-  return _registry.getOrCreate(projectName, env, maskId);
+  return _registry.getOrCreate(projectName, env, maskId, version);
 }
 
 export function initBlueprintCacheEntry(
@@ -129,9 +131,10 @@ export function initBlueprintCacheEntry(
   env: string | null,
   maskId: string | null,
   blueprint: Blueprint | null,
-  refreshCallback: RefreshCallback | null
+  refreshCallback: RefreshCallback | null,
+  version: string | null = null
 ): void {
-  const entry = _registry.getOrCreate(projectName, env, maskId);
+  const entry = _registry.getOrCreate(projectName, env, maskId, version);
   if (blueprint !== null) {
     entry.update(blueprint);
   }

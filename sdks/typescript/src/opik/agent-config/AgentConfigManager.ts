@@ -4,15 +4,9 @@ import * as OpikApi from "@/rest_api/api";
 import { generateId } from "@/utils/generateId";
 import { logger } from "@/utils/logger";
 import { Blueprint } from "./Blueprint";
-import {
-  inferBackendType,
-  serializeValue,
-  type SupportedValue,
-} from "./typeHelpers";
 
 export interface CreateBlueprintOptions {
-  values: Record<string, SupportedValue>;
-  serializedValues?: OpikApi.AgentConfigValueWrite[];
+  values: OpikApi.AgentConfigValueWrite[];
   description?: string;
 }
 
@@ -42,18 +36,6 @@ export class AgentConfigManager {
     return project.id;
   }
 
-  private buildBlueprintValues(
-    values: Record<string, SupportedValue>
-  ): OpikApi.AgentConfigValueWrite[] {
-    return Object.entries(values)
-      .filter(([, v]) => v != null)
-      .map(([key, value]) => ({
-        key,
-        value: serializeValue(value),
-        type: inferBackendType(value),
-      }));
-  }
-
   /**
    * Creates a new blueprint for the project and returns it.
    *
@@ -62,7 +44,6 @@ export class AgentConfigManager {
    */
   async createBlueprint(options: CreateBlueprintOptions): Promise<Blueprint> {
     const id = generateId();
-    const values = options.serializedValues ?? this.buildBlueprintValues(options.values);
 
     logger.debug(`Creating blueprint for project "${this.projectName}"`);
 
@@ -73,7 +54,7 @@ export class AgentConfigManager {
         id,
         type: OpikApi.AgentBlueprintWriteType.Blueprint,
         description: options.description,
-        values,
+        values: options.values,
       },
     });
 
@@ -88,7 +69,6 @@ export class AgentConfigManager {
    */
   async updateBlueprint(options: CreateBlueprintOptions): Promise<Blueprint> {
     const id = generateId();
-    const values = options.serializedValues ?? this.buildBlueprintValues(options.values);
 
     logger.debug(`Updating blueprint for project "${this.projectName}"`);
 
@@ -98,7 +78,7 @@ export class AgentConfigManager {
         id,
         type: OpikApi.AgentBlueprintWriteType.Blueprint,
         description: options.description,
-        values,
+        values: options.values,
       },
     });
 
@@ -116,7 +96,6 @@ export class AgentConfigManager {
    */
   async createMask(options: CreateBlueprintOptions): Promise<string> {
     const id = generateId();
-    const values = this.buildBlueprintValues(options.values);
 
     logger.debug(`Creating mask for project "${this.projectName}"`);
 
@@ -126,7 +105,7 @@ export class AgentConfigManager {
         id,
         type: OpikApi.AgentBlueprintWriteType.Mask,
         description: options.description,
-        values,
+        values: options.values,
       },
     });
 

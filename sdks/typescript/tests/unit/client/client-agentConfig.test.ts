@@ -105,7 +105,10 @@ describe("AgentConfigManager", () => {
       const manager = new AgentConfigManager("test-project", client);
 
       const blueprint = await manager.createBlueprint({
-        values: { temperature: "0.8", model: "gpt-4" },
+        values: [
+          { key: "temperature", value: "0.8", type: "string" },
+          { key: "model", value: "gpt-4", type: "string" },
+        ],
         description: "Test blueprint",
       });
 
@@ -126,10 +129,15 @@ describe("AgentConfigManager", () => {
       expect(blueprint.id).toBe("blueprint-id-1");
     });
 
-    it("should infer types when creating blueprint with native values", async () => {
+    it("should pass serialized values through unchanged", async () => {
       const manager = new AgentConfigManager("test-project", client);
       await manager.createBlueprint({
-        values: { temperature: 0.8, maxTokens: 100, stream: true, model: "gpt-4" },
+        values: [
+          { key: "temperature", value: "0.8", type: "float" },
+          { key: "maxTokens", value: "100", type: "integer" },
+          { key: "stream", value: "true", type: "boolean" },
+          { key: "model", value: "gpt-4", type: "string" },
+        ],
       });
 
       const createCall = createAgentConfigSpy.mock.calls[0][0];
@@ -145,7 +153,7 @@ describe("AgentConfigManager", () => {
 
     it("should use a client-side generated UUID in the POST body", async () => {
       const manager = new AgentConfigManager("test-project", client);
-      await manager.createBlueprint({ values: { key: "val" } });
+      await manager.createBlueprint({ values: [{ key: "key", value: "val", type: "string" }] });
 
       const createCall = createAgentConfigSpy.mock.calls[0][0];
       expect(createCall.id).toBeDefined();
@@ -162,7 +170,10 @@ describe("AgentConfigManager", () => {
       const manager = new AgentConfigManager("test-project", client);
 
       const blueprint = await manager.updateBlueprint({
-        values: { temperature: 0.9, model: "gpt-4o" },
+        values: [
+          { key: "temperature", value: "0.9", type: "float" },
+          { key: "model", value: "gpt-4o", type: "string" },
+        ],
         description: "Updated blueprint",
       });
 
@@ -184,7 +195,7 @@ describe("AgentConfigManager", () => {
 
     it("should use a client-side generated UUID in the PATCH body", async () => {
       const manager = new AgentConfigManager("test-project", client);
-      await manager.updateBlueprint({ values: { key: "val" } });
+      await manager.updateBlueprint({ values: [{ key: "key", value: "val", type: "string" }] });
 
       const updateCall = updateAgentConfigSpy.mock.calls[0][0];
       expect(updateCall.blueprint.id).toBeDefined();
@@ -199,7 +210,7 @@ describe("AgentConfigManager", () => {
     it("should call updateAgentConfig (PATCH) with type=mask and return the mask ID", async () => {
       const manager = new AgentConfigManager("test-project", client);
       const maskId = await manager.createMask({
-        values: { temperature: "0.5" },
+        values: [{ key: "temperature", value: "0.5", type: "float" }],
         description: "A/B variant",
       });
 
@@ -213,10 +224,10 @@ describe("AgentConfigManager", () => {
       expect(maskId.length).toBeGreaterThan(0);
     });
 
-    it("should infer types for mask values", async () => {
+    it("should pass serialized mask values through unchanged", async () => {
       const manager = new AgentConfigManager("test-project", client);
       await manager.createMask({
-        values: { temperature: 0.5 },
+        values: [{ key: "temperature", value: "0.5", type: "float" }],
       });
 
       const updateCall = updateAgentConfigSpy.mock.calls[0][0];

@@ -232,8 +232,7 @@ export function matchesBlueprint(
   return true;
 }
 
-// Legacy value-sniffing helpers — kept for AgentConfig.ts backward-compat
-export function inferBackendType(
+function inferBackendType(
   value: SupportedValue
 ): OpikApi.AgentConfigValueWriteType {
   if (typeof value === "boolean") return "boolean";

@@ -132,7 +132,7 @@ describe.skipIf(!shouldRunApiTests)(
         });
         const byName = await fetchByName();
         expect(byName.temperature).toBeCloseTo(0.5);
-        expect(byName.hint).toBeUndefined();
+        expect(byName.hint).toBeNull();
 
         // Deploy v1 to "staging" then retrieve by env
         await byName.deployTo("staging");
@@ -146,7 +146,7 @@ describe.skipIf(!shouldRunApiTests)(
         });
         const byEnv = await fetchByEnv();
         expect(byEnv.temperature).toBeCloseTo(0.5);
-        expect(byEnv.hint).toBeUndefined();
+        expect(byEnv.hint).toBeNull();
       },
       60_000
     );
@@ -259,7 +259,10 @@ describe.skipIf(!shouldRunApiTests)(
         const agentMeta = meta?.agent_configuration as Record<string, unknown>;
         expect(agentMeta._blueprint_id).toBeDefined();
         expect(agentMeta.blueprint_version).toBeDefined();
-        expect(agentMeta.values).toEqual({ temperature: 0.7, model: "gpt-4" });
+        expect(agentMeta.values).toEqual({
+          "TraceSchema.temperature": { value: 0.7, type: "float" },
+          "TraceSchema.model": { value: "gpt-4", type: "string" },
+        });
       },
       60_000
     );
@@ -285,7 +288,7 @@ describe.skipIf(!shouldRunApiTests)(
         // Create mask via AgentConfigManager low-level API
         const agentConfigLow = new AgentConfigManager(projectName, client);
         const maskId = await agentConfigLow.createMask({
-          values: { "MyConfig.temperature": 0.9 },
+          values: [{ key: "MyConfig.temperature", value: "0.9", type: "float" }],
         });
 
         const fetchWithMask = track(async () => {

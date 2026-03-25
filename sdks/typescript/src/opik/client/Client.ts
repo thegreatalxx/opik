@@ -1664,15 +1664,13 @@ export class OpikClient {
     let blueprint;
     if (latest) {
       blueprint = await agentConfig.updateBlueprint({
-        values: {},
-        serializedValues: serialized,
+        values: serialized,
         description: options?.description,
       });
     } else {
       try {
         blueprint = await agentConfig.createBlueprint({
-          values: {},
-          serializedValues: serialized,
+          values: serialized,
           description: options?.description,
         });
       } catch (error) {
@@ -1682,8 +1680,7 @@ export class OpikClient {
             return refetched.name ?? refetched.id;
           }
           blueprint = await agentConfig.updateBlueprint({
-            values: {},
-            serializedValues: serialized,
+            values: serialized,
             description: options?.description,
           });
         } else {
@@ -1763,11 +1760,10 @@ export class OpikClient {
     const fieldMeta = extractFieldMetadata(schema, prefix);
 
     // effectiveEnv is null for `latest` and `version` lookups (no env tag involved)
-    const effectiveEnv = options.latest || options.version
-      ? null
-      : (options.env ?? "prod");
+    const effectiveEnv = options.latest || options.version ? null : (options.env ?? "prod");
+    const effectiveVersion = options.version ?? null;
 
-    const cacheEntry = getCachedBlueprint(projectName, effectiveEnv, maskId ?? null);
+    const cacheEntry = getCachedBlueprint(projectName, effectiveEnv, maskId ?? null, effectiveVersion);
 
     let blueprint = null;
 
@@ -1809,7 +1805,7 @@ export class OpikClient {
             : () => agentConfig.getBlueprint({ env: effectiveEnv!, maskId: undefined })
           : null;
 
-      initBlueprintCacheEntry(projectName, effectiveEnv, maskId ?? null, blueprint, refreshCallback);
+      initBlueprintCacheEntry(projectName, effectiveEnv, maskId ?? null, blueprint, refreshCallback, effectiveVersion);
     } else {
       blueprint = cacheEntry.getBlueprint();
     }

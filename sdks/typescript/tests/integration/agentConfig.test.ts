@@ -34,12 +34,12 @@ describe.skipIf(!shouldRunApiTests)(
       const manager = new AgentConfigManager(testProjectName, client);
 
       const created = await manager.createBlueprint({
-        values: {
-          temperature: 0.8,
-          maxTokens: 100,
-          stream: true,
-          model: "gpt-4",
-        },
+        values: [
+          { key: "temperature", value: "0.8", type: "float" },
+          { key: "maxTokens", value: "100", type: "integer" },
+          { key: "stream", value: "true", type: "boolean" },
+          { key: "model", value: "gpt-4", type: "string" },
+        ],
         description: "Initial config",
       });
 
@@ -65,7 +65,7 @@ describe.skipIf(!shouldRunApiTests)(
       const manager = new AgentConfigManager(testProjectName, client);
 
       const created = await manager.createBlueprint({
-        values: { temperature: "0.7" },
+        values: [{ key: "temperature", value: "0.7", type: "string" }],
       });
 
       const fetched = await manager.getBlueprint({ id: created.id });
@@ -79,12 +79,15 @@ describe.skipIf(!shouldRunApiTests)(
       const manager = new AgentConfigManager(testProjectName, client);
 
       const baseBp = await manager.createBlueprint({
-        values: { temperature: "0.6", model: "gpt-3.5" },
+        values: [
+          { key: "temperature", value: "0.6", type: "string" },
+          { key: "model", value: "gpt-3.5", type: "string" },
+        ],
         description: "Base config",
       });
 
       const maskId = await manager.createMask({
-        values: { temperature: "0.5" },
+        values: [{ key: "temperature", value: "0.5", type: "string" }],
         description: "A/B variant",
       });
 
@@ -102,7 +105,10 @@ describe.skipIf(!shouldRunApiTests)(
       const manager = new AgentConfigManager(testProjectName, client);
 
       const created = await manager.createBlueprint({
-        values: { temperature: "0.9", model: "gpt-4o" },
+        values: [
+          { key: "temperature", value: "0.9", type: "string" },
+          { key: "model", value: "gpt-4o", type: "string" },
+        ],
         description: "Production config",
       });
 
@@ -132,10 +138,10 @@ describe.skipIf(!shouldRunApiTests)(
       const manager = new AgentConfigManager(testProjectName, client);
 
       const created = await manager.createBlueprint({
-        values: {
-          systemPrompt: promptV1,
-          pinnedVersion: promptVersionV1,
-        },
+        values: [
+          { key: "systemPrompt", value: promptV1.commit!, type: "prompt" },
+          { key: "pinnedVersion", value: promptVersionV1.commit, type: "prompt_commit" },
+        ],
         description: "Prompt resolution test",
       });
 
