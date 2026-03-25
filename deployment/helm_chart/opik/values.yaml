@@ -411,6 +411,9 @@ component:
     maps: []
     # use internal aws resolvr on vpc
     awsResolver: false
+    # Assistant sidebar CDN base URL for iframe shell proxy
+    # Set to enable /assistant/shell proxy (e.g., "https://cdn.example.com/assistant/v1")
+    assistantCdnUrl: ""
     # Enable HSTS header (only enable when running behind HTTPS termination)
     # DEPRECATED: Use extraServerHeaders instead for more flexibility
     hstsEnabled: false
@@ -463,13 +466,13 @@ component:
         - "'self'"
         - "'unsafe-inline'"
         - "'unsafe-eval'"
-        # Add external services here, e.g.:
-        # - "https://cdn.example.com"
+        - "https://cdn.comet.ml"
       # Styles allowed to load
       style-src:
         - "'self'"
         - "'unsafe-inline'"
         - "https://fonts.googleapis.com"
+        - "https://cdn.comet.ml"
       # Images allowed to load
       img-src:
         - "'self'"
@@ -495,8 +498,7 @@ component:
         - "ws:"
         - "wss:"
         - "https:"
-        # Add external API endpoints here, e.g.:
-        # - "https://api.example.com"
+        - "https://cdn.comet.ml"
       # Objects/plugins (Flash, Java, etc.)
       object-src:
         - "'none'"

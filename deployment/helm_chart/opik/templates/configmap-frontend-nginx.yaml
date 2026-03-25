@@ -169,6 +169,14 @@ data:
             rewrite ^(.*)$ $1/ permanent;
         }
 
+        {{- if .Values.component.frontend.assistantCdnUrl }}
+        location = {{ $rootPath }}/assistant/shell {
+            proxy_pass {{ .Values.component.frontend.assistantCdnUrl }}/shell;
+            proxy_ssl_server_name on;
+            proxy_cache_valid 200 5m;
+        }
+        {{- end }}
+
         {{- if not .Values.standalone }}
         location = {{ $rootPath }} {
             return 308 {{ $rootPath }}/;
