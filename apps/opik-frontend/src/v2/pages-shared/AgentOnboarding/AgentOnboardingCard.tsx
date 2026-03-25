@@ -18,18 +18,18 @@ const AgentOnboardingCard: React.FC<AgentOnboardingCardProps> = ({
 }) => {
   return (
     <div className="fixed inset-0 z-50 flex justify-center pt-40">
-      <div className="flex h-fit w-full max-w-[648px] flex-col gap-5 rounded-md border bg-background p-5 shadow-lg">
+      <div className="flex h-fit w-[40.5rem] flex-col gap-5 rounded-md border bg-background p-5 shadow-lg">
         <div className="flex flex-col gap-1.5">
           <h2 className="comet-title-s">{title}</h2>
           {description && (
             <p className="comet-body-s text-muted-slate">{description}</p>
           )}
         </div>
-        <div className="max-h-[calc(100vh-320px)] overflow-y-auto">
-          {children}
+        <div className="overflow-y-auto">{children}</div>
+        <div className="-mt-2 flex flex-col gap-3">
+          {showFooterSeparator && <Separator />}
+          <div className="flex items-center justify-end gap-2">{footer}</div>
         </div>
-        {showFooterSeparator && <Separator />}
-        <div className="flex items-center justify-end gap-2">{footer}</div>
       </div>
     </div>
   );

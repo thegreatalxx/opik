@@ -2,9 +2,11 @@ import React from "react";
 import { LoaderCircle } from "lucide-react";
 import { useAgentOnboarding } from "./AgentOnboardingContext";
 import { useUserApiKey } from "@/store/AppStore";
+import { buildDocsUrl } from "@/lib/utils";
 import CopyButton from "@/shared/CopyButton/CopyButton";
-import cursorLogo from "/images/integrations/cursor.png";
-import openAILogoUrl from "/images/integrations/openai.png";
+import claudeCodeLogo from "/images/integrations/claude_code.svg";
+import codexLogo from "/images/integrations/codex.svg";
+import cursorLogo from "/images/integrations/cursor.svg";
 
 const INSTALL_COMMAND = "npx skills add comet-ml/opik-skills -g";
 
@@ -45,7 +47,7 @@ const CodeBlockWithHeader: React.FC<{
         size="icon-xs"
       />
     </div>
-    <pre className="overflow-x-auto p-3 font-code text-[13px] leading-snug">
+    <pre className="whitespace-pre-wrap break-words p-2 font-code text-[13px] leading-snug">
       {code}
     </pre>
   </div>
@@ -64,15 +66,11 @@ const InstallWithAITab: React.FC = () => {
       <div className="flex flex-wrap items-center gap-2">
         <span className="comet-body-s-accented">Works with</span>
         <div className="flex items-center gap-1.5 rounded border px-2 py-1">
-          <img
-            src="/images/integrations/anthropic.png"
-            alt="Claude Code"
-            className="size-4"
-          />
+          <img src={claudeCodeLogo} alt="Claude Code" className="size-4" />
           <span className="comet-body-xs-accented">Claude Code</span>
         </div>
         <div className="flex items-center gap-1.5 rounded border px-2 py-1">
-          <img src={openAILogoUrl} alt="Codex" className="size-4" />
+          <img src={codexLogo} alt="Codex" className="size-4" />
           <span className="comet-body-xs-accented">Codex</span>
         </div>
         <div className="flex items-center gap-1.5 rounded border px-2 py-1">
@@ -118,7 +116,15 @@ const InstallWithAITab: React.FC = () => {
             </h4>
             <p className="comet-body-xs text-muted-slate">
               Connect your agent to Opik for observability, evaluation and
-              optimization. Why isn&apos;t my trace showing?
+              optimization.{" "}
+              <a
+                href={buildDocsUrl("/faq#troubleshooting")}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline"
+              >
+                Why isn&apos;t my trace showing?
+              </a>
             </p>
           </div>
         </TimelineStep>
