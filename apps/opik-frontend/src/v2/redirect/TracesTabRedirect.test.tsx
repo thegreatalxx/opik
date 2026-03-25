@@ -129,6 +129,30 @@ describe("TracesTabRedirect", () => {
     });
   });
 
+  it("redirects ?type=rules to /online-evaluation", () => {
+    mockSearch = { type: "rules" };
+    render(<TracesTabRedirect />);
+    expect(mockNavigate).toHaveBeenCalledWith(
+      projectRoute("/online-evaluation"),
+    );
+  });
+
+  it("redirects ?type=annotation-queues to /annotation-queues", () => {
+    mockSearch = { type: "annotation-queues" };
+    render(<TracesTabRedirect />);
+    expect(mockNavigate).toHaveBeenCalledWith(
+      projectRoute("/annotation-queues"),
+    );
+  });
+
+  it("redirects ?type=configuration to /agent-configuration", () => {
+    mockSearch = { type: "configuration" };
+    render(<TracesTabRedirect />);
+    expect(mockNavigate).toHaveBeenCalledWith(
+      projectRoute("/agent-configuration"),
+    );
+  });
+
   // --- Legacy ?view= redirect ---
 
   it("redirects ?view=dashboards to /insights", () => {
@@ -152,7 +176,7 @@ describe("TracesTabRedirect", () => {
 
   // --- Mixed params (real-world case) ---
 
-  it("redirects with ?tab=annotation-queues even when other params present", () => {
+  it("redirects with ?tab=annotation-queues and forwards remaining params", () => {
     mockSearch = {
       traces_filters: "[]",
       time_range: "past30days",
@@ -160,8 +184,54 @@ describe("TracesTabRedirect", () => {
       queues_filters: "[]",
     };
     render(<TracesTabRedirect />);
-    expect(mockNavigate).toHaveBeenCalledWith(
-      projectRoute("/annotation-queues"),
-    );
+    expect(mockNavigate).toHaveBeenCalledWith({
+      ...projectRoute("/annotation-queues"),
+      search: {
+        traces_filters: "[]",
+        time_range: "past30days",
+        queues_filters: "[]",
+      },
+    });
+  });
+
+  // --- SDK trace redirect (OPIK-4115) ---
+
+  it("preserves trace param from SDK redirect URL", () => {
+    mockSearch = {
+      tab: "logs",
+      logsType: "traces",
+      trace: "trace-abc-123",
+    };
+    render(<TracesTabRedirect />);
+    expect(mockNavigate).toHaveBeenCalledWith({
+      to: "/$workspaceName/projects/$projectId/logs",
+      params: { workspaceName: "default", projectId: "proj-123" },
+      search: { logsType: "traces", trace: "trace-abc-123" },
+      replace: true,
+    });
+  });
+
+  it("preserves all filter params when redirecting to /logs", () => {
+    mockSearch = {
+      tab: "logs",
+      logsType: "traces",
+      traces_filters: "[]",
+      time_range: "past30days",
+      size: "100",
+      height: "small",
+    };
+    render(<TracesTabRedirect />);
+    expect(mockNavigate).toHaveBeenCalledWith({
+      to: "/$workspaceName/projects/$projectId/logs",
+      params: { workspaceName: "default", projectId: "proj-123" },
+      search: {
+        logsType: "traces",
+        traces_filters: "[]",
+        time_range: "past30days",
+        size: "100",
+        height: "small",
+      },
+      replace: true,
+    });
   });
 });

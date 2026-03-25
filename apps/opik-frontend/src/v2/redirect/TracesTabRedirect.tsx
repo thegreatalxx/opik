@@ -12,11 +12,6 @@ const TAB_ROUTE_MAP: Record<string, string> = {
   metrics: "/insights",
 };
 
-// Maps old ?type= values (legacy single-param format)
-const LEGACY_TYPE_MAP: Record<string, string> = {
-  metrics: "/insights",
-};
-
 const TracesTabRedirect = () => {
   const workspaceName = useActiveWorkspaceName();
   const { projectId } = useParams({ strict: false }) as {
@@ -35,11 +30,21 @@ const TracesTabRedirect = () => {
     const legacyType = search.type;
     const legacyView = search.view;
 
-    const navigateToProjectRoute = (suffix: string) => {
+    // Strip tab/type/view, forward remaining params to target route
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { tab: _t, type: _ty, view: _v, ...forwardParams } = search;
+
+    const navigateToProjectRoute = (
+      suffix: string,
+      extraSearch?: Record<string, string>,
+    ) => {
+      const mergedSearch = { ...forwardParams, ...extraSearch };
       hasRedirected.current = true;
       navigate({
         to: `/$workspaceName/projects/$projectId${suffix}`,
         params: { workspaceName, projectId },
+        search:
+          Object.keys(mergedSearch).length > 0 ? mergedSearch : undefined,
         replace: true,
       });
     };
@@ -50,9 +55,9 @@ const TracesTabRedirect = () => {
       return;
     }
 
-    // Legacy ?type= param
-    if (legacyType && LEGACY_TYPE_MAP[legacyType]) {
-      navigateToProjectRoute(LEGACY_TYPE_MAP[legacyType]);
+    // Legacy ?type= param (same mapping as ?tab=)
+    if (legacyType && TAB_ROUTE_MAP[legacyType]) {
+      navigateToProjectRoute(TAB_ROUTE_MAP[legacyType]);
       return;
     }
 
@@ -62,16 +67,9 @@ const TracesTabRedirect = () => {
       return;
     }
 
-    // Default: redirect to /logs, preserving logsType and legacy type if it's a logs type
-    const logsType = search.logsType ?? legacyType ?? undefined;
-
-    hasRedirected.current = true;
-    navigate({
-      to: "/$workspaceName/projects/$projectId/logs",
-      params: { workspaceName, projectId },
-      search: logsType ? { logsType } : undefined,
-      replace: true,
-    });
+    // Default: redirect to /logs
+    const logsType = forwardParams.logsType ?? legacyType;
+    navigateToProjectRoute("/logs", logsType ? { logsType } : undefined);
   }, [workspaceName, projectId, search, navigate]);
 
   return <Loader />;
