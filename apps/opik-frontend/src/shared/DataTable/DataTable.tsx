@@ -58,7 +58,6 @@ declare module "@tanstack/react-table" {
     columnsStatistic?: ColumnsStatistic;
     rowHeight: ROW_HEIGHT;
     rowHeightStyle: React.CSSProperties;
-    hideHeaderIcons?: boolean;
     cellBorders?: boolean;
     onCommentsReply?: (row: TData, idx?: number) => void;
     aggregationMap?: Record<string, unknown>;
