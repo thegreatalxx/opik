@@ -210,6 +210,8 @@ function EvaluationSuiteItemsPage(): React.ReactElement {
           onSuccess: (initialVersion) => {
             const itemPayload = buildPayload({
               baseVersionOverride: initialVersion?.id,
+              tags,
+              changeDescription,
             });
 
             const hasItemChanges =
