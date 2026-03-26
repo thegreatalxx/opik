@@ -14,6 +14,7 @@ import {
 import { useActiveWorkspaceName } from "@/store/AppStore";
 import useWorkspace from "@/plugins/comet/useWorkspace";
 import useProjectById from "@/api/projects/useProjectById";
+import { BASE_API_URL } from "@/api/api";
 
 const DEV_BASE_URL = import.meta.env.VITE_ASSISTANT_SIDEBAR_BASE_URL;
 
@@ -22,6 +23,8 @@ const PROD_BASE = import.meta.env.VITE_ASSISTANT_SIDEBAR_CDN_URL;
 const FAILURE_COOLDOWN_MS = 5 * 60 * 1000;
 const FAILURE_KEY = "assistant_load_failure_ts";
 const IS_DEV = import.meta.env.DEV;
+const ASSISTANT_BACKEND_URL =
+  import.meta.env.VITE_ASSISTANT_BACKEND_URL || "/assistant-api";
 
 const stopPropagation = (e: Event) => e.stopPropagation();
 
@@ -143,8 +146,8 @@ function useBridgeContext(): BridgeContext {
       workspaceName,
       projectId: resolvedProjectId,
       projectName,
-      baseApiUrl: "/api",
-      assistantBackendUrl: "/assistant-api",
+      baseApiUrl: BASE_API_URL,
+      assistantBackendUrl: ASSISTANT_BACKEND_URL,
       theme: "light",
     }),
     [workspaceId, workspaceName, resolvedProjectId, projectName],
