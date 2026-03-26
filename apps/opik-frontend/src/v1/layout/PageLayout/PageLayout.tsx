@@ -40,8 +40,7 @@ const PageLayout = () => {
     FeatureToggleKeys.ASSISTANT_SIDEBAR_ENABLED,
   );
   const AssistantSidebar =
-    AssistantSidebarPlugin ||
-    (assistantEnabled ? AssistantSidebarLazy : null);
+    AssistantSidebarPlugin || (assistantEnabled ? AssistantSidebarLazy : null);
 
   // Force sidebar collapsed on mobile, use stored preference on desktop
   const isMobile =

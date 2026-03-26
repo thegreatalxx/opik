@@ -1,9 +1,4 @@
-import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-} from "react";
+import React, { useCallback, useEffect, useMemo, useRef } from "react";
 import { useParams, useRouter } from "@tanstack/react-router";
 import {
   AssistantSidebarBridge,
