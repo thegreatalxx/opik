@@ -38,7 +38,7 @@ const NewQuickstart: React.FunctionComponent = () => {
   if (project?.id) {
     return (
       <Navigate
-        to="/$workspaceName/projects/$projectId/traces"
+        to="/$workspaceName/projects/$projectId/logs"
         params={{ workspaceName, projectId: project.id }}
       />
     );

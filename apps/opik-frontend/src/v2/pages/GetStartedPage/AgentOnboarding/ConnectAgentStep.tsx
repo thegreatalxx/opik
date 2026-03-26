@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from "react";
+import React, { useState } from "react";
 import { ArrowRight, ChevronsRight, MonitorPlay, Undo2 } from "lucide-react";
 import { useNavigate } from "@tanstack/react-router";
 import { Button } from "@/ui/button";
@@ -6,6 +6,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/ui/tabs";
 import Slack from "@/icons/slack.svg?react";
 import useAppStore from "@/store/AppStore";
 import useProjectByName from "@/api/projects/useProjectByName";
+import useTracesList from "@/api/traces/useTracesList";
 import {
   useAgentOnboarding,
   AGENT_ONBOARDING_STEPS,
@@ -20,6 +21,8 @@ import {
   VIDEO_TUTORIAL_LINK,
 } from "@/v2/pages-shared/onboarding/IntegrationExplorer/components/HelpLinks";
 
+const TRACE_POLL_INTERVAL = 5000;
+
 const ConnectAgentStep: React.FC = () => {
   const { goToStep, agentName } = useAgentOnboarding();
   const navigate = useNavigate();
@@ -28,26 +31,39 @@ const ConnectAgentStep: React.FC = () => {
   const [selectedIntegrationId, setSelectedIntegrationId] = useState<
     string | null
   >(null);
-  const [firstTraceId, setFirstTraceId] = useState<string | null>(null);
 
   const { data: project } = useProjectByName(
     { projectName: agentName },
     { enabled: !!agentName },
   );
+  const projectId = project?.id;
 
-  const handleTraceReceived = useCallback((traceId: string) => {
-    setFirstTraceId(traceId);
-  }, []);
+  const { data: tracesData } = useTracesList(
+    {
+      projectId: projectId ?? "",
+      page: 1,
+      size: 1,
+      sorting: [{ id: "created_at", desc: false }],
+    },
+    {
+      enabled: !!projectId,
+      refetchInterval: (query) =>
+        query.state.data?.total ? false : TRACE_POLL_INTERVAL,
+    },
+  );
+
+  const firstTraceId = tracesData?.content?.[0]?.id;
+  const traceReceived = !!firstTraceId;
 
   const handleViewTraces = () => {
     goToStep(AGENT_ONBOARDING_STEPS.DONE, { agentName });
 
-    if (project?.id) {
+    if (projectId && firstTraceId) {
       navigate({
-        to: "/$workspaceName/projects/$projectId/traces",
-        params: { workspaceName, projectId: project.id },
+        to: "/$workspaceName/projects/$projectId/logs",
+        params: { workspaceName, projectId },
         search: {
-          ...(firstTraceId && { trace: firstTraceId }),
+          trace: firstTraceId,
           traces_sorting: [{ id: "created_at", desc: false }],
         },
       });
@@ -140,7 +156,7 @@ const ConnectAgentStep: React.FC = () => {
       description="Follow these steps to start sending traces to Opik."
       showFooterSeparator
       footer={
-        firstTraceId ? (
+        traceReceived ? (
           <Button
             onClick={handleViewTraces}
             id="onboarding-step2-view-traces"
@@ -174,7 +190,7 @@ const ConnectAgentStep: React.FC = () => {
         </TabsList>
 
         <TabsContent value="install-with-ai">
-          <InstallWithAITab onTraceReceived={handleTraceReceived} />
+          <InstallWithAITab traceReceived={traceReceived} />
         </TabsContent>
 
         <TabsContent value="manual-integration">

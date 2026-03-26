@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React from "react";
 import { Check, LoaderCircle } from "lucide-react";
 import { useAgentOnboarding } from "./AgentOnboardingContext";
 import { useUserApiKey } from "@/store/AppStore";
@@ -8,14 +8,11 @@ import {
   MASKED_API_KEY_PLACEHOLDER,
 } from "@/lib/utils";
 import CopyButton from "@/shared/CopyButton/CopyButton";
-import useProjectByName from "@/api/projects/useProjectByName";
-import useTracesList from "@/api/traces/useTracesList";
 import claudeCodeLogo from "/images/integrations/claude_code.svg";
 import codexLogo from "/images/integrations/codex.svg";
 import cursorLogo from "/images/integrations/cursor.svg";
 
 const INSTALL_COMMAND = "npx skills add comet-ml/opik-skills -g";
-const TRACE_POLL_INTERVAL = 5000;
 
 const TimelineStep: React.FC<{
   number?: number;
@@ -69,42 +66,14 @@ const CodeBlockWithHeader: React.FC<{
 );
 
 interface InstallWithAITabProps {
-  onTraceReceived?: (traceId: string) => void;
+  traceReceived: boolean;
 }
 
 const InstallWithAITab: React.FC<InstallWithAITabProps> = ({
-  onTraceReceived,
+  traceReceived,
 }) => {
   const { agentName } = useAgentOnboarding();
   const apiKey = useUserApiKey();
-
-  const { data: project } = useProjectByName(
-    { projectName: agentName },
-    { enabled: !!agentName },
-  );
-
-  const { data: tracesData } = useTracesList(
-    {
-      projectId: project?.id ?? "",
-      page: 1,
-      size: 1,
-      sorting: [{ id: "created_at", desc: false }],
-    },
-    {
-      enabled: !!project?.id,
-      refetchInterval: (query) =>
-        query.state.data?.total ? false : TRACE_POLL_INTERVAL,
-    },
-  );
-
-  const firstTrace = tracesData?.content?.[0];
-  const traceReceived = !!firstTrace;
-
-  useEffect(() => {
-    if (firstTrace && onTraceReceived) {
-      onTraceReceived(firstTrace.id);
-    }
-  }, [firstTrace, onTraceReceived]);
 
   const fallbackApiKey = MASKED_API_KEY_PLACEHOLDER;
 
@@ -168,23 +137,27 @@ const InstallWithAITab: React.FC<InstallWithAITabProps> = ({
           <div className="flex flex-col gap-1">
             <h4 className="comet-body-s-accented text-primary">
               {traceReceived
-                ? "First trace received!"
+                ? "First trace received! You're all set."
                 : "Waiting for first trace…"}
             </h4>
-            {!traceReceived && (
-              <p className="comet-body-xs text-muted-slate">
-                Connect your agent to Opik for observability, evaluation and
-                optimization.{" "}
-                <a
-                  href={buildDocsUrl("/faq#troubleshooting")}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="underline hover:text-foreground"
-                >
-                  Why isn&apos;t my trace showing?
-                </a>
-              </p>
-            )}
+            <p className="comet-body-xs text-muted-slate">
+              {traceReceived ? (
+                "Traces are flowing. You can now debug, evaluate, and optimize."
+              ) : (
+                <>
+                  Connect your agent to Opik for observability, evaluation and
+                  optimization.{" "}
+                  <a
+                    href={buildDocsUrl("/faq#troubleshooting")}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="underline hover:text-foreground"
+                  >
+                    Why isn&apos;t my trace showing?
+                  </a>
+                </>
+              )}
+            </p>
           </div>
         </TimelineStep>
       </div>
