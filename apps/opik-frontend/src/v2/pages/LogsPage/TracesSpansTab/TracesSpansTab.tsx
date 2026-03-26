@@ -885,7 +885,6 @@ export const TracesSpansTab: React.FC<TracesSpansTabProps> = ({
         handleRowClick(row, DetailsActionSection.Comments);
       },
       enableUserFeedbackEditing: true,
-      cellBorders: true,
     }),
     [handleRowClick],
   );
@@ -1333,7 +1332,7 @@ export const TracesSpansTab: React.FC<TracesSpansTabProps> = ({
           showLoadingOverlay={isPlaceholderData && isFetching}
         />
         <PageBodyStickyContainer
-          className="py-4"
+          className="-mt-px bottom-0 border-t border-border bg-background py-2 pb-4"
           direction="horizontal"
           limitWidth
         >

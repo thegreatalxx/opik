@@ -18,7 +18,8 @@ const PageBodyStickyTableWrapper: React.FC<PageBodyStickyTableWrapperProps> = ({
 
   return (
     <div
-      className="comet-sticky-table border-b"
+      // min-w-fit ensures border-b extends the full table width when scrolling horizontally
+      className="comet-sticky-table min-w-fit border-b"
       {...{
         [TABLE_WRAPPER_ATTRIBUTE]: "",
       }}
