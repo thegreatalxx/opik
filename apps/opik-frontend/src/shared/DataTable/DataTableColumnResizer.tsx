@@ -1,6 +1,5 @@
 import React from "react";
 import { Header } from "@tanstack/react-table";
-import last from "lodash/last";
 import { cn } from "@/lib/utils";
 
 type DataTableColumnResizerProps<TData> = {
@@ -15,14 +14,6 @@ const DataTableColumnResizer = <TData,>({
     (!header.isPlaceholder && header.subHeaders.length > 0)
   )
     return null;
-
-  const tableMeta = header.getContext().table.options.meta;
-  const hasStatistic = Boolean(tableMeta?.columnsStatistic);
-  const hasCellBorders = Boolean(tableMeta?.cellBorders);
-
-  const isMultiRow = header.column.depth > 0;
-  const isLastInGroup =
-    last(header.column.parent?.columns ?? [])?.id === header.column.id;
 
   return (
     <div
@@ -41,17 +32,6 @@ const DataTableColumnResizer = <TData,>({
           : "-right-1 w-[9px] justify-center",
       )}
     >
-      {!hasCellBorders && (
-        <div
-          className={cn(
-            "absolute top-2 h-7 w-px bg-border",
-            isMultiRow && "top-3 h-6",
-            hasStatistic && "h-10",
-            isLastInGroup && "-top-2 h-11",
-            isLastInGroup && hasStatistic && "h-14",
-          )}
-        />
-      )}
       <div className="absolute inset-y-0 w-px bg-transparent transition-colors group-hover:bg-gray-600 group-active:bg-blue-600"></div>
     </div>
   );
