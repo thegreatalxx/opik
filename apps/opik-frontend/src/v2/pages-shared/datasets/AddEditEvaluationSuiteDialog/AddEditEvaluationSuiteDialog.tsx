@@ -341,6 +341,7 @@ const AddEditEvaluationSuiteDialog = ({
     name,
     description,
     type,
+    activeProjectId,
     createMutate,
     onCreateSuccessHandler,
     setOpen,

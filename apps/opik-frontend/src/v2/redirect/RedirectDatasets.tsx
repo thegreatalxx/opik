@@ -18,11 +18,10 @@ const RedirectDatasets: React.FC = () => {
   const workspaceName = useAppStore((state) => state.activeWorkspaceName);
   const activeProjectId = useActiveProjectId();
 
-  const { data: datasetById, isPending: isPendingDatasetById } =
-    useDatasetById(
-      { datasetId: query.id || "" },
-      { enabled: !!query.id },
-    );
+  const { data: datasetById, isPending: isPendingDatasetById } = useDatasetById(
+    { datasetId: query.id || "" },
+    { enabled: !!query.id },
+  );
 
   const { data: datasetByName, isPending: isPendingDatasetByName } =
     useDatasetItemByName(
@@ -48,7 +47,13 @@ const RedirectDatasets: React.FC = () => {
         });
       }
     }
-  }, [dataset?.id, dataset?.project_id, activeProjectId, workspaceName, navigate]);
+  }, [
+    dataset?.id,
+    dataset?.project_id,
+    activeProjectId,
+    workspaceName,
+    navigate,
+  ]);
 
   if (!query.id && !query.name) {
     return <NoData message="No evaluation suite params set" />;
@@ -60,6 +65,21 @@ const RedirectDatasets: React.FC = () => {
         icon={<div className="comet-title-m mb-1 text-foreground">404</div>}
         title="This evaluation suite could not be found"
         message="The evaluation suite you're looking for doesn't exist or has been deleted."
+      >
+        <div className="pt-5">
+          <Link to="/$workspaceName/home" params={{ workspaceName }}>
+            <Button>Back to Home</Button>
+          </Link>
+        </div>
+      </NoData>
+    );
+  }
+
+  if (!isPending && dataset && !dataset.project_id && !activeProjectId) {
+    return (
+      <NoData
+        title="Unable to redirect"
+        message="This evaluation suite is not associated with a project. Please navigate to it from a project."
       >
         <div className="pt-5">
           <Link to="/$workspaceName/home" params={{ workspaceName }}>
