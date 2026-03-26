@@ -50,10 +50,10 @@ const PrettyCell = <TData,>(context: CellContext<TData, string | object>) => {
     context.table.options.meta?.rowHeight ??
     ROW_HEIGHT.small;
 
-  const isSmall = rowHeight === ROW_HEIGHT.small;
+  const isTruncated = rowHeight !== ROW_HEIGHT.large;
 
   const content = useMemo(() => {
-    if (isSmall) {
+    if (isTruncated) {
       return (
         <CellTooltipWrapper content={displayMessage}>
           <span className="comet-code truncate">
@@ -68,7 +68,7 @@ const PrettyCell = <TData,>(context: CellContext<TData, string | object>) => {
         <LinkifyText>{displayMessage}</LinkifyText>
       </div>
     );
-  }, [isSmall, displayMessage]);
+  }, [isTruncated, displayMessage]);
 
   const indicatorColor = colorIndicator
     ? fieldType === "input"

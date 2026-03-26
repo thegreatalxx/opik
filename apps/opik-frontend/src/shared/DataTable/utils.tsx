@@ -55,6 +55,17 @@ export type GetCommonPinningStylesProps<TData> = {
   table: Table<TData>;
 };
 
+const getIsLastLeftPinned = <TData,>(
+  column: Column<TData>,
+  table: Table<TData>,
+): boolean => {
+  if (column.getIsPinned() !== "left") return false;
+  const leftPinnedNonGrouped = table
+    .getVisibleLeafColumns()
+    .filter((col) => col.getIsPinned() === "left" && !col.getIsGrouped?.());
+  return last(leftPinnedNonGrouped)?.id === column.id;
+};
+
 export const getCommonPinningStyles = <TData,>({
   column,
   isHeader = false,
@@ -69,24 +80,19 @@ export const getCommonPinningStyles = <TData,>({
     return {};
   }
 
-  const allColumns = table.getVisibleLeafColumns();
-  const leftPinnedNonGroupedColumns = allColumns.filter(
-    (col) => col.getIsPinned() === "left" && !col.getIsGrouped?.(),
-  );
-  const rightPinnedNonGroupedColumns = allColumns.filter(
-    (col) => col.getIsPinned() === "right" && !col.getIsGrouped?.(),
-  );
-
-  const isLastLeftPinnedNonGroupedColumn =
-    isPinned === "left" && last(leftPinnedNonGroupedColumns)?.id === column.id;
-
+  const rightPinnedNonGroupedColumns = table
+    .getVisibleLeafColumns()
+    .filter(
+      (col) => col.getIsPinned() === "right" && !col.getIsGrouped?.(),
+    );
   const isFirstRightPinnedNonGroupedColumn =
     isPinned === "right" &&
     last(rightPinnedNonGroupedColumns)?.id === column.id;
 
   return {
+    // Last left-pinned column border is handled via CSS class (comet-pinned-last-left)
     boxShadow:
-      isLastLeftPinnedNonGroupedColumn || forceGroup
+      forceGroup
         ? "inset -1px 0px 0px 0px hsl(var(--border))"
         : isFirstRightPinnedNonGroupedColumn
           ? "inset 1px 0px 0px 0px hsl(var(--border))"
@@ -108,12 +114,14 @@ export const getCommonPinningStyles = <TData,>({
 
 export type GetCommonPinningClassesProps<TData> = {
   column: Column<TData>;
+  table: Table<TData>;
   isHeader?: boolean;
   forceGroup?: boolean;
 };
 
 export const getCommonPinningClasses = <TData,>({
   column,
+  table,
   isHeader = false,
   forceGroup = false,
 }: GetCommonPinningClassesProps<TData>): string => {
@@ -121,7 +129,11 @@ export const getCommonPinningClasses = <TData,>({
 
   if (!isPinned && !forceGroup) return "";
 
-  return cn("comet-pinned-cell", isHeader ? "bg-soft-background" : "bg-background");
+  return cn(
+    "comet-pinned-cell",
+    isHeader ? "bg-soft-background" : "bg-background",
+    getIsLastLeftPinned(column, table) && "comet-pinned-last-left",
+  );
 };
 
 const getRowRange = <TData,>(
@@ -196,6 +208,7 @@ export const generateSelectColumDef = <TData,>(meta?: {
         className="justify-center !px-0"
       >
         <Checkbox
+          variant="muted"
           onClick={(event) => event.stopPropagation()}
           checked={
             context.table.getIsAllPageRowsSelected() ||
@@ -222,6 +235,7 @@ export const generateSelectColumDef = <TData,>(meta?: {
           stopClickPropagation
         >
           <Checkbox
+            variant="muted"
             checked={context.row.getIsSelected()}
             disabled={!context.row.getCanSelect()}
             onCheckedChange={(value) => context.row.toggleSelected(!!value)}
@@ -362,6 +376,7 @@ export const generateDataRowCellDef = <
           stopClickPropagation
         >
           <Checkbox
+            variant="muted"
             style={{
               marginLeft: `${context.row.depth * 28}px`,
             }}
@@ -411,6 +426,7 @@ export const generateGroupedRowCellDef = <TData, TValue>(
             style={{ paddingLeft: `${context.row.depth * 20}px` }}
           >
             <Checkbox
+              variant="muted"
               checked={
                 row.getIsAllSubRowsSelected() ||
                 (row.getIsSomeSelected() && "indeterminate")
