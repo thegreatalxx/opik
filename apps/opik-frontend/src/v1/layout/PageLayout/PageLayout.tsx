@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { lazy, Suspense, useCallback, useEffect, useState } from "react";
 import { Outlet } from "@tanstack/react-router";
 import SideBar from "@/v1/layout/SideBar/SideBar";
 import TopBar from "@/v1/layout/TopBar/TopBar";
@@ -11,12 +11,17 @@ import { useIsFeatureEnabled } from "@/contexts/feature-toggles-provider";
 import { FeatureToggleKeys } from "@/types/feature-toggles";
 import QuickstartDialog from "@/v1/pages-shared/onboarding/QuickstartDialog/QuickstartDialog";
 
+const AssistantSidebarLazy = lazy(
+  () => import("@/plugins/comet/AssistantSidebar"),
+);
+
 const MOBILE_BREAKPOINT = 1024; // lg breakpoint in Tailwind
 
 const PageLayout = () => {
   const [storedExpanded = true, setStoredExpanded] =
     useLocalStorageState<boolean>("sidebar-expanded");
   const [bannerHeight, setBannerHeight] = useState(0);
+  const [assistantSidebarWidth, setAssistantSidebarWidth] = useState(0);
   const [showWelcomeWizard, setShowWelcomeWizard] = useState(false);
 
   const welcomeWizardEnabled = useIsFeatureEnabled(
@@ -28,6 +33,15 @@ const PageLayout = () => {
   });
 
   const RetentionBanner = usePluginsStore((state) => state.RetentionBanner);
+  const AssistantSidebarPlugin = usePluginsStore(
+    (state) => state.AssistantSidebar,
+  );
+  const assistantEnabled = useIsFeatureEnabled(
+    FeatureToggleKeys.ASSISTANT_SIDEBAR_ENABLED,
+  );
+  const AssistantSidebar =
+    AssistantSidebarPlugin ||
+    (assistantEnabled ? AssistantSidebarLazy : null);
 
   // Force sidebar collapsed on mobile, use stored preference on desktop
   const isMobile =
@@ -66,6 +80,7 @@ const PageLayout = () => {
       style={
         {
           "--banner-height": `${bannerHeight}px`,
+          "--assistant-sidebar-width": `${assistantSidebarWidth}px`,
         } as React.CSSProperties
       }
     >
@@ -80,6 +95,12 @@ const PageLayout = () => {
           <Outlet />
         </section>
       </main>
+
+      {AssistantSidebar ? (
+        <Suspense fallback={null}>
+          <AssistantSidebar onWidthChange={setAssistantSidebarWidth} />
+        </Suspense>
+      ) : null}
 
       {/* Welcome Wizard Dialog */}
       <WelcomeWizardDialog
