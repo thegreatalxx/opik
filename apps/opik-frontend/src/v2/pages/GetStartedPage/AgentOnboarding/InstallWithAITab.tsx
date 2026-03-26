@@ -12,7 +12,7 @@ import claudeCodeLogo from "/images/integrations/claude_code.svg";
 import codexLogo from "/images/integrations/codex.svg";
 import cursorLogo from "/images/integrations/cursor.svg";
 
-const INSTALL_COMMAND = "npx skills add comet-ml/opik-skills -g";
+const INSTALL_COMMAND = "npx skills add comet-ml/opik-skills -g --all";
 
 const TimelineStep: React.FC<{
   number?: number;
