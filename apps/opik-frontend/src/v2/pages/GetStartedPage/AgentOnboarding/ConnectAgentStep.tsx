@@ -8,7 +8,7 @@ import useTracesList from "@/api/traces/useTracesList";
 import {
   useAgentOnboarding,
   AGENT_ONBOARDING_STEPS,
-  TRACES_CREATED_AT_SORTING,
+  TRACES_OLDEST_FIRST_SORTING,
 } from "./AgentOnboardingContext";
 import AgentOnboardingCard from "./AgentOnboardingCard";
 import InstallWithAITab from "./InstallWithAITab";
@@ -40,7 +40,7 @@ const ConnectAgentStep: React.FC = () => {
       projectId: projectId ?? "",
       page: 1,
       size: 1,
-      sorting: TRACES_CREATED_AT_SORTING,
+      sorting: TRACES_OLDEST_FIRST_SORTING,
     },
     {
       enabled: !!projectId,
