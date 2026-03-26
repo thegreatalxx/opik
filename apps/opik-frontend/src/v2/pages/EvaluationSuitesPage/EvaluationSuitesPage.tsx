@@ -224,6 +224,7 @@ const EvaluationSuitesPage: React.FunctionComponent = () => {
   const { data, isPending, isPlaceholderData, isFetching } = useDatasetsList(
     {
       workspaceName,
+      projectId: activeProjectId,
       filters,
       sorting: sortedColumns,
       search: search!,
