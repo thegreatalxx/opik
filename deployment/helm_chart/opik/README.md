@@ -289,7 +289,6 @@ Call opik api on http://localhost:5173/api
 | component.backend.waitForMysql.image.tag | float | `1.36` |  |
 | component.backend.waitForMysql.mysql.host | string | `"opik-mysql"` |  |
 | component.backend.waitForMysql.mysql.port | int | `3306` |  |
-| component.frontend.assistantCdnUrl | string | `""` |  |
 | component.frontend.autoscaling.behavior.scaleDown.policies[0].periodSeconds | int | `60` |  |
 | component.frontend.autoscaling.behavior.scaleDown.policies[0].type | string | `"Percent"` |  |
 | component.frontend.autoscaling.behavior.scaleDown.policies[0].value | int | `50` |  |
@@ -318,7 +317,6 @@ Call opik api on http://localhost:5173/api
 | component.frontend.contentSecurityPolicy.connect-src[1] | string | `"ws:"` |  |
 | component.frontend.contentSecurityPolicy.connect-src[2] | string | `"wss:"` |  |
 | component.frontend.contentSecurityPolicy.connect-src[3] | string | `"https:"` |  |
-| component.frontend.contentSecurityPolicy.connect-src[4] | string | `"https://cdn.comet.ml"` |  |
 | component.frontend.contentSecurityPolicy.default-src[0] | string | `"'self'"` |  |
 | component.frontend.contentSecurityPolicy.font-src[0] | string | `"'self'"` |  |
 | component.frontend.contentSecurityPolicy.font-src[1] | string | `"data:"` |  |
@@ -340,11 +338,9 @@ Call opik api on http://localhost:5173/api
 | component.frontend.contentSecurityPolicy.script-src[0] | string | `"'self'"` |  |
 | component.frontend.contentSecurityPolicy.script-src[1] | string | `"'unsafe-inline'"` |  |
 | component.frontend.contentSecurityPolicy.script-src[2] | string | `"'unsafe-eval'"` |  |
-| component.frontend.contentSecurityPolicy.script-src[3] | string | `"https://cdn.comet.ml"` |  |
 | component.frontend.contentSecurityPolicy.style-src[0] | string | `"'self'"` |  |
 | component.frontend.contentSecurityPolicy.style-src[1] | string | `"'unsafe-inline'"` |  |
 | component.frontend.contentSecurityPolicy.style-src[2] | string | `"https://fonts.googleapis.com"` |  |
-| component.frontend.contentSecurityPolicy.style-src[3] | string | `"https://cdn.comet.ml"` |  |
 | component.frontend.contentSecurityPolicy.worker-src[0] | string | `"'self'"` |  |
 | component.frontend.contentSecurityPolicy.worker-src[1] | string | `"blob:"` |  |
 | component.frontend.enabled | bool | `true` |  |
