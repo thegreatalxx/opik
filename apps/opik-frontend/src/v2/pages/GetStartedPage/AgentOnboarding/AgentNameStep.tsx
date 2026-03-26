@@ -29,9 +29,8 @@ const AgentNameStep: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isValid || isCreating) return;
+    if (!isValid || isCreating || error) return;
 
-    setError("");
     setIsCreating(true);
 
     try {
@@ -50,7 +49,6 @@ const AgentNameStep: React.FC = () => {
       } else {
         setError("Failed to create project. Please try again.");
       }
-    } finally {
       setIsCreating(false);
     }
   };
@@ -61,15 +59,20 @@ const AgentNameStep: React.FC = () => {
         title="Tell us about your agent"
         description="We'll use this to name your project and set up tracing automatically."
         footer={
-          <Button
-            type="submit"
-            size="sm"
-            disabled={!isValid || isCreating}
-            id="onboarding-agent-name-continue"
-            data-fs-element="onboarding-agent-name-continue"
-          >
-            {isCreating ? "Creating…" : "Continue"}
-          </Button>
+          <>
+            {error && (
+              <p className="comet-body-xs mr-auto text-destructive">{error}</p>
+            )}
+            <Button
+              type="submit"
+              size="sm"
+              disabled={!isValid || isCreating || !!error}
+              id="onboarding-agent-name-continue"
+              data-fs-element="onboarding-agent-name-continue"
+            >
+              {isCreating ? "Creating" : "Continue"}
+            </Button>
+          </>
         }
       >
         <div className="flex flex-col gap-2">
@@ -84,7 +87,6 @@ const AgentNameStep: React.FC = () => {
               setError("");
             }}
           />
-          {error && <p className="comet-body-xs text-destructive">{error}</p>}
         </div>
       </AgentOnboardingCard>
     </form>

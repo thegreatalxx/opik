@@ -6,6 +6,7 @@ import useAppStore, { useUserApiKey } from "@/store/AppStore";
 import { putConfigInCode } from "@/lib/formatCodeSnippets";
 import { Integration } from "@/constants/integrations";
 import { INSTALL_OPIK_SECTION_TITLE } from "@/constants/shared";
+import { useAgentOnboarding } from "./AgentOnboardingContext";
 
 type ManualIntegrationDetailProps = {
   integration: Integration;
@@ -14,6 +15,7 @@ type ManualIntegrationDetailProps = {
 const ManualIntegrationDetail: React.FC<ManualIntegrationDetailProps> = ({
   integration,
 }) => {
+  const { agentName } = useAgentOnboarding();
   const workspaceName = useAppStore((state) => state.activeWorkspaceName);
   const apiKey = useUserApiKey();
 
@@ -23,6 +25,7 @@ const ManualIntegrationDetail: React.FC<ManualIntegrationDetailProps> = ({
     apiKey,
     shouldMaskApiKey: true,
     withHighlight: true,
+    projectName: agentName,
   });
 
   const { code: codeWithConfigToCopy } = putConfigInCode({
@@ -30,6 +33,7 @@ const ManualIntegrationDetail: React.FC<ManualIntegrationDetailProps> = ({
     workspaceName,
     apiKey,
     withHighlight: true,
+    projectName: agentName,
   });
 
   return (
