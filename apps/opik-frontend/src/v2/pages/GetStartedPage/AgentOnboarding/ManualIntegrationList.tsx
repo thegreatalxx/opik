@@ -7,7 +7,7 @@ import IntegrationCard from "@/v2/pages-shared/onboarding/IntegrationExplorer/co
 import CopyButton from "@/shared/CopyButton/CopyButton";
 import { useAgentOnboarding } from "./AgentOnboardingContext";
 import { useUserApiKey } from "@/store/AppStore";
-import { maskAPIKey, MASKED_API_KEY_PLACEHOLDER } from "@/lib/utils";
+import { maskAPIKey } from "@/lib/utils";
 import {
   INTEGRATION_CATEGORIES,
   getIntegrationsByCategory,
@@ -60,21 +60,23 @@ const ManualIntegrationList: React.FC<ManualIntegrationListProps> = ({
             />
           </div>
         </div>
-        <div className="flex flex-1 flex-col gap-1">
-          <span className="comet-body-s-accented px-0.5 pb-0.5">API key</span>
-          <div className="flex h-8 items-center gap-1 rounded border bg-primary-foreground px-2.5">
-            <code className="comet-body-s text-muted-slate">
-              {apiKey ? maskAPIKey(apiKey) : MASKED_API_KEY_PLACEHOLDER}
-            </code>
-            <CopyButton
-              text={apiKey || ""}
-              message="API key copied"
-              tooltipText="Copy API key"
-              size="icon-3xs"
-              className="ml-auto"
-            />
+        {apiKey && (
+          <div className="flex flex-1 flex-col gap-1">
+            <span className="comet-body-s-accented px-0.5 pb-0.5">API key</span>
+            <div className="flex h-8 items-center gap-1 rounded border bg-primary-foreground px-2.5">
+              <code className="comet-body-s text-muted-slate">
+                {maskAPIKey(apiKey)}
+              </code>
+              <CopyButton
+                text={apiKey}
+                message="API key copied"
+                tooltipText="Copy API key"
+                size="icon-3xs"
+                className="ml-auto"
+              />
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       <div className="flex flex-col gap-4">
