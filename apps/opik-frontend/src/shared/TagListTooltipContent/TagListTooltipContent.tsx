@@ -1,15 +1,20 @@
 import React from "react";
 import { useVisibleTags } from "@/hooks/useVisibleTags";
-import ColoredTag from "@/shared/ColoredTag/ColoredTag";
+import ColoredTag, { ColoredTagProps } from "@/shared/ColoredTag/ColoredTag";
+import { Separator } from "@/ui/separator";
 
 interface TagListTooltipContentProps {
   tags: string[];
   maxDisplayCount?: number;
+  variant?: ColoredTagProps["variant"];
+  hint?: string;
 }
 
 const TagListTooltipContent: React.FC<TagListTooltipContentProps> = ({
   tags,
   maxDisplayCount = 50,
+  variant,
+  hint,
 }) => {
   const { visibleItems, hasMoreItems, remainingCount } = useVisibleTags(
     tags,
@@ -19,12 +24,24 @@ const TagListTooltipContent: React.FC<TagListTooltipContentProps> = ({
   return (
     <div className="flex max-w-[300px] flex-wrap gap-1">
       {visibleItems.map((tag, index) => (
-        <ColoredTag key={`${tag}-${index}`} label={tag} size="sm" />
+        <ColoredTag
+          key={`${tag}-${index}`}
+          label={tag}
+          size="sm"
+          variant={variant}
+        />
       ))}
       {hasMoreItems && (
         <span className="text-xs italic text-muted-foreground">
           ... and {remainingCount} more
         </span>
+      )}
+
+      {hint && (
+        <>
+          <Separator className="my-1" />
+          <div className="comet-body-xs w-full px-1 text-muted-slate">{hint}</div>
+        </>
       )}
     </div>
   );
