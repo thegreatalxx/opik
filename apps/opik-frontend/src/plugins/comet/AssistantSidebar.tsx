@@ -3,7 +3,6 @@ import React, {
   useEffect,
   useMemo,
   useRef,
-  useState,
 } from "react";
 import { useParams, useRouter } from "@tanstack/react-router";
 import {
@@ -15,6 +14,7 @@ import { useUserApiKey, useActiveWorkspaceName } from "@/store/AppStore";
 import useWorkspace from "@/plugins/comet/useWorkspace";
 import useProjectById from "@/api/projects/useProjectById";
 import useAssistantSidebarConfig from "@/api/assistant-sidebar/useAssistantSidebarConfig";
+import { BASE_API_URL } from "@/api/api";
 
 const DEV_BASE_URL = import.meta.env.VITE_OLLIE_BASE_URL;
 
@@ -34,16 +34,39 @@ interface AssistantSidebarProps {
 
 const loadScript = (src: string): Promise<void> =>
   new Promise((resolve, reject) => {
-    if (document.querySelector(`script[src="${src}"]`)) {
-      resolve();
-      return;
+    const existing = document.querySelector(
+      `script[src="${src}"]`,
+    ) as HTMLScriptElement | null;
+    if (existing) {
+      if (existing.dataset.loaded === "true") {
+        resolve();
+        return;
+      }
+      if (existing.dataset.failed === "true") {
+        existing.remove();
+      } else {
+        // Still loading — attach to existing element
+        existing.addEventListener("load", () => resolve(), { once: true });
+        existing.addEventListener(
+          "error",
+          () => reject(new Error(`Failed to load script: ${src}`)),
+          { once: true },
+        );
+        return;
+      }
     }
     const script = document.createElement("script");
     script.src = src;
     script.async = true;
     script.crossOrigin = "anonymous";
-    script.onload = () => resolve();
-    script.onerror = () => reject(new Error(`Failed to load script: ${src}`));
+    script.onload = () => {
+      script.dataset.loaded = "true";
+      resolve();
+    };
+    script.onerror = () => {
+      script.dataset.failed = "true";
+      reject(new Error(`Failed to load script: ${src}`));
+    };
     document.head.appendChild(script);
   });
 
@@ -161,7 +184,7 @@ function suspendUntilScript(manifestUrl: string): boolean {
       currentManifestUrl = manifestUrl;
       status = "pending";
       promise = (
-        DEV_BASE_URL ? loadDevAssets() : loadProdAssets(manifestUrl)
+        IS_DEV && DEV_BASE_URL ? loadDevAssets() : loadProdAssets(manifestUrl)
       ).then(
         () => {
           status = "resolved";
@@ -200,7 +223,7 @@ function useBridgeContext(): BridgeContext {
       projectId: resolvedProjectId,
       projectName,
       authToken: apiKey,
-      baseApiUrl: "/api",
+      baseApiUrl: BASE_API_URL,
       assistantBackendUrl: "/ollie-assist",
       theme: "light",
     }),
@@ -278,18 +301,12 @@ const AssistantSidebar: React.FC<AssistantSidebarProps> = ({
   onWidthChange,
 }) => {
   const { data: sidebarConfig } = useAssistantSidebarConfig();
-  const [ready, setReady] = useState(false);
 
   const enabled = sidebarConfig?.enabled ?? false;
   const manifestUrl = sidebarConfig?.manifest_url ?? "";
+  const ready = enabled && Boolean(manifestUrl);
 
-  useEffect(() => {
-    if (enabled && manifestUrl) {
-      setReady(true);
-    }
-  }, [enabled, manifestUrl]);
-
-  if (!ready || !manifestUrl) return null;
+  if (!ready) return null;
 
   return (
     <AssistantSidebarContent
