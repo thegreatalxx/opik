@@ -3,8 +3,8 @@ import React, {
   useEffect,
   useMemo,
   useRef,
-  useState,
 } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useParams, useRouter } from "@tanstack/react-router";
 import {
   AssistantSidebarBridge,
@@ -160,40 +160,34 @@ interface AssistantMeta {
 }
 
 function useAssistantMeta(): AssistantMeta | null {
-  const [meta, setMeta] = useState<AssistantMeta | null>(null);
+  const versionBase = `${PROD_BASE}/v${ASSISTANT_BRIDGE_VERSION}`;
 
-  useEffect(() => {
-    let cancelled = false;
-
-    if (IS_DEV) {
-      if (DEV_BASE_URL) {
-        setMeta({ scriptUrl: `${DEV_BASE_URL}/assistant.js` });
-      }
-      return;
-    }
-
-    if (!PROD_BASE || isInCooldown()) return;
-
-    const versionBase = `${PROD_BASE}/v${ASSISTANT_BRIDGE_VERSION}`;
-    fetchManifest(versionBase)
-      .then((manifest) => {
-        if (cancelled) return;
+  const { data } = useQuery<AssistantMeta>({
+    queryKey: ["assistant-manifest", versionBase],
+    queryFn: async () => {
+      try {
+        const manifest = await fetchManifest(versionBase);
         clearFailure();
-        setMeta({
+        return {
           scriptUrl: `${versionBase}/${manifest.js}`,
           cssUrl: manifest.css ? `${versionBase}/${manifest.css}` : undefined,
-        });
-      })
-      .catch(() => {
+        };
+      } catch (err) {
         markFailure();
-      });
+        throw err;
+      }
+    },
+    enabled: !IS_DEV && !!PROD_BASE && !isInCooldown(),
+    staleTime: Infinity,
+    retry: false,
+  });
 
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  // In dev mode, return meta directly from env var — no fetch needed
+  if (IS_DEV && DEV_BASE_URL) {
+    return { scriptUrl: `${DEV_BASE_URL}/assistant.js` };
+  }
 
-  return meta;
+  return data ?? null;
 }
 
 interface AssistantSidebarProps {
