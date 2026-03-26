@@ -1,14 +1,9 @@
 import React, { useState } from "react";
 import { AxiosError, HttpStatusCode } from "axios";
-import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/ui/button";
 import { Input } from "@/ui/input";
 import { Label } from "@/ui/label";
-import api, {
-  PROJECT_STATISTICS_KEY,
-  PROJECTS_KEY,
-  PROJECTS_REST_ENDPOINT,
-} from "@/api/api";
+import useProjectCreateMutation from "@/api/projects/useProjectCreateMutation";
 import {
   useAgentOnboarding,
   AGENT_ONBOARDING_STEPS,
@@ -19,25 +14,22 @@ const MIN_AGENT_NAME_LENGTH = 3;
 
 const AgentNameStep: React.FC = () => {
   const { goToStep, agentName } = useAgentOnboarding();
-  const queryClient = useQueryClient();
   const [name, setName] = useState(agentName);
   const [error, setError] = useState("");
-  const [isCreating, setIsCreating] = useState(false);
+
+  const { mutateAsync: createProject, isPending } = useProjectCreateMutation({
+    showErrorToast: false,
+  });
 
   const trimmedName = name.trim();
   const isValid = trimmedName.length >= MIN_AGENT_NAME_LENGTH;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isValid || isCreating || error) return;
-
-    setIsCreating(true);
+    if (!isValid || isPending || error) return;
 
     try {
-      await api.post(PROJECTS_REST_ENDPOINT, { name: trimmedName });
-
-      queryClient.invalidateQueries({ queryKey: [PROJECT_STATISTICS_KEY] });
-      queryClient.invalidateQueries({ queryKey: [PROJECTS_KEY] });
+      await createProject({ project: { name: trimmedName } });
 
       goToStep(AGENT_ONBOARDING_STEPS.CONNECT_AGENT, {
         agentName: trimmedName,
@@ -49,7 +41,6 @@ const AgentNameStep: React.FC = () => {
       } else {
         setError("Failed to create project. Please try again.");
       }
-      setIsCreating(false);
     }
   };
 
@@ -66,11 +57,11 @@ const AgentNameStep: React.FC = () => {
             <Button
               type="submit"
               size="sm"
-              disabled={!isValid || isCreating || !!error}
+              disabled={!isValid || isPending || !!error}
               id="onboarding-agent-name-continue"
               data-fs-element="onboarding-agent-name-continue"
             >
-              {isCreating ? "Creating" : "Continue"}
+              {isPending ? "Creating" : "Continue"}
             </Button>
           </>
         }
