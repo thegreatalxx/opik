@@ -34,7 +34,7 @@ const PageLayout = () => {
   const [bannerHeight, setBannerHeight] = useState(0);
   const [showWelcomeWizard, setShowWelcomeWizard] = useState(false);
   const [overlayOpen, setOverlayOpen] = useState(false);
-  const sectionRef = useRef<HTMLElement>(null);
+  const [assistantSidebarWidth, setAssistantSidebarWidth] = useState(0);
   const sidebarWrapperRef = useRef<HTMLDivElement>(null);
 
   const welcomeWizardEnabled = useIsFeatureEnabled(
@@ -70,15 +70,11 @@ const PageLayout = () => {
     setOverlayOpen((prev) => !prev);
   }, []);
 
-  // Direct DOM updates — no setState, no re-render, no feedback loop
   const handleSidebarWidthChange = useCallback((width: number) => {
     if (sidebarWrapperRef.current) {
       sidebarWrapperRef.current.style.width = `${width}px`;
     }
-    sectionRef.current?.style.setProperty(
-      "--assistant-sidebar-width",
-      `${width}px`,
-    );
+    setAssistantSidebarWidth(width);
   }, []);
 
   useEffect(() => {
@@ -106,13 +102,12 @@ const PageLayout = () => {
 
   return (
     <section
-      ref={sectionRef}
       className="relative flex h-screen min-h-0 w-screen min-w-0 flex-col"
       style={
         {
           "--banner-height": `${bannerHeight}px`,
           "--sidebar-width": pinned ? "240px" : "0px",
-          "--assistant-sidebar-width": "0px",
+          "--assistant-sidebar-width": `${assistantSidebarWidth}px`,
         } as React.CSSProperties
       }
     >
