@@ -1,10 +1,8 @@
 import React, { useState } from "react";
 import { ArrowRight, ChevronsRight, MonitorPlay, Undo2 } from "lucide-react";
-import { useNavigate } from "@tanstack/react-router";
 import { Button } from "@/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/ui/tabs";
 import Slack from "@/icons/slack.svg?react";
-import useAppStore from "@/store/AppStore";
 import useProjectByName from "@/api/projects/useProjectByName";
 import useTracesList from "@/api/traces/useTracesList";
 import {
@@ -25,8 +23,6 @@ const TRACE_POLL_INTERVAL = 5000;
 
 const ConnectAgentStep: React.FC = () => {
   const { goToStep, agentName } = useAgentOnboarding();
-  const navigate = useNavigate();
-  const workspaceName = useAppStore((state) => state.activeWorkspaceName);
   const [activeTab, setActiveTab] = useState("install-with-ai");
   const [selectedIntegrationId, setSelectedIntegrationId] = useState<
     string | null
@@ -56,18 +52,10 @@ const ConnectAgentStep: React.FC = () => {
   const traceReceived = !!firstTraceId;
 
   const handleViewTraces = () => {
-    goToStep(AGENT_ONBOARDING_STEPS.DONE, { agentName });
-
-    if (projectId && firstTraceId) {
-      navigate({
-        to: "/$workspaceName/projects/$projectId/logs",
-        params: { workspaceName, projectId },
-        search: {
-          trace: firstTraceId,
-          traces_sorting: [{ id: "created_at", desc: false }],
-        },
-      });
-    }
+    goToStep(AGENT_ONBOARDING_STEPS.DONE, {
+      agentName,
+      traceId: firstTraceId,
+    });
   };
 
   const selectedIntegration = selectedIntegrationId

@@ -23,6 +23,7 @@ type AgentOnboardingStep =
 interface AgentOnboardingState {
   step: AgentOnboardingStep;
   agentName: string;
+  traceId?: string;
 }
 
 interface AgentOnboardingContextValue {

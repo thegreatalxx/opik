@@ -13,6 +13,7 @@ const NewQuickstart: React.FunctionComponent = () => {
   const [agentOnboardingState] = useLocalStorageState<{
     step: unknown;
     agentName?: string;
+    traceId?: string;
   }>(AGENT_ONBOARDING_KEY);
 
   const workspaceName = useAppStore((state) => state.activeWorkspaceName);
@@ -36,10 +37,20 @@ const NewQuickstart: React.FunctionComponent = () => {
   }
 
   if (project?.id) {
+    const traceId = agentOnboardingState?.traceId;
+
     return (
       <Navigate
         to="/$workspaceName/projects/$projectId/logs"
         params={{ workspaceName, projectId: project.id }}
+        search={
+          traceId
+            ? {
+                trace: traceId,
+                traces_sorting: [{ id: "created_at", desc: false }],
+              }
+            : undefined
+        }
       />
     );
   }
