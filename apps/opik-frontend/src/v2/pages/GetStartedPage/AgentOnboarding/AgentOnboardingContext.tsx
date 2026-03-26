@@ -10,6 +10,8 @@ import useSubmitOnboardingAnswerMutation from "@/api/feedback/useSubmitOnboardin
 
 export const AGENT_ONBOARDING_KEY = "agent-onboarding";
 
+export const TRACES_CREATED_AT_SORTING = [{ id: "created_at", desc: false }];
+
 export const AGENT_ONBOARDING_STEPS = {
   AGENT_NAME: "agent-name",
   CONNECT_AGENT: "connect-agent",

@@ -4,6 +4,7 @@ import AgentOnboardingOverlay from "./AgentOnboarding/AgentOnboardingOverlay";
 import {
   AGENT_ONBOARDING_KEY,
   AGENT_ONBOARDING_STEPS,
+  TRACES_CREATED_AT_SORTING,
 } from "./AgentOnboarding/AgentOnboardingContext";
 import useLocalStorageState from "use-local-storage-state";
 import useAppStore from "@/store/AppStore";
@@ -47,7 +48,7 @@ const NewQuickstart: React.FunctionComponent = () => {
           traceId
             ? {
                 trace: traceId,
-                traces_sorting: [{ id: "created_at", desc: false }],
+                traces_sorting: TRACES_CREATED_AT_SORTING,
               }
             : undefined
         }

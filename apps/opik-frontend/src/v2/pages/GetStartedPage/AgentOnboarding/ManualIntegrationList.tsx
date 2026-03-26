@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react";
-import { BookOpen } from "lucide-react";
+import { ExternalLink } from "lucide-react";
 import { useTheme } from "@/contexts/theme-provider";
 import { THEME_MODE } from "@/constants/theme";
 import { ToggleGroup, ToggleGroupItem } from "@/ui/toggle-group";
@@ -129,19 +129,14 @@ const ManualIntegrationList: React.FC<ManualIntegrationListProps> = ({
             )}
             target="_blank"
             rel="noopener noreferrer"
+            className="flex h-8 items-center gap-1 rounded-lg border bg-background px-3 py-1.5 transition-all duration-200 hover:bg-primary-foreground"
+            id="onboarding-integration-view-all"
+            data-fs-element="OnboardingIntegrationViewAll"
           >
-            <IntegrationCard
-              title="View all"
-              icon={
-                <div className="flex size-4 items-center justify-center rounded bg-primary/10">
-                  <BookOpen className="size-3 text-primary" />
-                </div>
-              }
-              className="h-8 gap-1 overflow-hidden p-[0.375rem_0.5rem] [&>div:last-child]:min-w-0 [&_h3]:truncate"
-              iconClassName="min-w-0"
-              id="onboarding-integration-view-all"
-              data-fs-element="OnboardingIntegrationViewAll"
-            />
+            <span className="comet-body-s-accented truncate font-normal text-foreground">
+              View all
+            </span>
+            <ExternalLink className="size-3 shrink-0 text-foreground" />
           </a>
         </div>
       </div>

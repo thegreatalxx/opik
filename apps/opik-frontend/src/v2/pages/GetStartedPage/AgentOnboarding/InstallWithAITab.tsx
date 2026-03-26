@@ -12,7 +12,7 @@ import claudeCodeLogo from "/images/integrations/claude_code.svg";
 import codexLogo from "/images/integrations/codex.svg";
 import cursorLogo from "/images/integrations/cursor.svg";
 
-const INSTALL_COMMAND = "npx skills add comet-ml/opik-skills -g";
+const INSTALL_COMMAND = "npx skills add comet-ml/opik-skills -g --all";
 
 const TimelineStep: React.FC<{
   number?: number;
@@ -78,7 +78,7 @@ const InstallWithAITab: React.FC<InstallWithAITabProps> = ({
   const fallbackApiKey = MASKED_API_KEY_PLACEHOLDER;
 
   const buildPrompt = (key: string) =>
-    `Instrument my agent with Opik, use project name "${agentName}" and API key "${key}".`;
+    `Instrument my agent with Opik, use project name "${agentName}" and API key "${key}". Once you are ready with the instrumentation of your agent, run it with a couple of interactions so that we make sure that the observability is correctly instrumented and the right traces are flowing to the Opik dashboard.`;
 
   const promptText = buildPrompt(apiKey || fallbackApiKey);
   const displayPromptText = buildPrompt(
