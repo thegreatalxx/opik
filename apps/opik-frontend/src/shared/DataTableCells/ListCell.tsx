@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import { CellContext } from "@tanstack/react-table";
 
 import { cn } from "@/lib/utils";
@@ -25,6 +25,8 @@ const ListCell = (context: CellContext<unknown, unknown>) => {
     [items, isEmpty],
   );
 
+  const [expanded, setExpanded] = useState(false);
+
   const { cellRef, visibleItems, hasHiddenItems, remainingCount, onMeasure } =
     useVisibleItemsByWidth(sortedList, LIST_CELL_CONFIG);
 
@@ -32,34 +34,70 @@ const ListCell = (context: CellContext<unknown, unknown>) => {
     return null;
   }
 
+  const displayedItems = expanded ? sortedList : visibleItems;
+
   return (
     <CellWrapper
       metadata={context.column.columnDef.meta}
       tableMetadata={context.table.options.meta}
-      className={cn(isSmall && "py-0")}
+      className={cn(isSmall && "py-0", expanded && "overflow-auto")}
     >
       <div ref={cellRef} className="w-full min-w-0 flex-1 overflow-hidden">
         <div
           className={cn(
-            "flex max-h-full flex-row gap-1",
-            isSmall ? "overflow-x-hidden" : "flex-wrap overflow-auto",
+            "flex flex-row items-start gap-1",
+            expanded
+              ? "flex-wrap"
+              : isSmall
+                ? "max-h-full overflow-x-hidden"
+                : "max-h-full flex-wrap overflow-auto",
           )}
         >
-          <ChildrenWidthMeasurer onMeasure={onMeasure}>
-            {sortedList.map((item) => (
-              <div key={item}>
-                <ColoredTag label={item} className="shrink-0" />
-              </div>
-            ))}
-          </ChildrenWidthMeasurer>
-          {visibleItems.map((item) => (
-            <ColoredTag key={item} label={item} className="min-w-0 shrink-0" />
+          {!expanded && (
+            <ChildrenWidthMeasurer onMeasure={onMeasure}>
+              {sortedList.map((item) => (
+                <div key={item}>
+                  <ColoredTag
+                    label={item}
+                    variant="primary"
+                    className="shrink-0"
+                    size={isSmall ? "sm" : "md"}
+                  />
+                </div>
+              ))}
+            </ChildrenWidthMeasurer>
+          )}
+          {displayedItems.map((item) => (
+            <ColoredTag
+              key={item}
+              label={item}
+              variant="primary"
+              className="min-w-0 max-w-full"
+              size={isSmall ? "sm" : "md"}
+            />
           ))}
-          {hasHiddenItems && (
+          {hasHiddenItems && !expanded && (
             <TooltipWrapper
-              content={<TagListTooltipContent tags={sortedList} />}
+              content={
+                <TagListTooltipContent
+                  tags={sortedList}
+                  variant="primary"
+                  hint="Click to show all"
+                />
+              }
             >
-              <div className="comet-body-s-accented flex h-6 items-center rounded-md border border-border pl-1 pr-1.5 text-muted-slate">
+              <div
+                className={cn(
+                  "flex cursor-pointer items-center rounded-sm text-primary-hover hover:underline",
+                  isSmall
+                    ? "comet-body-xs h-4 px-2"
+                    : "comet-body-s h-6 rounded-md px-1.5",
+                )}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setExpanded(true);
+                }}
+              >
                 +{remainingCount}
               </div>
             </TooltipWrapper>
