@@ -271,6 +271,14 @@ const AssistantSidebar: React.FC<AssistantSidebarProps> = ({
     emitHostEvent(listenersRef, "context:changed", context);
   }, [context]);
 
+  // Notify sidebar of visibility on mount/unmount
+  useEffect(() => {
+    emitHostEvent(listenersRef, "visibility:changed", { isOpen: true });
+    return () => {
+      emitHostEvent(listenersRef, "visibility:changed", { isOpen: false });
+    };
+  }, []);
+
   // Prevent host FocusScope from trapping focus when the iframe gains focus.
   // Radix's FocusScope yanks focus back when it leaves a dialog — stopping
   // propagation on the iframe's focusin keeps it away from document-level listeners.
