@@ -58,7 +58,6 @@ declare module "@tanstack/react-table" {
     columnsStatistic?: ColumnsStatistic;
     rowHeight: ROW_HEIGHT;
     rowHeightStyle: React.CSSProperties;
-    cellBorders?: boolean;
     onCommentsReply?: (row: TData, idx?: number) => void;
     aggregationMap?: Record<string, unknown>;
     enableUserFeedbackEditing?: boolean;
@@ -330,6 +329,7 @@ const DataTable = <TData, TValue>({
           })}
           className={getCommonPinningClasses({
             column: cell.column,
+            table,
             forceGroup: true,
           })}
         >
@@ -361,7 +361,7 @@ const DataTable = <TData, TValue>({
           key={cell.id}
           data-cell-id={cell.id}
           style={pinningStyles}
-          className={getCommonPinningClasses({ column: cell.column })}
+          className={getCommonPinningClasses({ column: cell.column, table })}
         />
       );
     }
@@ -371,7 +371,7 @@ const DataTable = <TData, TValue>({
         key={cell.id}
         data-cell-id={cell.id}
         style={pinningStyles}
-        className={getCommonPinningClasses({ column: cell.column })}
+        className={getCommonPinningClasses({ column: cell.column, table })}
       >
         {flexRender(cell.column.columnDef.cell, cell.getContext())}
       </TableCell>
@@ -399,7 +399,7 @@ const DataTable = <TData, TValue>({
       <DataTableTooltipContext>
         <Table
           ref={tableRef}
-          className={cn(table.options.meta?.cellBorders && "comet-cell-borders")}
+          className="comet-cell-borders"
           style={{
             ...(!autoWidth && { minWidth: table.getTotalSize() }),
             ...(tableHeight && { "--data-table-height": `${tableHeight}px` }),
@@ -439,10 +439,11 @@ const DataTable = <TData, TValue>({
                             isHeader: true,
                             isLastHeaderRow: isLastRow,
                             table,
-                          }),
+                                                }),
                         }}
                         className={getCommonPinningClasses({
                           column: header.column,
+                          table,
                           isHeader: true,
                         })}
                         colSpan={header.colSpan}

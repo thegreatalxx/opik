@@ -31,7 +31,7 @@ const TextCell = <TData,>(context: CellContext<TData, string>) => {
           </span>
         </CellTooltipWrapper>
       ) : (
-        <div className="size-full overflow-y-auto whitespace-pre-wrap break-words">
+        <div className="h-full overflow-y-auto whitespace-pre-wrap break-words">
           <LinkifyText>{value}</LinkifyText>
         </div>
       )}

@@ -550,7 +550,6 @@ export const ThreadsTab: React.FC<ThreadsTabProps> = ({
       projectId,
       projectName,
       enableUserFeedbackEditing: true,
-      cellBorders: true,
     }),
     [projectId, projectName],
   );
@@ -737,7 +736,7 @@ export const ThreadsTab: React.FC<ThreadsTabProps> = ({
           showLoadingOverlay={isPlaceholderData && isFetching}
         />
         <PageBodyStickyContainer
-          className="py-4"
+          className="-mt-px bottom-0 border-t border-border bg-background py-2 pb-4"
           direction="horizontal"
           limitWidth
         >
