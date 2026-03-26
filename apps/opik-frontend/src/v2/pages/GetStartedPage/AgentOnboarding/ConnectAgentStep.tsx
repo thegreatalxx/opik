@@ -97,18 +97,20 @@ const ConnectAgentStep: React.FC = () => {
             <div className="flex gap-2.5">
               <Button
                 variant="outline"
+                size="2xs"
                 className="flex-1"
                 asChild
                 id="onboarding-slack"
                 data-fs-element="OnboardingSlack"
               >
                 <a href={SLACK_LINK} target="_blank" rel="noopener noreferrer">
-                  <Slack className="mr-2 size-4" />
+                  <Slack className="mr-1.5 size-3" />
                   Get help in Slack
                 </a>
               </Button>
               <Button
                 variant="outline"
+                size="2xs"
                 className="flex-1"
                 asChild
                 id="onboarding-watch-tutorial"
@@ -119,7 +121,7 @@ const ConnectAgentStep: React.FC = () => {
                   target="_blank"
                   rel="noopener noreferrer"
                 >
-                  <MonitorPlay className="mr-2 size-4" />
+                  <MonitorPlay className="mr-1.5 size-3" />
                   Watch our tutorial
                 </a>
               </Button>
@@ -151,7 +153,7 @@ const ConnectAgentStep: React.FC = () => {
           <Button
             variant="link"
             onClick={handleSkip}
-            className="comet-body-s text-muted-slate"
+            className="comet-body-s px-0 text-muted-slate"
             id="onboarding-step2-skip"
             data-fs-element="onboarding-step2-skip"
           >

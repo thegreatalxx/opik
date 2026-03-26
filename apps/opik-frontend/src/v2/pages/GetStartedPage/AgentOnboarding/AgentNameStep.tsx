@@ -63,6 +63,7 @@ const AgentNameStep: React.FC = () => {
         footer={
           <Button
             type="submit"
+            size="sm"
             disabled={!isValid || isCreating}
             id="onboarding-agent-name-continue"
             data-fs-element="onboarding-agent-name-continue"
@@ -75,6 +76,7 @@ const AgentNameStep: React.FC = () => {
           <Label htmlFor="agent-name">Agent name</Label>
           <Input
             id="agent-name"
+            dimension="sm"
             placeholder="e.g. RAG Pipeline, Customer Support Bot, Code Review Agent..."
             value={name}
             onChange={(e) => {

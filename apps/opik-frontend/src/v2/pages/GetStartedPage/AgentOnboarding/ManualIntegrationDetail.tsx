@@ -58,27 +58,31 @@ const ManualIntegrationDetail: React.FC<ManualIntegrationDetailProps> = ({
       <IntegrationStep
         title={`${INSTALL_OPIK_SECTION_TITLE}.`}
         description="Install Opik from the command line using pip."
-        className="mb-2"
+        className="mb-2 border-0 p-0"
       >
         <div className="flex flex-col gap-3">
-          <div className="min-h-7">
+          <div className="min-h-7 overflow-hidden rounded-md border">
             <CodeHighlighter data={integration.installCommand} />
           </div>
-          <CodeHighlighter
-            data={`import opik\n\nopik.configure(use_local=False)`}
-          />
+          <div className="overflow-hidden rounded-md border">
+            <CodeHighlighter
+              data={`import opik\n\nopik.configure(use_local=False)`}
+            />
+          </div>
         </div>
       </IntegrationStep>
 
       <IntegrationStep
         title={`2. Run the following code to get started with ${integration.title}`}
-        className="mb-2"
+        className="mb-2 border-0 p-0"
       >
-        <CodeHighlighter
-          data={codeWithConfig}
-          copyData={codeWithConfigToCopy}
-          highlightedLines={lines}
-        />
+        <div className="overflow-hidden rounded-md border">
+          <CodeHighlighter
+            data={codeWithConfig}
+            copyData={codeWithConfigToCopy}
+            highlightedLines={lines}
+          />
+        </div>
       </IntegrationStep>
     </div>
   );

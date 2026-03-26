@@ -26,19 +26,22 @@ const TimelineStep: React.FC<{
   <div className="flex gap-3">
     <div className="flex flex-col items-center">
       {number != null ? (
-        <div className="flex size-5 shrink-0 items-center justify-center rounded-full border border-border text-[10px] font-medium text-muted-slate">
+        <div className="flex size-4 shrink-0 items-center justify-center rounded-full border border-[var(--timeline-connector)] text-[8px] font-semibold text-[var(--timeline-connector)]">
           {number}
         </div>
       ) : completed ? (
-        <div className="flex size-5 shrink-0 items-center justify-center rounded-full bg-primary">
-          <Check className="size-3 text-primary-foreground" />
+        <div className="flex size-4 shrink-0 items-center justify-center rounded-full bg-primary">
+          <Check className="size-2.5 text-primary-foreground" />
         </div>
       ) : (
-        <div className="flex size-5 shrink-0 items-center justify-center">
-          <LoaderCircle className="size-4 animate-spin text-primary" />
+        <div className="relative flex size-4 shrink-0 items-center justify-center">
+          <div className="absolute inset-0 animate-ping rounded-full bg-primary/20" />
+          <LoaderCircle className="relative size-3.5 animate-spin text-primary" />
         </div>
       )}
-      {!isLast && <div className="mt-1 w-px flex-1 bg-border" />}
+      {!isLast && (
+        <div className="w-px flex-1 bg-[var(--timeline-connector)] opacity-50" />
+      )}
     </div>
     <div className="flex-1 pb-6">{children}</div>
   </div>
@@ -50,16 +53,16 @@ const CodeBlockWithHeader: React.FC<{
   copyText?: string;
 }> = ({ title, code, copyText }) => (
   <div className="overflow-hidden rounded-md border bg-primary-foreground">
-    <div className="flex items-center justify-between border-b px-3 py-1.5">
+    <div className="flex items-center justify-between border-b px-2.5 py-1">
       <span className="comet-body-xs text-muted-slate">{title}</span>
       <CopyButton
         text={copyText ?? code}
         message="Successfully copied"
         tooltipText="Copy"
-        size="icon-xs"
+        size="icon-3xs"
       />
     </div>
-    <pre className="whitespace-pre-wrap break-words p-2 font-code text-[13px] leading-snug">
+    <pre className="whitespace-pre-wrap break-words px-2.5 py-2 font-code text-[13px] leading-snug">
       {code}
     </pre>
   </div>
@@ -114,7 +117,7 @@ const InstallWithAITab: React.FC<InstallWithAITabProps> = ({
   );
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-4 px-1">
       <div className="flex flex-wrap items-center gap-2">
         <span className="comet-body-s-accented">Works with</span>
         <div className="flex items-center gap-1.5 rounded border px-2 py-1">
@@ -134,7 +137,7 @@ const InstallWithAITab: React.FC<InstallWithAITabProps> = ({
 
       <div className="flex flex-col">
         <TimelineStep number={1}>
-          <div className="flex flex-col gap-1.5">
+          <div className="flex flex-col gap-2.5">
             <h4 className="comet-body-s-accented">Add the Opik skill</h4>
             <p className="comet-body-xs text-muted-slate">
               Install the Opik skill so it&apos;s available in Claude Code,
@@ -145,7 +148,7 @@ const InstallWithAITab: React.FC<InstallWithAITabProps> = ({
         </TimelineStep>
 
         <TimelineStep number={2}>
-          <div className="flex flex-col gap-1.5">
+          <div className="flex flex-col gap-2.5">
             <h4 className="comet-body-s-accented">
               Open your coding agent and paste this prompt
             </h4>
@@ -176,7 +179,7 @@ const InstallWithAITab: React.FC<InstallWithAITabProps> = ({
                   href={buildDocsUrl("/faq#troubleshooting")}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="underline"
+                  className="underline hover:text-foreground"
                 >
                   Why isn&apos;t my trace showing?
                 </a>
