@@ -42,6 +42,7 @@ export const useOptimizationsNewFormHandlers = () => {
 
   const { data: datasetsData } = useDatasetsList({
     workspaceName,
+    ...(activeProjectId && { projectId: activeProjectId }),
     page: 1,
     size: 1000,
   });
@@ -276,6 +277,7 @@ export const useOptimizationsNewFormHandlers = () => {
   return {
     form,
     isSubmitting,
+    activeProjectId,
     datasetId,
     optimizerType,
     metricType,

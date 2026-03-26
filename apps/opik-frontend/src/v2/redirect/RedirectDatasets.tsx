@@ -1,8 +1,9 @@
 import React, { useEffect } from "react";
-import Loader from "@/shared/Loader/Loader";
 import { StringParam, useQueryParams } from "use-query-params";
-import useAppStore, { useActiveProjectId } from "@/store/AppStore";
 import { Link, useNavigate } from "@tanstack/react-router";
+
+import useAppStore, { useActiveProjectId } from "@/store/AppStore";
+import Loader from "@/shared/Loader/Loader";
 import NoData from "@/shared/NoData/NoData";
 import useDatasetItemByName from "@/api/datasets/useDatasetItemByName";
 import useDatasetById from "@/api/datasets/useDatasetById";
@@ -45,6 +46,13 @@ const RedirectDatasets: React.FC = () => {
           },
           replace: true,
         });
+      } else {
+        // Legacy fallback: dataset exists but has no project_id and no active project
+        navigate({
+          to: "/$workspaceName/home",
+          params: { workspaceName },
+          replace: true,
+        });
       }
     }
   }, [
@@ -65,21 +73,6 @@ const RedirectDatasets: React.FC = () => {
         icon={<div className="comet-title-m mb-1 text-foreground">404</div>}
         title="This evaluation suite could not be found"
         message="The evaluation suite you're looking for doesn't exist or has been deleted."
-      >
-        <div className="pt-5">
-          <Link to="/$workspaceName/home" params={{ workspaceName }}>
-            <Button>Back to Home</Button>
-          </Link>
-        </div>
-      </NoData>
-    );
-  }
-
-  if (!isPending && dataset && !dataset.project_id && !activeProjectId) {
-    return (
-      <NoData
-        title="Unable to redirect"
-        message="This evaluation suite is not associated with a project. Please navigate to it from a project."
       >
         <div className="pt-5">
           <Link to="/$workspaceName/home" params={{ workspaceName }}>

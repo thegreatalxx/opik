@@ -32,7 +32,7 @@ import TextCell from "@/shared/DataTableCells/TextCell";
 import TraceCountCell from "@/v2/pages-shared/traces/TraceCountCell/TraceCountCell";
 import DatasetVersionCell from "@/shared/DataTableCells/DatasetVersionCell";
 import ListCell from "@/shared/DataTableCells/ListCell";
-import useAppStore from "@/store/AppStore";
+import useAppStore, { useActiveProjectId } from "@/store/AppStore";
 import { transformExperimentScores } from "@/lib/feedback-scores";
 import useGroupedExperimentsList, {
   GroupedExperiment,
@@ -114,6 +114,7 @@ interface ExperimentsTabProps {
 
 const ExperimentsTab: React.FC<ExperimentsTabProps> = ({ promptId }) => {
   const workspaceName = useAppStore((state) => state.activeWorkspaceName);
+  const activeProjectId = useActiveProjectId();
   const [search = "", setSearch] = useQueryParam("search", StringParam, {
     updateType: "replaceIn",
   });
@@ -360,6 +361,7 @@ const ExperimentsTab: React.FC<ExperimentsTabProps> = ({ promptId }) => {
       sortedColumns,
       filters,
       promptId,
+      projectId: activeProjectId,
     });
 
   const expandingConfig = useExpandingConfig({
