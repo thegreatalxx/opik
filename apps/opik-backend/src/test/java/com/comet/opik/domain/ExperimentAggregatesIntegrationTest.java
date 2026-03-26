@@ -1009,6 +1009,68 @@ class ExperimentAggregatesIntegrationTest {
         return experimentItems;
     }
 
+    /**
+     * Links an existing set of dataset items to an experiment by creating fresh traces for that experiment.
+     * Unlike {@link #createExperimentItemWithData}, this does NOT create new dataset items — it reuses the
+     * ones passed in. This is how the duplication bug (OPIK-5247) is reproduced: the same dataset_item_id
+     * ends up in both the aggregated and raw branches of the UNION ALL when one experiment is aggregated
+     * and the other is not.
+     */
+    private void linkExperimentToDatasetItems(UUID experimentId, List<DatasetItem> datasetItems,
+            String projectName, List<String> feedbackScores, String apiKey, String workspaceName) {
+
+        var traces = IntStream.range(0, datasetItems.size())
+                .mapToObj(idx -> {
+                    var baseTrace = factory.manufacturePojo(Trace.class)
+                            .toBuilder()
+                            .projectName(projectName)
+                            .usage(null)
+                            .visibilityMode(null)
+                            .build();
+                    return baseTrace.toBuilder()
+                            .endTime(baseTrace.startTime().plusSeconds((idx + 1) * 10L))
+                            .build();
+                })
+                .toList();
+        traceResourceClient.batchCreateTraces(traces, apiKey, workspaceName);
+
+        var allSpans = traces.stream()
+                .flatMap(trace -> PodamFactoryUtils.manufacturePojoList(factory, Span.class)
+                        .stream()
+                        .map(span -> span.toBuilder()
+                                .projectName(projectName)
+                                .traceId(trace.id())
+                                .parentSpanId(null)
+                                .usage(spanResourceClient.getTokenUsage())
+                                .build()))
+                .toList();
+        spanResourceClient.batchCreateSpans(allSpans, apiKey, workspaceName);
+
+        var allFeedbackScoreItems = traces.stream()
+                .flatMap(trace -> feedbackScores.stream()
+                        .map(name -> (FeedbackScoreBatchItem) factory
+                                .manufacturePojo(FeedbackScoreBatchItem.class).toBuilder()
+                                .id(trace.id())
+                                .projectName(projectName)
+                                .name(name)
+                                .value(BigDecimal.valueOf(Math.random() * 10))
+                                .source(ScoreSource.SDK)
+                                .build()))
+                .toList();
+        if (!allFeedbackScoreItems.isEmpty()) {
+            traceResourceClient.feedbackScores(allFeedbackScoreItems, apiKey, workspaceName);
+        }
+
+        var experimentItems = IntStream.range(0, datasetItems.size())
+                .mapToObj(i -> ExperimentItem.builder()
+                        .experimentId(experimentId)
+                        .datasetItemId(datasetItems.get(i).id())
+                        .traceId(traces.get(i).id())
+                        .build())
+                .toList();
+        experimentResourceClient.createExperimentItem(Set.copyOf(experimentItems), apiKey, workspaceName);
+    }
+
     private record AggregatesTestContext(
             String workspaceName,
             String apiKey,
@@ -1688,6 +1750,106 @@ class ExperimentAggregatesIntegrationTest {
 
         assertPageNotEmpty(afterAggregation);
         assertDatasetItemsWithExperimentItems(beforeAggregation.content(), afterAggregation.content());
+    }
+
+    @Test
+    @DisplayName("Compare view returns no duplicate rows when the same dataset items appear in both aggregated and raw branches (OPIK-5247)")
+    void compareViewReturnsNoDuplicatesWhenSameDatasetItemsSpanBothBranches() {
+        var workspaceName = UUID.randomUUID().toString();
+        var apiKey = UUID.randomUUID().toString();
+        var workspaceId = UUID.randomUUID().toString();
+
+        mockTargetWorkspace(apiKey, workspaceName, workspaceId);
+
+        var project = createProject(apiKey, workspaceName);
+        var dataset = createDataset(apiKey, workspaceName);
+
+        // Create shared dataset items first — both experiments will reference the exact same dataset_item_ids
+        int itemCount = 3;
+        var datasetItems = IntStream.range(0, itemCount)
+                .mapToObj(i -> factory.manufacturePojo(DatasetItem.class).toBuilder()
+                        .datasetId(dataset.id())
+                        .traceId(null)
+                        .experimentItems(null)
+                        .spanId(null)
+                        .source(DatasetItemSource.SDK)
+                        .build())
+                .toList();
+        datasetResourceClient.createDatasetItems(
+                DatasetItemBatch.builder().datasetId(dataset.id()).items(datasetItems).build(),
+                workspaceName, apiKey);
+
+        // Capture version1 — the only version that exists after the first item batch
+        var version1Id = datasetResourceClient.listVersions(dataset.id(), apiKey, workspaceName)
+                .content().getFirst().id();
+
+        // Add an extra item to produce a second distinct dataset version
+        var extraItem = factory.manufacturePojo(DatasetItem.class).toBuilder()
+                .datasetId(dataset.id())
+                .traceId(null)
+                .experimentItems(null)
+                .spanId(null)
+                .source(DatasetItemSource.SDK)
+                .build();
+        datasetResourceClient.createDatasetItems(
+                DatasetItemBatch.builder().datasetId(dataset.id()).items(List.of(extraItem)).build(),
+                workspaceName, apiKey);
+
+        // Capture version2 — newest first, so getFirst() returns the latest version
+        var version2Id = datasetResourceClient.listVersions(dataset.id(), apiKey, workspaceName)
+                .content().getFirst().id();
+
+        // Create experiments each pinned to a different dataset version
+        var experiment1 = experimentResourceClient.createPartialExperiment()
+                .datasetId(dataset.id())
+                .datasetName(dataset.name())
+                .datasetVersionId(version1Id)
+                .build();
+        experimentResourceClient.create(experiment1, apiKey, workspaceName);
+
+        var experiment2 = experimentResourceClient.createPartialExperiment()
+                .datasetId(dataset.id())
+                .datasetName(dataset.name())
+                .datasetVersionId(version2Id)
+                .build();
+        experimentResourceClient.create(experiment2, apiKey, workspaceName);
+
+        var feedbackScoreNames = PodamFactoryUtils.manufacturePojoList(factory, String.class);
+
+        // Link experiment1 and experiment2 to the SAME dataset items (each with its own traces)
+        linkExperimentToDatasetItems(experiment1.id(), datasetItems, project.name(), feedbackScoreNames, apiKey,
+                workspaceName);
+        linkExperimentToDatasetItems(experiment2.id(), datasetItems, project.name(), feedbackScoreNames, apiKey,
+                workspaceName);
+
+        var experimentIds = List.of(experiment1.id(), experiment2.id());
+
+        // Query BEFORE aggregation — both experiments are in the raw branch
+        var beforeAggregation = datasetResourceClient.getDatasetItemsWithExperimentItems(
+                dataset.id(), experimentIds, null, null, apiKey, workspaceName);
+
+        assertPageNotEmpty(beforeAggregation);
+
+        // Aggregate only experiment1 — its items move to the has_aggregated branch.
+        // experiment2's items remain in the has_raw branch.
+        // The same dataset_item_id now appears in BOTH branches of the UNION ALL,
+        // which is the exact scenario that caused row duplication in OPIK-5247.
+        experimentAggregatesService.populateAggregations(experiment1.id())
+                .contextWrite(ctx -> ctx
+                        .put(RequestContext.USER_NAME, USER)
+                        .put(RequestContext.WORKSPACE_ID, workspaceId))
+                .block();
+
+        // Query in mixed state — experiment1 in aggregated branch, experiment2 in raw branch
+        var mixedState = datasetResourceClient.getDatasetItemsWithExperimentItems(
+                dataset.id(), experimentIds, null, null, apiKey, workspaceName);
+
+        assertPageNotEmpty(mixedState);
+        assertThat(mixedState.content())
+                .as("Compare view must return exactly %d rows — one per dataset item, with no duplicates", itemCount)
+                .hasSize(itemCount);
+
+        assertDatasetItemsWithExperimentItems(beforeAggregation.content(), mixedState.content());
     }
 
     @Test

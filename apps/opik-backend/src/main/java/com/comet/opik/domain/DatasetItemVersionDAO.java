@@ -729,7 +729,6 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
             ;
             """;
 
-    // Query to fetch versioned dataset items with their associated experiment items
     private static final String SELECT_DATASET_ITEM_VERSIONS_WITH_EXPERIMENT_ITEMS = """
             WITH experiment_aggregated_scope_ids AS (
                 SELECT
@@ -1066,175 +1065,212 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
             )
             <endif>
             SELECT
-                *
+                id,
+                dataset_id,
+                data,
+                <if(truncate)>mapApply((k, v) -> (k, substring(replaceRegexpAll(v, '<truncate>', '"[image]"'), 1, <truncationSize>)), data)<else>data<endif> AS data_final,
+                description,
+                trace_id,
+                span_id,
+                source,
+                tags,
+                evaluators,
+                execution_policy,
+                created_at,
+                last_updated_at,
+                created_by,
+                last_updated_by,
+                duration,
+                total_estimated_cost,
+                usage,
+                feedback_scores,
+                input,
+                output,
+                metadata,
+                visibility_mode,
+                comments,
+                full_input,
+                full_output,
+                experiment_items_array
             FROM (
-                <if(has_aggregated)>
                 SELECT
-                    ei.dataset_item_id AS id,
-                    :datasetId AS dataset_id,
-                    <if(truncate)> mapApply((k, v) -> (k, substring(replaceRegexpAll(v, '<truncate>', '"[image]"'), 1, <truncationSize>)), COALESCE(di.data, map())) <else> COALESCE(di.data, map()) <endif> AS data_final,
-                    COALESCE(di.data, map()) AS data,
-                    di.description AS description,
-                    di.trace_id AS trace_id,
-                    di.span_id AS span_id,
-                    di.source AS source,
-                    di.tags AS tags,
-                    di.evaluators AS evaluators,
-                    di.execution_policy AS execution_policy,
-                    di.item_created_at AS created_at,
-                    di.item_last_updated_at AS last_updated_at,
-                    di.item_created_by AS created_by,
-                    di.item_last_updated_by AS last_updated_by,
-                    avg(ei.duration) AS duration,
-                    avg(ei.total_estimated_cost) AS total_estimated_cost,
-                    avgMap(ei.usage) AS usage,
-                    avgMap(ei.feedback_scores) AS feedback_scores,
-                    <if(truncate)>replaceRegexpAll(if(notEmpty(argMax(ei.input_slim, ei.id)), argMax(ei.input_slim, ei.id), argMax(ei.input, ei.id)), '<truncate>', '"[image]"')<else>argMax(ei.input, ei.id)<endif> AS input,
-                    <if(truncate)>replaceRegexpAll(if(notEmpty(argMax(ei.output_slim, ei.id)), argMax(ei.output_slim, ei.id), argMax(ei.output, ei.id)), '<truncate>', '"[image]"')<else>argMax(ei.output, ei.id)<endif> AS output,
-                    argMax(ei.metadata, ei.id) AS metadata,
-                    argMax(ei.visibility_mode, ei.id) AS visibility_mode,
-                    argMax(ei.comments_array_agg, ei.id) AS comments,
-                    groupArray(tuple(
-                        ei.id,
-                        ei.experiment_id,
-                        ei.dataset_item_id,
-                        ei.trace_id,
-                        <if(truncate)>replaceRegexpAll(if(notEmpty(ei.input_slim), ei.input_slim, ei.input), '<truncate>', '"[image]"')<else>ei.input<endif>,
-                        <if(truncate)>replaceRegexpAll(if(notEmpty(ei.output_slim), ei.output_slim, ei.output), '<truncate>', '"[image]"')<else>ei.output<endif>,
-                        ei.feedback_scores_array,
-                        ei.created_at,
-                        ei.last_updated_at,
-                        ei.created_by,
-                        ei.last_updated_by,
-                        ei.comments_array_agg,
-                        ei.duration,
-                        ei.total_estimated_cost,
-                        ei.usage,
-                        ei.visibility_mode,
-                        ei.metadata,
-                        di.description,
-                        ei.execution_policy,
-                        arp.assertions_array
-                    )) AS experiment_items_array
+                    id,
+                    dataset_id,
+                    arrayFold(
+                        (acc, pair) -> mapUpdate(acc, pair),
+                        arrayMap(x -> x.2, arraySort(x -> x.1, groupArray(tuple(di_row_id, data)))),
+                        CAST(map(), 'Map(String, String)')
+                    ) AS data,
+                    argMax(description, di_row_id) AS description,
+                    argMax(trace_id, di_row_id) AS trace_id,
+                    argMax(span_id, di_row_id) AS span_id,
+                    argMax(source, di_row_id) AS source,
+                    groupUniqArrayArray(tags) AS tags,
+                    argMax(evaluators, di_row_id) AS evaluators,
+                    argMax(execution_policy, di_row_id) AS execution_policy,
+                    argMax(created_at, di_row_id) AS created_at,
+                    argMax(last_updated_at, di_row_id) AS last_updated_at,
+                    argMax(created_by, di_row_id) AS created_by,
+                    argMax(last_updated_by, di_row_id) AS last_updated_by,
+                    avg(duration) AS duration,
+                    avg(total_estimated_cost) AS total_estimated_cost,
+                    avgMap(usage) AS usage,
+                    avgMap(feedback_scores) AS feedback_scores,
+                    argMax(input, ei_id) AS input,
+                    argMax(output, ei_id) AS output,
+                    argMax(metadata, ei_id) AS metadata,
+                    argMax(visibility_mode, ei_id) AS visibility_mode,
+                    argMax(comments, ei_id) AS comments,
+                    argMax(full_input, ei_id) AS full_input,
+                    argMax(full_output, ei_id) AS full_output,
+                    arrayReverseSort(x -> x.1, groupArray(experiment_item_tuple)) AS experiment_items_array
                 FROM (
+                    <if(has_aggregated)>
                     SELECT
-                        eia.id,
-                        eia.trace_id,
-                        eia.dataset_item_id,
-                        eia.experiment_id,
-                        eia.project_id,
-                        eia.input,
-                        eia.output,
-                        eia.input_slim,
-                        eia.output_slim,
-                        eia.feedback_scores_array,
-                        eia.duration AS duration,
-                        eia.total_estimated_cost,
-                        eia.usage,
-                        eia.visibility_mode,
-                        eia.created_at,
-                        eia.last_updated_at,
-                        eia.created_by,
-                        eia.last_updated_by,
-                        eia.metadata,
-                        eia.feedback_scores,
-                        eia.comments_array_agg,
-                        eia.execution_policy
-                    FROM experiment_item_aggregates AS eia FINAL
-                    WHERE eia.workspace_id = :workspace_id
-                    AND eia.experiment_id IN (SELECT id FROM experiment_aggregated_scope_ids)
-                    <if(push_top_limit)>AND eia.dataset_item_id IN (SELECT dataset_item_id FROM top_dataset_items)<endif>
-                    <if(experiment_item_filters)> AND <experiment_item_filters> <endif>
-                    <if(feedback_scores_filters_agg)> AND <feedback_scores_filters_agg> <endif>
-                    <if(feedback_scores_empty_filters_agg)> AND <feedback_scores_empty_filters_agg> <endif>
-                    <if(dataset_item_filters)>
-                    AND eia.dataset_item_id IN (SELECT arrayJoin([id, row_id]) FROM dataset_items_aggr_resolved WHERE <dataset_item_filters>)
+                        ei.dataset_item_id AS id,
+                        :datasetId AS dataset_id,
+                        COALESCE(di.data, map()) AS data,
+                        di.description AS description,
+                        di.trace_id AS trace_id,
+                        di.span_id AS span_id,
+                        di.source AS source,
+                        di.tags AS tags,
+                        di.evaluators AS evaluators,
+                        di.execution_policy AS execution_policy,
+                        di.item_created_at AS created_at,
+                        di.item_last_updated_at AS last_updated_at,
+                        di.item_created_by AS created_by,
+                        di.item_last_updated_by AS last_updated_by,
+                        ei.duration AS duration,
+                        ei.total_estimated_cost AS total_estimated_cost,
+                        ei.usage AS usage,
+                        ei.feedback_scores AS feedback_scores,
+                        <if(truncate)>replaceRegexpAll(if(notEmpty(ei.input_slim), ei.input_slim, ei.input), '<truncate>', '"[image]"')<else>ei.input<endif> AS input,
+                        <if(truncate)>replaceRegexpAll(if(notEmpty(ei.output_slim), ei.output_slim, ei.output), '<truncate>', '"[image]"')<else>ei.output<endif> AS output,
+                        ei.metadata AS metadata,
+                        ei.visibility_mode AS visibility_mode,
+                        ei.comments_array_agg AS comments,
+                        di.row_id AS di_row_id,
+                        ei.id AS ei_id,
+                        ei.input AS full_input,
+                        ei.output AS full_output,
+                        tuple(
+                            ei.id,
+                            ei.experiment_id,
+                            ei.dataset_item_id,
+                            ei.trace_id,
+                            <if(truncate)>replaceRegexpAll(if(notEmpty(ei.input_slim), ei.input_slim, ei.input), '<truncate>', '"[image]"')<else>ei.input<endif>,
+                            <if(truncate)>replaceRegexpAll(if(notEmpty(ei.output_slim), ei.output_slim, ei.output), '<truncate>', '"[image]"')<else>ei.output<endif>,
+                            ei.feedback_scores_array,
+                            ei.created_at,
+                            ei.last_updated_at,
+                            ei.created_by,
+                            ei.last_updated_by,
+                            ei.comments_array_agg,
+                            ei.duration,
+                            ei.total_estimated_cost,
+                            ei.usage,
+                            ei.visibility_mode,
+                            ei.metadata,
+                            di.description,
+                            ei.execution_policy,
+                            arp.assertions_array
+                        ) AS experiment_item_tuple
+                    FROM (
+                        SELECT
+                            eia.id,
+                            eia.trace_id,
+                            eia.dataset_item_id,
+                            eia.experiment_id,
+                            eia.project_id,
+                            eia.input,
+                            eia.output,
+                            eia.input_slim,
+                            eia.output_slim,
+                            eia.feedback_scores_array,
+                            eia.duration AS duration,
+                            eia.total_estimated_cost,
+                            eia.usage,
+                            eia.visibility_mode,
+                            eia.created_at,
+                            eia.last_updated_at,
+                            eia.created_by,
+                            eia.last_updated_by,
+                            eia.metadata,
+                            eia.feedback_scores,
+                            eia.comments_array_agg,
+                            eia.execution_policy
+                        FROM experiment_item_aggregates AS eia FINAL
+                        WHERE eia.workspace_id = :workspace_id
+                        AND eia.experiment_id IN (SELECT id FROM experiment_aggregated_scope_ids)
+                        <if(push_top_limit)>AND eia.dataset_item_id IN (SELECT dataset_item_id FROM top_dataset_items)<endif>
+                        <if(experiment_item_filters)> AND <experiment_item_filters> <endif>
+                        <if(feedback_scores_filters_agg)> AND <feedback_scores_filters_agg> <endif>
+                        <if(feedback_scores_empty_filters_agg)> AND <feedback_scores_empty_filters_agg> <endif>
+                        <if(dataset_item_filters)>
+                        AND eia.dataset_item_id IN (SELECT arrayJoin([id, row_id]) FROM dataset_items_aggr_resolved WHERE <dataset_item_filters>)
+                        <endif>
+                    ) ei
+                    LEFT JOIN dataset_items_aggr_resolved AS di ON (di.id = ei.dataset_item_id OR di.row_id = ei.dataset_item_id)
+                    LEFT JOIN assertion_results_per_trace AS arp ON ei.trace_id = arp.entity_id
                     <endif>
-                ) ei
-                LEFT JOIN dataset_items_aggr_resolved AS di ON (di.id = ei.dataset_item_id OR di.row_id = ei.dataset_item_id)
-                LEFT JOIN assertion_results_per_trace AS arp ON ei.trace_id = arp.entity_id
-                GROUP BY
-                    ei.dataset_item_id,
-                    :datasetId,
-                    COALESCE(di.data, map()),
-                    di.trace_id,
-                    di.description,
-                    di.span_id,
-                    di.source,
-                    di.tags,
-                    di.evaluators,
-                    di.execution_policy,
-                    di.item_created_at,
-                    di.item_last_updated_at,
-                    di.item_created_by,
-                    di.item_last_updated_by
-                <if(search || filters)>
-                  HAVING 1=1
 
-                  <if(search)>
-                  AND (multiSearchAnyCaseInsensitive(toString(data_final), :searchTerms) OR multiSearchAnyCaseInsensitive(toString(argMax(ei.input, ei.id)), :searchTerms) OR multiSearchAnyCaseInsensitive(toString(argMax(ei.output, ei.id)), :searchTerms))
-                  <endif>
+                <if(has_aggregated)><if(has_raw)>UNION ALL<endif><endif>
 
-                  <if(filters)>
-                  AND (<filters>)
-                  <endif>
-
-                <endif>
-                <endif>
-
-            <if(has_aggregated)><if(has_raw)>UNION ALL<endif><endif>
-
-                <if(has_raw)>
-                SELECT
-                    ei.dataset_item_id AS id,
-                    :datasetId AS dataset_id,
-                    <if(truncate)> mapApply((k, v) -> (k, substring(replaceRegexpAll(v, '<truncate>', '"[image]"'), 1, <truncationSize>)), COALESCE(di.data, map())) <else> COALESCE(di.data, map()) <endif> AS data_final,
-                    COALESCE(di.data, map()) AS data,
-                    di.description AS description,
-                    di.trace_id AS trace_id,
-                    di.span_id AS span_id,
-                    di.source AS source,
-                    di.tags AS tags,
-                    di.evaluators AS evaluators,
-                    di.execution_policy AS execution_policy,
-                    di.item_created_at AS created_at,
-                    di.item_last_updated_at AS last_updated_at,
-                    di.item_created_by AS created_by,
-                    di.item_last_updated_by AS last_updated_by,
-                    avg(tfs.duration) AS duration,
-                    avg(tfs.total_estimated_cost) AS total_estimated_cost,
-                    avgMap(tfs.usage) AS usage,
-                    avgMap(tfs.feedback_scores) AS feedback_scores,
-                    argMax(tfs.input, ei.id) AS input,
-                    argMax(tfs.output, ei.id) AS output,
-                    argMax(tfs.metadata, ei.id) AS metadata,
-                    argMax(tfs.visibility_mode, ei.id) AS visibility_mode,
-                    argMax(tfs.comments_array_agg, ei.id) AS comments,
-                    groupArray(tuple(
-                        ei.id,
-                        ei.experiment_id,
-                        ei.dataset_item_id,
-                        ei.trace_id,
-                        tfs.input,
-                        tfs.output,
-                        toString(tfs.feedback_scores_array),
-                        ei.created_at,
-                        ei.last_updated_at,
-                        ei.created_by,
-                        ei.last_updated_by,
-                        tfs.comments_array_agg,
-                        tfs.duration,
-                        tfs.total_estimated_cost,
-                        tfs.usage,
-                        tfs.visibility_mode,
-                        tfs.metadata,
-                        di.description,
-                        ei.execution_policy,
-                        arp.assertions_array
-                    )) AS experiment_items_array
-                FROM experiment_items_final AS ei
-                LEFT JOIN dataset_items_resolved AS di ON (di.id = ei.dataset_item_id OR di.row_id = ei.dataset_item_id)
-                LEFT JOIN (
+                    <if(has_raw)>
+                    SELECT
+                        ei.dataset_item_id AS id,
+                        :datasetId AS dataset_id,
+                        COALESCE(di.data, map()) AS data,
+                        di.description AS description,
+                        di.trace_id AS trace_id,
+                        di.span_id AS span_id,
+                        di.source AS source,
+                        di.tags AS tags,
+                        di.evaluators AS evaluators,
+                        di.execution_policy AS execution_policy,
+                        di.item_created_at AS created_at,
+                        di.item_last_updated_at AS last_updated_at,
+                        di.item_created_by AS created_by,
+                        di.item_last_updated_by AS last_updated_by,
+                        tfs.duration AS duration,
+                        tfs.total_estimated_cost AS total_estimated_cost,
+                        tfs.usage AS usage,
+                        tfs.feedback_scores AS feedback_scores,
+                        tfs.input AS input,
+                        tfs.output AS output,
+                        tfs.metadata AS metadata,
+                        tfs.visibility_mode AS visibility_mode,
+                        tfs.comments_array_agg AS comments,
+                        di.row_id AS di_row_id,
+                        ei.id AS ei_id,
+                        tfs.full_input AS full_input,
+                        tfs.full_output AS full_output,
+                        tuple(
+                            ei.id,
+                            ei.experiment_id,
+                            ei.dataset_item_id,
+                            ei.trace_id,
+                            tfs.input,
+                            tfs.output,
+                            toString(tfs.feedback_scores_array),
+                            ei.created_at,
+                            ei.last_updated_at,
+                            ei.created_by,
+                            ei.last_updated_by,
+                            tfs.comments_array_agg,
+                            tfs.duration,
+                            tfs.total_estimated_cost,
+                            tfs.usage,
+                            tfs.visibility_mode,
+                            tfs.metadata,
+                            di.description,
+                            ei.execution_policy,
+                            arp.assertions_array
+                        ) AS experiment_item_tuple
+                    FROM experiment_items_final AS ei
+                    LEFT JOIN dataset_items_resolved AS di ON (di.id = ei.dataset_item_id OR di.row_id = ei.dataset_item_id)
+                    LEFT JOIN (
                     SELECT
                         ei2.id AS item_id,
                         t.input,
@@ -1368,35 +1404,22 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
                         s.usage
                 ) AS tfs ON ei.id = tfs.item_id
                 LEFT JOIN assertion_results_per_trace AS arp ON ei.trace_id = arp.entity_id
-                GROUP BY
-                    ei.dataset_item_id,
-                    :datasetId,
-                    COALESCE(di.data, map()),
-                    di.trace_id,
-                    di.description,
-                    di.span_id,
-                    di.source,
-                    di.tags,
-                    di.evaluators,
-                    di.execution_policy,
-                    di.item_created_at,
-                    di.item_last_updated_at,
-                    di.item_created_by,
-                    di.item_last_updated_by
-                <if(search || filters)>
-                  HAVING 1=1
-
-                  <if(search)>
-                  AND (multiSearchAnyCaseInsensitive(toString(data_final), :searchTerms) OR multiSearchAnyCaseInsensitive(toString(argMax(tfs.full_input, ei.id)), :searchTerms) OR multiSearchAnyCaseInsensitive(toString(argMax(tfs.full_output, ei.id)), :searchTerms))
-                  <endif>
-
-                  <if(filters)>
-                  AND (<filters>)
-                  <endif>
-
                 <endif>
-                <endif>
+                )
+                GROUP BY id, dataset_id
             )
+            <if(search || filters)>
+            HAVING 1=1
+
+            <if(search)>
+            AND (multiSearchAnyCaseInsensitive(toString(data_final), :searchTerms) OR multiSearchAnyCaseInsensitive(toString(full_input), :searchTerms) OR multiSearchAnyCaseInsensitive(toString(full_output), :searchTerms))
+            <endif>
+
+            <if(filters)>
+            AND (<filters>)
+            <endif>
+
+            <endif>
             <if(sorting)>
             ORDER BY <sorting>, id DESC
             <else>
