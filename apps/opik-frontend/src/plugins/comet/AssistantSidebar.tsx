@@ -10,8 +10,10 @@ import {
   AssistantSidebarBridge,
   BridgeContext,
   HostEventMap,
+  SidebarEventMap,
 } from "@/types/assistant-sidebar";
 import { useActiveWorkspaceName } from "@/store/AppStore";
+import { useToast } from "@/ui/use-toast";
 import useWorkspace from "@/plugins/comet/useWorkspace";
 import useProjectById from "@/api/projects/useProjectById";
 import { BASE_API_URL } from "@/api/api";
@@ -82,6 +84,10 @@ function createHostListeners(): HostListeners {
 interface BridgeRefs {
   navigate: React.MutableRefObject<(path: string) => void>;
   onWidthChange: React.MutableRefObject<(width: number) => void>;
+  onNotification: React.MutableRefObject<
+    (data: SidebarEventMap["notification"]) => void
+  >;
+  onRequestVisibility: React.MutableRefObject<(open: boolean) => void>;
   context: React.MutableRefObject<BridgeContext>;
   listeners: React.MutableRefObject<HostListeners>;
 }
@@ -101,9 +107,19 @@ const createBridge = (refs: BridgeRefs): AssistantSidebarBridge => ({
   },
   emit: (event, data) => {
     if (event === "navigate") {
-      refs.navigate.current((data as { path: string }).path);
+      refs.navigate.current((data as SidebarEventMap["navigate"]).path);
     } else if (event === "sidebar:resized") {
-      refs.onWidthChange.current((data as { width: number }).width);
+      refs.onWidthChange.current(
+        (data as SidebarEventMap["sidebar:resized"]).width,
+      );
+    } else if (event === "notification") {
+      refs.onNotification.current(
+        data as SidebarEventMap["notification"],
+      );
+    } else if (event === "sidebar:request-open") {
+      refs.onRequestVisibility.current(true);
+    } else if (event === "sidebar:request-close") {
+      refs.onRequestVisibility.current(false);
     } else if (IS_DEV) {
       console.warn(
         `[AssistantBridge] Unhandled sidebar event: "${event}"`,
@@ -201,9 +217,25 @@ const AssistantSidebar: React.FC<AssistantSidebarProps> = ({
   const context = useBridgeContext();
   const router = useRouter();
 
+  const { toast } = useToast();
+
   const contextRef = useLatestRef(context);
   const onWidthChangeRef = useLatestRef(onWidthChange);
   const listenersRef = useRef<HostListeners>(createHostListeners());
+
+  const onNotificationRef = useLatestRef(
+    (data: SidebarEventMap["notification"]) => {
+      toast({
+        title: data.message,
+        variant: data.type === "error" ? "destructive" : "default",
+      });
+    },
+  );
+
+  // Best-effort: only effective if the sidebar has subscribed to visibility:changed
+  const onRequestVisibilityRef = useLatestRef((open: boolean) => {
+    emitHostEvent(listenersRef, "visibility:changed", { isOpen: open });
+  });
 
   const navigateRef = useLatestRef((path: string) => {
     const ws = contextRef.current.workspaceName;
@@ -215,6 +247,8 @@ const AssistantSidebar: React.FC<AssistantSidebarProps> = ({
     createBridge({
       navigate: navigateRef,
       onWidthChange: onWidthChangeRef,
+      onNotification: onNotificationRef,
+      onRequestVisibility: onRequestVisibilityRef,
       context: contextRef,
       listeners: listenersRef,
     }),
