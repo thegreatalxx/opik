@@ -40,12 +40,12 @@ const ListCell = (context: CellContext<unknown, unknown>) => {
     <CellWrapper
       metadata={context.column.columnDef.meta}
       tableMetadata={context.table.options.meta}
-      className={cn(isSmall && "py-0", expanded && "overflow-auto")}
+      className={cn(isSmall && "py-1", expanded && "overflow-auto")}
     >
-      <div ref={cellRef} className="w-full min-w-0 flex-1 overflow-hidden">
+      <div ref={cellRef} className="my-auto w-full min-w-0 overflow-hidden">
         <div
           className={cn(
-            "flex flex-row items-start gap-1",
+            "flex flex-row gap-1",
             expanded
               ? "flex-wrap"
               : isSmall
@@ -72,7 +72,7 @@ const ListCell = (context: CellContext<unknown, unknown>) => {
               key={item}
               label={item}
               variant="primary"
-              className="min-w-0 max-w-full"
+              className="block min-w-0 max-w-full"
               size={isSmall ? "sm" : "md"}
             />
           ))}
@@ -82,7 +82,7 @@ const ListCell = (context: CellContext<unknown, unknown>) => {
                 <TagListTooltipContent
                   tags={sortedList}
                   variant="primary"
-                  hint="Click to show all"
+                  hint="Click to expand"
                 />
               }
             >
