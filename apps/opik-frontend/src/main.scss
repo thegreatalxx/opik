@@ -769,6 +769,10 @@
   }
 }
 
+.mask-fade-to-bottom {
+  mask-image: linear-gradient(to bottom, rgb(0, 0, 0) 0%, transparent 100%);
+}
+
 .comet-table-body-loading-overlay {
   position: relative;
 
