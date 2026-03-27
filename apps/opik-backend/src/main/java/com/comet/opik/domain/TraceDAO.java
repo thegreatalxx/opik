@@ -796,7 +796,17 @@ class TraceDAOImpl implements TraceDAO {
             """;
 
     private static final String SELECT_BY_PROJECT_ID = """
-            WITH feedback_scores_combined_raw AS (
+            WITH <if(trace_id_prefilter)>trace_id_prefilter AS (
+                SELECT DISTINCT id
+                FROM traces
+                WHERE workspace_id = :workspace_id
+                AND project_id = :project_id
+                <if(last_received_id)> AND id \\< :last_received_id <endif>
+                <if(uuid_from_time)> AND id >= :uuid_from_time <endif>
+                <if(uuid_to_time)> AND id \\<= :uuid_to_time <endif>
+                <if(filters)> AND <filters> <endif>
+                <if(search_text)> AND <search_text> <endif>
+            ), <endif>feedback_scores_combined_raw AS (
                 SELECT workspace_id,
                        project_id,
                        entity_id,
@@ -814,8 +824,11 @@ class TraceDAOImpl implements TraceDAO {
                 WHERE entity_type = 'trace'
                   AND workspace_id = :workspace_id
                   AND project_id = :project_id
+                  <if(trace_id_prefilter)> AND entity_id IN (SELECT id FROM trace_id_prefilter)
+                  <else>
                   <if(uuid_from_time)> AND entity_id >= :uuid_from_time <endif>
                   <if(uuid_to_time)> AND entity_id \\<= :uuid_to_time <endif>
+                  <endif>
                 UNION ALL
                 SELECT workspace_id,
                        project_id,
@@ -834,8 +847,11 @@ class TraceDAOImpl implements TraceDAO {
                  WHERE entity_type = 'trace'
                    AND workspace_id = :workspace_id
                    AND project_id = :project_id
+                   <if(trace_id_prefilter)> AND entity_id IN (SELECT id FROM trace_id_prefilter)
+                   <else>
                    <if(uuid_from_time)> AND entity_id >= :uuid_from_time <endif>
                    <if(uuid_to_time)> AND entity_id \\<= :uuid_to_time <endif>
+                   <endif>
              ),
              feedback_scores_with_ranking AS (
                  SELECT workspace_id,
@@ -942,8 +958,11 @@ class TraceDAOImpl implements TraceDAO {
                     WHERE entity_type = 'trace'
                     AND workspace_id = :workspace_id
                     AND project_id = :project_id
+                    <if(trace_id_prefilter)> AND entity_id IN (SELECT id FROM trace_id_prefilter)
+                    <else>
                     <if(uuid_from_time)> AND entity_id >= :uuid_from_time <endif>
                     <if(uuid_to_time)> AND entity_id \\<= :uuid_to_time <endif>
+                    <endif>
                     ORDER BY (workspace_id, project_id, entity_type, entity_id, id) DESC, last_updated_at DESC
                     LIMIT 1 BY entity_id, id
                 )
@@ -953,8 +972,11 @@ class TraceDAOImpl implements TraceDAO {
                 FROM spans
                 WHERE workspace_id = :workspace_id
                 AND project_id = :project_id
+                <if(trace_id_prefilter)>AND trace_id IN (SELECT id FROM trace_id_prefilter)
+                <else>
                 <if(uuid_from_time)>AND trace_id >= :uuid_from_time<endif>
                 <if(uuid_to_time)>AND trace_id \\<= :uuid_to_time<endif>
+                <endif>
             ),
             span_feedback_scores_combined_raw AS (
                 SELECT workspace_id,
@@ -1123,8 +1145,11 @@ class TraceDAOImpl implements TraceDAO {
                 FROM spans FINAL
                 WHERE workspace_id = :workspace_id
                 AND project_id = :project_id
+                <if(trace_id_prefilter)>AND trace_id IN (SELECT id FROM trace_id_prefilter)
+                <else>
                 <if(uuid_from_time)>AND trace_id >= :uuid_from_time<endif>
                 <if(uuid_to_time)>AND trace_id \\<= :uuid_to_time<endif>
+                <endif>
                 GROUP BY workspace_id, project_id, trace_id
             ), comments_agg AS (
                 SELECT
@@ -1144,8 +1169,11 @@ class TraceDAOImpl implements TraceDAO {
                     FROM comments
                     WHERE workspace_id = :workspace_id
                     AND project_id = :project_id
+                    <if(trace_id_prefilter)> AND entity_id IN (SELECT id FROM trace_id_prefilter)
+                    <else>
                     <if(uuid_from_time)> AND entity_id >= :uuid_from_time <endif>
                     <if(uuid_to_time)> AND entity_id \\<= :uuid_to_time <endif>
+                    <endif>
                     ORDER BY (workspace_id, project_id, entity_id, id) DESC, last_updated_at DESC
                     LIMIT 1 BY id
                 )
@@ -1160,8 +1188,11 @@ class TraceDAOImpl implements TraceDAO {
                     WHERE aq.scope = 'trace'
                       AND workspace_id = :workspace_id
                       AND project_id = :project_id
+                      <if(trace_id_prefilter)> AND aqi.item_id IN (SELECT id FROM trace_id_prefilter)
+                      <else>
                       <if(uuid_from_time)> AND aqi.item_id >= :uuid_from_time <endif>
                       <if(uuid_to_time)> AND aqi.item_id \\<= :uuid_to_time <endif>
+                      <endif>
                  ) AS annotation_queue_ids_with_trace_id
                  GROUP BY trace_id
             )
@@ -1177,8 +1208,11 @@ class TraceDAOImpl implements TraceDAO {
                     SELECT DISTINCT experiment_id, trace_id, dataset_item_id
                     FROM experiment_items
                     WHERE workspace_id = :workspace_id
+                    <if(trace_id_prefilter)> AND trace_id IN (SELECT id FROM trace_id_prefilter)
+                    <else>
                     <if(uuid_from_time)> AND trace_id >= :uuid_from_time <endif>
                     <if(uuid_to_time)> AND trace_id \\<= :uuid_to_time <endif>
+                    <endif>
                 ) ei
                 INNER JOIN (
                     SELECT id, name, dataset_id
@@ -3041,6 +3075,33 @@ class TraceDAOImpl implements TraceDAO {
                 || sortFields.contains("total_estimated_cost");
     }
 
+    /**
+     * Determines whether to activate the trace_id_prefilter CTE for narrowing feedback_scores,
+     * comments, spans, guardrails, annotations, and experiments scans. Uses template attributes
+     * already computed by newTraceThreadFindTemplate to avoid redundant toAnalyticsDbFilters calls.
+     *
+     * <p>Only activates for filters that narrow beyond what time-range alone provides:
+     * uuidFromTime/uuidToTime are excluded because the if/else fallback applies them directly
+     * to each CTE; lastReceivedId is excluded because it's a pagination cursor, not a
+     * semantic filter.
+     *
+     * <p>Guardrails filters inject {@code gagg.guardrails_result} into the {@code <filters>}
+     * template variable, which references the guardrails_agg CTE alias. Since the prefilter
+     * CTE only queries the traces table, these references would fail. Guard against them.
+     */
+    private boolean shouldUseTraceIdPrefilter(TraceSearchCriteria criteria, ST template) {
+        boolean hasCteDependentFilters = template.getAttribute("feedback_scores_filters") != null
+                || template.getAttribute("feedback_scores_empty_filters") != null
+                || template.getAttribute("span_feedback_scores_filters") != null
+                || template.getAttribute("span_feedback_scores_empty_filters") != null
+                || template.getAttribute("guardrails_filters") != null;
+
+        boolean hasNarrowingFilters = criteria.searchText() != null
+                || template.getAttribute("filters") != null;
+
+        return !hasCteDependentFilters && hasNarrowingFilters;
+    }
+
     private Mono<? extends Result> getTracesByProjectId(
             int size, int page, TraceSearchCriteria traceSearchCriteria, Connection connection) {
 
@@ -3056,13 +3117,20 @@ class TraceDAOImpl implements TraceDAO {
             template.add("offset", offset);
             template.add("log_comment", logComment);
 
-            var finalTemplate = template;
-            Optional.ofNullable(
-                    sortingQueryBuilder.toOrderBySql(traceSearchCriteria.sortingFields(),
-                            TraceSortingFactory.EXPERIMENT_FIELD_MAPPING))
-                    .ifPresent(sortFields -> {
+            var orderBySql = sortingQueryBuilder.toOrderBySql(traceSearchCriteria.sortingFields(),
+                    TraceSortingFactory.EXPERIMENT_FIELD_MAPPING);
+            boolean sortHasFeedbackScores = Optional.ofNullable(orderBySql)
+                    .map(sortFields -> sortFields.contains("feedback_scores"))
+                    .orElse(false);
 
-                        if (sortFields.contains("feedback_scores")) {
+            if (shouldUseTraceIdPrefilter(traceSearchCriteria, template) && !sortHasFeedbackScores) {
+                template.add("trace_id_prefilter", true);
+            }
+
+            var finalTemplate = template;
+            Optional.ofNullable(orderBySql)
+                    .ifPresent(sortFields -> {
+                        if (sortHasFeedbackScores) {
                             finalTemplate.add("sort_has_feedback_scores", true);
                         }
 
@@ -3624,6 +3692,10 @@ class TraceDAOImpl implements TraceDAO {
             var logComment = getLogComment("find_trace_stream", workspaceId, "limit:" + limit + ":" + criteria);
             var template = newTraceThreadFindTemplate(SELECT_BY_PROJECT_ID, criteria, TRACE_SEARCH_CLAUSE);
             template.add("log_comment", logComment);
+
+            if (shouldUseTraceIdPrefilter(criteria, template)) {
+                template.add("trace_id_prefilter", true);
+            }
 
             template = ImageUtils.addTruncateToTemplate(template, criteria.truncate());
 
