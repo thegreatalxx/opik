@@ -1,7 +1,7 @@
 import React from "react";
 import { Check, LoaderCircle } from "lucide-react";
 import { useAgentOnboarding } from "./AgentOnboardingContext";
-import { useUserApiKey } from "@/store/AppStore";
+import { useUserApiKey, useActiveWorkspaceName } from "@/store/AppStore";
 import { buildDocsUrl, maskAPIKey } from "@/lib/utils";
 import CopyButton from "@/shared/CopyButton/CopyButton";
 import claudeCodeLogo from "/images/integrations/claude_code.svg";
@@ -70,9 +70,12 @@ const InstallWithAITab: React.FC<InstallWithAITabProps> = ({
 }) => {
   const { agentName } = useAgentOnboarding();
   const apiKey = useUserApiKey();
+  const workspaceName = useActiveWorkspaceName();
 
   const buildPrompt = (shouldMaskAPIKey: boolean) =>
     `Instrument my agent with Opik, use project name "${agentName}"${
+      workspaceName ? `, workspace "${workspaceName}"` : ""
+    }${
       apiKey
         ? ` and API key "${shouldMaskAPIKey ? maskAPIKey(apiKey) : apiKey}"`
         : ""
