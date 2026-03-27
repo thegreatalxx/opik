@@ -9,6 +9,7 @@ import {
 import useLocalStorageState from "use-local-storage-state";
 import useAppStore from "@/store/AppStore";
 import useProjectByName from "@/api/projects/useProjectByName";
+import { LOGS_TYPE } from "@/constants/traces";
 
 const NewQuickstart: React.FunctionComponent = () => {
   const [agentOnboardingState] = useLocalStorageState<{
@@ -44,14 +45,13 @@ const NewQuickstart: React.FunctionComponent = () => {
       <Navigate
         to="/$workspaceName/projects/$projectId/logs"
         params={{ workspaceName, projectId: project.id }}
-        search={
-          traceId
-            ? {
-                trace: traceId,
-                traces_sorting: TRACES_OLDEST_FIRST_SORTING,
-              }
-            : undefined
-        }
+        search={{
+          logsType: LOGS_TYPE.traces,
+          ...(traceId && {
+            trace: traceId,
+            traces_sorting: TRACES_OLDEST_FIRST_SORTING,
+          }),
+        }}
       />
     );
   }
