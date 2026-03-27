@@ -1309,6 +1309,7 @@ export const TracesSpansTab: React.FC<TracesSpansTabProps> = ({
         isLoading={isTableLoading}
         isEmpty={showEmptyState}
         emptyState={<NoTracesPage type={type} />}
+        skeleton
       >
         <DataTable
           columns={columns}
@@ -1318,6 +1319,7 @@ export const TracesSpansTab: React.FC<TracesSpansTabProps> = ({
           activeRowId={activeRowId ?? ""}
           sortConfig={sortConfig}
           resizeConfig={resizeConfig}
+          showSkeleton={isTableLoading}
           selectionConfig={{
             rowSelection,
             setRowSelection,
