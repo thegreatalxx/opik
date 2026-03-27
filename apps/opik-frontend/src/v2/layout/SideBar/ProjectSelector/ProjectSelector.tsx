@@ -82,42 +82,42 @@ const ProjectSelector: React.FC = () => {
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      {isLoading ? (
-        <span className="flex w-full items-center gap-2 rounded-md px-2 py-1">
-          <Spinner size="xs" />
-          <span className="comet-body-s text-muted-slate">Loading…</span>
-        </span>
-      ) : (
-        <PopoverAnchor asChild>
-          <PopoverTrigger asChild>
-            <button
-              className={cn(
-                "flex w-full items-center gap-1 rounded-md px-2 py-1",
-                open ? "bg-primary-foreground" : "hover:bg-primary-foreground",
-              )}
-            >
-              {activeProject ? (
-                <TooltipWrapper content={activeProject.name}>
-                  <span className="comet-body-s-accented flex-1 truncate text-left text-foreground">
-                    {activeProject.name}
-                  </span>
-                </TooltipWrapper>
-              ) : (
-                <span className="comet-body-s-accented flex-1 truncate text-left text-muted-slate">
-                  Select project
+      <PopoverAnchor asChild>
+        <PopoverTrigger asChild>
+          <button
+            className={cn(
+              "flex w-full items-center gap-1 rounded-md px-2 py-1",
+              open ? "bg-primary-foreground" : "hover:bg-primary-foreground",
+            )}
+          >
+            {isLoading ? (
+              <>
+                <Spinner size="xs" />
+                <span className="comet-body-s flex-1 text-left text-muted-slate">
+                  Loading…
                 </span>
-              )}
-              <span className="shrink-0 text-muted-slate">
-                {open ? (
-                  <ChevronUp className="size-3.5" />
-                ) : (
-                  <ChevronDown className="size-3.5" />
-                )}
+              </>
+            ) : activeProject ? (
+              <TooltipWrapper content={activeProject.name}>
+                <span className="comet-body-s-accented flex-1 truncate text-left text-foreground">
+                  {activeProject.name}
+                </span>
+              </TooltipWrapper>
+            ) : (
+              <span className="comet-body-s-accented flex-1 truncate text-left text-muted-slate">
+                Select project
               </span>
-            </button>
-          </PopoverTrigger>
-        </PopoverAnchor>
-      )}
+            )}
+            <span className="shrink-0 text-muted-slate">
+              {open ? (
+                <ChevronUp className="size-3.5" />
+              ) : (
+                <ChevronDown className="size-3.5" />
+              )}
+            </span>
+          </button>
+        </PopoverTrigger>
+      </PopoverAnchor>
       <PopoverContent
         align="start"
         side="bottom"
@@ -240,7 +240,7 @@ const ProjectItem: React.FC<ProjectItemProps> = ({
           isSelected && "bg-muted",
         )}
         onClick={(e) => {
-          if (e.metaKey || e.ctrlKey) return;
+          if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
           e.preventDefault();
           onSelect(project.id);
         }}
