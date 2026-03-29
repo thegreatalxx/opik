@@ -153,9 +153,7 @@ interface AssistantMeta {
   version: string;
 }
 
-function useAssistantMeta(
-  backendUrl: string | null,
-): AssistantMeta | null {
+function useAssistantMeta(backendUrl: string | null): AssistantMeta | null {
   const manifestUrl = DEV_BASE_URL
     ? `${DEV_BASE_URL}/manifest.json`
     : backendUrl
