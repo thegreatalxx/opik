@@ -101,9 +101,9 @@ const FeedbackScoreEditDropdown: React.FC<FeedbackScoreEditDropdownProps> = ({
           size="icon-xs"
           variant="outline"
           className={cn(
-            "hidden group-hover:inline-flex",
+            "hidden shrink-0 group-hover:inline-flex",
             keepVisible && "inline-flex",
-            size === "sm" && "size-4",
+            size === "sm" ? "size-4" : "size-5",
           )}
           onClick={(e) => {
             e.stopPropagation();
