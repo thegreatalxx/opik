@@ -10,7 +10,7 @@ const DataTableNoMatchingData: React.FC<DataTableNoMatchingDataProps> = ({
   onClearFilters,
 }) => {
   return (
-    <div className="sticky left-0 flex min-h-[50vh] w-[var(--scroll-body-client-width,100%)] items-center justify-center bg-white dark:bg-background">
+    <div className="sticky left-0 flex min-h-[50vh] w-[var(--scroll-body-client-width,100%)] items-center justify-center bg-background">
       <div className="flex flex-col items-center gap-2">
         <SearchX className="mb-1 size-5 text-muted-slate" />
         <h3 className="comet-body">No matching results</h3>
