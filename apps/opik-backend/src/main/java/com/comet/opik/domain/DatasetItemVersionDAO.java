@@ -1006,6 +1006,14 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
                 ORDER BY (workspace_id, project_id, entity_id, id) DESC, last_updated_at DESC
                 LIMIT 1 BY id
             )
+            , all_experiment_trace_ids AS (
+                SELECT trace_id FROM experiment_items_final
+                UNION ALL
+                SELECT DISTINCT trace_id
+                FROM experiment_item_aggregates FINAL
+                WHERE workspace_id = :workspace_id
+                AND experiment_id IN (SELECT id FROM experiment_aggregated_scope_ids)
+            )
             , assertion_results_per_trace AS (
                 SELECT
                     entity_id,
@@ -1021,7 +1029,7 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
                 WHERE entity_type = 'trace'
                   AND workspace_id = :workspace_id
                   <if(has_target_projects)>AND project_id IN :target_project_ids<endif>
-                  AND entity_id IN (SELECT trace_id FROM experiment_items_final)
+                  AND entity_id IN (SELECT trace_id FROM all_experiment_trace_ids)
                 GROUP BY entity_id
             )
             , dataset_items_aggr_resolved AS (

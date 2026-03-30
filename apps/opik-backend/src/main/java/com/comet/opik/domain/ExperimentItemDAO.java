@@ -366,6 +366,11 @@ class ExperimentItemDAO {
                       ))) AS comments_array_agg
                   FROM comments_final
                   GROUP BY entity_id
+            ), all_experiment_trace_ids AS (
+                  SELECT trace_id FROM experiment_items_ids
+                  UNION ALL
+                  SELECT DISTINCT trace_id
+                  FROM experiment_item_aggregates_final
             ), assertion_results_per_trace AS (
                   SELECT
                       entity_id,
@@ -381,7 +386,7 @@ class ExperimentItemDAO {
                   WHERE entity_type = 'trace'
                     AND workspace_id = :workspace_id
                     <if(has_target_projects)>AND project_id IN :target_project_ids<endif>
-                    AND entity_id IN (SELECT trace_id FROM experiment_items_ids)
+                    AND entity_id IN (SELECT trace_id FROM all_experiment_trace_ids)
                   GROUP BY entity_id
             )
               SELECT
@@ -408,8 +413,9 @@ class ExperimentItemDAO {
                       ei.last_updated_by AS last_updated_by,
                       ei.visibility_mode AS trace_visibility_mode,
                       ei.execution_policy,
-                      '' AS assertions_array
+                      arp.assertions_array AS assertions_array
                   FROM experiment_item_aggregates_final AS ei
+                  LEFT JOIN assertion_results_per_trace AS arp ON ei.trace_id = arp.entity_id
                   <endif>
 
                   <if(has_aggregated)><if(has_raw)>UNION ALL<endif><endif>
