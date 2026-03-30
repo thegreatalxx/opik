@@ -67,4 +67,3 @@ export const CELL_HORIZONTAL_ALIGNMENT_MAP: Record<COLUMN_TYPE, string> = {
   [COLUMN_TYPE.errors]: "justify-start",
 };
 
-// ALEX Check is minimal
