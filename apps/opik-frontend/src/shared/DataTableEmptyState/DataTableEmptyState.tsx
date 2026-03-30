@@ -39,6 +39,4 @@ const DataTableEmptyState: React.FC<DataTableEmptyStateProps> = ({
   );
 };
 
-// ALEX fix a bug with columns tags and version for detailed
-
 export default DataTableEmptyState;

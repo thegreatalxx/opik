@@ -36,6 +36,18 @@ export const CELL_TEXT_CLASS_MAP: Record<ROW_HEIGHT, string> = {
   [ROW_HEIGHT.large]: "comet-body-s",
 };
 
+export const TAG_SIZE_MAP: Record<ROW_HEIGHT, "default" | "md"> = {
+  [ROW_HEIGHT.small]: "default",
+  [ROW_HEIGHT.medium]: "md",
+  [ROW_HEIGHT.large]: "md",
+};
+
+export const FEEDBACK_SCORE_TAG_SIZE_MAP: Record<ROW_HEIGHT, "sm" | "md"> = {
+  [ROW_HEIGHT.small]: "sm",
+  [ROW_HEIGHT.medium]: "md",
+  [ROW_HEIGHT.large]: "md",
+};
+
 export const CELL_VERTICAL_ALIGNMENT_MAP = {
   [CELL_VERTICAL_ALIGNMENT.start]: "items-start",
   [CELL_VERTICAL_ALIGNMENT.center]: "items-center",
