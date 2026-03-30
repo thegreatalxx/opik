@@ -116,7 +116,7 @@ const DataTablePagination = ({
               disabled={disabledSizeChange}
             >
               {size}
-              <ChevronDown className="size-3.5 ml-1" />
+              <ChevronDown className="ml-1 size-3.5" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start">

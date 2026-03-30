@@ -56,7 +56,10 @@ const PageBodyScrollContainer: React.FC<PageBodyScrollContainerProps> = ({
     const handleScroll = () => {
       const isScrolled = scrollContainer.scrollTop > tableOffset;
       scrollContainer.toggleAttribute("data-header-stuck", isScrolled);
-      scrollContainer.toggleAttribute("data-scrolled-right", scrollContainer.scrollLeft > 0);
+      scrollContainer.toggleAttribute(
+        "data-scrolled-right",
+        scrollContainer.scrollLeft > 0,
+      );
     };
 
     scrollContainer.addEventListener("scroll", handleScroll, { passive: true });
@@ -70,7 +73,11 @@ const PageBodyScrollContainer: React.FC<PageBodyScrollContainerProps> = ({
 
   return (
     <PageBodyScrollContainerContext.Provider
-      value={{ scrollContainer: scrollContainer ?? null, tableOffset, recalculateOffsets }}
+      value={{
+        scrollContainer: scrollContainer ?? null,
+        tableOffset,
+        recalculateOffsets,
+      }}
     >
       <div
         ref={ref}
