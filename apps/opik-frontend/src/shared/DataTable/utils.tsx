@@ -21,6 +21,7 @@ import TooltipWrapper from "@/shared/TooltipWrapper/TooltipWrapper";
 import ExplainerIcon from "@/shared/ExplainerIcon/ExplainerIcon";
 import Loader from "@/shared/Loader/Loader";
 import {
+  CELL_TEXT_CLASS_MAP,
   ROW_HEIGHT_MAP,
   TABLE_HEADER_Z_INDEX,
   TABLE_ROW_Z_INDEX,
@@ -133,6 +134,7 @@ export const getCommonPinningClasses = <TData,>({
     "comet-pinned-cell",
     isHeader ? "bg-soft-background" : "bg-background",
     getIsLastLeftPinned(column, table) && "comet-pinned-last-left",
+    forceGroup && "comet-grouped-cell",
   );
 };
 
@@ -414,11 +416,14 @@ export const generateGroupedRowCellDef = <TData, TValue>(
     header: () => "",
     cell: (context: CellContext<TData, TValue>) => {
       const { row, cell } = context;
+      const rowHeight =
+        context.table.options.meta?.rowHeight ?? ROW_HEIGHT.small;
+      const textClass = CELL_TEXT_CLASS_MAP[rowHeight];
       return (
         <CellWrapper
           metadata={context.column.columnDef.meta}
           tableMetadata={context.table.options.meta}
-          className="h-11 items-center p-0 pr-2"
+          className="items-center p-0 pr-2"
           stopClickPropagation
         >
           <div
@@ -439,7 +444,7 @@ export const generateGroupedRowCellDef = <TData, TValue>(
             <Button
               variant="minimal"
               size="sm"
-              className="ml-1.5 pr-1"
+              className={cn("ml-1.5 pr-1", textClass)}
               onClick={(event) => {
                 row.toggleExpanded();
                 event.stopPropagation();

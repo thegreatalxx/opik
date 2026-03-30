@@ -4,6 +4,8 @@ import CellWrapper from "@/shared/DataTableCells/CellWrapper";
 import { TriangleAlert, ZoomIn } from "lucide-react";
 import CellTooltipWrapper from "./CellTooltipWrapper";
 import { ProjectErrorCount } from "@/types/projects";
+import { ROW_HEIGHT } from "@/types/shared";
+import { TAG_SIZE_MAP } from "@/constants/shared";
 import { Button } from "@/ui/button";
 
 type CustomMeta = {
@@ -34,6 +36,8 @@ const ErrorsCountCell = (context: CellContext<unknown, ProjectErrorCount>) => {
   const error = context.getValue();
   const { custom } = context.column.columnDef.meta ?? {};
   const { onZoomIn } = (custom ?? {}) as CustomMeta;
+  const rowHeight = context.table.options.meta?.rowHeight ?? ROW_HEIGHT.small;
+  const tagSize = TAG_SIZE_MAP[rowHeight];
 
   if (!error?.count) {
     return null;
@@ -57,6 +61,7 @@ const ErrorsCountCell = (context: CellContext<unknown, ProjectErrorCount>) => {
         <Tag
           onClick={onClick}
           variant="red"
+          size={tagSize}
           className="flex cursor-pointer items-center gap-1"
         >
           <TriangleAlert className="size-3 shrink-0" />

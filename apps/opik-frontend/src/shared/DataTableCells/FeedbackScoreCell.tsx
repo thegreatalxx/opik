@@ -85,6 +85,7 @@ const FeedbackScoreCell = (context: CellContext<unknown, unknown>) => {
         feedbackScore={feedbackScore}
         isUserFeedbackColumn={isUserFeedbackColumn}
         onValueChange={handleValueChange}
+        size={isSmall ? "sm" : "md"}
       />
 
       {reasons.length > 0 && (

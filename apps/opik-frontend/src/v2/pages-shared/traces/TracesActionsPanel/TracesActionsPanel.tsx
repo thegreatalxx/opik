@@ -189,6 +189,3 @@ const TracesActionsPanel: React.FunctionComponent<TracesActionsPanelProps> = ({
 };
 
 export default TracesActionsPanel;
-
-// ALEX
-// HIDE BOTTOM PAGINATION FOR LOADING STATE
