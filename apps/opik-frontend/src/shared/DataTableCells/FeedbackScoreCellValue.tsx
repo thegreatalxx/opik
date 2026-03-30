@@ -15,12 +15,14 @@ const FeedbackScoreCellValue = ({
   color: customColor,
   onValueChange,
   tooltipSuffix,
+  size = "md",
 }: {
   isUserFeedbackColumn?: boolean;
   feedbackScore?: TraceFeedbackScore;
   color?: string;
   onValueChange?: (name: string, value: number) => void;
   tooltipSuffix?: string;
+  size?: "sm" | "md";
 }) => {
   const { getColor } = useWorkspaceColorMap();
   const [openHoverCard, setOpenHoverCard] = useState(false);
@@ -38,6 +40,7 @@ const FeedbackScoreCellValue = ({
           <FeedbackScoreEditDropdown
             feedbackScore={feedbackScore}
             onValueChange={onValueChange}
+            size={size}
           />
         )}
         <span>-</span>

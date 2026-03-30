@@ -40,7 +40,6 @@ import {
   ColumnData,
   ColumnsStatistic,
   DynamicColumn,
-  HeaderIconType,
   ROW_HEIGHT,
 } from "@/types/shared";
 import { CUSTOM_FILTER_VALIDATION_REGEXP } from "@/constants/filters";
@@ -1345,7 +1344,7 @@ export const TracesSpansTab: React.FC<TracesSpansTabProps> = ({
           showLoadingOverlay={isPlaceholderData && isFetching}
         />
         <PageBodyStickyContainer
-          className="-mt-px bottom-0 border-t border-border bg-background py-2 pb-4"
+          className="-mt-px bottom-0 border-t border-border py-2 pb-4"
           direction="horizontal"
           limitWidth
         >

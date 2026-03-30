@@ -3,6 +3,8 @@ import { CellContext } from "@tanstack/react-table";
 
 import CellWrapper from "@/shared/DataTableCells/CellWrapper";
 import { Tag } from "@/ui/tag";
+import { ROW_HEIGHT } from "@/types/shared";
+import { TAG_SIZE_MAP } from "@/constants/shared";
 import { AggregatedCandidate } from "@/types/optimizations";
 import {
   computeCandidateStatuses,
@@ -40,6 +42,8 @@ const TrialStatusCell = (context: CellContext<unknown, unknown>) => {
     [candidates, isEvaluationSuite, isInProgress, inProgressInfo],
   );
   const status = statusMap.get(row.candidateId) ?? "pruned";
+  const rowHeight = context.table.options.meta?.rowHeight ?? ROW_HEIGHT.small;
+  const tagSize = TAG_SIZE_MAP[rowHeight];
 
   return (
     <CellWrapper
@@ -47,13 +51,13 @@ const TrialStatusCell = (context: CellContext<unknown, unknown>) => {
       tableMetadata={context.table.options.meta}
     >
       {isBest ? (
-        <Tag variant="green" size="md">
+        <Tag variant="green" size={tagSize}>
           Best
         </Tag>
       ) : (
         <Tag
           variant={STATUS_VARIANT_MAP[status]}
-          size="md"
+          size={tagSize}
           className="capitalize"
         >
           {status}

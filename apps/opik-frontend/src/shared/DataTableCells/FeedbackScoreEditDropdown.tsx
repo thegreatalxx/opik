@@ -26,11 +26,13 @@ import { findValueByAuthor } from "@/lib/feedback-scores";
 interface FeedbackScoreEditDropdownProps {
   feedbackScore?: TraceFeedbackScore;
   onValueChange: (name: string, value: number) => void;
+  size?: "sm" | "md";
 }
 
 const FeedbackScoreEditDropdown: React.FC<FeedbackScoreEditDropdownProps> = ({
   feedbackScore,
   onValueChange,
+  size = "md",
 }) => {
   const workspaceName = useAppStore((state) => state.activeWorkspaceName);
   const currentUserName = useLoggedInUserNameOrOpenSourceDefaultUser();
@@ -101,13 +103,14 @@ const FeedbackScoreEditDropdown: React.FC<FeedbackScoreEditDropdownProps> = ({
           className={cn(
             "hidden group-hover:inline-flex",
             keepVisible && "inline-flex",
+            size === "sm" && "size-4",
           )}
           onClick={(e) => {
             e.stopPropagation();
           }}
         >
           <TooltipWrapper content="Click to edit your score">
-            <Pencil className="size-3" />
+            <Pencil className={size === "sm" ? "size-2.5" : "size-3"} />
           </TooltipWrapper>
         </Button>
       </DropdownMenuTrigger>

@@ -34,6 +34,7 @@ const TypeHeader = <TData,>(context: HeaderContext<TData, unknown>) => {
     >
       {headerCheckbox && (
         <Checkbox
+          variant="muted"
           className="mr-3.5"
           onClick={(event) => event.stopPropagation()}
           checked={
