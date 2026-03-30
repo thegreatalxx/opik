@@ -74,7 +74,7 @@ const InstallWithAITab: React.FC<InstallWithAITabProps> = ({
 
   const buildPrompt = (shouldMaskAPIKey: boolean) =>
     `Instrument my agent with Opik, use project name "${agentName}"${
-      workspaceName ? `, workspace "${workspaceName}"` : ""
+      workspaceName ? `, workspace name "${workspaceName}"` : ""
     }${
       apiKey
         ? ` and API key "${shouldMaskAPIKey ? maskAPIKey(apiKey) : apiKey}"`
