@@ -23,7 +23,8 @@ const PrettyCell = <TData,>(context: CellContext<TData, string | object>) => {
     defaultValue: MAX_DATA_LENGTH,
   });
   const { custom } = context.column.columnDef.meta ?? {};
-  const { fieldType = "input", colorIndicator = false } = (custom ?? {}) as CustomMeta;
+  const { fieldType = "input", colorIndicator = false } = (custom ??
+    {}) as CustomMeta;
   const value = context.getValue() as string | object | undefined | null;
 
   const displayMessage = useMemo(() => {

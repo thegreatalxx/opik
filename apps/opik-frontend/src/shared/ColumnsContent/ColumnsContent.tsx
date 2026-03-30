@@ -46,17 +46,13 @@ const ColumnsContent = <TColumnData,>({
 }: ColumnsContentProps<TColumnData>) => {
   const [search, setSearch] = useState("");
 
-  const {
-    selectAllColumnsIds,
-    allColumnsSelected,
-    selectedCount,
-    totalCount,
-  } = useColumnsCount({
-    columns,
-    selectedColumns,
-    sections,
-    excludeFromSelectAll,
-  });
+  const { selectAllColumnsIds, allColumnsSelected, selectedCount, totalCount } =
+    useColumnsCount({
+      columns,
+      selectedColumns,
+      sections,
+      excludeFromSelectAll,
+    });
 
   const toggleColumns = (value: boolean) => {
     if (value) {

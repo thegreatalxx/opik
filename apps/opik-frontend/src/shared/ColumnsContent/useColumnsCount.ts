@@ -10,7 +10,7 @@ interface UseColumnsCountParams<TColumnData> {
   excludeFromSelectAll?: string[];
 }
 
-export const useColumnsCount = <TColumnData,>({
+export const useColumnsCount = <TColumnData>({
   columns,
   selectedColumns,
   sections,
