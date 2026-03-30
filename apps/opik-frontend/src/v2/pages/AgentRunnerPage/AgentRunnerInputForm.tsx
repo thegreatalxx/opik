@@ -11,6 +11,44 @@ type AgentParam = {
   type: string;
 };
 
+const NUMERIC_TYPES = new Set(["int", "integer", "float", "double", "number"]);
+const BOOL_TYPES = new Set(["bool", "boolean"]);
+const OBJECT_TYPES = new Set(["dict", "object", "json", "list"]);
+
+const coerceValue = (value: string, type: string): unknown => {
+  const lower = type.toLowerCase();
+
+  if (BOOL_TYPES.has(lower)) {
+    return value === "true";
+  }
+
+  if (NUMERIC_TYPES.has(lower)) {
+    const num = Number(value);
+    return isNaN(num) ? value : num;
+  }
+
+  if (OBJECT_TYPES.has(lower)) {
+    try {
+      return JSON.parse(value);
+    } catch {
+      return value;
+    }
+  }
+
+  // Optional types — try JSON first, then number, then string
+  if (lower.startsWith("optional")) {
+    if (value === "") return null;
+    try {
+      return JSON.parse(value);
+    } catch {
+      const num = Number(value);
+      return isNaN(num) ? value : num;
+    }
+  }
+
+  return value;
+};
+
 type AgentRunnerInputFormProps = {
   fields: AgentParam[];
   onSubmit: (inputs: Record<string, unknown>, maskId?: string) => void;
@@ -36,15 +74,7 @@ const AgentRunnerInputForm: React.FC<AgentRunnerInputFormProps> = ({
     const inputs: Record<string, unknown> = {};
     for (const field of fields) {
       const value = data[field.name];
-      if (field.type === "integer" || field.type === "int") {
-        inputs[field.name] = parseInt(value, 10);
-      } else if (field.type === "float" || field.type === "double") {
-        inputs[field.name] = parseFloat(value);
-      } else if (field.type === "boolean") {
-        inputs[field.name] = value === "true";
-      } else {
-        inputs[field.name] = value;
-      }
+      inputs[field.name] = coerceValue(value, field.type);
     }
     onSubmit(inputs);
   });
@@ -59,7 +89,12 @@ const AgentRunnerInputForm: React.FC<AgentRunnerInputFormProps> = ({
         <div className="flex flex-col gap-4">
           {fields.map((field) => (
             <div key={field.name} className="flex flex-col gap-1.5">
-              <Label className="comet-body-xs-accented">{field.name}</Label>
+              <Label className="comet-body-xs-accented">
+                {field.name}
+                <span className="ml-1 font-normal text-light-slate">
+                  {field.type}
+                </span>
+              </Label>
 
               {field.type === "boolean" ? (
                 <Switch
@@ -72,14 +107,14 @@ const AgentRunnerInputForm: React.FC<AgentRunnerInputFormProps> = ({
               ) : field.type === "object" || field.type === "json" ? (
                 <Textarea
                   {...register(field.name)}
-                  placeholder={field.name}
+                  placeholder={`Enter ${field.name}...`}
                   rows={4}
                   disabled={isRunning}
                 />
               ) : (
                 <Input
                   {...register(field.name)}
-                  placeholder={field.name}
+                  placeholder={`Enter ${field.name}...`}
                   inputMode={
                     field.type === "integer" || field.type === "int"
                       ? "numeric"
