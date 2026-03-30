@@ -1789,6 +1789,113 @@ class ExperimentAggregatesIntegrationTest {
                 .isEqualTo(BigDecimal.ZERO);
     }
 
+    @Test
+    @DisplayName("Assertion results and status persist in dataset items endpoint after experiment aggregation")
+    void assertionResultsPersistAfterAggregationInDatasetItemsEndpoint() {
+        var workspaceName = UUID.randomUUID().toString();
+        var apiKey = UUID.randomUUID().toString();
+        var workspaceId = UUID.randomUUID().toString();
+
+        mockTargetWorkspace(apiKey, workspaceName, workspaceId);
+
+        var project = createProject(apiKey, workspaceName);
+        var dataset = createDataset(apiKey, workspaceName);
+
+        var experiment = experimentResourceClient.createPartialExperiment()
+                .datasetId(dataset.id())
+                .datasetName(dataset.name())
+                .evaluationMethod(EvaluationMethod.EVALUATION_SUITE)
+                .build();
+        experimentResourceClient.create(experiment, apiKey, workspaceName);
+
+        List<String> feedbackScores = PodamFactoryUtils.manufacturePojoList(factory, String.class);
+        var experimentItems = createExperimentItemWithData(
+                experiment.id(), dataset.id(), project.name(),
+                feedbackScores, apiKey, workspaceName);
+
+        // Log assertion scores on the first trace
+        var traceId = experimentItems.getFirst().traceId();
+        var assertionScores = List.of(
+                (FeedbackScoreBatchItem) factory.manufacturePojo(FeedbackScoreBatchItem.class).toBuilder()
+                        .id(traceId)
+                        .projectName(project.name())
+                        .name("assertion-grounded")
+                        .categoryName("suite_assertion")
+                        .value(BigDecimal.ONE)
+                        .source(ScoreSource.SDK)
+                        .build(),
+                (FeedbackScoreBatchItem) factory.manufacturePojo(FeedbackScoreBatchItem.class).toBuilder()
+                        .id(traceId)
+                        .projectName(project.name())
+                        .name("assertion-concise")
+                        .categoryName("suite_assertion")
+                        .value(BigDecimal.ZERO)
+                        .source(ScoreSource.SDK)
+                        .build());
+
+        traceResourceClient.feedbackScores(assertionScores, apiKey, workspaceName);
+
+        // Query BEFORE aggregation via datasets endpoint
+        var pageBefore = datasetResourceClient.getDatasetItemsWithExperimentItems(
+                dataset.id(), List.of(experiment.id()), apiKey, workspaceName);
+
+        assertThat(pageBefore.content()).isNotEmpty();
+
+        var itemsBefore = pageBefore.content().stream()
+                .flatMap(di -> di.experimentItems().stream())
+                .filter(ei -> ei.traceId().equals(traceId))
+                .toList();
+
+        assertThat(itemsBefore)
+                .as("Assertions should be present before aggregation")
+                .isNotEmpty()
+                .allSatisfy(ei -> {
+                    assertThat(ei.assertionResults()).isNotNull().isNotEmpty();
+                    assertThat(ei.status()).isNotNull();
+                });
+
+        // Populate aggregates
+        experimentAggregatesService.populateAggregations(experiment.id())
+                .contextWrite(ctx -> ctx
+                        .put(RequestContext.USER_NAME, USER)
+                        .put(RequestContext.WORKSPACE_ID, workspaceId))
+                .block();
+
+        // Query AFTER aggregation via the same datasets endpoint
+        var pageAfter = datasetResourceClient.getDatasetItemsWithExperimentItems(
+                dataset.id(), List.of(experiment.id()), apiKey, workspaceName);
+
+        assertThat(pageAfter.content()).isNotEmpty();
+
+        var itemsAfter = pageAfter.content().stream()
+                .flatMap(di -> di.experimentItems().stream())
+                .filter(ei -> ei.traceId().equals(traceId))
+                .toList();
+
+        assertThat(itemsAfter)
+                .as("Assertions must still be present after aggregation (OPIK-5247)")
+                .isNotEmpty()
+                .allSatisfy(ei -> {
+                    assertThat(ei.assertionResults()).isNotNull().isNotEmpty();
+                    assertThat(ei.status()).isNotNull();
+                });
+
+        // Verify assertion values match before and after
+        for (int i = 0; i < itemsBefore.size(); i++) {
+            var before = itemsBefore.get(i);
+            var after = itemsAfter.get(i);
+
+            assertThat(after.assertionResults())
+                    .as("Assertion results should match after aggregation")
+                    .usingRecursiveComparison()
+                    .isEqualTo(before.assertionResults());
+
+            assertThat(after.status())
+                    .as("Status should match after aggregation")
+                    .isEqualTo(before.status());
+        }
+    }
+
     @ParameterizedTest(name = "{0}")
     @MethodSource("countFilterScenarios")
     @DisplayName("ExperimentDAO.FIND returns consistent results before and after populating experiment_aggregates for all filter types (UNION ALL hybrid)")
