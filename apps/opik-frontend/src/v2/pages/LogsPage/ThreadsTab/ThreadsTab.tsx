@@ -733,6 +733,7 @@ export const ThreadsTab: React.FC<ThreadsTabProps> = ({
         isLoading={isTableLoading}
         isEmpty={showEmptyState}
         emptyState={<NoThreadsPage />}
+        skeleton
       >
         <DataTable
           columns={columns}
@@ -742,6 +743,7 @@ export const ThreadsTab: React.FC<ThreadsTabProps> = ({
           activeRowId={activeRowId ?? ""}
           sortConfig={sortConfig}
           resizeConfig={resizeConfig}
+          showSkeleton={isTableLoading}
           selectionConfig={{
             rowSelection,
             setRowSelection,
