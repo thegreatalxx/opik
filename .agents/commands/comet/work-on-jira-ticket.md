@@ -19,6 +19,7 @@ This workflow will:
 ## Inputs
 
 - **Jira link (required)**: e.g., `https://comet-ml.atlassian.net/browse/OPIK-1234`
+- **Worktree (optional)**: Pass `worktree` to work in an isolated git worktree, or `no-worktree` to skip. If neither is specified, prompt the user when uncommitted changes are detected.
 
 ---
 
@@ -91,18 +92,38 @@ This workflow will:
 ### 6. Git & Branch Setup
 
 - Repo: Opik repository (current workspace)
-- **CRITICAL**: Handle working directory state BEFORE branching:
+- **NEVER commit directly to main** (following Opik git workflow)
+
+#### 6a. Worktree Decision
+
+Determine whether to use a git worktree for isolation:
+
+- **If `worktree` was passed as an argument**: Use a worktree (skip prompt).
+- **If `no-worktree` was passed as an argument**: Do not use a worktree (skip prompt).
+- **If neither was passed**: Check `git status` for uncommitted changes.
+  - If there are uncommitted changes, ask the user:
+    > "You have uncommitted changes on the current branch. Would you like to work in a worktree? This keeps your current branch untouched. (yes/no)"
+  - If no uncommitted changes, proceed without a worktree (no prompt needed).
+
+#### 6b. Worktree Path (if using worktree)
+
+1. Use the `EnterWorktree` tool with name `{USERNAME}-OPIK-{TICKET-NUMBER}-{TICKET-SUMMARY}` (replace `/` and `+` with `-` since worktree names only allow letters, digits, dots, underscores, and dashes).
+2. Inside the worktree, create the properly named branch:
+   ```bash
+   git checkout -b {USERNAME}/OPIK-{TICKET-NUMBER}-{TICKET-SUMMARY}
+   ```
+3. Continue with implementation in the worktree directory.
+
+#### 6c. Normal Path (if not using worktree)
+
+- **Handle working directory state BEFORE branching**:
   - If working directory has changes:
     - **Option 1**: Stash changes: `git stash push -m "WIP: before OPIK-{TICKET-NUMBER}"`
     - **Option 2**: Ask user what to do with uncommitted changes
-  - **NEVER commit directly to main** (following Opik git workflow)
 - If on `main`, create branch following Opik conventions:
   ```bash
-  # Ensure you're on main and pull latest
   git checkout main
   git pull origin main
-  
-  # Create task-specific branch
   git checkout -b {USERNAME}/OPIK-{TICKET-NUMBER}-{TICKET-SUMMARY}
   ```
 - **After branch creation**: Apply stashed changes if any: `git stash pop`
