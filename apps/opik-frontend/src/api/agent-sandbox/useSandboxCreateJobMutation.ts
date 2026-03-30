@@ -4,6 +4,7 @@ import { AxiosError } from "axios";
 
 import api, { AGENT_SANDBOX_KEY, LOCAL_RUNNERS_REST_ENDPOINT } from "@/api/api";
 import { CreateLocalRunnerJobRequest } from "@/types/agent-sandbox";
+import { extractIdFromLocation } from "@/lib/utils";
 import { useToast } from "@/ui/use-toast";
 
 const useSandboxCreateJobMutation = () => {
@@ -12,17 +13,18 @@ const useSandboxCreateJobMutation = () => {
 
   return useMutation({
     mutationFn: async (request: CreateLocalRunnerJobRequest) => {
-      const { data } = await api.post(
+      const { data, headers } = await api.post(
         `${LOCAL_RUNNERS_REST_ENDPOINT}jobs`,
         request,
       );
-      return data as { id: string };
+      const id = data?.id ?? extractIdFromLocation(headers?.location);
+      return { id };
     },
     onError: (error: AxiosError) => {
       const message = get(
         error,
         ["response", "data", "message"],
-        error.message,
+        error.message || "Unable to create sandbox job. Please try again.",
       );
 
       toast({
