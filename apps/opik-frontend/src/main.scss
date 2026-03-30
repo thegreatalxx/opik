@@ -222,7 +222,7 @@
     --warning-box-icon-bg: 45 93% 58%;
     --warning-box-icon-text: 32 85% 32%;
 
-    --selection-bar: #171A7A;
+    --selection-bar: #171a7a;
     --row-selected: 235 85% 97%;
 
     --radius: 0.5rem;
@@ -713,6 +713,20 @@
 }
 
 // rewrite padding for first cell for tables that takes full width with sticky behaviour
+.comet-compare-optimizations-table {
+  thead[data-sticky-vertical] {
+    top: 0 !important;
+  }
+
+  thead:before {
+    height: 0 !important;
+  }
+
+  table {
+    border-bottom: 1px solid hsl(var(--border)) !important;
+  }
+}
+
 .comet-sticky-table {
   thead:before {
     content: "";
@@ -803,19 +817,6 @@
   }
 }
 
-.comet-compare-optimizations-table {
-  thead[data-sticky-vertical] {
-    top: 0 !important;
-  }
-
-  thead:before {
-    height: 0 !important;
-  }
-
-  table {
-    border-bottom: 1px solid hsl(var(--border)) !important;
-  }
-}
 
 .comet-table {
   /* resets padding for all nested cells wrappers */
