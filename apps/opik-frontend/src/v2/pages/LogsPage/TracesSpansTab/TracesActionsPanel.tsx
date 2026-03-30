@@ -1,6 +1,7 @@
 import React, { useState, useRef, useCallback } from "react";
 import { Tag, Trash } from "lucide-react";
 import slugify from "slugify";
+import { cn } from "@/lib/utils";
 import { Button } from "@/ui/button";
 import { Span, Trace } from "@/types/traces";
 import { TRACE_DATA_TYPE } from "@/hooks/useTracesOrSpansList";
@@ -25,6 +26,7 @@ type TracesActionsPanelProps = {
   columnsToExport: string[];
   projectName: string;
   projectId: string;
+  buttonVariant?: "outline" | "ghost" | "ghostInverted";
 };
 
 const TracesActionsPanel: React.FunctionComponent<TracesActionsPanelProps> = ({
@@ -34,6 +36,7 @@ const TracesActionsPanel: React.FunctionComponent<TracesActionsPanelProps> = ({
   columnsToExport,
   projectName,
   projectId,
+  buttonVariant = "outline",
 }) => {
   const resetKeyRef = useRef(0);
   const [open, setOpen] = useState<boolean | number>(false);
@@ -117,34 +120,45 @@ const TracesActionsPanel: React.FunctionComponent<TracesActionsPanelProps> = ({
         selectedRows={selectedRows}
         disabled={disabled}
         dataType={type === TRACE_DATA_TYPE.traces ? "traces" : "spans"}
+        buttonVariant={buttonVariant}
       />
       <TooltipWrapper content="Manage tags">
         <Button
-          variant="outline"
-          size="icon-sm"
+          variant={buttonVariant}
+          size="sm"
           onClick={() => {
             setOpen(3);
             resetKeyRef.current = resetKeyRef.current + 1;
           }}
           disabled={disabled}
         >
-          <Tag />
+          <Tag className="size-3.5 mr-1.5" />
+          <span>Manage tags</span>
         </Button>
       </TooltipWrapper>
       {showEvaluate && (
         <EvaluateButton
           isNoRules={!rules?.length}
           disabled={disabled}
+          buttonVariant={buttonVariant}
+          label="Evaluate"
           onClick={() => {
             setOpen(4);
             resetKeyRef.current = resetKeyRef.current + 1;
           }}
         />
       )}
+      <div
+        className={cn(
+          "mx-1 h-4 w-px shrink-0",
+          buttonVariant === "ghostInverted" ? "bg-white" : "bg-border",
+        )}
+      />
       <ExportToButton
         disabled={disabled || columnsToExport.length === 0 || !isExportEnabled}
         getData={mapRowData}
         generateFileName={generateFileName}
+        buttonVariant={buttonVariant}
         tooltipContent={
           !isExportEnabled
             ? "Export functionality is disabled for this installation"
@@ -154,7 +168,7 @@ const TracesActionsPanel: React.FunctionComponent<TracesActionsPanelProps> = ({
       {type === TRACE_DATA_TYPE.traces && canDeleteTraces && (
         <TooltipWrapper content="Delete">
           <Button
-            variant="outline"
+            variant={buttonVariant}
             size="icon-sm"
             onClick={() => {
               setOpen(2);
@@ -171,3 +185,6 @@ const TracesActionsPanel: React.FunctionComponent<TracesActionsPanelProps> = ({
 };
 
 export default TracesActionsPanel;
+
+// ALEX
+// HIDE BOTTOM PAGINATION FOR LOADING STATE

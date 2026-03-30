@@ -18,10 +18,8 @@ import isNumber from "lodash/isNumber";
 import isArray from "lodash/isArray";
 import get from "lodash/get";
 import uniq from "lodash/uniq";
-import {
-  useMetricDateRangeWithQueryAndStorage,
-  MetricDateRangeSelect,
-} from "@/v2/pages-shared/traces/MetricDateRangeSelect";
+import { useMetricDateRangeWithQueryAndStorage } from "@/v2/pages-shared/traces/MetricDateRangeSelect";
+import TimeRangeToggle from "@/shared/TimeRangeToggle/TimeRangeToggle";
 
 import useTracesOrSpansList, {
   TRACE_DATA_TYPE,
@@ -58,12 +56,13 @@ import NoTracesPage from "@/v2/pages/LogsPage/NoTracesPage";
 import SearchInput from "@/shared/SearchInput/SearchInput";
 import FiltersButton from "@/shared/FiltersButton/FiltersButton";
 import TracesActionsPanel from "@/v2/pages/LogsPage/TracesSpansTab/TracesActionsPanel";
-import { Separator } from "@/ui/separator";
 import { Button } from "@/ui/button";
+import { Separator } from "@/ui/separator";
 import DataTableRowHeightSelector from "@/shared/DataTableRowHeightSelector/DataTableRowHeightSelector";
 import ColumnsButton from "@/shared/ColumnsButton/ColumnsButton";
 import DataTable from "@/shared/DataTable/DataTable";
 import DataTableNoData from "@/shared/DataTableNoData/DataTableNoData";
+import DataTableNoMatchingData from "@/shared/DataTableNoData/DataTableNoMatchingData";
 import DataTablePagination from "@/shared/DataTablePagination/DataTablePagination";
 import LinkCell from "@/shared/DataTableCells/LinkCell";
 import ResourceCell from "@/shared/DataTableCells/ResourceCell";
@@ -113,6 +112,7 @@ import { getSpanTypeFilterConfig } from "@/v2/pages-shared/traces/spanTypeFilter
 import SpanTypeCell from "@/shared/DataTableCells/SpanTypeCell";
 import { Filter, FilterOperator } from "@/types/filters";
 import { useTruncationEnabled } from "@/contexts/server-sync-provider";
+import SelectionActionBar from "@/v2/components/SelectionActionBar/SelectionActionBar";
 import LogsTypeToggle from "@/v2/pages/LogsPage/LogsTypeToggle";
 import { LOGS_TYPE } from "@/constants/traces";
 
@@ -526,6 +526,7 @@ export const TracesSpansTab: React.FC<TracesSpansTabProps> = ({
   );
 
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
+
   const [isTableDataEnabled, setIsTableDataEnabled] = useState(false);
 
   // Declare selectedColumns early so it can be used in excludeFields computation
@@ -654,9 +655,11 @@ export const TracesSpansTab: React.FC<TracesSpansTabProps> = ({
     isPending || isFeedbackScoresPending || isSpanFeedbackScoresPending;
 
   const noData = !search && filters.length === 0;
-  const noDataText = noData
-    ? `There are no ${type === TRACE_DATA_TYPE.traces ? "traces" : "spans"} yet`
-    : "No search results";
+
+  const handleClearFilters = useCallback(() => {
+    setSearch("");
+    setFilters([]);
+  }, [setSearch, setFilters]);
 
   const rows: Array<Span | Trace> = useMemo(
     () => data?.content ?? [],
@@ -1231,63 +1234,25 @@ export const TracesSpansTab: React.FC<TracesSpansTabProps> = ({
   return (
     <>
       <PageBodyStickyContainer
-        className="-mt-4 flex flex-wrap items-center justify-between gap-x-8 gap-y-2 py-4"
+        className="-mt-4 flex flex-wrap items-center justify-between gap-x-8 gap-y-2 py-4 pb-0"
         direction="bidirectional"
         limitWidth
       >
         <div className="flex items-center gap-2">
           <LogsTypeToggle value={logsType} onValueChange={onLogsTypeChange} />
-          <SearchInput
-            searchText={search as string}
-            setSearchText={setSearch}
-            placeholder={`Search ${type}...`}
-            className="w-[320px]"
-            dimension="sm"
-          />
-          <FiltersButton
-            columns={filtersColumnData}
-            config={filtersConfig as never}
-            filters={filters}
-            onChange={setFilters}
-            layout="icon"
-          />
         </div>
         <div className="flex items-center gap-2">
-          <TracesActionsPanel
-            projectId={projectId}
-            projectName={projectName}
-            getDataForExport={getDataForExport}
-            selectedRows={selectedRows}
-            columnsToExport={columnsToExport}
-            type={type as TRACE_DATA_TYPE}
-          />
-          <Separator orientation="vertical" className="mx-2 h-4" />
-          <MetricDateRangeSelect
+          <TimeRangeToggle
             value={dateRange}
             onChangeValue={handleDateRangeChange}
             minDate={minDate}
             maxDate={maxDate}
           />
-          <TooltipWrapper
-            content={`Refresh ${
-              type === TRACE_DATA_TYPE.traces ? "traces" : "spans"
-            } list`}
-          >
-            <Button
-              variant="outline"
-              size="icon-sm"
-              className="shrink-0"
-              onClick={() => {
-                refetch();
-                refetchStatistic();
-              }}
-            >
-              <RotateCw />
-            </Button>
-          </TooltipWrapper>
+          <Separator orientation="vertical" className="mx-1 h-6" />
           <DataTableRowHeightSelector
             type={height as ROW_HEIGHT}
             setType={setHeight}
+            layout="labeled"
           />
           <ColumnsButton
             columns={columnData}
@@ -1296,14 +1261,73 @@ export const TracesSpansTab: React.FC<TracesSpansTabProps> = ({
             order={columnsOrder}
             onOrderChange={setColumnsOrder}
             sections={columnSections}
+            layout="labeled"
             excludeFromSelectAll={
               metadataColumnsData.length > 0
                 ? metadataColumnsData.map((col) => col.id)
                 : []
             }
-          ></ColumnsButton>
+          />
+          <Separator orientation="vertical" className="mx-1 h-6" />
+          <TooltipWrapper
+            content={`Refresh ${
+              type === TRACE_DATA_TYPE.traces ? "traces" : "spans"
+            } list`}
+          >
+            <Button
+              variant="outline"
+              size="sm"
+              className="shrink-0"
+              onClick={() => {
+                refetch();
+                refetchStatistic();
+              }}
+            >
+              <RotateCw className="mr-1.5 size-3.5" />
+              Refresh
+            </Button>
+          </TooltipWrapper>
         </div>
       </PageBodyStickyContainer>
+      {selectedRows.length > 0 ? (
+        <SelectionActionBar
+          selectedCount={selectedRows.length}
+          onDeselectAll={() => setRowSelection({})}
+        >
+          <TracesActionsPanel
+            projectId={projectId}
+            projectName={projectName}
+            getDataForExport={getDataForExport}
+            selectedRows={selectedRows}
+            columnsToExport={columnsToExport}
+            type={type as TRACE_DATA_TYPE}
+            buttonVariant="ghostInverted"
+          />
+        </SelectionActionBar>
+      ) : (
+        <PageBodyStickyContainer
+          className="py-2"
+          direction="bidirectional"
+          limitWidth
+        >
+          <div className="flex h-10 items-center gap-2">
+            <SearchInput
+              searchText={search as string}
+              setSearchText={setSearch}
+              placeholder={`Search ${type}...`}
+              className="w-[320px]"
+              dimension="sm"
+            />
+            <FiltersButton
+              columns={filtersColumnData}
+              config={filtersConfig as never}
+              filters={filters}
+              onChange={setFilters}
+              layout="icon"
+            />
+          </div>
+        </PageBodyStickyContainer>
+      )}
 
       <DataTableStateHandler
         isLoading={isTableLoading}
@@ -1327,7 +1351,9 @@ export const TracesSpansTab: React.FC<TracesSpansTabProps> = ({
           getRowId={getRowId}
           rowHeight={height as ROW_HEIGHT}
           columnPinning={DEFAULT_TRACES_COLUMN_PINNING}
-          noData={<DataTableNoData title={noDataText} />}
+          noData={
+            <DataTableNoMatchingData onClearFilters={handleClearFilters} />
+          }
           TableWrapper={PageBodyStickyTableWrapper}
           stickyHeader
           meta={meta}
