@@ -97,6 +97,9 @@ import { useTruncationEnabled } from "@/contexts/server-sync-provider";
 
 const getRowId = (d: Trace) => d.id;
 
+const TLS_STORAGE_PREFIX = "tls-traces-";
+export const TLS_QUERY_PREFIX = "tls_";
+
 const SHARED_COLUMNS: ColumnData<BaseTraceData>[] = [
   {
     id: "name",
@@ -426,39 +429,55 @@ const TraceLogsSidebar: React.FunctionComponent<TraceLogsSidebarProps> = ({
     maxDate,
   } = useMetricDateRangeWithQueryAndStorage();
 
-  const [search = "", setSearch] = useQueryParam("tls_search", StringParam, {
-    updateType: "replaceIn",
-  });
+  const [search = "", setSearch] = useQueryParam(
+    `${TLS_QUERY_PREFIX}search`,
+    StringParam,
+    {
+      updateType: "replaceIn",
+    },
+  );
   const trimmedSearch = (search as string).trim().toLowerCase();
 
   const [sheetContentRef, setSheetContentRef] = useState<HTMLDivElement | null>(
     null,
   );
 
-  const [traceId = "", setTraceId] = useQueryParam("tls_trace", StringParam, {
-    updateType: "replaceIn",
-  });
+  const [traceId = "", setTraceId] = useQueryParam(
+    `${TLS_QUERY_PREFIX}trace`,
+    StringParam,
+    {
+      updateType: "replaceIn",
+    },
+  );
 
-  const [spanId = "", setSpanId] = useQueryParam("tls_span", StringParam, {
-    updateType: "replaceIn",
-  });
+  const [spanId = "", setSpanId] = useQueryParam(
+    `${TLS_QUERY_PREFIX}span`,
+    StringParam,
+    {
+      updateType: "replaceIn",
+    },
+  );
 
-  const [page = 1, setPage] = useQueryParam("tls_page", NumberParam, {
-    updateType: "replaceIn",
-  });
+  const [page = 1, setPage] = useQueryParam(
+    `${TLS_QUERY_PREFIX}page`,
+    NumberParam,
+    {
+      updateType: "replaceIn",
+    },
+  );
 
   const [size, setSize] = useQueryParamAndLocalStorageState<
     number | null | undefined
   >({
-    localStorageKey: `tls-traces-${PAGINATION_SIZE_KEY_SUFFIX}`,
-    queryKey: "tls-pagination-size",
+    localStorageKey: `${TLS_STORAGE_PREFIX}${PAGINATION_SIZE_KEY_SUFFIX}`,
+    queryKey: `${TLS_QUERY_PREFIX}size`,
     defaultValue: 100,
     queryParamConfig: NumberParam,
     syncQueryWithLocalStorageOnInit: true,
   });
 
   const [, setLastSection] = useQueryParam(
-    "tls_lastSection",
+    `${TLS_QUERY_PREFIX}lastSection`,
     DetailsActionSectionParam,
     {
       updateType: "replaceIn",
@@ -468,22 +487,26 @@ const TraceLogsSidebar: React.FunctionComponent<TraceLogsSidebarProps> = ({
   const [height, setHeight] = useQueryParamAndLocalStorageState<
     string | null | undefined
   >({
-    localStorageKey: `tls-traces-${ROW_HEIGHT_KEY_SUFFIX}`,
-    queryKey: "tls-row-height",
+    localStorageKey: `${TLS_STORAGE_PREFIX}${ROW_HEIGHT_KEY_SUFFIX}`,
+    queryKey: `${TLS_QUERY_PREFIX}height`,
     defaultValue: ROW_HEIGHT.small,
     queryParamConfig: StringParam,
     syncQueryWithLocalStorageOnInit: true,
   });
 
-  const [filters = [], setFilters] = useQueryParam("tls_filters", JsonParam, {
-    updateType: "replaceIn",
-  });
+  const [filters = [], setFilters] = useQueryParam(
+    `${TLS_QUERY_PREFIX}filters`,
+    JsonParam,
+    {
+      updateType: "replaceIn",
+    },
+  );
 
   const [sortedColumns, setSortedColumns] = useQueryParamAndLocalStorageState<
     ColumnSort[]
   >({
-    localStorageKey: `tls-traces-${COLUMNS_SORT_KEY_SUFFIX}`,
-    queryKey: "tls-columns-sort",
+    localStorageKey: `${TLS_STORAGE_PREFIX}${COLUMNS_SORT_KEY_SUFFIX}`,
+    queryKey: `${TLS_QUERY_PREFIX}sort`,
     defaultValue: [],
     queryParamConfig: JsonParam,
   });
@@ -543,10 +566,10 @@ const TraceLogsSidebar: React.FunctionComponent<TraceLogsSidebarProps> = ({
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
 
   const [selectedColumns, setSelectedColumns] = useLocalStorageState<string[]>(
-    `tls-traces-${SELECTED_COLUMNS_KEY_V2_SUFFIX}`,
+    `${TLS_STORAGE_PREFIX}${SELECTED_COLUMNS_KEY_V2_SUFFIX}`,
     {
       defaultValue: migrateSelectedColumns(
-        `tls-traces-selected-columns`,
+        `${TLS_STORAGE_PREFIX}selected-columns`,
         DEFAULT_TRACES_COLUMNS,
         [COLUMN_ID_ID, "start_time"],
       ),
@@ -662,7 +685,7 @@ const TraceLogsSidebar: React.FunctionComponent<TraceLogsSidebarProps> = ({
   );
 
   const [columnsOrder, setColumnsOrder] = useLocalStorageState<string[]>(
-    `tls-traces-${COLUMNS_ORDER_KEY_SUFFIX}`,
+    `${TLS_STORAGE_PREFIX}${COLUMNS_ORDER_KEY_SUFFIX}`,
     {
       defaultValue: DEFAULT_TRACES_COLUMNS_ORDER,
     },
@@ -670,19 +693,19 @@ const TraceLogsSidebar: React.FunctionComponent<TraceLogsSidebarProps> = ({
 
   const [scoresColumnsOrder, setScoresColumnsOrder] = useLocalStorageState<
     string[]
-  >(`tls-traces-${COLUMNS_SCORES_ORDER_KEY_SUFFIX}`, {
+  >(`${TLS_STORAGE_PREFIX}${COLUMNS_SCORES_ORDER_KEY_SUFFIX}`, {
     defaultValue: [],
   });
 
   const [metadataColumnsOrder, setMetadataColumnsOrder] = useLocalStorageState<
     string[]
-  >(`tls-traces-${COLUMNS_METADATA_ORDER_KEY_SUFFIX}`, {
+  >(`${TLS_STORAGE_PREFIX}${COLUMNS_METADATA_ORDER_KEY_SUFFIX}`, {
     defaultValue: [COLUMN_METADATA_ID],
   });
 
   const [columnsWidth, setColumnsWidth] = useLocalStorageState<
     Record<string, number>
-  >(`tls-traces-${COLUMNS_WIDTH_KEY_SUFFIX}`, {
+  >(`${TLS_STORAGE_PREFIX}${COLUMNS_WIDTH_KEY_SUFFIX}`, {
     defaultValue: {},
   });
 
@@ -708,7 +731,7 @@ const TraceLogsSidebar: React.FunctionComponent<TraceLogsSidebarProps> = ({
   );
 
   useDynamicColumnsCache({
-    dynamicColumnsKey: `tls-traces-${DYNAMIC_COLUMNS_KEY_SUFFIX}`,
+    dynamicColumnsKey: `${TLS_STORAGE_PREFIX}${DYNAMIC_COLUMNS_KEY_SUFFIX}`,
     dynamicColumnsIds,
     setSelectedColumns,
   });

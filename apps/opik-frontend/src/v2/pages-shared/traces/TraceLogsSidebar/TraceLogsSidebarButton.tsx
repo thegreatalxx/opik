@@ -5,7 +5,7 @@ import { BooleanParam, JsonParam, useQueryParam } from "use-query-params";
 import { Tag } from "@/ui/tag";
 import { Button } from "@/ui/button";
 import TooltipWrapper from "@/shared/TooltipWrapper/TooltipWrapper";
-import TraceLogsSidebar from "./TraceLogsSidebar";
+import TraceLogsSidebar, { TLS_QUERY_PREFIX } from "./TraceLogsSidebar";
 import { LOGS_SOURCE } from "@/types/traces";
 import { Filter } from "@/types/filters";
 
@@ -19,12 +19,16 @@ type TraceLogsSidebarButtonProps = {
 const TraceLogsSidebarButton: React.FunctionComponent<
   TraceLogsSidebarButtonProps
 > = ({ projectId, logsSource, sourceFilters, variant = "tag" }) => {
-  const [open = false, setOpen] = useQueryParam("tls_open", BooleanParam, {
-    updateType: "replaceIn",
-  });
-  const [, setTlsFilters] = useQueryParam("tls_filters", JsonParam, {
-    updateType: "replaceIn",
-  });
+  const [open = false, setOpen] = useQueryParam(
+    `${TLS_QUERY_PREFIX}open`,
+    BooleanParam,
+    { updateType: "replaceIn" },
+  );
+  const [, setTlsFilters] = useQueryParam(
+    `${TLS_QUERY_PREFIX}filters`,
+    JsonParam,
+    { updateType: "replaceIn" },
+  );
 
   const handleOpen = useCallback(() => {
     if (sourceFilters?.length) {
