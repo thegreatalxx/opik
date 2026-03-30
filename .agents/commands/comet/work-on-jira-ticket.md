@@ -107,10 +107,10 @@ Determine whether to use a git worktree for isolation:
 
 #### 6b. Worktree Path (if using worktree)
 
-1. Use the `EnterWorktree` tool with name `{USERNAME}-OPIK-{TICKET-NUMBER}-{TICKET-SUMMARY}` (replace `/` and `+` with `-` since worktree names only allow letters, digits, dots, underscores, and dashes).
-2. Inside the worktree, create the properly named branch:
+1. Slugify `{TICKET-SUMMARY}` for the worktree name: replace any character not in `[A-Za-z0-9._-]` with `-`, collapse consecutive `-` into one, and trim leading/trailing `-`. Then call `EnterWorktree` with name `{USERNAME}-OPIK-{TICKET-NUMBER}-{SLUGIFIED-SUMMARY}`.
+2. Inside the worktree, create the properly named branch (using the same slugified summary):
    ```bash
-   git checkout -b {USERNAME}/OPIK-{TICKET-NUMBER}-{TICKET-SUMMARY}
+   git checkout -b {USERNAME}/OPIK-{TICKET-NUMBER}-{SLUGIFIED-SUMMARY}
    ```
 3. Continue with implementation in the worktree directory.
 
