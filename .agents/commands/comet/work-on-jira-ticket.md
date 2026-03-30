@@ -101,7 +101,7 @@ Determine whether to use a git worktree for isolation:
 - **If `worktree` was passed as an argument**: Use a worktree (skip prompt).
 - **If `no-worktree` was passed as an argument**: Do not use a worktree (skip prompt).
 - **If neither was passed**: Use the `AskUserQuestion` tool to prompt the user with clickable options:
-    - **question**: "Would you like to work in a worktree? Tip: pass `worktree` or `no-worktree` to skip this prompt. Learn more: https://docs.claude.ai/en/docs/worktrees"
+    - **question**: "Would you like to work in a worktree? Tip: pass `worktree` or `no-worktree` to skip this prompt. Learn more: https://docs.anthropic.com/en/docs/claude-code/common-workflows"
     - **header**: "Worktree"
     - **options**:
       1. **Yes** — "Create a separate copy of the repo so your current branch stays untouched (Recommended)"
