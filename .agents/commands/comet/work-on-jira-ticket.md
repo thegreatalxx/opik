@@ -102,7 +102,13 @@ Determine whether to use a git worktree for isolation:
 - **If `no-worktree` was passed as an argument**: Do not use a worktree (skip prompt).
 - **If neither was passed**: Check `git status` for uncommitted changes.
   - If there are uncommitted changes, ask the user:
-    > "You have uncommitted changes on the current branch. Would you like to work in a worktree? This keeps your current branch untouched. (yes/no)"
+    > "You have uncommitted changes on the current branch. Would you like to work in a **worktree**?
+    >
+    > A worktree creates a separate copy of the repo in its own folder so you can work on this ticket without touching your current branch or needing to stash anything. Your existing changes stay exactly as they are.
+    >
+    > Learn more: https://docs.claude.ai/en/docs/worktrees
+    >
+    > Use worktree? (yes/no)"
   - If no uncommitted changes, proceed without a worktree (no prompt needed).
 
 #### 6b. Worktree Path (if using worktree)
