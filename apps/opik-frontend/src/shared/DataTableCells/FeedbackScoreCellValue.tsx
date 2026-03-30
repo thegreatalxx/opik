@@ -71,6 +71,7 @@ const FeedbackScoreCellValue = ({
         <FeedbackScoreEditDropdown
           feedbackScore={feedbackScore}
           onValueChange={onValueChange}
+          size={size}
         />
       )}
       <MultiValueFeedbackScoreHoverCard
