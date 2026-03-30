@@ -206,7 +206,7 @@ const AgentRunnerExecutionPanel: React.FC<AgentRunnerExecutionPanelProps> = ({
   return (
     <div className="flex h-full flex-col">
       <ResizablePanelGroup
-        direction="vertical"
+        direction="horizontal"
         autoSaveId="agent-sandbox-trajectory"
       >
         <ResizablePanel id="agent-tree" defaultSize={50} minSize={20}>
