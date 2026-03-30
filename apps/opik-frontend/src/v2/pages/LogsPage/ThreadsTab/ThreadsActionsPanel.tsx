@@ -117,7 +117,7 @@ const ThreadsActionsPanel: React.FunctionComponent<
           }}
           disabled={disabled}
         >
-          <Tag className="size-3.5 mr-1.5" />
+          <Tag className="mr-1.5 size-3.5" />
           <span>Manage tags</span>
         </Button>
       </TooltipWrapper>

@@ -60,7 +60,6 @@ import { Separator } from "@/ui/separator";
 import DataTableRowHeightSelector from "@/shared/DataTableRowHeightSelector/DataTableRowHeightSelector";
 import ColumnsButton from "@/shared/ColumnsButton/ColumnsButton";
 import DataTable from "@/shared/DataTable/DataTable";
-import DataTableNoData from "@/shared/DataTableNoData/DataTableNoData";
 import DataTableNoMatchingData from "@/shared/DataTableNoData/DataTableNoMatchingData";
 import DataTablePagination from "@/shared/DataTablePagination/DataTablePagination";
 import LinkCell from "@/shared/DataTableCells/LinkCell";
@@ -1359,7 +1358,7 @@ export const TracesSpansTab: React.FC<TracesSpansTabProps> = ({
           showLoadingOverlay={isPlaceholderData && isFetching}
         />
         <PageBodyStickyContainer
-          className="-mt-px bottom-0 border-t border-border py-2 pb-4"
+          className="bottom-0 -mt-px border-t border-border py-2 pb-4"
           direction="horizontal"
           limitWidth
         >

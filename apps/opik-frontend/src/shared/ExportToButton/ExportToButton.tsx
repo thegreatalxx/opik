@@ -99,7 +99,11 @@ const ExportToButton: React.FC<ExportToButtonProps> = ({
   );
 
   const buttonElement = (
-    <Button variant={buttonVariant} size="icon-sm" disabled={disabled || loading}>
+    <Button
+      variant={buttonVariant}
+      size="icon-sm"
+      disabled={disabled || loading}
+    >
       {loading ? <Loader2 className="animate-spin" /> : <Download />}
     </Button>
   );

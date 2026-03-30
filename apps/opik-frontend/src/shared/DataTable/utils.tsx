@@ -83,21 +83,18 @@ export const getCommonPinningStyles = <TData,>({
 
   const rightPinnedNonGroupedColumns = table
     .getVisibleLeafColumns()
-    .filter(
-      (col) => col.getIsPinned() === "right" && !col.getIsGrouped?.(),
-    );
+    .filter((col) => col.getIsPinned() === "right" && !col.getIsGrouped?.());
   const isFirstRightPinnedNonGroupedColumn =
     isPinned === "right" &&
     last(rightPinnedNonGroupedColumns)?.id === column.id;
 
   return {
     // Last left-pinned column border is handled via CSS class (comet-pinned-last-left)
-    boxShadow:
-      forceGroup
-        ? "inset -1px 0px 0px 0px hsl(var(--border))"
-        : isFirstRightPinnedNonGroupedColumn
-          ? "inset 1px 0px 0px 0px hsl(var(--border))"
-          : undefined,
+    boxShadow: forceGroup
+      ? "inset -1px 0px 0px 0px hsl(var(--border))"
+      : isFirstRightPinnedNonGroupedColumn
+        ? "inset 1px 0px 0px 0px hsl(var(--border))"
+        : undefined,
     left: forceGroup
       ? 0
       : isPinned === "left"
