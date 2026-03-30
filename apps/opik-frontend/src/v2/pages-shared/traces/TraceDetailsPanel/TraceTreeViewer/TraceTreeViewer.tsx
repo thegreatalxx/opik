@@ -214,6 +214,8 @@ const TraceTreeViewer: React.FunctionComponent<TraceTreeViewerProps> = ({
         lookup[trace.id].children?.push(lookup[span.id]);
       } else if (lookup[directParentKey]) {
         lookup[directParentKey].children?.push(lookup[span.id]);
+      } else {
+        lookup[trace.id].children?.push(lookup[span.id]);
       }
     });
 
