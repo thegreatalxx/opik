@@ -15,7 +15,11 @@ const ConfigurationVersionCell = <TData,>(
 
   return (
     <div className="flex h-full items-start px-2 pt-2">
-      <ConfigurationVersionTag version={value.version} maskId={value.maskId} variant="white" />
+      <ConfigurationVersionTag
+        version={value.version}
+        maskId={value.maskId}
+        variant="white"
+      />
     </div>
   );
 };
