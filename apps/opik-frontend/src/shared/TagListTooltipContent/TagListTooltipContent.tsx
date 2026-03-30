@@ -40,7 +40,9 @@ const TagListTooltipContent: React.FC<TagListTooltipContentProps> = ({
       {hint && (
         <>
           <Separator className="my-1" />
-          <div className="comet-body-xs w-full px-1 text-muted-slate">{hint}</div>
+          <div className="comet-body-xs w-full px-1 text-muted-slate">
+            {hint}
+          </div>
         </>
       )}
     </div>

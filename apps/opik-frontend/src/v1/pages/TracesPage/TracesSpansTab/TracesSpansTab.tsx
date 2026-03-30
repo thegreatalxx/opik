@@ -42,7 +42,6 @@ import {
   ColumnData,
   ColumnsStatistic,
   DynamicColumn,
-  HeaderIconType,
   ROW_HEIGHT,
 } from "@/types/shared";
 import { CUSTOM_FILTER_VALIDATION_REGEXP } from "@/constants/filters";

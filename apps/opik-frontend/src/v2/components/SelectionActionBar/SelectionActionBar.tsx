@@ -31,10 +31,10 @@ const SelectionActionBar: React.FC<SelectionActionBarProps> = ({
         <div className="flex items-center gap-3">
           <span>Selected: {selectedCount}</span>
           <button
-            className="flex items-center gap-1 text-white/80 hover:text-white ml-1"
+            className="text-white/80 ml-1 flex items-center gap-1 hover:text-white"
             onClick={onDeselectAll}
           >
-            <X className="size-3.5 mr-0.5" />
+            <X className="mr-0.5 size-3.5" />
             Deselect all
           </button>
         </div>

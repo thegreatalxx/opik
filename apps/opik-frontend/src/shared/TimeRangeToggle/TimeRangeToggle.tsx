@@ -84,9 +84,7 @@ const getActivePreset = (value: DateRangeValue): TimeRangePresetKey | null => {
   return null;
 };
 
-const getActiveRelativePreset = (
-  value: DateRangeValue,
-): string | null => {
+const getActiveRelativePreset = (value: DateRangeValue): string | null => {
   const rangePreset = getRangePreset(value);
   if (rangePreset) {
     const found = RELATIVE_PRESETS.find(

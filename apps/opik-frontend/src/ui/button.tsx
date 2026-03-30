@@ -22,7 +22,7 @@ const buttonVariants = cva(
         ghost:
           "font-normal hover:text-primary-hover active:text-primary-active disabled:text-muted-gray disabled:opacity-100",
         ghostInverted:
-          "font-normal text-white/80 hover:bg-white/10 hover:text-white active:bg-white/15 active:text-white disabled:text-white/40 disabled:opacity-100",
+          "text-white/80 hover:bg-white/10 active:bg-white/15 disabled:text-white/40 font-normal hover:text-white active:text-white disabled:opacity-100",
         minimal:
           "font-normal text-light-slate hover:text-foreground active:text-foreground disabled:text-muted-gray disabled:opacity-100",
         link: "text-primary underline-offset-4 hover:underline dark:text-primary-hover dark:disabled:text-muted-gray",
