@@ -108,7 +108,11 @@ const AgentRunnerExecutionPanel: React.FC<AgentRunnerExecutionPanelProps> = ({
     "agentSandboxSection",
   );
   const scrollRef = useRef<HTMLDivElement>(null);
-  const { setTree } = useTreeDetailsStore();
+  const setTree = useTreeDetailsStore((s) => s.setTree);
+
+  useEffect(() => {
+    setSelectedSpanId("");
+  }, [traceId]);
 
   const { data: trace } = useTraceById(
     { traceId: traceId ?? "", stripAttachments: true },
