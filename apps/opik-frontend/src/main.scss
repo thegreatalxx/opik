@@ -222,6 +222,9 @@
     --warning-box-icon-bg: 45 93% 58%;
     --warning-box-icon-text: 32 85% 32%;
 
+    --selection-bar: #171A7A;
+    --row-selected: 213 32% 95%;
+
     --radius: 0.5rem;
 
     --header-height: 48px;
@@ -420,6 +423,9 @@
     --warning-box-text: 48 96% 64%;
     --warning-box-icon-bg: 32 95% 44%;
     --warning-box-icon-text: 45 93% 58%;
+
+    --selection-bar: #2a2e9e;
+    --row-selected: 0 0% 15%;
   }
 
   /* CodeMirror cursor and selection fix for dark mode */
