@@ -11,6 +11,7 @@ import {
   useHydrateFromApi,
   useIsHydrated,
 } from "@/store/DatasetExportStore";
+import { useActiveWorkspaceName } from "@/store/AppStore";
 import useDatasetExportJobs from "@/api/datasets/useDatasetExportJobs";
 import { DATASET_EXPORT_STATUS } from "@/types/datasets";
 import ConfirmDialog from "@/shared/ConfirmDialog/ConfirmDialog";
@@ -25,11 +26,14 @@ const DatasetExportPanel: React.FC = () => {
   const removeJob = useRemoveExportJob();
   const hydrateFromApi = useHydrateFromApi();
   const isHydrated = useIsHydrated();
+  const workspaceName = useActiveWorkspaceName();
   const [showCloseConfirm, setShowCloseConfirm] = useState(false);
 
-  // Fetch all export jobs on mount to restore state after page refresh
+  // Fetch all export jobs on mount to restore state after page refresh.
+  // Guard on workspaceName because this component renders at the App root,
+  // before WorkspacePreloader sets the Comet-Workspace header on axios.
   const { data: apiJobs } = useDatasetExportJobs({
-    enabled: !isHydrated,
+    enabled: !isHydrated && !!workspaceName,
   });
 
   // Hydrate store from API data
