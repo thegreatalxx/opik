@@ -124,11 +124,12 @@ Determine whether to use a git worktree for isolation:
   - If working directory has changes:
     - **Option 1**: Stash changes: `git stash push -m "WIP: before OPIK-{TICKET-NUMBER}"`
     - **Option 2**: Ask user what to do with uncommitted changes
+- Slugify `{TICKET-SUMMARY}` the same way as step 6b: replace any character not in `[A-Za-z0-9._-]` with `-`, collapse consecutive `-` into one, and trim leading/trailing `-`.
 - If on `main`, create branch following Opik conventions:
   ```bash
   git checkout main
   git pull origin main
-  git checkout -b {USERNAME}/OPIK-{TICKET-NUMBER}-{TICKET-SUMMARY}
+  git checkout -b {USERNAME}/OPIK-{TICKET-NUMBER}-{SLUGIFIED-SUMMARY}
   ```
 - **After branch creation**: Apply stashed changes if any: `git stash pop`
 - **Verify branch creation**: Confirm new branch is active and clean.
