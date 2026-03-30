@@ -54,7 +54,7 @@ Tag.displayName = "Tag";
 
 export const TAG_VARIANTS: Exclude<
   TagProps["variant"],
-  "red" | "transparent"
+  "red" | "transparent" | "white"
 >[] = [
   "primary",
   "gray",
