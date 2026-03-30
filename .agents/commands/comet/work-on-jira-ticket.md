@@ -96,6 +96,8 @@ This workflow will:
 
 #### 6a. Worktree Decision
 
+If the `EnterWorktree` tool is not available (e.g., running in Cursor or another editor), skip steps 6a and 6b entirely and go straight to 6c (normal path).
+
 Determine whether to use a git worktree for isolation:
 
 - **If `worktree` was passed as an argument**: Use a worktree (skip prompt).
