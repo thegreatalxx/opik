@@ -931,7 +931,7 @@ serviceToggles:
 localRunner:
   # Default: false
   # Description: Whether the local runner feature is enabled
-  enabled: ${TOGGLE_RUNNERS_ENABLED:-false}
+  enabled: ${TOGGLE_RUNNERS_ENABLED:-true}
   # Default: 30m
   # Description: Maximum time a job can run before being considered timed out
   jobTimeout: ${OPIK_RUNNER_JOB_TIMEOUT:-30m}
