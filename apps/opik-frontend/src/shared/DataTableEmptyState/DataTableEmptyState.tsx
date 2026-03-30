@@ -18,7 +18,7 @@ const DataTableEmptyState: React.FC<DataTableEmptyStateProps> = ({
   onQuickstartClick,
 }) => {
   return (
-    <div className="flex h-full w-full items-center justify-center">
+    <div className="flex h-[50vh] w-full items-center justify-center">
       <div className="flex flex-col items-center gap-4">
         <Icon className="size-8 text-lime-500" />
         <h2 className="comet-title-m">{title}</h2>
