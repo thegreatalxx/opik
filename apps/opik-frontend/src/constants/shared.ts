@@ -66,4 +66,3 @@ export const CELL_HORIZONTAL_ALIGNMENT_MAP: Record<COLUMN_TYPE, string> = {
   [COLUMN_TYPE.category]: "justify-start",
   [COLUMN_TYPE.errors]: "justify-start",
 };
-
