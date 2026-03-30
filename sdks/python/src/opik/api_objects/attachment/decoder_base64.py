@@ -35,8 +35,12 @@ class Base64AttachmentDecoder(decoder.AttachmentDecoder):
             return None
 
         try:
-            # Decode base64 string to bytes
-            decoded_bytes = base64.b64decode(raw_data, validate=True)
+            # Decode base64 string to bytes.
+            # Try standard base64 first; fall back to URL-safe base64 (- and _ chars).
+            try:
+                decoded_bytes = base64.b64decode(raw_data, validate=True)
+            except (ValueError, binascii.Error):
+                decoded_bytes = base64.urlsafe_b64decode(raw_data + "==")
 
             # Detect MIME type from content
             mime_type = decoder_helpers.detect_mime_type(decoded_bytes)

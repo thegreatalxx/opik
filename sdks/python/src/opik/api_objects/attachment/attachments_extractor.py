@@ -33,12 +33,13 @@ class AttachmentsExtractor:
         self.decoder = decoder_base64.Base64AttachmentDecoder()
 
         # Pattern to match base64 strings (can be embedded in text)
+        # Matches both standard base64 (+/) and URL-safe base64 (-_)
         # Requires at least min_attachment_size characters to reduce false positives
         min_base64_groups = int(min_attachment_size / 4)
         BASE64_PATTERN = (
-            r"(?:[A-Za-z0-9+/]{4}){"
+            r"(?:[A-Za-z0-9+/\-_]{4}){"
             + str(min_base64_groups)
-            + ",}(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?"
+            + r",}(?:[A-Za-z0-9+/\-_]{2}==|[A-Za-z0-9+/\-_]{3}=)?"
         )
         self.pattern = re.compile(BASE64_PATTERN)
 

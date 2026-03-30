@@ -25,6 +25,7 @@ type MediaItem = {
   video_url?: { url: string };
   audio_url?: { url: string };
   input_audio?: { data: string };
+  inline_data?: { data: string; mime_type?: string };
 };
 
 const getRoleLabel = (role: string): string => {
@@ -76,6 +77,12 @@ const getTextAndMedia = (
       if (item.type === "audio_url" || item.type === "input_audio") {
         const url = item.audio_url?.url || item.url;
         if (url) audios.push(url);
+        return;
+      }
+
+      // Google GenAI inline_data (images via ADK)
+      if (item.inline_data?.data) {
+        images.push(item.inline_data.data);
       }
     });
 
