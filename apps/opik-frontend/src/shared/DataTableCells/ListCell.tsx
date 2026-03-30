@@ -22,10 +22,7 @@ const CELL_PADDING: Record<ROW_HEIGHT, number> = {
 };
 
 function getVisibleRowCount(rowHeight: ROW_HEIGHT): number {
-  const totalHeight = parseInt(
-    ROW_HEIGHT_MAP[rowHeight].height as string,
-    10,
-  );
+  const totalHeight = parseInt(ROW_HEIGHT_MAP[rowHeight].height as string, 10);
   const availableHeight = totalHeight - CELL_PADDING[rowHeight];
   return Math.max(1, Math.floor(availableHeight / TAG_ROW_HEIGHT_MD));
 }
@@ -33,8 +30,7 @@ function getVisibleRowCount(rowHeight: ROW_HEIGHT): number {
 const ListCell = (context: CellContext<unknown, unknown>) => {
   const items = context.getValue() as string[];
 
-  const rowHeight =
-    context.table.options.meta?.rowHeight ?? ROW_HEIGHT.small;
+  const rowHeight = context.table.options.meta?.rowHeight ?? ROW_HEIGHT.small;
   const isSmall = rowHeight === ROW_HEIGHT.small;
   const tagSize = isSmall ? "sm" : ("md" as const);
 
@@ -46,8 +42,10 @@ const ListCell = (context: CellContext<unknown, unknown>) => {
 
   const [expanded, setExpanded] = useState(false);
 
-  const { cellRef, visibleItems, onMeasure } =
-    useVisibleItemsByWidth(sortedList, LIST_CELL_CONFIG);
+  const { cellRef, visibleItems, onMeasure } = useVisibleItemsByWidth(
+    sortedList,
+    LIST_CELL_CONFIG,
+  );
 
   const itemsPerRow = visibleItems.length;
 
@@ -83,9 +81,7 @@ const ListCell = (context: CellContext<unknown, unknown>) => {
         <div
           className={cn(
             "flex flex-row gap-1",
-            isSmall && !expanded
-              ? "max-h-full overflow-x-hidden"
-              : "flex-wrap",
+            isSmall && !expanded ? "max-h-full overflow-x-hidden" : "flex-wrap",
           )}
         >
           {!expanded && (
