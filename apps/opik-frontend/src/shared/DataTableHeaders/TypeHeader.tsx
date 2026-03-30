@@ -1,70 +1,29 @@
-import React, { ForwardRefExoticComponent, RefAttributes } from "react";
+import { useCallback, useRef, useState } from "react";
 import { HeaderContext } from "@tanstack/react-table";
-import { COLUMN_TYPE, HeaderIconType } from "@/types/shared";
-import {
-  Text,
-  Hash,
-  List,
-  Clock,
-  Braces,
-  PenLine,
-  Coins,
-  Construction,
-  LucideProps,
-  AlertTriangle,
-  Tag,
-  GitCommitVertical,
-  CheckCheck,
-  Repeat2,
-  CircleCheck,
-} from "lucide-react";
 import { Checkbox } from "@/ui/checkbox";
 import HeaderWrapper from "@/shared/DataTableHeaders/HeaderWrapper";
 import useSortableHeader from "@/shared/DataTableHeaders/useSortableHeader";
 import ExplainerIcon from "@/shared/ExplainerIcon/ExplainerIcon";
-
-const COLUMN_TYPE_MAP: Record<
-  HeaderIconType,
-  ForwardRefExoticComponent<
-    Omit<LucideProps, "ref"> & RefAttributes<SVGSVGElement>
-  >
-> = {
-  guardrails: Construction,
-  tags: Tag,
-  version: GitCommitVertical,
-  assertions: CheckCheck,
-  execution_policy: Repeat2,
-  pass_rate: CircleCheck,
-  result: CircleCheck,
-  [COLUMN_TYPE.string]: Text,
-  [COLUMN_TYPE.number]: Hash,
-  [COLUMN_TYPE.list]: List,
-  [COLUMN_TYPE.time]: Clock,
-  [COLUMN_TYPE.duration]: Clock,
-  [COLUMN_TYPE.dictionary]: Braces,
-  [COLUMN_TYPE.numberDictionary]: PenLine,
-  [COLUMN_TYPE.cost]: Coins,
-  [COLUMN_TYPE.category]: Text,
-  [COLUMN_TYPE.errors]: AlertTriangle,
-};
+import TooltipWrapper from "@/shared/TooltipWrapper/TooltipWrapper";
 
 const TypeHeader = <TData,>(context: HeaderContext<TData, unknown>) => {
   const { column } = context;
-  const {
-    header,
-    headerCheckbox,
-    type: columnType,
-    iconType,
-    explainer,
-  } = column.columnDef.meta ?? {};
-
-  const type = iconType ?? columnType;
-  const Icon = type ? COLUMN_TYPE_MAP[type] : "span";
+  const { header, headerCheckbox, explainer } = column.columnDef.meta ?? {};
 
   const { className, onClickHandler, renderSort } = useSortableHeader({
     column,
     withSeparator: Boolean(explainer),
   });
+
+  const textRef = useRef<HTMLSpanElement>(null);
+  const [isTruncated, setIsTruncated] = useState(false);
+
+  const checkTruncation = useCallback(() => {
+    const el = textRef.current;
+    if (el) {
+      setIsTruncated(el.scrollWidth > el.clientWidth);
+    }
+  }, []);
 
   return (
     <HeaderWrapper
@@ -75,6 +34,7 @@ const TypeHeader = <TData,>(context: HeaderContext<TData, unknown>) => {
     >
       {headerCheckbox && (
         <Checkbox
+          variant="muted"
           className="mr-3.5"
           onClick={(event) => event.stopPropagation()}
           checked={
@@ -87,8 +47,11 @@ const TypeHeader = <TData,>(context: HeaderContext<TData, unknown>) => {
           aria-label="Select all"
         />
       )}
-      {Boolean(Icon) && <Icon className="size-3.5 shrink-0 text-light-slate" />}
-      <span className="truncate">{header}</span>
+      <TooltipWrapper content={isTruncated ? header : null}>
+        <span ref={textRef} className="truncate" onMouseEnter={checkTruncation}>
+          {header}
+        </span>
+      </TooltipWrapper>
       {explainer && <ExplainerIcon {...explainer} />}
       {renderSort()}
     </HeaderWrapper>

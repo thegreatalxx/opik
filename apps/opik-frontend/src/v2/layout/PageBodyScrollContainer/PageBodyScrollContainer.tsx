@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 import { useObserveResizeNode } from "@/hooks/useObserveResizeNode";
 import { STICKY_ATTRIBUTE_VERTICAL } from "@/shared/PageBodyStickyContainer/PageBodyStickyContainer";
@@ -41,6 +41,31 @@ const PageBodyScrollContainer: React.FC<PageBodyScrollContainerProps> = ({
       setTableOffset(tableOffset);
     },
   );
+
+  const recalculateOffsets = useCallback(() => {
+    if (scrollContainer) {
+      const { width, tableOffset } = calculateOffsets(scrollContainer);
+      setWidth(width);
+      setTableOffset(tableOffset);
+    }
+  }, [scrollContainer]);
+
+  useEffect(() => {
+    if (!scrollContainer) return;
+
+    const handleScroll = () => {
+      const isScrolled = scrollContainer.scrollTop > tableOffset;
+      scrollContainer.toggleAttribute("data-header-stuck", isScrolled);
+      scrollContainer.toggleAttribute(
+        "data-scrolled-right",
+        scrollContainer.scrollLeft > 0,
+      );
+    };
+
+    scrollContainer.addEventListener("scroll", handleScroll, { passive: true });
+    return () => scrollContainer.removeEventListener("scroll", handleScroll);
+  }, [scrollContainer, tableOffset]);
+
   const style =
     width > 0
       ? ({ "--scroll-body-client-width": `${width}px` } as React.CSSProperties)
@@ -48,7 +73,11 @@ const PageBodyScrollContainer: React.FC<PageBodyScrollContainerProps> = ({
 
   return (
     <PageBodyScrollContainerContext.Provider
-      value={{ scrollContainer: scrollContainer ?? null, tableOffset }}
+      value={{
+        scrollContainer: scrollContainer ?? null,
+        tableOffset,
+        recalculateOffsets,
+      }}
     >
       <div
         ref={ref}

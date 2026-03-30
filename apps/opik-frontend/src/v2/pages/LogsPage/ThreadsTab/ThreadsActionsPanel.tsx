@@ -1,6 +1,7 @@
 import React, { useCallback, useRef, useState } from "react";
 import { Trash, Tag } from "lucide-react";
 import slugify from "slugify";
+import { cn } from "@/lib/utils";
 
 import { Button } from "@/ui/button";
 import { Thread } from "@/types/traces";
@@ -25,6 +26,7 @@ type ThreadsActionsPanelProps = {
   columnsToExport: string[];
   projectName: string;
   projectId: string;
+  buttonVariant?: "outline" | "ghost" | "ghostInverted";
 };
 
 const ThreadsActionsPanel: React.FunctionComponent<
@@ -35,6 +37,7 @@ const ThreadsActionsPanel: React.FunctionComponent<
   columnsToExport,
   projectName,
   projectId,
+  buttonVariant = "outline",
 }) => {
   const resetKeyRef = useRef(0);
   const [open, setOpen] = useState<boolean | number>(false);
@@ -102,32 +105,43 @@ const ThreadsActionsPanel: React.FunctionComponent<
         selectedRows={selectedRows}
         disabled={disabled}
         dataType="threads"
+        buttonVariant={buttonVariant}
       />
       <TooltipWrapper content="Manage tags">
         <Button
-          variant="outline"
-          size="icon-sm"
+          variant={buttonVariant}
+          size="sm"
           onClick={() => {
             setOpen(3);
             resetKeyRef.current = resetKeyRef.current + 1;
           }}
           disabled={disabled}
         >
-          <Tag />
+          <Tag className="mr-1.5 size-3.5" />
+          <span>Manage tags</span>
         </Button>
       </TooltipWrapper>
       <EvaluateButton
         isNoRules={!rules?.length}
         disabled={disabled}
+        buttonVariant={buttonVariant}
+        label="Evaluate"
         onClick={() => {
           setOpen(4);
           resetKeyRef.current = resetKeyRef.current + 1;
         }}
       />
+      <div
+        className={cn(
+          "mx-1 h-4 w-px shrink-0",
+          buttonVariant === "ghostInverted" ? "bg-white" : "bg-border",
+        )}
+      />
       <ExportToButton
         disabled={disabled || columnsToExport.length === 0 || !isExportEnabled}
         getData={mapRowData}
         generateFileName={generateFileName}
+        buttonVariant={buttonVariant}
         tooltipContent={
           !isExportEnabled
             ? "Export functionality is disabled for this installation"
@@ -136,7 +150,7 @@ const ThreadsActionsPanel: React.FunctionComponent<
       />
       <TooltipWrapper content="Delete">
         <Button
-          variant="outline"
+          variant={buttonVariant}
           size="icon-sm"
           onClick={() => {
             setOpen(2);

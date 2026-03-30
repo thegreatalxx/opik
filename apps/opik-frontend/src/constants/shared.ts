@@ -19,9 +19,33 @@ export const TABLE_HEADER_Z_INDEX = 2;
 export const TABLE_ROW_Z_INDEX = 0;
 
 export const ROW_HEIGHT_MAP: Record<ROW_HEIGHT, React.CSSProperties> = {
-  [ROW_HEIGHT.small]: { height: "44px" },
-  [ROW_HEIGHT.medium]: { height: "96px" },
-  [ROW_HEIGHT.large]: { height: "296px" },
+  [ROW_HEIGHT.small]: { height: "32px" },
+  [ROW_HEIGHT.medium]: { height: "40px" },
+  [ROW_HEIGHT.large]: { height: "160px" },
+};
+
+export const HEADER_TEXT_CLASS_MAP: Record<ROW_HEIGHT, string> = {
+  [ROW_HEIGHT.small]: "comet-body-xs",
+  [ROW_HEIGHT.medium]: "comet-body-s",
+  [ROW_HEIGHT.large]: "comet-body-s",
+};
+
+export const CELL_TEXT_CLASS_MAP: Record<ROW_HEIGHT, string> = {
+  [ROW_HEIGHT.small]: "comet-body-xs",
+  [ROW_HEIGHT.medium]: "comet-body-s",
+  [ROW_HEIGHT.large]: "comet-body-s",
+};
+
+export const TAG_SIZE_MAP: Record<ROW_HEIGHT, "default" | "md"> = {
+  [ROW_HEIGHT.small]: "default",
+  [ROW_HEIGHT.medium]: "md",
+  [ROW_HEIGHT.large]: "md",
+};
+
+export const FEEDBACK_SCORE_TAG_SIZE_MAP: Record<ROW_HEIGHT, "sm" | "md"> = {
+  [ROW_HEIGHT.small]: "sm",
+  [ROW_HEIGHT.medium]: "md",
+  [ROW_HEIGHT.large]: "md",
 };
 
 export const CELL_VERTICAL_ALIGNMENT_MAP = {
