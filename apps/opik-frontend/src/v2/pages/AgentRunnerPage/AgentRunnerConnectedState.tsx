@@ -1,10 +1,12 @@
 import React, { useState } from "react";
-import { Settings2 } from "lucide-react";
+import { Save } from "lucide-react";
 
+import { Button } from "@/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/ui/tabs";
 import useConfigHistoryListInfinite from "@/api/agent-configs/useConfigHistoryListInfinite";
 import { LocalRunner } from "@/types/agent-sandbox";
 import AgentRunnerInputForm from "./AgentRunnerInputForm";
+import AgentRunnerConfigEditor from "./AgentRunnerConfigEditor";
 
 type AgentRunnerConnectedStateProps = {
   projectId: string;
@@ -54,11 +56,21 @@ const AgentRunnerConnectedState: React.FC<AgentRunnerConnectedStateProps> = ({
 
         <TabsContent value="configuration" className="flex-1 p-6">
           {latestConfig ? (
-            <div className="flex items-center gap-2">
-              <Settings2 className="size-3.5 text-muted-slate" />
-              <span className="comet-body-xs text-muted-slate">
-                Configuration: {configVersionLabel}
-              </span>
+            <div>
+              <div className="mb-4 flex items-center gap-3">
+                <span className="comet-body-xs text-muted-slate">
+                  Configuration: {configVersionLabel} (Prod)
+                </span>
+                <Button variant="outline" size="xs">
+                  <Save className="mr-1 size-3" />
+                  Save as new version
+                </Button>
+              </div>
+              <AgentRunnerConfigEditor
+                item={latestConfig}
+                projectId={projectId}
+                onClose={() => setActiveTab("input")}
+              />
             </div>
           ) : (
             <p className="comet-body-s text-muted-slate">
