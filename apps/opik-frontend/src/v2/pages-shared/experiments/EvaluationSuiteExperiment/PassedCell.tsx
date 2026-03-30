@@ -6,6 +6,8 @@ import VerticallySplitCellWrapper, {
 } from "@/shared/DataTableCells/VerticallySplitCellWrapper";
 import AssertionsBreakdownTooltip from "./AssertionsBreakdownTooltip";
 import { Tag, TagProps } from "@/ui/tag";
+import { ROW_HEIGHT } from "@/types/shared";
+import { TAG_SIZE_MAP } from "@/constants/shared";
 import {
   AssertionResult,
   ExperimentItem,
@@ -110,11 +112,12 @@ function getStatusInfoForExperiment(
   };
 }
 
-const StatusTag: React.FC<StatusInfo> = ({
+const StatusTag: React.FC<StatusInfo & { tagSize?: TagProps["size"] }> = ({
   status,
   assertionsByRun,
   passedCount,
   totalCount,
+  tagSize = "md",
 }) => {
   const isMultiRun = totalCount > 1;
 
@@ -126,7 +129,7 @@ const StatusTag: React.FC<StatusInfo> = ({
     <AssertionsBreakdownTooltip assertionsByRun={assertionsByRun}>
       <Tag
         variant={STATUS_DISPLAY[status].variant}
-        size="md"
+        size={tagSize}
         className="cursor-default"
       >
         {STATUS_DISPLAY[status].label}
@@ -142,6 +145,8 @@ const PassedCell: React.FC<CellContext<ExperimentsCompare, unknown>> = (
   const row = context.row.original;
   const { custom } = context.column.columnDef.meta ?? {};
   const { experimentsIds } = (custom ?? {}) as Partial<CustomMeta>;
+  const rowHeight = context.table.options.meta?.rowHeight ?? ROW_HEIGHT.small;
+  const tagSize = TAG_SIZE_MAP[rowHeight];
 
   if (experimentsIds) {
     const renderContent = (
@@ -149,7 +154,7 @@ const PassedCell: React.FC<CellContext<ExperimentsCompare, unknown>> = (
       experimentId: string,
     ) => {
       const statusInfo = getStatusInfoForExperiment(row, experimentId, item);
-      return <StatusTag {...statusInfo} />;
+      return <StatusTag {...statusInfo} tagSize={tagSize} />;
     };
 
     return (
@@ -170,7 +175,7 @@ const PassedCell: React.FC<CellContext<ExperimentsCompare, unknown>> = (
       metadata={context.column.columnDef.meta}
       tableMetadata={context.table.options.meta}
     >
-      <StatusTag {...statusInfo} />
+      <StatusTag {...statusInfo} tagSize={tagSize} />
     </CellWrapper>
   );
 };

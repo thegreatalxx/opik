@@ -36,8 +36,8 @@ export const useColumnsCount = <TColumnData,>({
     [selectedColumns, selectAllColumnsIds],
   );
 
-  const selectedCount = selectedColumns.filter(
-    (id) => !excludeFromSelectAll.includes(id),
+  const selectedCount = selectedColumns.filter((id) =>
+    selectAllColumnsIds.includes(id),
   ).length;
 
   const totalCount = selectAllColumnsIds.length;

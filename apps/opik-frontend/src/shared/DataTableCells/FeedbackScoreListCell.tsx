@@ -4,6 +4,7 @@ import get from "lodash/get";
 import isNumber from "lodash/isNumber";
 import isArray from "lodash/isArray";
 
+import { cn } from "@/lib/utils";
 import CellWrapper from "@/shared/DataTableCells/CellWrapper";
 import { TraceFeedbackScore } from "@/types/traces";
 import FeedbackScoreTag from "../FeedbackScoreTag/FeedbackScoreTag";
@@ -14,7 +15,9 @@ import {
   ScoreType,
   SCORE_TYPE_EXPERIMENT,
   SCORE_TYPE_FEEDBACK,
+  ROW_HEIGHT,
 } from "@/types/shared";
+import { FEEDBACK_SCORE_TAG_SIZE_MAP } from "@/constants/shared";
 import { useVisibleItemsByWidth } from "@/hooks/useVisibleItemsByWidth";
 import { formatScoreDisplay, getScoreDisplayName } from "@/lib/feedback-scores";
 
@@ -54,6 +57,9 @@ const FeedbackScoreListCell = <TData,>(
     })),
   ];
 
+  const rowHeight = context.table.options.meta?.rowHeight ?? ROW_HEIGHT.small;
+  const tagSize = FEEDBACK_SCORE_TAG_SIZE_MAP[rowHeight];
+
   const { getHoverCardName, areAggregatedScores } = (context.column.columnDef
     .meta?.custom ?? {}) as CustomMeta<TData>;
 
@@ -91,6 +97,7 @@ const FeedbackScoreListCell = <TData,>(
                         colorKey={item.colorKey}
                         value={item.value}
                         reason={item.reason}
+                        size={tagSize}
                       />
                     </div>
                   ))}
@@ -102,10 +109,18 @@ const FeedbackScoreListCell = <TData,>(
                     colorKey={item.colorKey}
                     value={item.value}
                     className="min-w-0"
+                    size={tagSize}
                   />
                 ))}
                 {hasHiddenItems && (
-                  <div className="comet-body-s-accented flex h-6 items-center rounded-md border border-border pl-1 pr-1.5 text-muted-slate">
+                  <div
+                    className={cn(
+                      "flex items-center rounded-md border border-border pl-1 pr-1.5 text-muted-slate",
+                      tagSize === "sm"
+                        ? "comet-body-xs-accented h-4"
+                        : "comet-body-s-accented h-6",
+                    )}
+                  >
                     +{remainingCount}
                   </div>
                 )}
