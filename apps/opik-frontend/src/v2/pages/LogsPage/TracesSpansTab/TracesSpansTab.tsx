@@ -657,7 +657,8 @@ export const TracesSpansTab: React.FC<TracesSpansTabProps> = ({
   const handleClearFilters = useCallback(() => {
     setSearch("");
     setFilters([]);
-  }, [setSearch, setFilters]);
+    setPage(1);
+  }, [setSearch, setFilters, setPage]);
 
   const rows: Array<Span | Trace> = useMemo(
     () => data?.content ?? [],
