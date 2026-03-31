@@ -4,14 +4,12 @@ import { CellContext } from "@tanstack/react-table";
 import { Tag } from "@/ui/tag";
 import CustomSquare from "@/icons/custom-square.svg?react";
 import CellWrapper from "@/shared/DataTableCells/CellWrapper";
-import { ROW_HEIGHT } from "@/types/shared";
-import { TAG_SIZE_MAP } from "@/constants/shared";
+import { getCellTagSize, TAG_SIZE_MAP } from "@/constants/shared";
 
 const StatusCell = (context: CellContext<unknown, unknown>) => {
   const { column, table } = context;
   const value = context.getValue() as boolean;
-  const rowHeight = table.options.meta?.rowHeight ?? ROW_HEIGHT.small;
-  const tagSize = TAG_SIZE_MAP[rowHeight];
+  const tagSize = getCellTagSize(context, TAG_SIZE_MAP);
 
   return (
     <CellWrapper

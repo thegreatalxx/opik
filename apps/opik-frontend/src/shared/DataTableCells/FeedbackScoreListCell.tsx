@@ -15,9 +15,11 @@ import {
   ScoreType,
   SCORE_TYPE_EXPERIMENT,
   SCORE_TYPE_FEEDBACK,
-  ROW_HEIGHT,
 } from "@/types/shared";
-import { FEEDBACK_SCORE_TAG_SIZE_MAP } from "@/constants/shared";
+import {
+  getCellTagSize,
+  FEEDBACK_SCORE_TAG_SIZE_MAP,
+} from "@/constants/shared";
 import { useVisibleItemsByWidth } from "@/hooks/useVisibleItemsByWidth";
 import { formatScoreDisplay, getScoreDisplayName } from "@/lib/feedback-scores";
 
@@ -57,8 +59,7 @@ const FeedbackScoreListCell = <TData,>(
     })),
   ];
 
-  const rowHeight = context.table.options.meta?.rowHeight ?? ROW_HEIGHT.small;
-  const tagSize = FEEDBACK_SCORE_TAG_SIZE_MAP[rowHeight];
+  const tagSize = getCellTagSize(context, FEEDBACK_SCORE_TAG_SIZE_MAP);
 
   const { getHoverCardName, areAggregatedScores } = (context.column.columnDef
     .meta?.custom ?? {}) as CustomMeta<TData>;

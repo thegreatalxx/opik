@@ -47,24 +47,29 @@ export const calculateHeightStyle = (rowHeight: ROW_HEIGHT) => {
   return ROW_HEIGHT_MAP[rowHeight];
 };
 
+export const computePinnedColumnIds = <TData,>(
+  table: Table<TData>,
+): { lastLeftPinnedColumnId?: string; lastRightPinnedColumnId?: string } => {
+  let lastLeftPinnedColumnId: string | undefined;
+  let lastRightPinnedColumnId: string | undefined;
+
+  for (const col of table.getVisibleLeafColumns()) {
+    if (col.getIsGrouped?.()) continue;
+    const pin = col.getIsPinned();
+    if (pin === "left") lastLeftPinnedColumnId = col.id;
+    else if (pin === "right") lastRightPinnedColumnId = col.id;
+  }
+
+  return { lastLeftPinnedColumnId, lastRightPinnedColumnId };
+};
+
 export type GetCommonPinningStylesProps<TData> = {
   column: Column<TData>;
   isHeader?: boolean;
   isLastHeaderRow?: boolean;
   applyStickyWorkaround?: boolean;
   forceGroup?: boolean;
-  table: Table<TData>;
-};
-
-const getIsLastLeftPinned = <TData,>(
-  column: Column<TData>,
-  table: Table<TData>,
-): boolean => {
-  if (column.getIsPinned() !== "left") return false;
-  const leftPinnedNonGrouped = table
-    .getVisibleLeafColumns()
-    .filter((col) => col.getIsPinned() === "left" && !col.getIsGrouped?.());
-  return last(leftPinnedNonGrouped)?.id === column.id;
+  lastRightPinnedColumnId?: string;
 };
 
 export const getCommonPinningStyles = <TData,>({
@@ -73,7 +78,7 @@ export const getCommonPinningStyles = <TData,>({
   isLastHeaderRow = false,
   applyStickyWorkaround = false,
   forceGroup = false,
-  table,
+  lastRightPinnedColumnId,
 }: GetCommonPinningStylesProps<TData>): CSSProperties => {
   const isPinned = column.getIsPinned();
 
@@ -81,12 +86,8 @@ export const getCommonPinningStyles = <TData,>({
     return {};
   }
 
-  const rightPinnedNonGroupedColumns = table
-    .getVisibleLeafColumns()
-    .filter((col) => col.getIsPinned() === "right" && !col.getIsGrouped?.());
   const isFirstRightPinnedNonGroupedColumn =
-    isPinned === "right" &&
-    last(rightPinnedNonGroupedColumns)?.id === column.id;
+    isPinned === "right" && lastRightPinnedColumnId === column.id;
 
   return {
     // Last left-pinned column border is handled via CSS class (comet-pinned-last-left)
@@ -112,25 +113,28 @@ export const getCommonPinningStyles = <TData,>({
 
 export type GetCommonPinningClassesProps<TData> = {
   column: Column<TData>;
-  table: Table<TData>;
   isHeader?: boolean;
   forceGroup?: boolean;
+  lastLeftPinnedColumnId?: string;
 };
 
 export const getCommonPinningClasses = <TData,>({
   column,
-  table,
   isHeader = false,
   forceGroup = false,
+  lastLeftPinnedColumnId,
 }: GetCommonPinningClassesProps<TData>): string => {
   const isPinned = column.getIsPinned();
 
   if (!isPinned && !forceGroup) return "";
 
+  const isLastLeftPinned =
+    isPinned === "left" && lastLeftPinnedColumnId === column.id;
+
   return cn(
     "comet-pinned-cell",
     isHeader ? "bg-soft-background" : "bg-background",
-    getIsLastLeftPinned(column, table) && "comet-pinned-last-left",
+    isLastLeftPinned && "comet-pinned-last-left",
     forceGroup && "comet-grouped-cell",
   );
 };

@@ -1,4 +1,5 @@
 import React from "react";
+import { CellContext } from "@tanstack/react-table";
 import {
   CELL_VERTICAL_ALIGNMENT,
   COLUMN_TYPE,
@@ -47,6 +48,15 @@ export const FEEDBACK_SCORE_TAG_SIZE_MAP: Record<ROW_HEIGHT, "sm" | "md"> = {
   [ROW_HEIGHT.medium]: "md",
   [ROW_HEIGHT.large]: "md",
 };
+
+export function getCellTagSize<T>(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  context: CellContext<any, any>,
+  sizeMap: Record<ROW_HEIGHT, T>,
+): T {
+  const rowHeight = context.table.options.meta?.rowHeight ?? ROW_HEIGHT.small;
+  return sizeMap[rowHeight];
+}
 
 export const CELL_VERTICAL_ALIGNMENT_MAP = {
   [CELL_VERTICAL_ALIGNMENT.start]: "items-start",
