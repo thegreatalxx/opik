@@ -1350,9 +1350,7 @@ export const TracesSpansTab: React.FC<TracesSpansTabProps> = ({
           noData={
             <DataTableNoMatchingData
               onClearFilters={
-                search || filters.length > 0
-                  ? handleClearFilters
-                  : undefined
+                search || filters.length > 0 ? handleClearFilters : undefined
               }
             />
           }

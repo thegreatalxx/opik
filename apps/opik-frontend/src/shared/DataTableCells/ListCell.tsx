@@ -86,7 +86,7 @@ const ListCell = (context: CellContext<unknown, unknown>) => {
               <div key={item}>
                 <ColoredTag
                   label={item}
-                  variant="primary"
+                  variant="lavender"
                   className="shrink-0"
                   size={tagSize}
                 />
@@ -97,7 +97,7 @@ const ListCell = (context: CellContext<unknown, unknown>) => {
             <ColoredTag
               key={item}
               label={item}
-              variant="primary"
+              variant="lavender"
               className="block min-w-0 max-w-full"
               size={tagSize}
             />
@@ -107,14 +107,14 @@ const ListCell = (context: CellContext<unknown, unknown>) => {
               content={
                 <TagListTooltipContent
                   tags={hiddenItems}
-                  variant="primary"
+                  variant="lavender"
                   size={tagSize}
                 />
               }
             >
               <div
                 className={cn(
-                  "flex items-center rounded-sm text-primary-hover",
+                  "flex items-center rounded-sm text-[var(--tag-lavender-text)]",
                   isSmall
                     ? "comet-body-xs h-4 px-2"
                     : "comet-body-s h-6 rounded-md px-1.5",

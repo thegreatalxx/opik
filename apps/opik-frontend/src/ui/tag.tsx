@@ -19,6 +19,7 @@ const tagVariants = cva("inline-block truncate rounded-sm transition-colors", {
       turquoise:
         "bg-[var(--tag-turquoise-bg)] text-[var(--tag-turquoise-text)]",
       blue: "bg-[var(--tag-blue-bg)] text-[var(--tag-blue-text)]",
+      lavender: "bg-[var(--tag-lavender-bg)] text-[var(--tag-lavender-text)]",
       white:
         "border border-gray-200 bg-white text-muted-slate dark:border-gray-600 dark:bg-gray-800 dark:text-foreground",
       transparent: "border border-border bg-transparent",
@@ -55,7 +56,7 @@ Tag.displayName = "Tag";
 
 export const TAG_VARIANTS: Exclude<
   TagProps["variant"],
-  "red" | "transparent" | "white"
+  "red" | "transparent" | "white" | "lavender"
 >[] = [
   "primary",
   "gray",
@@ -72,7 +73,7 @@ export const TAG_VARIANTS: Exclude<
 export const TAG_VARIANTS_COLOR_MAP: Record<
   Exclude<
     TagProps["variant"],
-    null | undefined | "red" | "transparent" | "white"
+    null | undefined | "red" | "transparent" | "white" | "lavender"
   >,
   string
 > = {

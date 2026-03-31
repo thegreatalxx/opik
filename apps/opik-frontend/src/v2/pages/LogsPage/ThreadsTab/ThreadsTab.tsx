@@ -770,9 +770,7 @@ export const ThreadsTab: React.FC<ThreadsTabProps> = ({
           noData={
             <DataTableNoMatchingData
               onClearFilters={
-                search || filters.length > 0
-                  ? handleClearFilters
-                  : undefined
+                search || filters.length > 0 ? handleClearFilters : undefined
               }
             />
           }
