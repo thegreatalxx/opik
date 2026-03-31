@@ -59,6 +59,8 @@ interface MetricContainerChartProps {
   isAggregateTotal?: boolean;
   customEmptyState?: React.ReactNode;
   logsSource?: LOGS_SOURCE;
+  showLegend?: boolean;
+  colorMap?: Record<string, string>;
 }
 
 const customColorMap = {
@@ -101,6 +103,8 @@ const MetricContainerChart = ({
   isAggregateTotal = false,
   customEmptyState,
   logsSource,
+  showLegend = true,
+  colorMap,
 }: MetricContainerChartProps) => {
   const { data: response, isPending } = useProjectMetric(
     {
@@ -175,7 +179,7 @@ const MetricContainerChart = ({
     return data.every((record) => lines.every((line) => isNil(record[line])));
   }, [data, lines, isPending]);
 
-  const config = useChartConfig(lines, labelsMap, customColorMap);
+  const config = useChartConfig(lines, labelsMap, colorMap ?? customColorMap);
 
   const labelActions = useMemo(() => {
     if (!getLabelAction) return undefined;
@@ -212,6 +216,7 @@ const MetricContainerChart = ({
       data={data}
       labelActions={labelActions}
       isAggregateTotal={isAggregateTotal}
+      showLegend={showLegend}
     />
   );
 
