@@ -663,7 +663,7 @@ export const ThreadsTab: React.FC<ThreadsTabProps> = ({
     <>
       <PageBodyStickyContainer
         className="-mt-4 flex flex-wrap items-center justify-between gap-x-8 gap-y-2 py-4 pb-0"
-        direction="bidirectional"
+        direction="horizontal"
         limitWidth
       >
         <div className="flex items-center gap-2">
@@ -680,7 +680,7 @@ export const ThreadsTab: React.FC<ThreadsTabProps> = ({
       </PageBodyStickyContainer>
       <PageBodyStickyContainer
         className="pt-3"
-        direction="bidirectional"
+        direction="horizontal"
         limitWidth
       >
         <MetricsSummary

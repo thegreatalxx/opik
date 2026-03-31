@@ -1,18 +1,10 @@
 import React, { useMemo, useState, useCallback } from "react";
-import {
-  Braces,
-  AlertTriangle,
-  Clock,
-  Coins,
-  ArrowUp,
-  ArrowDown,
-  LucideIcon,
-} from "lucide-react";
+import { Braces, AlertTriangle, Clock, Coins, LucideIcon } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { formatDuration } from "@/lib/date";
 import { formatCost } from "@/lib/money";
-import { Skeleton } from "@/ui/skeleton";
+import MetricCard from "./MetricCard";
 import useProjectKpiCards, {
   KpiEntityType,
   KpiMetric,
@@ -21,9 +13,7 @@ import useProjectKpiCards, {
 import { Filters } from "@/types/filters";
 import { PercentageTrendType } from "@/shared/PercentageTrend/PercentageTrend";
 import MetricContainerChart from "@/v2/pages-shared/dashboards/widgets/ProjectMetricsWidget/MetricChart/MetricChartContainer";
-import {
-  METRIC_NAME_TYPE,
-} from "@/api/projects/useProjectMetric";
+import { METRIC_NAME_TYPE } from "@/api/projects/useProjectMetric";
 import { CHART_TYPE } from "@/constants/chart";
 import {
   durationYTickFormatter,
@@ -91,12 +81,19 @@ type ChartMetricConfig = {
 const CHART_GREEN = "var(--chart-green)";
 const CHART_RED = "var(--chart-red)";
 const CHART_BLUE = "var(--chart-blue)";
+const CHART_TEAL = "var(--chart-teal)";
 
 const COUNT_METRIC_MAP: Record<KpiEntityType, METRIC_NAME_TYPE> = {
   traces: METRIC_NAME_TYPE.TRACE_COUNT,
   spans: METRIC_NAME_TYPE.SPAN_COUNT,
   threads: METRIC_NAME_TYPE.THREAD_COUNT,
 };
+
+const ERROR_RATE_METRIC_MAP: Partial<Record<KpiEntityType, METRIC_NAME_TYPE>> =
+  {
+    traces: METRIC_NAME_TYPE.TRACE_ERROR_RATE,
+    spans: METRIC_NAME_TYPE.SPAN_ERROR_RATE,
+  };
 
 const AVG_DURATION_LINE_NAME_MAP: Record<KpiEntityType, string> = {
   traces: "trace_average_duration",
@@ -123,17 +120,17 @@ const getChartConfig = (
       };
     case "errors":
       return {
-        metricName: COUNT_METRIC_MAP[entityType],
+        metricName: ERROR_RATE_METRIC_MAP[entityType]!,
         chartType: CHART_TYPE.bar,
         colorMap: { [entityType]: CHART_RED },
       };
     case "avg_duration":
       return {
         metricName: AVG_DURATION_METRIC_MAP[entityType],
-        chartType: CHART_TYPE.line,
+        chartType: CHART_TYPE.bar,
         customYTickFormatter: durationYTickFormatter,
         renderValue: renderDurationTooltipValue,
-        colorMap: { [AVG_DURATION_LINE_NAME_MAP[entityType]]: CHART_GREEN },
+        colorMap: { [AVG_DURATION_LINE_NAME_MAP[entityType]]: CHART_TEAL },
       };
     case "total_cost":
       return {
@@ -146,93 +143,29 @@ const getChartConfig = (
   }
 };
 
-const computePercentageChange = (
-  current: number | null,
-  previous: number | null,
-): number | undefined => {
-  if (current === null || previous === null) return undefined;
-  if (previous === 0) return current === 0 ? 0 : current > 0 ? Infinity : -Infinity;
-  if (current === 0) return -100;
-  return ((current - previous) / previous) * 100;
-};
+const SKELETON_BAR_COUNT = 30;
+const SKELETON_BAR_HEIGHTS = Array.from(
+  { length: SKELETON_BAR_COUNT },
+  (_, i) => `${20 + ((i * 17 + 7) % 51)}%`,
+);
 
-type MetricCardProps = {
-  icon: LucideIcon;
-  label: string;
-  value: string;
-  currentRaw?: number | null;
-  previousRaw?: number | null;
-  trend: PercentageTrendType;
-  selected?: boolean;
-  onClick?: () => void;
-};
+const ChartPlaceholderBars: React.FC = () => (
+  <div className="flex h-[var(--chart-height)] min-h-[80px] items-end gap-[3px]">
+    {SKELETON_BAR_HEIGHTS.map((height, i) => (
+      <div
+        key={i}
+        className="flex-1 rounded-t-sm bg-[hsl(var(--muted))]"
+        style={{ height }}
+      />
+    ))}
+  </div>
+);
 
-const MetricCard: React.FC<MetricCardProps> = ({
-  icon: Icon,
-  label,
-  value,
-  currentRaw,
-  previousRaw,
-  trend,
-  selected = false,
-  onClick,
-}) => {
-  const percentage = computePercentageChange(
-    currentRaw ?? null,
-    previousRaw ?? null,
-  );
-
-  const renderChange = () => {
-    if (percentage === undefined) return null;
-    if (percentage === 0) {
-      return (
-        <span className="text-xs text-muted-foreground">No changes</span>
-      );
-    }
-
-    const isUp = percentage > 0;
-    const isBetter =
-      trend === "direct" ? isUp : !isUp;
-    const ChangeIcon = isUp ? ArrowUp : ArrowDown;
-    const colorClass = isBetter ? "text-primary" : "text-chart-red";
-    const displayValue = isFinite(percentage)
-      ? `${Math.abs(percentage).toFixed(1)}%`
-      : "";
-
-    return (
-      <span className={cn("inline-flex items-center gap-0.5 text-xs font-medium", colorClass)}>
-        <ChangeIcon className="size-3" />
-        {displayValue}
-      </span>
-    );
-  };
-
-  return (
-    <div
-      className={cn(
-        "-mr-px flex cursor-pointer items-center justify-between border bg-white px-4 py-3 transition-colors hover:bg-muted/30",
-        selected && "border-b-2 border-b-primary",
-      )}
-      onClick={onClick}
-    >
-      <div className="flex items-center gap-3">
-        <Icon className="size-4 shrink-0 text-muted-foreground" />
-        <div className="flex items-center gap-2">
-          <span className="comet-body-s text-muted-foreground">{label}</span>
-          <span className="comet-body-s-accented">{value}</span>
-          {renderChange()}
-        </div>
-      </div>
-    </div>
-  );
-};
-
-const MetricCardSkeleton: React.FC = () => (
-  <div className="-mr-px flex items-center gap-3 border bg-white px-4 py-3">
-    <Skeleton className="size-4 shrink-0" />
-    <div className="flex items-baseline gap-2">
-      <Skeleton className="h-4 w-16" />
-      <Skeleton className="h-4 w-12" />
+const ChartEmptyState: React.FC = () => (
+  <div className="relative">
+    <ChartPlaceholderBars />
+    <div className="absolute inset-0 flex items-center justify-center">
+      <span className="comet-body-s text-light-slate">Data not available</span>
     </div>
   </div>
 );
@@ -260,13 +193,20 @@ const MetricsSummary: React.FC<MetricsSummaryProps> = ({
 }) => {
   const [selectedMetric, setSelectedMetric] = useState<KpiMetricType>("count");
 
+  const chartIntervalConfig = useMemo(() => {
+    const interval = calculateIntervalType(dateRange);
+    const { intervalStart: chartStart, intervalEnd: chartEnd } =
+      calculateIntervalStartAndEnd(dateRange);
+    return { interval, intervalStart: chartStart, intervalEnd: chartEnd };
+  }, [dateRange]);
+
   const { data, isPending } = useProjectKpiCards(
     {
       projectId,
       entityType,
       filters,
-      intervalStart,
-      intervalEnd,
+      intervalStart: intervalStart ?? chartIntervalConfig.intervalStart,
+      intervalEnd: intervalEnd ?? chartIntervalConfig.intervalEnd,
     },
     {
       refetchInterval: REFETCH_INTERVAL,
@@ -279,12 +219,12 @@ const MetricsSummary: React.FC<MetricsSummaryProps> = ({
     return map;
   }, [data?.stats]);
 
-  const chartIntervalConfig = useMemo(() => {
-    const interval = calculateIntervalType(dateRange);
-    const { intervalStart: chartStart, intervalEnd: chartEnd } =
-      calculateIntervalStartAndEnd(dateRange);
-    return { interval, intervalStart: chartStart, intervalEnd: chartEnd };
-  }, [dateRange]);
+  const allZero = useMemo(() => {
+    if (!data?.stats?.length) return true;
+    return data.stats.every(
+      (s) => (s.current_value ?? 0) === 0 && (s.previous_value ?? 0) === 0,
+    );
+  }, [data?.stats]);
 
   const chartConfig = useMemo(
     () => getChartConfig(selectedMetric, entityType),
@@ -297,77 +237,85 @@ const MetricsSummary: React.FC<MetricsSummaryProps> = ({
     return { traceFilters: filters };
   }, [entityType, filters]);
 
+  const filteredCards = useMemo(
+    () =>
+      entityType === "threads"
+        ? METRIC_CARDS.filter((card) => card.type !== "errors")
+        : METRIC_CARDS,
+    [entityType],
+  );
+
   const handleSelectMetric = useCallback(
     (type: KpiMetricType) => setSelectedMetric(type),
     [],
   );
 
-  if (isPending) {
-    return (
-      <div>
-        <div className="grid grid-cols-4">
-          <MetricCardSkeleton />
-          <MetricCardSkeleton />
-          <MetricCardSkeleton />
-          <MetricCardSkeleton />
-        </div>
-        <div className="flex h-20 items-center justify-center border bg-white">
-          <Skeleton className="mx-6 h-14 w-full" />
-        </div>
-      </div>
-    );
-  }
+  const showData = !isPending && !allZero;
 
   return (
     <div>
-      <div className="grid grid-cols-4">
-        {METRIC_CARDS.map((card) => {
+      <div
+        className="grid"
+        style={{
+          gridTemplateColumns: `repeat(${filteredCards.length}, minmax(0, 1fr))`,
+        }}
+      >
+        {filteredCards.map((card, index) => {
           const metric = metricsMap.get(card.type);
-          const currentValue = metric?.current_value;
-          const value =
-            currentValue !== null && currentValue !== undefined
-              ? card.formatter(currentValue)
-              : "-";
+          const currentValue = metric?.current_value ?? 0;
+          const previousValue = metric?.previous_value ?? 0;
           const label = card.type === "count" ? countLabel : card.label;
+          const isFirst = index === 0;
+          const isLast = index === filteredCards.length - 1;
 
           return (
             <MetricCard
               key={card.type}
               icon={card.icon}
               label={label}
-              value={value}
-              currentRaw={metric?.current_value}
-              previousRaw={metric?.previous_value}
+              value={showData ? card.formatter(currentValue) : "N/A"}
+              currentRaw={showData ? currentValue : undefined}
+              previousRaw={showData ? previousValue : undefined}
               trend={card.trend}
-              selected={selectedMetric === card.type}
+              selected={showData && selectedMetric === card.type}
               onClick={() => handleSelectMetric(card.type)}
+              className={cn(
+                isFirst && "rounded-tl-md",
+                isLast && "rounded-tr-md",
+              )}
             />
           );
         })}
       </div>
       <div
-        className="border bg-white p-4"
+        className="rounded-b-md border border-t-0 bg-white p-4"
         style={{ "--chart-height": "80px" } as React.CSSProperties}
       >
-        <MetricContainerChart
-          name=""
-          description=""
-          chartType={chartConfig.chartType}
-          projectId={projectId}
-          interval={chartIntervalConfig.interval}
-          intervalStart={chartIntervalConfig.intervalStart}
-          intervalEnd={chartIntervalConfig.intervalEnd}
-          metricName={chartConfig.metricName}
-          customYTickFormatter={chartConfig.customYTickFormatter}
-          renderValue={chartConfig.renderValue}
-          chartId={`kpi-chart-${selectedMetric}`}
-          chartOnly
-          showLegend={false}
-          colorMap={chartConfig.colorMap}
-          filterLineCallback={chartConfig.filterLineCallback}
-          labelsMap={chartConfig.labelsMap}
-          {...chartFilters}
-        />
+        {showData ? (
+          <MetricContainerChart
+            name=""
+            description=""
+            chartType={chartConfig.chartType}
+            projectId={projectId}
+            interval={chartIntervalConfig.interval}
+            intervalStart={chartIntervalConfig.intervalStart}
+            intervalEnd={chartIntervalConfig.intervalEnd}
+            metricName={chartConfig.metricName}
+            customYTickFormatter={chartConfig.customYTickFormatter}
+            renderValue={chartConfig.renderValue}
+            chartId={`kpi-chart-${selectedMetric}`}
+            chartOnly
+            showLegend={false}
+            customEmptyState={<ChartEmptyState />}
+            customLoadingState={<ChartPlaceholderBars />}
+            colorMap={chartConfig.colorMap}
+            filterLineCallback={chartConfig.filterLineCallback}
+            labelsMap={chartConfig.labelsMap}
+            {...chartFilters}
+          />
+        ) : (
+          <ChartEmptyState />
+        )}
       </div>
     </div>
   );

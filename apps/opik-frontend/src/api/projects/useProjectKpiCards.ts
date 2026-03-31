@@ -42,8 +42,8 @@ const getProjectKpiCards = async (
     {
       entity_type: entityType,
       ...processedFilters,
-      interval_start: intervalStart,
-      interval_end: intervalEnd,
+      ...(intervalStart && { interval_start: intervalStart }),
+      ...(intervalEnd && { interval_end: intervalEnd }),
     },
     { signal },
   );
