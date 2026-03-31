@@ -67,7 +67,8 @@ const FeedbackScoreCell = (context: CellContext<unknown, unknown>) => {
 
   const isUserFeedbackColumn =
     isEditingEnabled && context.column.id === "feedback_scores_User feedback";
-  const isCompact = rowHeight === ROW_HEIGHT.small || rowHeight === ROW_HEIGHT.medium;
+  const isCompact =
+    rowHeight === ROW_HEIGHT.small || rowHeight === ROW_HEIGHT.medium;
 
   return (
     <CellWrapper
@@ -96,7 +97,7 @@ const FeedbackScoreCell = (context: CellContext<unknown, unknown>) => {
             </div>
           </FeedbackScoreReasonTooltip>
         ) : (
-          <span className="min-w-0 w-full overflow-y-auto break-words text-xs text-muted-foreground">
+          <span className="w-full min-w-0 overflow-y-auto break-words text-xs text-muted-foreground">
             {reasons.map((r) => r.reason).join(", ")}
           </span>
         ))}

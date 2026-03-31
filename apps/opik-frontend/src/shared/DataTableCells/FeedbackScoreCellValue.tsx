@@ -35,7 +35,7 @@ const FeedbackScoreCellValue = ({
   // If no feedback score, show only dash with optional edit button
   if (!feedbackScore) {
     return (
-      <div className="flex shrink-0 min-w-0 items-center gap-1 overflow-hidden">
+      <div className="flex min-w-0 shrink-0 items-center gap-1 overflow-hidden">
         {shouldShowEditDropdown && (
           <FeedbackScoreEditDropdown
             feedbackScore={feedbackScore}
@@ -66,7 +66,7 @@ const FeedbackScoreCellValue = ({
   const showTooltip = !getIsMultiValueFeedbackScore(valueByAuthor);
 
   return (
-    <div className="flex shrink-0 min-w-0 items-center gap-1 overflow-hidden">
+    <div className="flex min-w-0 shrink-0 items-center gap-1 overflow-hidden">
       {shouldShowEditDropdown && (
         <FeedbackScoreEditDropdown
           feedbackScore={feedbackScore}

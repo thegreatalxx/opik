@@ -408,8 +408,8 @@ const DataTable = <TData, TValue>({
 
   return (
     <div className={cn(showSkeleton && "mask-fade-to-bottom")}>
-    <TableWrapper>
-      <DataTableTooltipContext>
+      <TableWrapper>
+        <DataTableTooltipContext>
           <Table
             ref={tableRef}
             className="comet-cell-borders"
@@ -488,8 +488,8 @@ const DataTable = <TData, TValue>({
               />
             )}
           </Table>
-      </DataTableTooltipContext>
-    </TableWrapper>
+        </DataTableTooltipContext>
+      </TableWrapper>
     </div>
   );
 };
