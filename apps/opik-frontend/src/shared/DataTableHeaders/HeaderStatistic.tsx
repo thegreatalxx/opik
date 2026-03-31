@@ -200,7 +200,7 @@ const HeaderStatistic: React.FC<HeaderStatisticProps> = ({
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <div className="flex max-w-full cursor-pointer items-center">
-                <span className="comet-body-s truncate text-foreground">
+                <span className="truncate text-foreground">
                   <span>{selectedValue}</span>
                   <TooltipWrapper content={formatTooltip(displayValue)}>
                     <span className="ml-1">{dataFormater(displayValue)}</span>
@@ -250,7 +250,7 @@ const HeaderStatistic: React.FC<HeaderStatisticProps> = ({
 
       // Just avg, no dropdown needed
       return (
-        <span className="comet-body-s truncate text-foreground">
+        <span className="truncate text-foreground">
           <span>{AGGREGATION_VALUE.AVG}</span>
           <TooltipWrapper content={formatTooltip(statistic.value)}>
             <span className="ml-1">{dataFormater(statistic.value)}</span>
@@ -260,7 +260,7 @@ const HeaderStatistic: React.FC<HeaderStatisticProps> = ({
     }
     case STATISTIC_AGGREGATION_TYPE.COUNT:
       return (
-        <span className="comet-body-s truncate text-foreground">
+        <span className="truncate text-foreground">
           <span>{statistic.type.toLowerCase()}</span>
           <TooltipWrapper content={formatTooltip(statistic.value)}>
             <span className="ml-1">{dataFormater(statistic.value)}</span>
@@ -272,7 +272,7 @@ const HeaderStatistic: React.FC<HeaderStatisticProps> = ({
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <div className="flex max-w-full cursor-pointer items-center">
-              <span className="comet-body-s truncate text-foreground">
+              <span className="truncate text-foreground">
                 <span>{selectedValue}</span>
                 <TooltipWrapper
                   content={formatTooltip(
@@ -307,7 +307,7 @@ const HeaderStatistic: React.FC<HeaderStatisticProps> = ({
         </DropdownMenu>
       );
     default:
-      return <span className="comet-body-s text-foreground">-</span>;
+      return <span className="text-foreground">-</span>;
   }
 };
 
