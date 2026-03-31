@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { CellContext } from "@tanstack/react-table";
 
 import { cn } from "@/lib/utils";
@@ -40,8 +40,6 @@ const ListCell = (context: CellContext<unknown, unknown>) => {
     [items, isEmpty],
   );
 
-  const [expanded, setExpanded] = useState(false);
-
   const { cellRef, visibleItems, onMeasure } = useVisibleItemsByWidth(
     sortedList,
     LIST_CELL_CONFIG,
@@ -59,17 +57,16 @@ const ListCell = (context: CellContext<unknown, unknown>) => {
     return null;
   }
 
-  const displayedItems = expanded
-    ? sortedList
-    : sortedList.slice(0, maxVisibleItems);
-  const hiddenCount = sortedList.length - maxVisibleItems;
-  const showOverflowIndicator = !expanded && hiddenCount > 0;
+  const displayedItems = sortedList.slice(0, maxVisibleItems);
+  const hiddenItems = sortedList.slice(maxVisibleItems);
+  const hiddenCount = hiddenItems.length;
+  const showOverflowIndicator = hiddenCount > 0;
 
   return (
     <CellWrapper
       metadata={context.column.columnDef.meta}
       tableMetadata={context.table.options.meta}
-      className={cn(isSmall && "py-1", expanded && "overflow-auto")}
+      className={cn(isSmall && "py-1")}
     >
       <div
         ref={cellRef}
@@ -81,23 +78,21 @@ const ListCell = (context: CellContext<unknown, unknown>) => {
         <div
           className={cn(
             "flex flex-row gap-1",
-            isSmall && !expanded ? "max-h-full overflow-x-hidden" : "flex-wrap",
+            isSmall ? "max-h-full overflow-x-hidden" : "flex-wrap",
           )}
         >
-          {!expanded && (
-            <ChildrenWidthMeasurer onMeasure={onMeasure}>
-              {sortedList.map((item) => (
-                <div key={item}>
-                  <ColoredTag
-                    label={item}
-                    variant="primary"
-                    className="shrink-0"
-                    size={tagSize}
-                  />
-                </div>
-              ))}
-            </ChildrenWidthMeasurer>
-          )}
+          <ChildrenWidthMeasurer onMeasure={onMeasure}>
+            {sortedList.map((item) => (
+              <div key={item}>
+                <ColoredTag
+                  label={item}
+                  variant="primary"
+                  className="shrink-0"
+                  size={tagSize}
+                />
+              </div>
+            ))}
+          </ChildrenWidthMeasurer>
           {displayedItems.map((item) => (
             <ColoredTag
               key={item}
@@ -111,23 +106,19 @@ const ListCell = (context: CellContext<unknown, unknown>) => {
             <TooltipWrapper
               content={
                 <TagListTooltipContent
-                  tags={sortedList}
+                  tags={hiddenItems}
                   variant="primary"
-                  hint="Click to expand"
+                  size={tagSize}
                 />
               }
             >
               <div
                 className={cn(
-                  "flex cursor-pointer items-center rounded-sm text-primary-hover hover:underline",
+                  "flex items-center rounded-sm text-primary-hover",
                   isSmall
                     ? "comet-body-xs h-4 px-2"
                     : "comet-body-s h-6 rounded-md px-1.5",
                 )}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setExpanded(true);
-                }}
               >
                 +{hiddenCount}
               </div>

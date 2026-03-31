@@ -3,6 +3,7 @@ import { Tag, Trash } from "lucide-react";
 import slugify from "slugify";
 import { cn } from "@/lib/utils";
 import { Button } from "@/ui/button";
+import { Separator } from "@/ui/separator";
 import { Span, Trace } from "@/types/traces";
 import { TRACE_DATA_TYPE } from "@/hooks/useTracesOrSpansList";
 import AddToDropdown from "@/v2/pages-shared/traces/AddToDropdown/AddToDropdown";
@@ -152,10 +153,11 @@ const TracesActionsPanel: React.FunctionComponent<TracesActionsPanelProps> = ({
           }}
         />
       )}
-      <div
+      <Separator
+        orientation="vertical"
         className={cn(
-          "mx-1 h-4 w-px shrink-0",
-          buttonVariant === "ghostInverted" ? "bg-white" : "bg-border",
+          "mx-1 h-4 opacity-50",
+          buttonVariant === "ghostInverted" && "bg-white",
         )}
       />
       <ExportToButton

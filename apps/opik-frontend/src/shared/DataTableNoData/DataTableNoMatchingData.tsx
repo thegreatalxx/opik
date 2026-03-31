@@ -3,7 +3,7 @@ import { SearchX } from "lucide-react";
 import { Button } from "@/ui/button";
 
 type DataTableNoMatchingDataProps = {
-  onClearFilters: () => void;
+  onClearFilters?: () => void;
 };
 
 const DataTableNoMatchingData: React.FC<DataTableNoMatchingDataProps> = ({
@@ -17,9 +17,11 @@ const DataTableNoMatchingData: React.FC<DataTableNoMatchingDataProps> = ({
         <p className="comet-body-s text-muted-slate">
           Try adjusting your filters or search query.
         </p>
-        <Button variant="link" size="sm" onClick={onClearFilters}>
-          Clear filters
-        </Button>
+        {onClearFilters && (
+          <Button variant="link" size="sm" onClick={onClearFilters}>
+            Clear filters
+          </Button>
+        )}
       </div>
     </div>
   );

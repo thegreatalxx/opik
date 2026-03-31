@@ -2,6 +2,8 @@ import React from "react";
 import { Header } from "@tanstack/react-table";
 import { cn } from "@/lib/utils";
 
+const EDGE_MARGIN = 5;
+
 type DataTableColumnResizerProps<TData> = {
   header: Header<TData, unknown>;
 };
@@ -15,15 +17,52 @@ const DataTableColumnResizer = <TData,>({
   )
     return null;
 
+  const resizeHandler = header.getResizeHandler();
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    resizeHandler(e);
+
+    const scrollContainer = (e.target as HTMLElement).closest(
+      "[data-table-scroll-container]",
+    ) as HTMLElement | null;
+    const headerEl = (e.target as HTMLElement).closest("th") as HTMLElement;
+    if (!scrollContainer || !headerEl) return;
+
+    const columnId = header.column.id;
+    const table = header.getContext().table;
+
+    const onMouseMove = () => {
+      const containerRight = scrollContainer.getBoundingClientRect().right;
+      const headerLeft = headerEl.getBoundingClientRect().left;
+      const maxWidth = containerRight - headerLeft - EDGE_MARGIN;
+
+      if (header.column.getSize() > maxWidth) {
+        table.setColumnSizing((prev) => ({
+          ...prev,
+          [columnId]: Math.max(
+            header.column.columnDef.minSize ?? 0,
+            Math.floor(maxWidth),
+          ),
+        }));
+      }
+    };
+
+    const cleanup = () => {
+      document.removeEventListener("mousemove", onMouseMove);
+      document.removeEventListener("mouseup", cleanup);
+    };
+
+    document.addEventListener("mousemove", onMouseMove);
+    document.addEventListener("mouseup", cleanup);
+  };
+
   return (
     <div
-      {...{
-        onMouseDown: header.getResizeHandler(),
-        onTouchStart: header.getResizeHandler(),
-        style: {
-          userSelect: "none",
-          touchAction: "none",
-        },
+      onMouseDown={handleMouseDown}
+      onTouchStart={resizeHandler}
+      style={{
+        userSelect: "none",
+        touchAction: "none",
       }}
       className={cn(
         "group absolute top-0 h-[var(--data-table-height,56px)] z-[5] flex cursor-ew-resize items-stretch transition-all",

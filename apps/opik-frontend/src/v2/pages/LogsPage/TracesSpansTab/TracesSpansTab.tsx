@@ -639,10 +639,22 @@ export const TracesSpansTab: React.FC<TracesSpansTabProps> = ({
     },
   );
 
+  const { data: existenceData } = useTracesOrSpansList(
+    {
+      projectId,
+      type: type as TRACE_DATA_TYPE,
+      page: 1,
+      size: 1,
+      logsSource: LOGS_SOURCE.sdk,
+    },
+    {
+      enabled: isTableDataEnabled,
+    },
+  );
+  const hasProjectData = (existenceData?.total ?? 0) > 0;
+
   const isTableLoading =
     isPending || isFeedbackScoresPending || isSpanFeedbackScoresPending;
-
-  const noData = !search && filters.length === 0;
 
   const handleClearFilters = useCallback(() => {
     setSearch("");
@@ -656,7 +668,7 @@ export const TracesSpansTab: React.FC<TracesSpansTabProps> = ({
   );
 
   const showEmptyState =
-    !isTableLoading && noData && rows.length === 0 && page === 1;
+    !isTableLoading && !hasProjectData && rows.length === 0 && page === 1;
 
   // Extract metadata paths directly from loaded traces/spans data
   const metadataPaths = useMemo(() => {
@@ -1336,7 +1348,13 @@ export const TracesSpansTab: React.FC<TracesSpansTabProps> = ({
           rowHeight={height as ROW_HEIGHT}
           columnPinning={DEFAULT_TRACES_COLUMN_PINNING}
           noData={
-            <DataTableNoMatchingData onClearFilters={handleClearFilters} />
+            <DataTableNoMatchingData
+              onClearFilters={
+                search || filters.length > 0
+                  ? handleClearFilters
+                  : undefined
+              }
+            />
           }
           TableWrapper={PageBodyStickyTableWrapper}
           stickyHeader

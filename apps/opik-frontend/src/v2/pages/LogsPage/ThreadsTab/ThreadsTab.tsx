@@ -47,7 +47,7 @@ import { Separator } from "@/ui/separator";
 import DataTableRowHeightSelector from "@/shared/DataTableRowHeightSelector/DataTableRowHeightSelector";
 import ColumnsButton from "@/shared/ColumnsButton/ColumnsButton";
 import DataTable from "@/shared/DataTable/DataTable";
-import DataTableNoData from "@/shared/DataTableNoData/DataTableNoData";
+import DataTableNoMatchingData from "@/shared/DataTableNoData/DataTableNoMatchingData";
 import DataTablePagination from "@/shared/DataTablePagination/DataTablePagination";
 import IdCell from "@/shared/DataTableCells/IdCell";
 import DurationCell from "@/shared/DataTableCells/DurationCell";
@@ -434,8 +434,24 @@ export const ThreadsTab: React.FC<ThreadsTabProps> = ({
     },
   );
 
-  const noData = !search && filters.length === 0;
-  const noDataText = noData ? `There are no threads yet` : "No search results";
+  const { data: existenceData } = useThreadList(
+    {
+      projectId,
+      page: 1,
+      size: 1,
+      logsSource: LOGS_SOURCE.sdk,
+    },
+    {
+      enabled: isTableDataEnabled,
+    },
+  );
+  const hasProjectData = (existenceData?.total ?? 0) > 0;
+
+  const handleClearFilters = useCallback(() => {
+    setSearch("");
+    setFilters([]);
+    setPage(1);
+  }, [setSearch, setFilters, setPage]);
 
   const filtersConfig = useMemo(
     () => ({
@@ -640,7 +656,7 @@ export const ThreadsTab: React.FC<ThreadsTabProps> = ({
 
   const isTableLoading = isPending || isFeedbackScoresNamesPending;
   const showEmptyState =
-    !isTableLoading && noData && rows.length === 0 && page === 1;
+    !isTableLoading && !hasProjectData && rows.length === 0 && page === 1;
 
   return (
     <>
@@ -751,7 +767,15 @@ export const ThreadsTab: React.FC<ThreadsTabProps> = ({
           getRowId={getRowId}
           rowHeight={height as ROW_HEIGHT}
           columnPinning={DEFAULT_COLUMN_PINNING}
-          noData={<DataTableNoData title={noDataText} />}
+          noData={
+            <DataTableNoMatchingData
+              onClearFilters={
+                search || filters.length > 0
+                  ? handleClearFilters
+                  : undefined
+              }
+            />
+          }
           TableWrapper={PageBodyStickyTableWrapper}
           stickyHeader
           meta={meta}

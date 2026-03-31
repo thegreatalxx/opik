@@ -45,7 +45,7 @@ export const TAG_SIZE_MAP: Record<ROW_HEIGHT, "default" | "md"> = {
 
 export const FEEDBACK_SCORE_TAG_SIZE_MAP: Record<ROW_HEIGHT, "sm" | "md"> = {
   [ROW_HEIGHT.small]: "sm",
-  [ROW_HEIGHT.medium]: "md",
+  [ROW_HEIGHT.medium]: "sm",
   [ROW_HEIGHT.large]: "md",
 };
 

@@ -7,6 +7,7 @@ interface TagListTooltipContentProps {
   tags: string[];
   maxDisplayCount?: number;
   variant?: ColoredTagProps["variant"];
+  size?: ColoredTagProps["size"];
   hint?: string;
 }
 
@@ -14,6 +15,7 @@ const TagListTooltipContent: React.FC<TagListTooltipContentProps> = ({
   tags,
   maxDisplayCount = 50,
   variant,
+  size = "sm",
   hint,
 }) => {
   const { visibleItems, hasMoreItems, remainingCount } = useVisibleTags(
@@ -27,7 +29,7 @@ const TagListTooltipContent: React.FC<TagListTooltipContentProps> = ({
         <ColoredTag
           key={`${tag}-${index}`}
           label={tag}
-          size="sm"
+          size={size}
           variant={variant}
         />
       ))}

@@ -4,6 +4,7 @@ import slugify from "slugify";
 import { cn } from "@/lib/utils";
 
 import { Button } from "@/ui/button";
+import { Separator } from "@/ui/separator";
 import { Thread } from "@/types/traces";
 import useThreadBatchDeleteMutation from "@/api/traces/useThreadBatchDeleteMutation";
 import ConfirmDialog from "@/shared/ConfirmDialog/ConfirmDialog";
@@ -131,10 +132,11 @@ const ThreadsActionsPanel: React.FunctionComponent<
           resetKeyRef.current = resetKeyRef.current + 1;
         }}
       />
-      <div
+      <Separator
+        orientation="vertical"
         className={cn(
-          "mx-1 h-4 w-px shrink-0",
-          buttonVariant === "ghostInverted" ? "bg-white" : "bg-border",
+          "mx-1 h-4 opacity-50",
+          buttonVariant === "ghostInverted" && "bg-white",
         )}
       />
       <ExportToButton

@@ -252,7 +252,7 @@ export const generateSelectColumDef = <TData,>(meta?: {
       );
     },
     meta,
-    size: 50,
+    size: 56,
     enableResizing: false,
     enableSorting: false,
     enableHiding: false,
