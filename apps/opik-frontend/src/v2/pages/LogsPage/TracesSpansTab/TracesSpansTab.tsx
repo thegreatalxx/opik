@@ -19,7 +19,7 @@ import isArray from "lodash/isArray";
 import get from "lodash/get";
 import uniq from "lodash/uniq";
 import { useMetricDateRangeWithQueryAndStorage } from "@/v2/pages-shared/traces/MetricDateRangeSelect";
-import TimeRangeToggle from "@/shared/TimeRangeToggle/TimeRangeToggle";
+import MetricDateRangeSelect from "@/v2/pages-shared/traces/MetricDateRangeSelect/MetricDateRangeSelect";
 
 import useTracesOrSpansList, {
   TRACE_DATA_TYPE,
@@ -1238,7 +1238,7 @@ export const TracesSpansTab: React.FC<TracesSpansTabProps> = ({
           <LogsTypeToggle value={logsType} onValueChange={onLogsTypeChange} />
         </div>
         <div className="flex items-center gap-2">
-          <TimeRangeToggle
+          <MetricDateRangeSelect
             value={dateRange}
             onChangeValue={handleDateRangeChange}
             minDate={minDate}

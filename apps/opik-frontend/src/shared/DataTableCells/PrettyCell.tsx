@@ -6,7 +6,6 @@ import CellWrapper from "@/shared/DataTableCells/CellWrapper";
 import CellTooltipWrapper from "@/shared/DataTableCells/CellTooltipWrapper";
 import LinkifyText from "@/shared/LinkifyText/LinkifyText";
 import { prettifyMessage } from "@/lib/traces";
-import { cn } from "@/lib/utils";
 import useLocalStorageState from "use-local-storage-state";
 import { useTruncationEnabled } from "@/contexts/server-sync-provider";
 
@@ -28,29 +27,23 @@ const PrettyCell = <TData,>(context: CellContext<TData, string | object>) => {
     {}) as CustomMeta;
   const value = context.getValue() as string | object | undefined | null;
 
-  const { displayMessage, isMonospace } = useMemo(() => {
-    if (!value) return { displayMessage: "-", isMonospace: false };
+  const displayMessage = useMemo(() => {
+    if (!value) return "-";
 
     const pretty = prettifyMessage(value, { type: fieldType });
 
     let message: string;
-    let mono: boolean;
     if (isObject(pretty.message)) {
       message = JSON.stringify(value, null, 2);
-      mono = true;
     } else {
       message = pretty.message || "";
-      mono = !pretty.prettified;
     }
 
     if (truncationEnabled && message.length > maxDataLength) {
-      return {
-        displayMessage: message.slice(0, maxDataLength) + " [truncated]",
-        isMonospace: mono,
-      };
+      return message.slice(0, maxDataLength) + " [truncated]";
     }
 
-    return { displayMessage: message, isMonospace: mono };
+    return message;
   }, [value, fieldType, truncationEnabled, maxDataLength]);
 
   const rowHeight =
@@ -64,7 +57,7 @@ const PrettyCell = <TData,>(context: CellContext<TData, string | object>) => {
     if (isTruncated) {
       return (
         <CellTooltipWrapper content={displayMessage}>
-          <span className={cn(isMonospace && "comet-code", "truncate")}>
+          <span className="comet-code truncate">
             <LinkifyText>{displayMessage}</LinkifyText>
           </span>
         </CellTooltipWrapper>
@@ -72,11 +65,11 @@ const PrettyCell = <TData,>(context: CellContext<TData, string | object>) => {
     }
 
     return (
-      <div className={cn(isMonospace && "comet-code", "size-full overflow-y-auto whitespace-pre-wrap break-words")}>
+      <div className="comet-code size-full overflow-y-auto whitespace-pre-wrap break-words">
         <LinkifyText>{displayMessage}</LinkifyText>
       </div>
     );
-  }, [isTruncated, displayMessage, isMonospace]);
+  }, [isTruncated, displayMessage]);
 
   const indicatorColor = colorIndicator
     ? fieldType === "input"

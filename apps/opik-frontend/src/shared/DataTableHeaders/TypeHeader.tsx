@@ -11,12 +11,11 @@ const TypeHeader = <TData,>(context: HeaderContext<TData, unknown>) => {
   const { column } = context;
   const { header, headerCheckbox, explainer } = column.columnDef.meta ?? {};
 
-  const { className, onClickHandler, renderSort, isSorted } = useSortableHeader(
-    {
+  const { className, onClickHandler, renderSort, isSorted, isSortable } =
+    useSortableHeader({
       column,
       withSeparator: Boolean(explainer),
-    },
-  );
+    });
 
   const textRef = useRef<HTMLSpanElement>(null);
   const [isTruncated, setIsTruncated] = useState(false);
@@ -53,13 +52,21 @@ const TypeHeader = <TData,>(context: HeaderContext<TData, unknown>) => {
       <TooltipWrapper content={isTruncated ? header : null}>
         <span
           ref={textRef}
-          className={cn("truncate", isSorted && "text-foreground-secondary")}
+          className={cn(
+            "truncate",
+            isSortable && isSorted && "text-foreground-secondary",
+          )}
           onMouseEnter={checkTruncation}
         >
           {header}
         </span>
       </TooltipWrapper>
-      {explainer && <ExplainerIcon {...explainer} />}
+      {explainer && (
+        <ExplainerIcon
+          {...explainer}
+          className={cn(isSortable && isSorted && "text-foreground-secondary")}
+        />
+      )}
       {renderSort()}
     </HeaderWrapper>
   );

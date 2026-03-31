@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { useObserveResizeNode } from "@/hooks/useObserveResizeNode";
 import { STICKY_ATTRIBUTE_VERTICAL } from "@/shared/PageBodyStickyContainer/PageBodyStickyContainer";
@@ -48,6 +48,40 @@ const PageBodyScrollContainer: React.FC<PageBodyScrollContainerProps> = ({
       setTableOffset(tableOffset);
     }
   }, [scrollContainer]);
+
+  const rafId = useRef(0);
+  const prevStuck = useRef(false);
+  const prevScrolledRight = useRef(false);
+
+  useEffect(() => {
+    if (!scrollContainer) return;
+
+    const handleScroll = () => {
+      cancelAnimationFrame(rafId.current);
+      rafId.current = requestAnimationFrame(() => {
+        const isStuck = scrollContainer.scrollTop > tableOffset;
+        const isScrolledRight = scrollContainer.scrollLeft > 0;
+
+        if (isStuck !== prevStuck.current) {
+          prevStuck.current = isStuck;
+          scrollContainer.toggleAttribute("data-header-stuck", isStuck);
+        }
+        if (isScrolledRight !== prevScrolledRight.current) {
+          prevScrolledRight.current = isScrolledRight;
+          scrollContainer.toggleAttribute(
+            "data-scrolled-right",
+            isScrolledRight,
+          );
+        }
+      });
+    };
+
+    scrollContainer.addEventListener("scroll", handleScroll, { passive: true });
+    return () => {
+      cancelAnimationFrame(rafId.current);
+      scrollContainer.removeEventListener("scroll", handleScroll);
+    };
+  }, [scrollContainer, tableOffset]);
 
   const style =
     width > 0

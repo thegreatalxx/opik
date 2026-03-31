@@ -17,7 +17,7 @@ import findIndex from "lodash/findIndex";
 import isNumber from "lodash/isNumber";
 import get from "lodash/get";
 import { useMetricDateRangeWithQueryAndStorage } from "@/v2/pages-shared/traces/MetricDateRangeSelect";
-import TimeRangeToggle from "@/shared/TimeRangeToggle/TimeRangeToggle";
+import MetricDateRangeSelect from "@/v2/pages-shared/traces/MetricDateRangeSelect/MetricDateRangeSelect";
 
 import {
   COLUMN_COMMENTS_ID,
@@ -669,7 +669,7 @@ export const ThreadsTab: React.FC<ThreadsTabProps> = ({
           <LogsTypeToggle value={logsType} onValueChange={onLogsTypeChange} />
         </div>
         <div className="flex items-center gap-2">
-          <TimeRangeToggle
+          <MetricDateRangeSelect
             value={dateRange}
             onChangeValue={handleDateRangeChange}
             minDate={minDate}

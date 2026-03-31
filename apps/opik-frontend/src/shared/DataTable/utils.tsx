@@ -207,7 +207,7 @@ export const generateSelectColumDef = <TData,>(meta?: {
         metadata={context.column.columnDef.meta}
         tableMetadata={context.table.options.meta}
         supportStatistic={false}
-        className="justify-center !px-0"
+        className="!pl-3 !pr-0"
       >
         <Checkbox
           variant="muted"
@@ -233,7 +233,7 @@ export const generateSelectColumDef = <TData,>(meta?: {
         <CellWrapper
           metadata={context.column.columnDef.meta}
           tableMetadata={context.table.options.meta}
-          className={cn("justify-center py-3.5 !px-0", additionalClassName)}
+          className={cn("py-3.5 !pl-3 !pr-0", additionalClassName)}
           stopClickPropagation
         >
           <Checkbox
