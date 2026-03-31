@@ -1254,9 +1254,7 @@ export const TracesSpansTab: React.FC<TracesSpansTabProps> = ({
       >
         <MetricsSummary
           projectId={projectId}
-          entityType={
-            type === TRACE_DATA_TYPE.traces ? "traces" : "spans"
-          }
+          entityType={type === TRACE_DATA_TYPE.traces ? "traces" : "spans"}
           countLabel={type === TRACE_DATA_TYPE.traces ? "Traces" : "Spans"}
           filters={filters}
           intervalStart={intervalStart}

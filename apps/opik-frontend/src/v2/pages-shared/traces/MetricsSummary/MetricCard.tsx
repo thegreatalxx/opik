@@ -10,8 +10,7 @@ const computePercentageChange = (
   if (current === null && previous === null) return undefined;
   const c = current ?? 0;
   const p = previous ?? 0;
-  if (p === 0)
-    return c === 0 ? 0 : c > 0 ? Infinity : -Infinity;
+  if (p === 0) return c === 0 ? 0 : c > 0 ? Infinity : -Infinity;
   if (c === 0) return -100;
   return ((c - p) / p) * 100;
 };
@@ -54,7 +53,9 @@ const MetricCard: React.FC<MetricCardProps> = ({
     const isBetter = trend === "direct" ? isUp : !isUp;
     const ChangeIcon = isUp ? ArrowUp : ArrowDown;
     const colorClass = selected
-      ? (isBetter ? "text-primary" : "text-chart-red")
+      ? isBetter
+        ? "text-primary"
+        : "text-chart-red"
       : "text-muted-slate";
     return (
       <span

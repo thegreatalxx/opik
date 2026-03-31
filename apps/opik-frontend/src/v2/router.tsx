@@ -52,7 +52,6 @@ import EvaluationSuiteItemsPage from "@/v2/pages/EvaluationSuiteItemsPage/Evalua
 import ProjectHomePage from "@/v2/pages/ProjectHomePage/ProjectHomePage";
 import TracesTabRedirect from "@/v2/redirect/TracesTabRedirect";
 import InsightsPage from "@/v2/pages/InsightsPage/InsightsPage";
-import KpiCardsTestPage from "@/v2/pages/KpiCardsTestPage";
 
 const TanStackRouterDevtools =
   process.env.NODE_ENV === "production"
@@ -518,13 +517,6 @@ const automationLogsRoute = createRoute({
   component: AutomationLogsPage,
 });
 
-// ----------- KPI cards test (temporary)
-const kpiCardsTestRoute = createRoute({
-  path: "/$workspaceName/kpi-cards-test",
-  getParentRoute: () => workspaceGuardRoute,
-  component: KpiCardsTestPage,
-});
-
 // ═══════════════════════════════════════════════════════════════
 // V1 COMPAT REDIRECTS
 // ═══════════════════════════════════════════════════════════════
@@ -542,7 +534,6 @@ const routeTree = rootRoute.addChildren([
     getStartedRoute,
   ]),
   workspaceGuardSMELayoutRoute.addChildren([homeSMERoute]),
-  kpiCardsTestRoute,
   workspaceGuardRoute.addChildren([
     baseRoute,
     homeRoute,
