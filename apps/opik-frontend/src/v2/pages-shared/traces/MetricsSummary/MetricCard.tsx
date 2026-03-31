@@ -56,10 +56,6 @@ const MetricCard: React.FC<MetricCardProps> = ({
     const colorClass = selected
       ? (isBetter ? "text-primary" : "text-chart-red")
       : "text-muted-slate";
-    const displayValue = isFinite(percentage)
-      ? `${Math.abs(percentage).toFixed(1)}%`
-      : "";
-
     return (
       <span
         className={cn(
@@ -68,7 +64,7 @@ const MetricCard: React.FC<MetricCardProps> = ({
         )}
       >
         <ChangeIcon className="size-3" />
-        {displayValue}
+        {`${Math.abs(percentage).toFixed(1)}%`}
       </span>
     );
   };
