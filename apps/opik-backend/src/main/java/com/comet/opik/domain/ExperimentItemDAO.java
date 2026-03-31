@@ -408,7 +408,7 @@ class ExperimentItemDAO {
                       ei.last_updated_by AS last_updated_by,
                       ei.visibility_mode AS trace_visibility_mode,
                       ei.execution_policy,
-                      '' AS assertions_array
+                      ei.assertions_array AS assertions_array
                   FROM experiment_item_aggregates_final AS ei
                   <endif>
 
@@ -611,7 +611,8 @@ class ExperimentItemDAO {
         return makeMonoContextAware((userName, workspaceId) -> {
             List<QueryItem> queryItems = getQueryItemPlaceHolder(experimentItems.size());
 
-            var template = getSTWithLogComment(INSERT, "insert_experiment_items", workspaceId, experimentItems.size())
+            var template = getSTWithLogComment(INSERT, "insert_experiment_items", workspaceId, userName,
+                    experimentItems.size())
                     .add("items", queryItems);
 
             String sql = template.render();
@@ -716,7 +717,7 @@ class ExperimentItemDAO {
                 experimentIds.size(), limit, lastRetrievedId);
 
         return makeFluxContextAware((userName, workspaceId) -> {
-            var template = getSTWithLogComment(STREAM, "get_experiment_items_stream", workspaceId,
+            var template = getSTWithLogComment(STREAM, "get_experiment_items_stream", workspaceId, userName,
                     experimentIds.size());
             if (lastRetrievedId != null) {
                 template.add("lastRetrievedId", lastRetrievedId);
