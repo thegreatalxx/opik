@@ -3,8 +3,7 @@ import CellWrapper from "@/shared/DataTableCells/CellWrapper";
 import { BaseTraceDataErrorInfo } from "@/types/traces";
 import CellTooltipWrapper from "./CellTooltipWrapper";
 import { Tag } from "@/ui/tag";
-import { ROW_HEIGHT } from "@/types/shared";
-import { TAG_SIZE_MAP } from "@/constants/shared";
+import { getCellTagSize, TAG_SIZE_MAP } from "@/constants/shared";
 import { TriangleAlert } from "lucide-react";
 
 const ErrorCell = <TData,>(
@@ -14,8 +13,7 @@ const ErrorCell = <TData,>(
 
   if (!value) return null;
 
-  const rowHeight = context.table.options.meta?.rowHeight ?? ROW_HEIGHT.small;
-  const tagSize = TAG_SIZE_MAP[rowHeight];
+  const tagSize = getCellTagSize(context, TAG_SIZE_MAP);
 
   const errorMessage = value.message
     ? `Message: ${value.message}`

@@ -2,8 +2,7 @@ import { CellContext } from "@tanstack/react-table";
 import ColoredTag from "@/shared/ColoredTag/ColoredTag";
 import { Tag, TagProps } from "@/ui/tag";
 import CellWrapper from "@/shared/DataTableCells/CellWrapper";
-import { ROW_HEIGHT } from "@/types/shared";
-import { TAG_SIZE_MAP } from "@/constants/shared";
+import { getCellTagSize, TAG_SIZE_MAP } from "@/constants/shared";
 
 type CustomMeta = {
   colored?: boolean;
@@ -15,8 +14,7 @@ const TagCell = (context: CellContext<unknown, string>) => {
   const { colored = true, variantMap } = (custom ?? {}) as CustomMeta;
   const value = context.getValue();
   const fixedVariant = variantMap?.[value];
-  const rowHeight = context.table.options.meta?.rowHeight ?? ROW_HEIGHT.small;
-  const tagSize = TAG_SIZE_MAP[rowHeight];
+  const tagSize = getCellTagSize(context, TAG_SIZE_MAP);
 
   return (
     <CellWrapper

@@ -3,8 +3,7 @@ import { CellContext } from "@tanstack/react-table";
 import { GitCommitVertical } from "lucide-react";
 import { Tag } from "@/ui/tag";
 import CellWrapper from "@/shared/DataTableCells/CellWrapper";
-import { ROW_HEIGHT } from "@/types/shared";
-import { TAG_SIZE_MAP } from "@/constants/shared";
+import { getCellTagSize, TAG_SIZE_MAP } from "@/constants/shared";
 
 const DatasetVersionCell = (context: CellContext<unknown, string>) => {
   const value = context.getValue();
@@ -13,8 +12,7 @@ const DatasetVersionCell = (context: CellContext<unknown, string>) => {
     return null;
   }
 
-  const rowHeight = context.table.options.meta?.rowHeight ?? ROW_HEIGHT.small;
-  const tagSize = TAG_SIZE_MAP[rowHeight];
+  const tagSize = getCellTagSize(context, TAG_SIZE_MAP);
 
   return (
     <CellWrapper

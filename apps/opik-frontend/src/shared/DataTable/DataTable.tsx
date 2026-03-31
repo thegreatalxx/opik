@@ -41,6 +41,7 @@ import {
 } from "@/types/shared";
 import {
   calculateHeightStyle,
+  computePinnedColumnIds,
   getCommonPinningClasses,
   getCommonPinningStyles,
 } from "@/shared/DataTable/utils";
@@ -231,6 +232,8 @@ const DataTable = <TData, TValue>({
   });
 
   const rowClickWrapper = useCustomRowClick();
+  const { lastLeftPinnedColumnId, lastRightPinnedColumnId } =
+    computePinnedColumnIds(table);
   const columnSizing = table.getState().columnSizing;
   const headers = table.getFlatHeaders();
 
@@ -316,7 +319,7 @@ const DataTable = <TData, TValue>({
     const pinningStyles = getCommonPinningStyles({
       column: cell.column,
       applyStickyWorkaround: stickyBorderWorkaround,
-      table,
+      lastRightPinnedColumnId,
     });
 
     if (cell.getIsGrouped()) {
@@ -328,12 +331,12 @@ const DataTable = <TData, TValue>({
             column: cell.column,
             applyStickyWorkaround: stickyBorderWorkaround,
             forceGroup: true,
-            table,
+            lastRightPinnedColumnId,
           })}
           className={getCommonPinningClasses({
             column: cell.column,
-            table,
             forceGroup: true,
+            lastLeftPinnedColumnId,
           })}
         >
           {flexRender(cell.column.columnDef.cell, cell.getContext())}
@@ -364,7 +367,7 @@ const DataTable = <TData, TValue>({
           key={cell.id}
           data-cell-id={cell.id}
           style={pinningStyles}
-          className={getCommonPinningClasses({ column: cell.column, table })}
+          className={getCommonPinningClasses({ column: cell.column, lastLeftPinnedColumnId })}
         />
       );
     }
@@ -374,7 +377,7 @@ const DataTable = <TData, TValue>({
         key={cell.id}
         data-cell-id={cell.id}
         style={pinningStyles}
-        className={getCommonPinningClasses({ column: cell.column, table })}
+        className={getCommonPinningClasses({ column: cell.column, lastLeftPinnedColumnId })}
       >
         {flexRender(cell.column.columnDef.cell, cell.getContext())}
       </TableCell>
@@ -442,13 +445,13 @@ const DataTable = <TData, TValue>({
                               column: header.column,
                               isHeader: true,
                               isLastHeaderRow: isLastRow,
-                              table,
+                              lastRightPinnedColumnId,
                             }),
                           }}
                           className={getCommonPinningClasses({
                             column: header.column,
-                            table,
                             isHeader: true,
+                            lastLeftPinnedColumnId,
                           })}
                           colSpan={header.colSpan}
                         >
