@@ -1,5 +1,6 @@
 import React, { useMemo, useState, useCallback } from "react";
 import { Braces, AlertTriangle, Clock, Coins, LucideIcon } from "lucide-react";
+import { ValueType } from "recharts/types/component/DefaultTooltipContent";
 
 import { cn } from "@/lib/utils";
 import { formatDuration } from "@/lib/date";
@@ -21,7 +22,6 @@ import {
   costYTickFormatter,
   renderCostTooltipValue,
 } from "@/v2/pages-shared/dashboards/widgets/ProjectMetricsWidget/chartUtils";
-import { ValueType } from "recharts/types/component/DefaultTooltipContent";
 import { ChartTooltipRenderValueArguments } from "@/shared/Charts/ChartTooltipContent/ChartTooltipContent";
 import {
   calculateIntervalType,
@@ -288,7 +288,7 @@ const MetricsSummary: React.FC<MetricsSummaryProps> = ({
         })}
       </div>
       <div
-        className="rounded-b-md border border-t-0 bg-white p-4"
+        className="rounded-b-md border border-t-0 bg-background p-4"
         style={{ "--chart-height": "80px" } as React.CSSProperties}
       >
         {showData ? (

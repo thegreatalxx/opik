@@ -178,9 +178,7 @@ const MetricContainerChart = ({
     if (isPending) return false;
     if (data.length === 0) return true;
 
-    return data.every((record) =>
-      lines.every((line) => isNil(record[line]) || record[line] === 0),
-    );
+    return data.every((record) => lines.every((line) => isNil(record[line])));
   }, [data, lines, isPending]);
 
   const config = useChartConfig(lines, labelsMap, colorMap ?? customColorMap);

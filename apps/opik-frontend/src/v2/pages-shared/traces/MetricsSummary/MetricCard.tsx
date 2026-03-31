@@ -74,7 +74,9 @@ const MetricCard: React.FC<MetricCardProps> = ({
     <div
       className={cn(
         "flex h-11 cursor-pointer items-center justify-between border px-4 transition-colors [&:not(:last-child)]:-mr-px",
-        selected ? "bg-white" : "bg-[#FCFCFD] hover:bg-white",
+        selected
+          ? "bg-background"
+          : "bg-soft-background hover:bg-background",
         className,
       )}
       onClick={onClick}
