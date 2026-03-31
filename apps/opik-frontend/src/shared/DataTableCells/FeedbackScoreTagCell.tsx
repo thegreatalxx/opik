@@ -3,7 +3,10 @@ import { CellContext } from "@tanstack/react-table";
 import isObject from "lodash/isObject";
 
 import { TraceFeedbackScore } from "@/types/traces";
-import { getCellTagSize, FEEDBACK_SCORE_TAG_SIZE_MAP } from "@/constants/shared";
+import {
+  getCellTagSize,
+  FEEDBACK_SCORE_TAG_SIZE_MAP,
+} from "@/constants/shared";
 import CellWrapper from "@/shared/DataTableCells/CellWrapper";
 import FeedbackScoreTag from "@/shared/FeedbackScoreTag/FeedbackScoreTag";
 

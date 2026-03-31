@@ -367,7 +367,10 @@ const DataTable = <TData, TValue>({
           key={cell.id}
           data-cell-id={cell.id}
           style={pinningStyles}
-          className={getCommonPinningClasses({ column: cell.column, lastLeftPinnedColumnId })}
+          className={getCommonPinningClasses({
+            column: cell.column,
+            lastLeftPinnedColumnId,
+          })}
         />
       );
     }
@@ -377,7 +380,10 @@ const DataTable = <TData, TValue>({
         key={cell.id}
         data-cell-id={cell.id}
         style={pinningStyles}
-        className={getCommonPinningClasses({ column: cell.column, lastLeftPinnedColumnId })}
+        className={getCommonPinningClasses({
+          column: cell.column,
+          lastLeftPinnedColumnId,
+        })}
       >
         {flexRender(cell.column.columnDef.cell, cell.getContext())}
       </TableCell>

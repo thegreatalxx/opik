@@ -11,7 +11,6 @@ import {
 import { ChevronDown, ChevronUp } from "lucide-react";
 import isString from "lodash/isString";
 import get from "lodash/get";
-import last from "lodash/last";
 
 import { Checkbox } from "@/ui/checkbox";
 import { Button } from "@/ui/button";
