@@ -21,10 +21,11 @@ const FeedbackScoreHeader = <TData,>(
   const effectiveColorKey = scoreName ?? header ?? "";
   const color = getColor(effectiveColorKey, colorMap);
 
-  const { className, onClickHandler, renderSort, isSorted } =
-    useSortableHeader({
+  const { className, onClickHandler, renderSort, isSorted } = useSortableHeader(
+    {
       column,
-    });
+    },
+  );
 
   const formattedScore =
     scoreValue !== undefined ? formatScoreDisplay(scoreValue) : null;
@@ -45,7 +46,9 @@ const FeedbackScoreHeader = <TData,>(
       />
       {header ? (
         <TooltipWrapper content={header} side="top">
-          <span className={cn("truncate", isSorted && "text-foreground-secondary")}>
+          <span
+            className={cn("truncate", isSorted && "text-foreground-secondary")}
+          >
             {header}
           </span>
         </TooltipWrapper>

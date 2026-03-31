@@ -11,11 +11,12 @@ const TypeHeader = <TData,>(context: HeaderContext<TData, unknown>) => {
   const { column } = context;
   const { header, headerCheckbox, explainer } = column.columnDef.meta ?? {};
 
-  const { className, onClickHandler, renderSort, isSorted } =
-    useSortableHeader({
+  const { className, onClickHandler, renderSort, isSorted } = useSortableHeader(
+    {
       column,
       withSeparator: Boolean(explainer),
-    });
+    },
+  );
 
   const textRef = useRef<HTMLSpanElement>(null);
   const [isTruncated, setIsTruncated] = useState(false);
