@@ -19,7 +19,7 @@ type AgentConfigurationEditViewProps = {
   item: ConfigHistoryItem;
   projectId: string;
   onCancel: () => void;
-  onSaved: () => void;
+  onSaved: (maskId: string) => void;
 };
 
 const AgentConfigurationEditView: React.FC<AgentConfigurationEditViewProps> = ({

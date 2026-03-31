@@ -9,12 +9,14 @@ type AgentRunnerConfigEditorProps = {
   item: ConfigHistoryItem;
   projectId: string;
   onClose: () => void;
+  onMaskSaved: (maskId: string) => void;
 };
 
 const AgentRunnerConfigEditor: React.FC<AgentRunnerConfigEditorProps> = ({
   item,
   projectId,
   onClose,
+  onMaskSaved,
 }) => {
   return (
     <div>
@@ -27,7 +29,10 @@ const AgentRunnerConfigEditor: React.FC<AgentRunnerConfigEditorProps> = ({
         item={item}
         projectId={projectId}
         onCancel={onClose}
-        onSaved={onClose}
+        onSaved={(maskId) => {
+          onMaskSaved(maskId);
+          onClose();
+        }}
       />
     </div>
   );

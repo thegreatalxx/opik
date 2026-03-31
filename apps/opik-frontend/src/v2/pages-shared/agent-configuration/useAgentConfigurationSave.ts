@@ -39,7 +39,7 @@ type UseAgentConfigurationSaveParams = {
   originalValues: React.RefObject<Record<string, string>>;
   description: string;
   projectId: string;
-  onSaved: () => void;
+  onSaved: (maskId: string) => void;
 };
 
 export const useAgentConfigurationSave = ({
@@ -150,12 +150,16 @@ export const useAgentConfigurationSave = ({
           project_id: projectId,
           blueprint: {
             description: description || undefined,
-            type: BlueprintType.BLUEPRINT,
+            type: BlueprintType.MASK,
             values,
           },
         },
       },
-      { onSuccess: onSaved },
+      {
+        onSuccess: (data) => {
+          if (data.id) onSaved(data.id);
+        },
+      },
     );
   }, [
     agentConfig,

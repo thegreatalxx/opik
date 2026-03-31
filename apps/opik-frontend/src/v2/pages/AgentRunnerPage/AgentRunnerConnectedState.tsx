@@ -22,6 +22,7 @@ const AgentRunnerConnectedState: React.FC<AgentRunnerConnectedStateProps> = ({
   result,
 }) => {
   const [activeTab, setActiveTab] = useState("input");
+  const [maskId, setMaskId] = useState<string | undefined>();
 
   const { data: configData } = useConfigHistoryListInfinite({ projectId });
   const latestConfig = configData?.pages?.[0]?.content?.[0];
@@ -49,6 +50,7 @@ const AgentRunnerConnectedState: React.FC<AgentRunnerConnectedStateProps> = ({
             fields={inputFields}
             onSubmit={onRun}
             isRunning={isRunning}
+            maskId={maskId}
           />
         </TabsContent>
 
@@ -64,6 +66,7 @@ const AgentRunnerConnectedState: React.FC<AgentRunnerConnectedStateProps> = ({
                 item={latestConfig}
                 projectId={projectId}
                 onClose={() => setActiveTab("input")}
+                onMaskSaved={setMaskId}
               />
             </div>
           ) : (

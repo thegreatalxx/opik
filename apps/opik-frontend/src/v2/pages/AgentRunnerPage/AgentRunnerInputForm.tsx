@@ -53,12 +53,14 @@ type AgentRunnerInputFormProps = {
   fields: AgentParam[];
   onSubmit: (inputs: Record<string, unknown>, maskId?: string) => void;
   isRunning: boolean;
+  maskId?: string;
 };
 
 const AgentRunnerInputForm: React.FC<AgentRunnerInputFormProps> = ({
   fields,
   onSubmit,
   isRunning,
+  maskId,
 }) => {
   const { register, handleSubmit, setValue, watch } = useForm({
     defaultValues: fields.reduce(
@@ -76,7 +78,7 @@ const AgentRunnerInputForm: React.FC<AgentRunnerInputFormProps> = ({
       const value = data[field.name];
       inputs[field.name] = coerceValue(value, field.type);
     }
-    onSubmit(inputs);
+    onSubmit(inputs, maskId);
   });
 
   return (
