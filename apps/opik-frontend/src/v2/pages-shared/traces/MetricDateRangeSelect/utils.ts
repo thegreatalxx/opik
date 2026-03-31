@@ -99,14 +99,10 @@ export const calculateIntervalStartAndEnd = (
   let startTime: dayjs.Dayjs;
 
   if (isEndDateToday) {
+    endTime = dayjs().utc();
     if (isPresetRange) {
-      endTime = undefined;
-      startTime = dayjs()
-        .utc()
-        .subtract(daysDiff || 1, "days")
-        .startOf(startOf);
+      startTime = endTime.subtract(daysDiff || 1, "days").startOf(startOf);
     } else {
-      endTime = dayjs().utc();
       startTime = endTime.subtract(daysDiff || 1, "days").startOf(startOf);
     }
   } else {
