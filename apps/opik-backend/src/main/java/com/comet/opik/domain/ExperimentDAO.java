@@ -83,7 +83,7 @@ import static java.util.stream.Collectors.toSet;
 @Singleton
 @RequiredArgsConstructor(onConstructor_ = @Inject)
 @Slf4j
-class ExperimentDAO {
+public class ExperimentDAO {
 
     /**
      * Common parameters for target project IDs query.
@@ -151,6 +151,13 @@ class ExperimentDAO {
             FilterStrategy.EXPERIMENT_SCORES_IS_EMPTY,
             FilterStrategy.EXPERIMENT_SCORES_AGGREGATED,
             FilterStrategy.EXPERIMENT_SCORES_AGGREGATED_IS_EMPTY);
+
+    private static final String HAS_VERSION1_EXPERIMENTS = """
+            SELECT 1 FROM experiments
+            WHERE workspace_id = :workspace_id AND project_id = ''
+            AND name NOT IN :demo_experiment_names
+            LIMIT 1
+            SETTINGS log_comment = '<log_comment>'""";
 
     /**
      * The query validates if already exists with this id. Failing if so.
@@ -1730,6 +1737,19 @@ class ExperimentDAO {
     private final @NonNull GroupingQueryBuilder groupingQueryBuilder;
     private final @NonNull ExperimentAggregatesDAO experimentAggregatesDAO;
 
+    public Mono<Boolean> hasVersion1Experiments(@NonNull String workspaceId,
+            @NonNull List<String> demoExperimentNames) {
+        var template = getSTWithLogComment(HAS_VERSION1_EXPERIMENTS,
+                "has_version1_experiments", workspaceId, "", demoExperimentNames);
+        return Mono.from(connectionFactory.create())
+                .flatMapMany(connection -> Flux.from(connection.createStatement(template.render())
+                        .bind("workspace_id", workspaceId)
+                        .bind("demo_experiment_names", demoExperimentNames.toArray(String[]::new))
+                        .execute())
+                        .flatMap(result -> Flux.from(result.map((row, metadata) -> true))))
+                .hasElements();
+    }
+
     @WithSpan
     Mono<Void> insert(@NonNull Experiment experiment, @NonNull String executionPolicyJson) {
         return Mono.from(connectionFactory.create())
@@ -1819,7 +1839,8 @@ class ExperimentDAO {
 
                     return Mono.from(connectionFactory.create())
                             .flatMapMany(connection -> makeFluxContextAware((userName, workspaceId) -> {
-                                var template = getSTWithLogComment(FIND, "get_experiment_by_id", workspaceId, "");
+                                var template = getSTWithLogComment(FIND, "get_experiment_by_id", workspaceId, userName,
+                                        "");
                                 template.add("id", id.toString());
                                 template.add("limit", limit);
                                 template.add("has_aggregated", hasAggregated);
@@ -1850,6 +1871,7 @@ class ExperimentDAO {
                     return Mono.from(connectionFactory.create())
                             .flatMapMany(connection -> makeFluxContextAware((userName, workspaceId) -> {
                                 var template = getSTWithLogComment(FIND, "get_experiments_by_ids", workspaceId,
+                                        userName,
                                         ids.size());
                                 template.add("ids_list", ids);
                                 template.add("has_aggregated", hasAggregated);
@@ -1868,7 +1890,7 @@ class ExperimentDAO {
         log.info("Getting experiment by '{}'", request);
         return Mono.from(connectionFactory.create())
                 .flatMapMany(connection -> makeFluxContextAware((userName, workspaceId) -> {
-                    var template = getSTWithLogComment(FIND, "get_experiments_stream", workspaceId, "");
+                    var template = getSTWithLogComment(FIND, "get_experiments_stream", workspaceId, userName, "");
                     template.add("name", request.name());
                     if (request.lastRetrievedId() != null) {
                         template.add("lastRetrievedId", request.lastRetrievedId());
@@ -2155,7 +2177,7 @@ class ExperimentDAO {
     }
 
     private ST newFindTemplate(String query, ExperimentSearchCriteria criteria, String queryName, String workspaceId) {
-        var template = getSTWithLogComment(query, queryName, workspaceId, "");
+        var template = getSTWithLogComment(query, queryName, workspaceId, "", "");
         Optional.ofNullable(criteria.datasetId())
                 .ifPresent(datasetId -> template.add("dataset_id", datasetId));
         Optional.ofNullable(criteria.name())
@@ -2249,7 +2271,7 @@ class ExperimentDAO {
     private Publisher<? extends Result> findByName(String name, UUID projectId, Connection connection) {
         return makeFluxContextAware((userName, workspaceId) -> {
             log.info("Finding experiment by name '{}'", name);
-            var template = getSTWithLogComment(FIND_BY_NAME, "find_experiments_by_name", workspaceId, "");
+            var template = getSTWithLogComment(FIND_BY_NAME, "find_experiments_by_name", workspaceId, userName, "");
             if (projectId != null) {
                 template.add("project_id", true);
             }
@@ -2368,7 +2390,7 @@ class ExperimentDAO {
         return Mono.from(connectionFactory.create())
                 .flatMapMany(connection -> makeFluxContextAware((userName, workspaceId) -> {
                     var template = getSTWithLogComment(FIND_EXPERIMENT_DATASET_ID_EXPERIMENT_IDS,
-                            "get_experiments_dataset_info", workspaceId, ids.size());
+                            "get_experiments_dataset_info", workspaceId, userName, ids.size());
                     template.add("experiment_ids", ids);
                     var statement = connection.createStatement(template.render())
                             .bind("experiment_ids", ids.toArray(UUID[]::new))
@@ -2384,7 +2406,7 @@ class ExperimentDAO {
         return Mono.from(connectionFactory.create())
                 .flatMapMany(connection -> makeFluxContextAware((userName, workspaceId) -> {
                     var template = getSTWithLogComment(FIND_EXPERIMENT_DATASET_ID_EXPERIMENT_IDS,
-                            "find_all_dataset_ids", workspaceId, "");
+                            "find_all_dataset_ids", workspaceId, userName, "");
 
                     bindFindAllDatasetIdsTemplateParams(criteria, template);
 
@@ -2495,7 +2517,7 @@ class ExperimentDAO {
     }
 
     private ST newGroupTemplate(String query, ExperimentGroupCriteria criteria, String queryName, String workspaceId) {
-        var template = getSTWithLogComment(query, queryName, workspaceId, "");
+        var template = getSTWithLogComment(query, queryName, workspaceId, "", "");
 
         ExperimentGroupMappers.applyGroupCriteriaToTemplate(template, criteria, filterQueryBuilder);
         groupingQueryBuilder.addGroupingTemplateParams(criteria.groups(), template);
@@ -2671,7 +2693,7 @@ class ExperimentDAO {
 
     private ST buildUpdateTemplate(ExperimentUpdate experimentUpdate, boolean mergeTags, String queryName,
             String workspaceId) {
-        var template = getSTWithLogComment(UPDATE, queryName, workspaceId, "");
+        var template = getSTWithLogComment(UPDATE, queryName, workspaceId, "", "");
 
         if (StringUtils.isNotBlank(experimentUpdate.name())) {
             template.add("name", experimentUpdate.name());

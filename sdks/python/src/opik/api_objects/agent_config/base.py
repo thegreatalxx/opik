@@ -3,7 +3,8 @@ import logging
 import typing
 
 from opik.exceptions import AgentConfigNotFound
-from . import type_helpers
+from opik.rest_api import core as rest_api_core
+from .. import type_helpers
 from . import cache as cache_mod
 from .context import get_active_config_mask
 
@@ -25,6 +26,7 @@ class _OpikState:
     project: typing.Optional[str] = None
     env: typing.Optional[str] = None
     mask_id: typing.Optional[str] = None
+    version: typing.Optional[str] = None
     manager: typing.Any = None
     blueprint_id: typing.Optional[str] = None
     blueprint_version: typing.Optional[str] = None
@@ -126,7 +128,9 @@ class AgentConfig:
     def _resolve_field(self, attr: str) -> typing.Any:
         state = self._state
         project = typing.cast(str, state.project)  # guarded by __getattribute__
-        instance_cache = cache_mod.get_cached_config(project, state.env, state.mask_id)
+        instance_cache = cache_mod.get_cached_config(
+            project, state.env, state.mask_id, state.version
+        )
         state.blueprint_id = instance_cache.blueprint_id
         state.blueprint_version = instance_cache.blueprint_version
         state.is_fallback = instance_cache.blueprint_id is None
@@ -162,11 +166,13 @@ class AgentConfig:
         if missing_locally:
             return False
 
-        for key, (py_type, value, _desc) in fields_with_values.items():
+        for key, (py_type, value, desc) in fields_with_values.items():
             bp_value = blueprint.get(key)
             local_ser = type_helpers.python_value_to_backend_value(value, py_type)
             bp_ser = type_helpers.python_value_to_backend_value(bp_value, py_type)
             if local_ser != bp_ser:
+                return False
+            if desc != blueprint.get_field_description(key):
                 return False
         return True
 
@@ -180,17 +186,37 @@ class AgentConfig:
 
         latest = manager.get_blueprint(field_types=field_types)
 
-        is_first_blueprint = latest is None
         if latest is not None and self._matches_blueprint(latest, fields_with_values):
             bp = latest
-        else:
-            bp = manager.create_blueprint(
+        elif latest is not None:
+            # There's another blueprint and the values don't match
+            bp = manager.update_blueprint(
                 fields_with_values=fields_with_values,
                 description=description,
                 field_types=field_types,
             )
-            if is_first_blueprint:
-                manager.tag_blueprint_with_env(env="prod", blueprint_id=bp.id)
+        else:
+            try:
+                bp = manager.create_blueprint(
+                    fields_with_values=fields_with_values,
+                    description=description,
+                    field_types=field_types,
+                )
+            except rest_api_core.ApiError as e:
+                if e.status_code != 409:
+                    raise
+                # A parallel caller created the config first — re-fetch and compare.
+                latest = manager.get_blueprint(field_types=field_types)
+                if latest is not None and self._matches_blueprint(
+                    latest, fields_with_values
+                ):
+                    bp = latest
+                else:
+                    bp = manager.update_blueprint(
+                        fields_with_values=fields_with_values,
+                        description=description,
+                        field_types=field_types,
+                    )
 
         self._state.manager = manager
         self._state.blueprint_id = bp.id
@@ -287,16 +313,31 @@ class AgentConfig:
                 exc_info=True,
             )
             cache_mod.init_cache_entry(
-                project_name, resolved_env, mask_id, field_types, manager
+                project_name,
+                resolved_env,
+                mask_id,
+                field_types,
+                manager,
+                version=version,
             )
             return fallback
 
         kwargs: typing.Dict[str, typing.Any] = {}
+        missing_keys = [
+            cf.prefixed_key
+            for cf in cls.__field_metadata__.values()
+            if cf.prefixed_key not in bp.keys()
+        ]
+        if missing_keys:
+            version_label = bp.name or bp.id or "unknown"
+            raise KeyError(
+                f"Agent config version {version_label!r} is missing expected field(s): "
+                f"{missing_keys}. The retrieved version does not contain all fields "
+                f"declared in {cls.__name__}. Publish a new config or "
+                f"use an existing one that includes the missing fields."
+            )
         for f_name, cf in cls.__field_metadata__.items():
-            if cf.prefixed_key in bp.keys():
-                kwargs[f_name] = bp[cf.prefixed_key]
-            else:
-                kwargs[f_name] = object.__getattribute__(fallback, f_name)
+            kwargs[f_name] = bp[cf.prefixed_key]
 
         instance = cls(**kwargs)
 
@@ -304,6 +345,7 @@ class AgentConfig:
         state.project = project_name
         state.env = resolved_env
         state.mask_id = mask_id
+        state.version = version
         state.manager = manager
         state.blueprint_id = bp.id
         state.blueprint_version = bp.name
@@ -311,7 +353,13 @@ class AgentConfig:
         state.is_fallback = False
 
         cache_mod.init_cache_entry(
-            project_name, resolved_env, mask_id, field_types, manager, blueprint=bp
+            project_name,
+            resolved_env,
+            mask_id,
+            field_types,
+            manager,
+            blueprint=bp,
+            version=version,
         )
 
         return instance

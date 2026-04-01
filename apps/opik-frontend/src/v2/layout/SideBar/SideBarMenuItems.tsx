@@ -1,18 +1,12 @@
 import React from "react";
-import { cn } from "@/lib/utils";
 import { useActiveProjectId } from "@/store/AppStore";
 import SidebarMenuItem, {
   MenuItem,
 } from "@/v2/layout/SideBar/MenuItem/SidebarMenuItem";
 import getMenuItems from "@/v2/layout/SideBar/helpers/getMenuItems";
 import { usePermissions } from "@/contexts/PermissionsContext";
-import { Separator } from "@/ui/separator";
 
-interface SideBarMenuItemsProps {
-  expanded: boolean;
-}
-
-const SideBarMenuItems: React.FC<SideBarMenuItemsProps> = ({ expanded }) => {
+const SideBarMenuItems: React.FC = () => {
   const activeProjectId = useActiveProjectId();
   const {
     permissions: { canViewExperiments, canViewDatasets },
@@ -25,27 +19,19 @@ const SideBarMenuItems: React.FC<SideBarMenuItemsProps> = ({ expanded }) => {
   });
 
   const renderItems = (items: MenuItem[]) => {
-    return items.map((item) => (
-      <SidebarMenuItem key={item.id} item={item} expanded={expanded} />
-    ));
+    return items.map((item) => <SidebarMenuItem key={item.id} item={item} />);
   };
 
   return (
     <>
-      {menuItems.map((menuGroup, index) => (
-        <li key={menuGroup.id}>
-          {index > 0 && <Separator className="my-2" />}
-          {menuGroup.label && expanded && (
-            <div className="comet-body-s-accented truncate px-2 py-1 text-light-slate">
+      {menuItems.map((menuGroup) => (
+        <li key={menuGroup.id} className="pb-3">
+          {menuGroup.label && (
+            <div className="comet-body-xs truncate px-2 py-1 text-light-slate">
               {menuGroup.label}
             </div>
           )}
-          <ul
-            className={cn(
-              "flex flex-col text-foreground",
-              !expanded && "items-center",
-            )}
-          >
+          <ul className="flex flex-col text-foreground">
             {renderItems(menuGroup.items)}
           </ul>
         </li>

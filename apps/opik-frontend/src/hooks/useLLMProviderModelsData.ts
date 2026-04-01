@@ -617,6 +617,14 @@ export const PROVIDER_MODELS: PROVIDER_MODELS_TYPE = {
       label: "google/gemma-3n-e4b-it:free",
     },
     {
+      value: PROVIDER_MODEL_TYPE.GOOGLE_LYRIA_3_CLIP_PREVIEW,
+      label: "google/lyria-3-clip-preview",
+    },
+    {
+      value: PROVIDER_MODEL_TYPE.GOOGLE_LYRIA_3_PRO_PREVIEW,
+      label: "google/lyria-3-pro-preview",
+    },
+    {
       value: PROVIDER_MODEL_TYPE.GRYPHE_MYTHOMAX_L2_13B,
       label: "gryphe/mythomax-l2-13b",
     },
@@ -647,6 +655,10 @@ export const PROVIDER_MODELS: PROVIDER_MODELS_TYPE = {
     {
       value: PROVIDER_MODEL_TYPE.KWAIPILOT_KAT_CODER_PRO,
       label: "kwaipilot/kat-coder-pro",
+    },
+    {
+      value: PROVIDER_MODEL_TYPE.KWAIPILOT_KAT_CODER_PRO_V2,
+      label: "kwaipilot/kat-coder-pro-v2",
     },
     {
       value: PROVIDER_MODEL_TYPE.KWAIPILOT_KAT_CODER_PRO_FREE,
@@ -1661,12 +1673,24 @@ export const PROVIDER_MODELS: PROVIDER_MODELS_TYPE = {
       label: "qwen/qwen3.5-plus-02-15",
     },
     {
+      value: PROVIDER_MODEL_TYPE.QWEN_QWEN3_6_PLUS_PREVIEW_FREE,
+      label: "qwen/qwen3.6-plus-preview:free",
+    },
+    {
       value: PROVIDER_MODEL_TYPE.QWEN_QWQ_32B,
       label: "qwen/qwq-32b",
     },
     {
       value: PROVIDER_MODEL_TYPE.RAIFLE_SORCERERLM_8X22B,
       label: "raifle/sorcererlm-8x22b",
+    },
+    {
+      value: PROVIDER_MODEL_TYPE.REKA_REKA_EDGE,
+      label: "reka/reka-edge",
+    },
+    {
+      value: PROVIDER_MODEL_TYPE.REKAAI_REKA_FLASH_3,
+      label: "rekaai/reka-flash-3",
     },
     {
       value: PROVIDER_MODEL_TYPE.RELACE_RELACE_APPLY_3,
@@ -1801,8 +1825,16 @@ export const PROVIDER_MODELS: PROVIDER_MODELS_TYPE = {
       label: "x-ai/grok-4.1-fast:free",
     },
     {
+      value: PROVIDER_MODEL_TYPE.X_AI_GROK_4_20,
+      label: "x-ai/grok-4.20",
+    },
+    {
       value: PROVIDER_MODEL_TYPE.X_AI_GROK_4_20_BETA,
       label: "x-ai/grok-4.20-beta",
+    },
+    {
+      value: PROVIDER_MODEL_TYPE.X_AI_GROK_4_20_MULTI_AGENT,
+      label: "x-ai/grok-4.20-multi-agent",
     },
     {
       value: PROVIDER_MODEL_TYPE.X_AI_GROK_4_20_MULTI_AGENT_BETA,
@@ -1906,6 +1938,14 @@ export const PROVIDER_MODELS: PROVIDER_MODELS_TYPE = {
     {
       value: PROVIDER_MODEL_TYPE.GEMINI_2_0_FLASH_LITE,
       label: "Gemini 2.0 Flash-Lite",
+    },
+    {
+      value: PROVIDER_MODEL_TYPE.LYRIA_3_CLIP_PREVIEW,
+      label: "Lyria 3 Clip Preview",
+    },
+    {
+      value: PROVIDER_MODEL_TYPE.LYRIA_3_PRO_PREVIEW,
+      label: "Lyria 3 Pro Preview",
     },
   ],
 
