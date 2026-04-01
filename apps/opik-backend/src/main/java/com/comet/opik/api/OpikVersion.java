@@ -1,5 +1,6 @@
 package com.comet.opik.api;
 
+import com.comet.opik.infrastructure.db.HasValue;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonValue;
 import lombok.Getter;
@@ -12,7 +13,7 @@ import java.util.Optional;
 @Getter
 @RequiredArgsConstructor
 @Slf4j
-public enum OpikVersion {
+public enum OpikVersion implements HasValue {
     VERSION_1("version_1"),
     VERSION_2("version_2");
 

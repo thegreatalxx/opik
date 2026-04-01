@@ -78,7 +78,7 @@ import static com.comet.opik.infrastructure.db.TransactionTemplateAsync.WRITE;
  * @see WorkspaceVersion
  */
 public interface WorkspaceVersionService {
-    Mono<WorkspaceVersion> getWorkspaceVersion(String workspaceId, OpikVersion authSuggestedVersion);
+    Mono<WorkspaceVersion> getWorkspaceVersion(String workspaceId, OpikVersion authSuggestedVersion, String userName);
 }
 
 /**
@@ -117,7 +117,8 @@ abstract class AbstractWorkspaceVersionService implements WorkspaceVersionServic
     }
 
     @Override
-    public Mono<WorkspaceVersion> getWorkspaceVersion(@NonNull String workspaceId, OpikVersion authSuggestedVersion) {
+    public Mono<WorkspaceVersion> getWorkspaceVersion(@NonNull String workspaceId, OpikVersion authSuggestedVersion,
+            String userName) {
         var forcedVersion = getForcedVersion();
         if (forcedVersion.isPresent()) {
             log.info("Workspace version forced by feature flag, opikVersion '{}', workspaceId '{}'",
@@ -130,11 +131,11 @@ abstract class AbstractWorkspaceVersionService implements WorkspaceVersionServic
                         log.warn("Cache read failed, computing version, workspaceId '{}'", workspaceId, throwable);
                         return Mono.empty();
                     })
-                    .switchIfEmpty(Mono.defer(() -> computeVersion(workspaceId, authSuggestedVersion)
+                    .switchIfEmpty(Mono.defer(() -> computeVersion(workspaceId, authSuggestedVersion, userName)
                             .flatMap(response -> cacheResult(workspaceId, response))
                             .onErrorResume(throwable -> fallback(workspaceId, authSuggestedVersion, throwable))));
         }
-        return computeVersion(workspaceId, authSuggestedVersion)
+        return computeVersion(workspaceId, authSuggestedVersion, userName)
                 .onErrorResume(throwable -> fallback(workspaceId, authSuggestedVersion, throwable));
     }
 
@@ -157,22 +158,23 @@ abstract class AbstractWorkspaceVersionService implements WorkspaceVersionServic
                 });
     }
 
-    private Mono<WorkspaceVersion> computeVersion(String workspaceId, OpikVersion authSuggestedVersion) {
+    private Mono<WorkspaceVersion> computeVersion(String workspaceId, OpikVersion authSuggestedVersion,
+            String userName) {
         if (authSuggestedVersion == OpikVersion.VERSION_2) {
             log.info("Locked via auth one-way gate, workspaceId '{}', version '{}'", workspaceId, authSuggestedVersion);
-            return storeAndReturn(workspaceId, OpikVersion.VERSION_2);
+            return storeAndReturn(workspaceId, OpikVersion.VERSION_2, userName);
         }
-        return getStoredVersion(workspaceId)
+        return getStoredOpikVersion(workspaceId)
                 .flatMap(stored -> {
                     if (stored.isPresent() && stored.get() == OpikVersion.VERSION_2) {
                         log.info("Locked via stored V2 latch, workspaceId '{}'", workspaceId);
                         return Mono.just(buildResponse(OpikVersion.VERSION_2));
                     }
-                    return checkEntities(workspaceId);
+                    return checkEntities(workspaceId, userName);
                 });
     }
 
-    private Mono<WorkspaceVersion> checkEntities(String workspaceId) {
+    private Mono<WorkspaceVersion> checkEntities(String workspaceId, String userName) {
         return Flux.concat(
                 Mono.fromCallable(() -> hasStateDbVersion1Entities(workspaceId))
                         .subscribeOn(Schedulers.boundedElastic()),
@@ -180,30 +182,30 @@ abstract class AbstractWorkspaceVersionService implements WorkspaceVersionServic
                 experimentDAO.hasVersion1Experiments(workspaceId, DemoData.EXPERIMENTS))
                 .any(found -> found)
                 .flatMap(found -> {
-                    var version = found ? OpikVersion.VERSION_1 : OpikVersion.VERSION_2;
+                    var opikVersion = found ? OpikVersion.VERSION_1 : OpikVersion.VERSION_2;
                     log.info("Workspace version determined as '{}' for workspace '{}' (hasVersion1Entities={})",
-                            version.getValue(), workspaceId, found);
-                    if (version == OpikVersion.VERSION_2) {
-                        return storeAndReturn(workspaceId, OpikVersion.VERSION_2);
+                            opikVersion.getValue(), workspaceId, found);
+                    if (opikVersion == OpikVersion.VERSION_2) {
+                        return storeAndReturn(workspaceId, OpikVersion.VERSION_2, userName);
                     }
-                    return Mono.just(buildResponse(version));
+                    return Mono.just(buildResponse(opikVersion));
                 });
     }
 
-    private Mono<Optional<OpikVersion>> getStoredVersion(String workspaceId) {
+    private Mono<Optional<OpikVersion>> getStoredOpikVersion(String workspaceId) {
         return Mono.fromCallable(() -> transactionTemplate.inTransaction(READ_ONLY,
-                handle -> handle.attach(WorkspaceDAO.class).getVersion(workspaceId)))
+                handle -> handle.attach(WorkspaceDAO.class).getOpikVersion(workspaceId)))
                 .subscribeOn(Schedulers.boundedElastic());
     }
 
-    private Mono<WorkspaceVersion> storeAndReturn(String workspaceId, OpikVersion version) {
+    private Mono<WorkspaceVersion> storeAndReturn(String workspaceId, OpikVersion opikVersion, String userName) {
         return Mono.fromCallable(() -> {
             transactionTemplate.inTransaction(WRITE, handle -> {
-                handle.attach(WorkspaceDAO.class).upsertVersion(workspaceId, version);
+                handle.attach(WorkspaceDAO.class).upsertOpikVersion(workspaceId, opikVersion, userName);
                 return null;
             });
-            log.info("Stored workspace version '{}' for workspace '{}'", version.getValue(), workspaceId);
-            return buildResponse(version);
+            log.info("Stored workspace version '{}' for workspace '{}'", opikVersion.getValue(), workspaceId);
+            return buildResponse(opikVersion);
         }).subscribeOn(Schedulers.boundedElastic());
     }
 
