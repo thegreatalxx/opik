@@ -3,7 +3,6 @@ import Breadcrumbs from "@/v2/layout/Breadcrumbs/Breadcrumbs";
 import usePluginsStore from "@/store/PluginsStore";
 import AppDebugInfo from "@/v2/layout/AppDebugInfo/AppDebugInfo";
 import SettingsMenu from "../SettingsMenu/SettingsMenu";
-import SupportHub from "@/v2/layout/SupportHub/SupportHub";
 import GitHubStarButton from "@/v2/layout/TopBar/GitHubStarButton";
 
 type TopBarProps = {
@@ -27,7 +26,6 @@ const TopBar: React.FunctionComponent<TopBarProps> = ({ startSlot }) => {
         <AppDebugInfo />
         {UpgradeButton && <UpgradeButton />}
         <GitHubStarButton />
-        <SupportHub />
         {UserMenu ? <UserMenu /> : <SettingsMenu />}
       </div>
     </nav>

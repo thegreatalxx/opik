@@ -1,11 +1,9 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import copy from "clipboard-copy";
 import {
-  Book,
+  ArrowUpRight,
   Check,
   Copy,
-  GraduationCap,
-  ArrowUpRight,
   KeyRound,
   LogOut,
   Settings,
@@ -14,8 +12,8 @@ import {
   UserPlus,
 } from "lucide-react";
 
-import { useOpenQuickStartDialog } from "@/hooks/useOpenQuickStartDialog";
 import TooltipWrapper from "@/shared/TooltipWrapper/TooltipWrapper";
+import SupportHubSubMenu from "@/shared/SupportHub/SupportHubSubMenu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/ui/avatar";
 import {
   DropdownMenu,
@@ -35,7 +33,7 @@ import { APP_VERSION } from "@/constants/app";
 import { ADMIN_DASHBOARD_LABEL } from "@/constants/labels";
 import { useIsFeatureEnabled } from "@/contexts/feature-toggles-provider";
 import { FeatureToggleKeys } from "@/types/feature-toggles";
-import { buildDocsUrl, cn, maskAPIKey } from "@/lib/utils";
+import { cn, maskAPIKey } from "@/lib/utils";
 import useAppStore from "@/store/AppStore";
 import api from "./api";
 import { ORGANIZATION_ROLE_TYPE } from "./types";
@@ -53,7 +51,6 @@ const UserMenu = () => {
   const { toast } = useToast();
   const { theme, themeOptions, CurrentIcon, handleThemeSelect } =
     useThemeOptions();
-  const { open: openQuickstart } = useOpenQuickStartDialog();
   const workspaceName = useAppStore((state) => state.activeWorkspaceName);
 
   const { data: user } = useUser();
@@ -252,21 +249,7 @@ const UserMenu = () => {
             {renderInviteMembers()}
           </DropdownMenuGroup>
           <DropdownMenuSeparator />
-          <DropdownMenuGroup>
-            <DropdownMenuItem
-              onClick={openQuickstart}
-              className="cursor-pointer"
-            >
-              <GraduationCap className="mr-2 size-4" />
-              <span>Quickstart guide</span>
-            </DropdownMenuItem>
-            <a href={buildDocsUrl()} target="_blank" rel="noreferrer">
-              <DropdownMenuItem className="cursor-pointer">
-                <Book className="mr-2 size-4" />
-                <span>Docs</span>
-              </DropdownMenuItem>
-            </a>
-          </DropdownMenuGroup>
+          <SupportHubSubMenu />
           <DropdownMenuSeparator />
           <DropdownMenuGroup>
             <DropdownMenuSub>

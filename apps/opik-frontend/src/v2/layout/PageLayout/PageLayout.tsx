@@ -9,7 +9,7 @@ import WelcomeWizardDialog from "@/v2/pages-shared/WelcomeWizard/WelcomeWizardDi
 import useWelcomeWizardStatus from "@/api/welcome-wizard/useWelcomeWizardStatus";
 import { useIsFeatureEnabled } from "@/contexts/feature-toggles-provider";
 import { FeatureToggleKeys } from "@/types/feature-toggles";
-import QuickstartDialog from "@/v2/pages-shared/onboarding/QuickstartDialog/QuickstartDialog";
+import LayoutDialogs from "@/v2/layout/LayoutDialogs";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { PortalContainerProvider } from "@/lib/portal-container";
 import SilentErrorBoundary from "@/shared/SilentErrorBoundary/SilentErrorBoundary";
@@ -128,7 +128,7 @@ const PageLayout = () => {
               onClose={handleCloseWelcomeWizard}
             />
 
-            <QuickstartDialog />
+            <LayoutDialogs />
           </div>
         </PortalContainerProvider>
 
