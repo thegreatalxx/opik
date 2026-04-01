@@ -26,6 +26,7 @@ import java.util.Optional;
 
 import static com.comet.opik.infrastructure.ServiceTogglesConfig.FORCE_WORKSPACE_VERSION_DISABLED;
 import static com.comet.opik.infrastructure.db.TransactionTemplateAsync.READ_ONLY;
+import static com.comet.opik.infrastructure.db.TransactionTemplateAsync.WRITE;
 
 /**
  * Determines the Opik navigation version for a workspace.
@@ -159,20 +160,51 @@ abstract class AbstractWorkspaceVersionService implements WorkspaceVersionServic
     private Mono<WorkspaceVersion> computeVersion(String workspaceId, OpikVersion authSuggestedVersion) {
         if (authSuggestedVersion == OpikVersion.VERSION_2) {
             log.info("Locked via auth one-way gate, workspaceId '{}', version '{}'", workspaceId, authSuggestedVersion);
-            return Mono.just(buildResponse(OpikVersion.VERSION_2));
+            return storeAndReturn(workspaceId, OpikVersion.VERSION_2);
         }
+        return Mono.fromCallable(() -> getStoredVersion(workspaceId))
+                .subscribeOn(Schedulers.boundedElastic())
+                .flatMap(stored -> {
+                    if (stored.isPresent() && stored.get() == OpikVersion.VERSION_2) {
+                        log.info("Locked via stored V2 latch, workspaceId '{}'", workspaceId);
+                        return Mono.just(buildResponse(OpikVersion.VERSION_2));
+                    }
+                    return checkEntities(workspaceId);
+                });
+    }
+
+    private Mono<WorkspaceVersion> checkEntities(String workspaceId) {
         return Flux.concat(
                 Mono.fromCallable(() -> hasStateDbVersion1Entities(workspaceId))
                         .subscribeOn(Schedulers.boundedElastic()),
                 optimizationDAO.hasVersion1Optimizations(workspaceId),
                 experimentDAO.hasVersion1Experiments(workspaceId, DemoData.EXPERIMENTS))
                 .any(found -> found)
-                .map(found -> {
+                .flatMap(found -> {
                     var version = found ? OpikVersion.VERSION_1 : OpikVersion.VERSION_2;
                     log.info("Workspace version determined as '{}' for workspace '{}' (hasVersion1Entities={})",
                             version.getValue(), workspaceId, found);
-                    return buildResponse(version);
+                    if (version == OpikVersion.VERSION_2) {
+                        return storeAndReturn(workspaceId, OpikVersion.VERSION_2);
+                    }
+                    return Mono.just(buildResponse(version));
                 });
+    }
+
+    private Optional<OpikVersion> getStoredVersion(String workspaceId) {
+        return transactionTemplate.inTransaction(READ_ONLY,
+                handle -> handle.attach(WorkspaceVersionDAO.class).getStoredOpikVersion(workspaceId));
+    }
+
+    private Mono<WorkspaceVersion> storeAndReturn(String workspaceId, OpikVersion version) {
+        return Mono.fromCallable(() -> {
+            transactionTemplate.inTransaction(WRITE, handle -> {
+                handle.attach(WorkspaceVersionDAO.class).storeOpikVersion(workspaceId, version);
+                return null;
+            });
+            log.info("Stored workspace version '{}' for workspace '{}'", version.getValue(), workspaceId);
+            return buildResponse(version);
+        }).subscribeOn(Schedulers.boundedElastic());
     }
 
     private Optional<OpikVersion> getForcedVersion() {

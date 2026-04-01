@@ -269,26 +269,33 @@ class WorkspaceVersionResourceTest {
 
         @Test
         void workspaceVersion__whenDatasetEntities__returnsExpectedVersion() {
-            // When Auth says Version1 entity check still runs
-            var workspaceName = mockWorkspace(OpikVersion.VERSION_1);
-
-            // Demo-only datasets do not trigger version_1
+            // V2-compatible entities don't trigger V1 (use fresh workspace — no prior V2 latch)
+            var v2Workspace = mockWorkspace(OpikVersion.VERSION_1);
             datasetClient.createDataset(podamFactory.manufacturePojo(Dataset.class).toBuilder()
                     .name("Demo dataset")
                     .projectId(null)
                     .projectName(null)
-                    .build(),
-                    API_KEY, workspaceName);
-            // Dataset under project does not trigger version_1
+                    .build(), API_KEY, v2Workspace);
             datasetClient.createDataset(podamFactory.manufacturePojo(Dataset.class).toBuilder()
                     .projectId(null)
-                    .build(),
-                    API_KEY, workspaceName);
-            // Auth says version_1 — not a one-way gate, project scoped workspace still returns V2
-            assertThat(workspaceClient.getWorkspaceVersion(API_KEY, workspaceName)).isEqualTo(V2_WORKSPACE_VERSION);
+                    .build(), API_KEY, v2Workspace);
+            assertThat(workspaceClient.getWorkspaceVersion(API_KEY, v2Workspace)).isEqualTo(V2_WORKSPACE_VERSION);
 
-            // Version 1 dataset triggers version_1
+            // V1 dataset in a fresh workspace triggers V1
+            var v1Workspace = mockWorkspace(OpikVersion.VERSION_1);
             datasetClient.createDataset(podamFactory.manufacturePojo(Dataset.class).toBuilder()
+                    .projectId(null)
+                    .projectName(null)
+                    .build(), API_KEY, v1Workspace);
+            assertThat(workspaceClient.getWorkspaceVersion(API_KEY, v1Workspace)).isEqualTo(V1_WORKSPACE_VERSION);
+        }
+
+        @Test
+        void workspaceVersion__whenPromptWithoutProject__returnsVersion1() {
+            var workspaceName = mockWorkspace();
+
+            // V1 prompt triggers version_1 on first check
+            promptClient.createPrompt(podamFactory.manufacturePojo(Prompt.class).toBuilder()
                     .projectId(null)
                     .projectName(null)
                     .build(), API_KEY, workspaceName);
@@ -296,114 +303,106 @@ class WorkspaceVersionResourceTest {
         }
 
         @Test
-        void workspaceVersion__whenPromptWithoutProject__returnsVersion1() {
-            // Auth doesn't include opikVersion — defensive, entity check is primary signal
-            var workspaceName = mockWorkspace();
-
-            // Empty workspace returns version_2
-            assertThat(workspaceClient.getWorkspaceVersion(API_KEY, workspaceName)).isEqualTo(V2_WORKSPACE_VERSION);
-
-            // Version 1 prompt triggers version_1
-            promptClient.createPrompt(podamFactory.manufacturePojo(Prompt.class).toBuilder()
-                    .projectId(null)
-                    .projectName(null)
-                    .build(),
-                    API_KEY, workspaceName);
-            assertThat(workspaceClient.getWorkspaceVersion(API_KEY, workspaceName)).isEqualTo(V1_WORKSPACE_VERSION);
-        }
-
-        @Test
         void workspaceVersion__whenDashboardWithoutProject__returnsVersion1() {
             var workspaceName = mockWorkspace();
 
-            // Empty workspace returns version_2
-            assertThat(workspaceClient.getWorkspaceVersion(API_KEY, workspaceName)).isEqualTo(V2_WORKSPACE_VERSION);
-
-            // Version 1 dashboard triggers version_1
+            // V1 dashboard triggers version_1 on first check
             dashboardClient.create(dashboardClient.createPartialDashboard().build(), API_KEY, workspaceName);
             assertThat(workspaceClient.getWorkspaceVersion(API_KEY, workspaceName)).isEqualTo(V1_WORKSPACE_VERSION);
         }
 
         @Test
         void workspaceVersion__whenMultiProjectRule__returnsVersion1() {
-            var workspaceName = mockWorkspace();
-
-            // Single-project rule does not trigger version_1
+            // Single-project rule does not trigger V1
+            var v2Workspace = mockWorkspace();
             evaluatorClient.createEvaluator(podamFactory.manufacturePojo(AutomationRuleEvaluatorLlmAsJudge.class)
                     .toBuilder()
                     .projectIds(Set.of(UUID.randomUUID()))
-                    .build(),
-                    workspaceName, API_KEY);
-            assertThat(workspaceClient.getWorkspaceVersion(API_KEY, workspaceName)).isEqualTo(V2_WORKSPACE_VERSION);
+                    .build(), v2Workspace, API_KEY);
+            assertThat(workspaceClient.getWorkspaceVersion(API_KEY, v2Workspace)).isEqualTo(V2_WORKSPACE_VERSION);
 
-            // Multi-project rule triggers version_1
+            // Multi-project rule triggers V1 in a fresh workspace
+            var v1Workspace = mockWorkspace();
             evaluatorClient.createEvaluator(podamFactory.manufacturePojo(AutomationRuleEvaluatorLlmAsJudge.class)
                     .toBuilder()
                     .projectIds(Set.of(UUID.randomUUID(), UUID.randomUUID()))
-                    .build(),
-                    workspaceName, API_KEY);
-            assertThat(workspaceClient.getWorkspaceVersion(API_KEY, workspaceName)).isEqualTo(V1_WORKSPACE_VERSION);
+                    .build(), v1Workspace, API_KEY);
+            assertThat(workspaceClient.getWorkspaceVersion(API_KEY, v1Workspace)).isEqualTo(V1_WORKSPACE_VERSION);
         }
 
         @Test
         void workspaceVersion__whenExperimentWithoutProject__returnsVersion1() {
-            var workspaceName = mockWorkspace();
-
-            // Project-scoped dataset for the experiment does not trigger V1
+            // V2: demo experiment without project does not trigger V1
+            var v2Workspace = mockWorkspace();
             var dataset = podamFactory.manufacturePojo(Dataset.class).toBuilder()
                     .projectId(null)
                     .build();
-            datasetClient.createDataset(dataset, API_KEY, workspaceName);
-            // Demo experiment without project does not trigger V1
+            datasetClient.createDataset(dataset, API_KEY, v2Workspace);
             experimentClient.create(experimentClient.createPartialExperiment()
                     .name("Demo evaluation")
                     .datasetName(dataset.name())
-                    .build(),
-                    API_KEY, workspaceName);
-            assertThat(workspaceClient.getWorkspaceVersion(API_KEY, workspaceName)).isEqualTo(V2_WORKSPACE_VERSION);
+                    .build(), API_KEY, v2Workspace);
+            assertThat(workspaceClient.getWorkspaceVersion(API_KEY, v2Workspace)).isEqualTo(V2_WORKSPACE_VERSION);
 
-            // Non-demo experiment without project triggers V1
+            // V1: non-demo experiment without project triggers V1 in a fresh workspace
+            var v1Workspace = mockWorkspace();
+            var dataset2 = podamFactory.manufacturePojo(Dataset.class).toBuilder()
+                    .projectId(null)
+                    .build();
+            datasetClient.createDataset(dataset2, API_KEY, v1Workspace);
             experimentClient.create(experimentClient.createPartialExperiment()
-                    .datasetName(dataset.name())
-                    .build(),
-                    API_KEY, workspaceName);
-            assertThat(workspaceClient.getWorkspaceVersion(API_KEY, workspaceName)).isEqualTo(V1_WORKSPACE_VERSION);
+                    .datasetName(dataset2.name())
+                    .build(), API_KEY, v1Workspace);
+            assertThat(workspaceClient.getWorkspaceVersion(API_KEY, v1Workspace)).isEqualTo(V1_WORKSPACE_VERSION);
         }
 
         @Test
         void workspaceVersion__whenOptimizationWithoutProject__returnsVersion1() {
             var workspaceName = mockWorkspace();
 
-            // Project-scoped dataset for the optimization does not trigger V1
+            // V1 optimization in fresh workspace triggers V1
             var dataset = podamFactory.manufacturePojo(Dataset.class).toBuilder()
                     .projectId(null)
                     .build();
             datasetClient.createDataset(dataset, API_KEY, workspaceName);
-            assertThat(workspaceClient.getWorkspaceVersion(API_KEY, workspaceName)).isEqualTo(V2_WORKSPACE_VERSION);
-
-            // Workspace level optimization triggers V1
             optimizationClient.create(optimizationClient.createPartialOptimization()
                     .datasetName(dataset.name())
-                    .build(),
-                    API_KEY, workspaceName);
+                    .build(), API_KEY, workspaceName);
             assertThat(workspaceClient.getWorkspaceVersion(API_KEY, workspaceName)).isEqualTo(V1_WORKSPACE_VERSION);
         }
 
         @Test
         void workspaceVersion__whenAlertWithoutProject__returnsVersion1() {
-            var workspaceName = mockWorkspace();
-
-            // Project-scoped alert (projectId column) does not trigger version_1
+            // V2: project-scoped alert does not trigger V1
+            var v2Workspace = mockWorkspace();
             alertClient.createAlert(
                     AlertResourceTest.generateAlertForProject(podamFactory, UUID.randomUUID()),
-                    API_KEY, workspaceName, 201);
-            assertThat(workspaceClient.getWorkspaceVersion(API_KEY, workspaceName)).isEqualTo(V2_WORKSPACE_VERSION);
+                    API_KEY, v2Workspace, 201);
+            assertThat(workspaceClient.getWorkspaceVersion(API_KEY, v2Workspace)).isEqualTo(V2_WORKSPACE_VERSION);
 
-            // Workspace level alert triggers version_1
+            // V1: workspace-level alert in a fresh workspace triggers V1
+            var v1Workspace = mockWorkspace();
             alertClient.createAlert(
                     AlertResourceTest.generateAlert(podamFactory),
-                    API_KEY, workspaceName, 201);
-            assertThat(workspaceClient.getWorkspaceVersion(API_KEY, workspaceName)).isEqualTo(V1_WORKSPACE_VERSION);
+                    API_KEY, v1Workspace, 201);
+            assertThat(workspaceClient.getWorkspaceVersion(API_KEY, v1Workspace)).isEqualTo(V1_WORKSPACE_VERSION);
+        }
+
+        @Test
+        void workspaceVersion__whenV2ThenV1EntityCreated__staysV2() {
+            var workspaceName = mockWorkspace();
+
+            // Empty workspace → V2 (this latches V2 in the DB)
+            assertThat(workspaceClient.getWorkspaceVersion(API_KEY, workspaceName)).isEqualTo(V2_WORKSPACE_VERSION);
+
+            // Create a V1 entity (dataset without project)
+            datasetClient.createDataset(podamFactory.manufacturePojo(Dataset.class).toBuilder()
+                    .projectId(null)
+                    .projectName(null)
+                    .build(), API_KEY, workspaceName);
+
+            // Should still be V2 — stored latch prevents flapping back to V1
+            assertThat(workspaceClient.getWorkspaceVersion(API_KEY, workspaceName)).isEqualTo(V2_WORKSPACE_VERSION);
         }
     }
 
