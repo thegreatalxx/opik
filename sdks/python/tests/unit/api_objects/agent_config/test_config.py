@@ -2,7 +2,7 @@ from unittest import mock
 
 import pytest
 
-from opik.api_objects.agent_config.config import _AgentConfigManager
+from opik.api_objects.agent_config.config import AgentConfigManager
 from opik.api_objects.agent_config.blueprint import Blueprint
 from opik.rest_api import core as rest_api_core
 from opik.rest_api.types.agent_blueprint_public import AgentBlueprintPublic
@@ -32,18 +32,18 @@ def mock_rest_client():
 
 @pytest.fixture
 def agent_config(mock_rest_client):
-    return _AgentConfigManager(
+    return AgentConfigManager(
         project_name="my-project",
         rest_client_=mock_rest_client,
     )
 
 
-class Test_AgentConfigManagerProperties:
+class TestAgentConfigManagerProperties:
     def test_project_name(self, agent_config):
         assert agent_config.project_name == "my-project"
 
 
-class Test_AgentConfigManagerGetBlueprint:
+class TestAgentConfigManagerGetBlueprint:
     def test_get_blueprint__returns_blueprint(self, agent_config, mock_rest_client):
         mock_rest_client.projects.retrieve_project.return_value = mock.Mock(id="proj-1")
         mock_rest_client.agent_configs.get_latest_blueprint.return_value = (
@@ -168,7 +168,7 @@ class Test_AgentConfigManagerGetBlueprint:
         )
 
 
-class Test_AgentConfigManagerGetBlueprintByName:
+class TestAgentConfigManagerGetBlueprintByName:
     def test_get_blueprint_by_name__returns_blueprint(
         self, agent_config, mock_rest_client
     ):
@@ -198,7 +198,7 @@ class Test_AgentConfigManagerGetBlueprintByName:
         assert result is None
 
 
-class Test_AgentConfigManagerCreateBlueprint:
+class TestAgentConfigManagerCreateBlueprint:
     def test_create_blueprint__happy_path__calls_backend_and_returns_blueprint(
         self, agent_config, mock_rest_client
     ):
@@ -296,7 +296,7 @@ class Test_AgentConfigManagerCreateBlueprint:
         assert call_kwargs["blueprint"].description == "v1"
 
 
-class Test_AgentConfigManagerCreateMask:
+class TestAgentConfigManagerCreateMask:
     def test_create_mask__happy_path__calls_backend_with_mask_type(
         self, agent_config, mock_rest_client
     ):
@@ -353,7 +353,7 @@ class Test_AgentConfigManagerCreateMask:
 
 class TestResolveFieldsWithValues:
     def test_none_value__included_with_str_type(self):
-        result = _AgentConfigManager._resolve_fields_with_values(
+        result = AgentConfigManager._resolve_fields_with_values(
             parameters={"temp": 0.5, "name": None},
             fields_with_values=None,
         )
@@ -361,7 +361,7 @@ class TestResolveFieldsWithValues:
         assert result["name"] == (str, None, None)
 
     def test_all_none_parameters__included_with_str_type(self):
-        result = _AgentConfigManager._resolve_fields_with_values(
+        result = AgentConfigManager._resolve_fields_with_values(
             parameters={"a": None, "b": None},
             fields_with_values=None,
         )
@@ -369,7 +369,7 @@ class TestResolveFieldsWithValues:
 
     def test_fields_with_values_takes_precedence_over_parameters(self):
         explicit = {"x": (int, 1, None)}
-        result = _AgentConfigManager._resolve_fields_with_values(
+        result = AgentConfigManager._resolve_fields_with_values(
             parameters={"x": 99},
             fields_with_values=explicit,
         )

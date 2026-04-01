@@ -5,7 +5,7 @@ import pytest
 import opik
 from opik import opik_context
 from opik.api_objects.agent_config.cache import get_global_registry
-from opik.api_objects.agent_config.config import _AgentConfigManager
+from opik.api_objects.agent_config.config import AgentConfigManager
 from opik.api_objects.agent_config.context import agent_config_context
 
 from opik.api_objects.prompt.text.prompt import Prompt
@@ -305,7 +305,7 @@ def test_mask_overrides_config__happyflow(
 
     get_global_registry().clear()
 
-    manager = _AgentConfigManager(
+    manager = AgentConfigManager(
         project_name=project_name,
         rest_client_=opik_client.rest_client,
     )

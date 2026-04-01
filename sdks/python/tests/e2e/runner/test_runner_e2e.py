@@ -11,7 +11,7 @@ from typing import Optional
 
 import opik
 import opik.rest_api.client as rest_api_client
-from opik.api_objects.agent_config.config import _AgentConfigManager
+from opik.api_objects.agent_config.config import AgentConfigManager
 from ..conftest import OPIK_E2E_TESTS_PROJECT_NAME
 from .conftest import RunnerInfo
 
@@ -170,7 +170,7 @@ def test_runner_with_mask(
 
     wait_for_agent_registration(api_client, "echo_config", project_id)
 
-    manager = _AgentConfigManager(
+    manager = AgentConfigManager(
         project_name=OPIK_E2E_TESTS_PROJECT_NAME,
         rest_client_=opik_client.rest_client,
     )
