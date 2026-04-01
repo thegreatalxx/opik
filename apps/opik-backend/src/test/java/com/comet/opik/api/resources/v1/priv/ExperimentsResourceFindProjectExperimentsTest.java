@@ -819,6 +819,58 @@ class ExperimentsResourceFindProjectExperimentsTest {
     }
 
     @ParameterizedTest
+    @MethodSource("metadataEmptyOperators")
+    @DisplayName("when filtering by metadata with IS_EMPTY/IS_NOT_EMPTY, then return correct experiments")
+    void findByFilterMetadataEmpty(Operator operator, boolean expectExperimentWithConfig) {
+        var workspaceName = UUID.randomUUID().toString();
+        var workspaceId = UUID.randomUUID().toString();
+        var apiKey = UUID.randomUUID().toString();
+        mockTargetWorkspace(apiKey, workspaceName, workspaceId);
+
+        var project = factory.manufacturePojo(Project.class);
+        var projectId = projectResourceClient.createProject(project, apiKey, workspaceName);
+
+        var experimentWithConfig = experimentResourceClient.createPartialExperiment()
+                .projectName(project.name())
+                .projectId(projectId)
+                .metadata(JsonUtils.getJsonNodeFromString("{\"config\":{\"name\":\"simulated\"}}"))
+                .build();
+        // metadata is null — config.name key is not present at all
+        var experimentWithoutConfig = experimentResourceClient.createPartialExperiment()
+                .projectName(project.name())
+                .projectId(projectId)
+                .metadata(null)
+                .build();
+
+        experimentResourceClient.create(experimentWithConfig, apiKey, workspaceName);
+        experimentResourceClient.create(experimentWithoutConfig, apiKey, workspaceName);
+
+        var filters = List.of(ExperimentFilter.builder()
+                .field(ExperimentField.METADATA)
+                .operator(operator)
+                .key("$.config.name")
+                .value("")
+                .build());
+
+        var actualPage = experimentResourceClient.getProjectExperiments(projectId, 1, 10, null, null, null, false,
+                null, filters, false, apiKey, workspaceName, SC_OK);
+
+        assertThat(actualPage.total()).isEqualTo(1);
+        assertThat(actualPage.content()).hasSize(1);
+
+        var expectedExperimentId = expectExperimentWithConfig
+                ? experimentWithConfig.id()
+                : experimentWithoutConfig.id();
+        assertThat(actualPage.content().getFirst().id()).isEqualTo(expectedExperimentId);
+    }
+
+    private Stream<Arguments> metadataEmptyOperators() {
+        return Stream.of(
+                Arguments.of(Operator.IS_NOT_EMPTY, true),
+                Arguments.of(Operator.IS_EMPTY, false));
+    }
+
+    @ParameterizedTest
     @MethodSource("findByFilterTags")
     @DisplayName("when filtering by tags, then return matching experiments")
     void findByFilterTags(Operator operator, String value) {
