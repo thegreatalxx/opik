@@ -18,7 +18,7 @@ import {
   DropdownMenuTrigger,
 } from "@/ui/dropdown-menu";
 import TooltipWrapper from "@/shared/TooltipWrapper/TooltipWrapper";
-import { buildDocsUrl, cn } from "@/lib/utils";
+import { buildDocsUrl } from "@/lib/utils";
 import { useLayoutDialog } from "@/hooks/useLayoutDialog";
 
 const SLACK_LINK = "http://chat.comet.com";
@@ -88,12 +88,7 @@ const SupportHubSubMenu: React.FC<SupportHubSubMenuProps> = ({
   }
 
   const trigger = expanded ? (
-    <button
-      className={cn(
-        "comet-body-s flex h-8 w-full items-center gap-2 rounded-md text-muted-slate hover:bg-primary-foreground",
-        "px-2.5",
-      )}
-    >
+    <button className="comet-body-s flex h-8 w-full items-center gap-2 rounded-md px-2.5 text-muted-slate hover:bg-primary-foreground">
       <LifeBuoy className="size-4 shrink-0" />
       <span className="grow truncate text-left">Support hub</span>
     </button>

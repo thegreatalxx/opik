@@ -1,7 +1,9 @@
 import { useQueryParam, BooleanParam } from "use-query-params";
 import { useCallback } from "react";
 
-export const useLayoutDialog = (key: string) => {
+type LayoutDialogKey = "quickstart" | "feedback";
+
+export const useLayoutDialog = (key: LayoutDialogKey) => {
   const [isOpen = false, setIsOpen] = useQueryParam(key, BooleanParam, {
     updateType: "replaceIn",
   });
