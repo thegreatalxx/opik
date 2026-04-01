@@ -5,7 +5,6 @@ import {
   ChevronUp,
   MoreHorizontal,
   Pencil,
-  Settings2,
   Trash,
 } from "lucide-react";
 import { Link, useNavigate } from "@tanstack/react-router";
@@ -27,10 +26,7 @@ import {
   DropdownMenuTrigger,
 } from "@/ui/dropdown-menu";
 import { SearchInput } from "@/shared/SearchInput/SearchInput";
-import {
-  setActiveProject,
-  useActiveProjectInitializer,
-} from "@/hooks/useActiveProjectInitializer";
+import { setActiveProject } from "@/hooks/useActiveProjectInitializer";
 import useAppStore, { useActiveProjectId } from "@/store/AppStore";
 import { Spinner } from "@/ui/spinner";
 import useProjectsList from "@/api/projects/useProjectsList";
@@ -49,8 +45,6 @@ interface ProjectSelectorProps {
 const ProjectSelector: React.FC<ProjectSelectorProps> = ({
   expanded = true,
 }) => {
-  useActiveProjectInitializer();
-
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const activeProjectId = useActiveProjectId();
@@ -184,22 +178,6 @@ const ProjectSelector: React.FC<ProjectSelectorProps> = ({
             />
           ))}
         </div>
-        <Separator className="my-1" />
-        <Button
-          variant="ghost"
-          size="sm"
-          className="w-full justify-start text-primary"
-          onClick={() => {
-            setOpen(false);
-            navigate({
-              to: "/$workspaceName/projects",
-              params: { workspaceName },
-            });
-          }}
-        >
-          <Settings2 className="mr-2 size-3.5" />
-          Manage projects
-        </Button>
       </PopoverContent>
     </Popover>
   );
