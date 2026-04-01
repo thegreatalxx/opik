@@ -162,8 +162,7 @@ abstract class AbstractWorkspaceVersionService implements WorkspaceVersionServic
             log.info("Locked via auth one-way gate, workspaceId '{}', version '{}'", workspaceId, authSuggestedVersion);
             return storeAndReturn(workspaceId, OpikVersion.VERSION_2);
         }
-        return Mono.fromCallable(() -> getStoredVersion(workspaceId))
-                .subscribeOn(Schedulers.boundedElastic())
+        return getStoredVersion(workspaceId)
                 .flatMap(stored -> {
                     if (stored.isPresent() && stored.get() == OpikVersion.VERSION_2) {
                         log.info("Locked via stored V2 latch, workspaceId '{}'", workspaceId);
@@ -191,15 +190,16 @@ abstract class AbstractWorkspaceVersionService implements WorkspaceVersionServic
                 });
     }
 
-    private Optional<OpikVersion> getStoredVersion(String workspaceId) {
-        return transactionTemplate.inTransaction(READ_ONLY,
-                handle -> handle.attach(WorkspaceVersionDAO.class).getStoredOpikVersion(workspaceId));
+    private Mono<Optional<OpikVersion>> getStoredVersion(String workspaceId) {
+        return Mono.fromCallable(() -> transactionTemplate.inTransaction(READ_ONLY,
+                handle -> handle.attach(WorkspaceDAO.class).getVersion(workspaceId)))
+                .subscribeOn(Schedulers.boundedElastic());
     }
 
     private Mono<WorkspaceVersion> storeAndReturn(String workspaceId, OpikVersion version) {
         return Mono.fromCallable(() -> {
             transactionTemplate.inTransaction(WRITE, handle -> {
-                handle.attach(WorkspaceVersionDAO.class).storeOpikVersion(workspaceId, version);
+                handle.attach(WorkspaceDAO.class).upsertVersion(workspaceId, version);
                 return null;
             });
             log.info("Stored workspace version '{}' for workspace '{}'", version.getValue(), workspaceId);
