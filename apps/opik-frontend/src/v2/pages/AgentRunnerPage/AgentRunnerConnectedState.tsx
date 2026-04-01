@@ -1,14 +1,13 @@
 import React, { useMemo, useState } from "react";
-import { ChevronDown } from "lucide-react";
 
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/ui/tabs";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/ui/dropdown-menu";
-import { Button } from "@/ui/button";
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/ui/select";
 import useConfigHistoryListInfinite from "@/api/agent-configs/useConfigHistoryListInfinite";
 import { LocalRunner } from "@/types/agent-sandbox";
 import AgentRunnerInputForm from "./AgentRunnerInputForm";
@@ -28,7 +27,7 @@ const AgentRunnerConnectedState: React.FC<AgentRunnerConnectedStateProps> = ({
   isRunning,
 }) => {
   const [activeTab, setActiveTab] = useState("input");
-  const [selectedConfigId, setSelectedConfigId] = useState<string | null>(null);
+  const [selectedVersionId, setSelectedVersionId] = useState<string>("");
 
   const { data: configData } = useConfigHistoryListInfinite({ projectId });
 
@@ -37,22 +36,16 @@ const AgentRunnerConnectedState: React.FC<AgentRunnerConnectedStateProps> = ({
     [configData],
   );
 
-  const selectedConfig = useMemo(() => {
-    if (selectedConfigId) {
+  const activeVersion = useMemo(() => {
+    if (selectedVersionId) {
       return (
-        allVersions.find((v) => v.id === selectedConfigId) ??
+        allVersions.find((v) => v.id === selectedVersionId) ??
         allVersions[0] ??
         null
       );
     }
     return allVersions[0] ?? null;
-  }, [allVersions, selectedConfigId]);
-
-  const versionLabel = selectedConfig
-    ? `Configuration: ${selectedConfig.name}${
-        selectedConfig.tags?.length ? ` (${selectedConfig.tags[0]})` : ""
-      }`
-    : "No configuration";
+  }, [allVersions, selectedVersionId]);
 
   const agent = runner.agents?.[0];
   const inputFields = agent?.params ?? [];
@@ -92,41 +85,42 @@ const AgentRunnerConnectedState: React.FC<AgentRunnerConnectedStateProps> = ({
           forceMount
           hidden={activeTab !== "configuration"}
         >
-          {selectedConfig ? (
+          {activeVersion ? (
             <AgentConfigurationEditView
-              item={selectedConfig}
+              key={activeVersion.id}
+              item={activeVersion}
               projectId={projectId}
-              onSaved={() => {}}
+              onSaved={() => setSelectedVersionId("")}
               headerLeft={
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="outline" size="2xs" className="gap-1">
-                      {versionLabel}
-                      <ChevronDown className="size-3.5" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="start">
+                <Select
+                  value={selectedVersionId || activeVersion.id}
+                  onValueChange={setSelectedVersionId}
+                >
+                  <SelectTrigger className="h-6 w-auto gap-1 px-2 text-xs focus:border-input">
+                    <span>Configuration:</span>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
                     {allVersions.map((v) => (
-                      <DropdownMenuItem
-                        key={v.id}
-                        onClick={() => setSelectedConfigId(v.id)}
-                      >
+                      <SelectItem key={v.id} value={v.id}>
                         {v.name}
                         {v.tags?.length > 0 && (
                           <span className="ml-2 text-muted-slate">
-                            {v.tags.join(" · ")}
+                            ({v.tags.join(" · ")})
                           </span>
                         )}
-                      </DropdownMenuItem>
+                      </SelectItem>
                     ))}
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                  </SelectContent>
+                </Select>
               }
             />
           ) : (
-            <p className="comet-body-s text-muted-slate">
-              No agent configuration found for this project.
-            </p>
+            <div className="flex flex-col items-center py-8 text-muted-slate">
+              <p className="comet-body-s">
+                No agent configuration found for this project.
+              </p>
+            </div>
           )}
         </TabsContent>
       </Tabs>
