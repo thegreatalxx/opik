@@ -5,7 +5,7 @@ import {
   Check,
   Copy,
   GraduationCap,
-  Grip,
+  ArrowUpRight,
   KeyRound,
   LogOut,
   Settings,
@@ -17,13 +17,11 @@ import {
 import { useOpenQuickStartDialog } from "@/hooks/useOpenQuickStartDialog";
 import TooltipWrapper from "@/shared/TooltipWrapper/TooltipWrapper";
 import { Avatar, AvatarFallback, AvatarImage } from "@/ui/avatar";
-import { Button } from "@/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuGroup,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuPortal,
   DropdownMenuSeparator,
   DropdownMenuSub,
@@ -131,45 +129,6 @@ const UserMenu = () => {
     );
   };
 
-  const renderAppSelector = () => {
-    if (isLLMOnlyOrganization) {
-      return null;
-    }
-
-    return (
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="icon-2xs">
-            <Grip />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          <DropdownMenuLabel>Your apps</DropdownMenuLabel>
-
-          <DropdownMenuGroup>
-            <DropdownMenuItem
-              className="flex cursor-pointer flex-row gap-3"
-              onClick={handleSwitchToEM}
-            >
-              <span className="flex size-6 items-center justify-center rounded-[6px] bg-[var(--feature-experiment-management)] text-[8px] font-medium text-white">
-                EM
-              </span>
-              <span>Experiment management</span>
-            </DropdownMenuItem>
-
-            <DropdownMenuItem className="flex cursor-pointer flex-row gap-3">
-              <span className="flex size-6 items-center justify-center rounded-[6px] bg-[var(--feature-llm)] text-[8px] font-medium text-white">
-                LLM
-              </span>
-
-              <span>LLM Evaluation (Opik)</span>
-            </DropdownMenuItem>
-          </DropdownMenuGroup>
-        </DropdownMenuContent>
-      </DropdownMenu>
-    );
-  };
-
   const renderInviteMembers = () => {
     if (isCollaboratorsTabEnabled) {
       if (!canInviteMembers) {
@@ -220,7 +179,7 @@ const UserMenu = () => {
     return (
       <DropdownMenu>
         <DropdownMenuTrigger asChild>{renderAvatar(true)}</DropdownMenuTrigger>
-        <DropdownMenuContent className="w-60" align="end">
+        <DropdownMenuContent className="w-64" align="end">
           <div className="flex items-center gap-2 px-4 py-2">
             {renderAvatar()}
             <TooltipWrapper content={user.userName}>
@@ -257,7 +216,7 @@ const UserMenu = () => {
                   <span>API Key</span>
                 </DropdownMenuSubTrigger>
                 <DropdownMenuPortal>
-                  <DropdownMenuSubContent className="w-60">
+                  <DropdownMenuSubContent className="w-64">
                     <div className="flex h-10 items-center justify-between gap-2 px-4">
                       <span className="comet-body-s truncate text-foreground">
                         {maskAPIKey(user.apiKeys[0])}
@@ -336,6 +295,21 @@ const UserMenu = () => {
               </DropdownMenuPortal>
             </DropdownMenuSub>
           </DropdownMenuGroup>
+          {!isLLMOnlyOrganization && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                className="cursor-pointer"
+                onClick={handleSwitchToEM}
+              >
+                <span className="mr-2 flex size-4 items-center justify-center rounded bg-[var(--feature-experiment-management)] text-[6px] font-medium text-white">
+                  EM
+                </span>
+                <span className="truncate">Experiment Management</span>
+                <ArrowUpRight className="ml-auto size-4 shrink-0 text-light-slate" />
+              </DropdownMenuItem>
+            </>
+          )}
           <DropdownMenuItem
             className="cursor-pointer"
             onClick={async () => {
@@ -373,12 +347,7 @@ const UserMenu = () => {
     );
   };
 
-  return (
-    <div className="flex shrink-0 items-center gap-3">
-      {renderAppSelector()}
-      {renderUserMenu()}
-    </div>
-  );
+  return renderUserMenu();
 };
 
 export default UserMenu;
