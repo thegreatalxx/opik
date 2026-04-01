@@ -21,6 +21,7 @@ export type MenuItem = {
   icon: LucideIcon;
   label: string;
   disabled?: boolean;
+  muted?: boolean;
   featureFlag?: FeatureToggleKeys;
   onClick?: MouseEventHandler<HTMLButtonElement>;
 };
@@ -56,7 +57,8 @@ const SidebarMenuItem: React.FunctionComponent<SidebarMenuItemProps> = ({
   );
 
   const linkClasses = cn(
-    "comet-body-s relative flex w-full items-center gap-2 rounded-md h-7 text-foreground hover:bg-primary-foreground data-[status=active]:bg-primary-100 data-[status=active]:text-primary py-1",
+    "comet-body-s relative flex w-full items-center gap-2 rounded-md h-7 hover:bg-primary-foreground data-[status=active]:bg-primary-100 data-[status=active]:text-primary py-1",
+    item.muted ? "text-muted-slate" : "text-foreground",
     expanded ? "px-2" : "w-7 justify-center",
   );
 

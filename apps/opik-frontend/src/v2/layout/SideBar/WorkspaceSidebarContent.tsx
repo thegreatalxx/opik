@@ -10,7 +10,7 @@ import useProjectById from "@/api/projects/useProjectById";
 import TooltipWrapper from "@/shared/TooltipWrapper/TooltipWrapper";
 import SidebarMenuItem from "@/v2/layout/SideBar/MenuItem/SidebarMenuItem";
 import GitHubStarListItem from "@/v2/layout/SideBar/GitHubStarListItem/GitHubStarListItem";
-import { getWorkspaceMenuItems } from "@/v2/layout/SideBar/helpers/getMenuItems";
+import { getWorkspaceSidebarMenuItems } from "@/v2/layout/SideBar/helpers/getMenuItems";
 import { usePermissions } from "@/contexts/PermissionsContext";
 
 interface WorkspaceSidebarContentProps {
@@ -37,7 +37,7 @@ const WorkspaceSidebarContent: React.FC<WorkspaceSidebarContentProps> = ({
     { enabled: !!activeProjectId },
   );
 
-  const menuGroups = getWorkspaceMenuItems({ canViewDashboards });
+  const menuGroups = getWorkspaceSidebarMenuItems({ canViewDashboards });
 
   const workspaceSelector = SidebarWorkspaceSelectorComponent ? (
     <SidebarWorkspaceSelectorComponent expanded={expanded} />

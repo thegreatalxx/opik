@@ -5,6 +5,7 @@ import {
   ChartLine,
   FileTerminal,
   FlaskConical,
+  LayoutDashboard,
   ListChecks,
   Rows3,
   Settings2,
@@ -182,7 +183,39 @@ export const getWorkspaceMenuItems = ({
 }): MenuItemGroup[] => {
   return [
     {
-      id: "workspace",
+      id: "workspace-nav",
+      items: [
+        {
+          id: "workspace",
+          path: canViewDashboards
+            ? "/$workspaceName/dashboards"
+            : "/$workspaceName/projects",
+          type: MENU_ITEM_TYPE.router,
+          icon: LayoutDashboard,
+          label: "Workspace",
+          muted: true,
+        },
+        {
+          id: "configuration",
+          path: "/$workspaceName/configuration",
+          type: MENU_ITEM_TYPE.router,
+          icon: Settings2,
+          label: "Configuration",
+          muted: true,
+        },
+      ],
+    },
+  ];
+};
+
+export const getWorkspaceSidebarMenuItems = ({
+  canViewDashboards,
+}: {
+  canViewDashboards: boolean;
+}): MenuItemGroup[] => {
+  return [
+    {
+      id: "workspace-sidebar",
       items: [
         {
           id: "configuration",
