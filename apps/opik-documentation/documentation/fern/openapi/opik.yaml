@@ -16676,7 +16676,6 @@ components:
     KpiCardRequest:
       required:
       - entity_type
-      - interval_end
       - interval_start
       type: object
       properties:
