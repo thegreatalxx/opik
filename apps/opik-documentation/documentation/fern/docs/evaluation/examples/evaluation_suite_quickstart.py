@@ -22,10 +22,10 @@ openai_client = track_openai(OpenAI())
 # Step 1 — Create a suite
 # ---------------------------------------------------------------------------
 
-opik_client = opik.Opik(project_name="qa-bot-eval")
+opik_client = opik.Opik()
 
 suite = opik_client.get_or_create_evaluation_suite(
-    name="acme-cloud-qa",
+    name="customer-support-qa",
     assertions=[
         "The response is grounded in the provided documentation context",
         "The response directly addresses the user's question",
@@ -87,8 +87,8 @@ def make_task(system_prompt):
 PROMPT_V1 = "You are a helpful assistant. Be as detailed as possible."
 PROMPT_V2 = "You are a concise assistant. Answer based ONLY on the provided context."
 
-result_v1 = suite.run(task=make_task(PROMPT_V1))
-result_v2 = suite.run(task=make_task(PROMPT_V2))
+result_v1 = suite.run(task=make_task(PROMPT_V1), project_name="eval-suites-demo")
+result_v2 = suite.run(task=make_task(PROMPT_V2), project_name="eval-suites-demo")
 
 print(f"\nv1 pass rate: {result_v1.pass_rate:.0%}")
 print(f"v2 pass rate: {result_v2.pass_rate:.0%}")
