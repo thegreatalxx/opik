@@ -138,12 +138,8 @@ const PROMPT_V1 = "You are a helpful assistant. Be as detailed as possible.";
 const PROMPT_V2 =
   "You are a concise assistant. Answer based ONLY on the provided context.";
 
-const resultV1 = await suite.run(makeTask(PROMPT_V1), {
-  projectName: "qa-bot-eval",
-});
-const resultV2 = await suite.run(makeTask(PROMPT_V2), {
-  projectName: "qa-bot-eval",
-});
+const resultV1 = await suite.run(makeTask(PROMPT_V1));
+const resultV2 = await suite.run(makeTask(PROMPT_V2));
 
 console.log(`v1 pass rate: ${((resultV1.passRate ?? 0) * 100).toFixed(0)}%`);
 console.log(`v2 pass rate: ${((resultV2.passRate ?? 0) * 100).toFixed(0)}%`);
@@ -223,7 +219,6 @@ By default, assertions are checked by `gpt-5-nano`. You can override this when r
 ```typescript
 const result = await suite.run(task, {
   model: "gpt-4o",
-  projectName: "qa-bot-eval",
 });
 ```
 
@@ -305,12 +300,8 @@ const PROMPT_V1 = "You are a helpful assistant. Be as detailed as possible.";
 const PROMPT_V2 =
   "You are a concise assistant. Answer based ONLY on the provided context.";
 
-const resultV1 = await suite.run(makeTask(PROMPT_V1), {
-  projectName: "qa-bot-eval",
-});
-const resultV2 = await suite.run(makeTask(PROMPT_V2), {
-  projectName: "qa-bot-eval",
-});
+const resultV1 = await suite.run(makeTask(PROMPT_V1));
+const resultV2 = await suite.run(makeTask(PROMPT_V2));
 
 console.log(`\nv1 pass rate: ${((resultV1.passRate ?? 0) * 100).toFixed(0)}%`);
 console.log(`v2 pass rate: ${((resultV2.passRate ?? 0) * 100).toFixed(0)}%`);
