@@ -206,6 +206,134 @@ class DatasetsResourceProjectScopedTest {
     }
 
     @Test
+    @DisplayName("Create dataset with same name in different projects succeeds")
+    void createDataset__sameNameDifferentProjects__succeeds() {
+        String apiKey = UUID.randomUUID().toString();
+        String workspaceName = UUID.randomUUID().toString();
+        String workspaceId = UUID.randomUUID().toString();
+        mockTargetWorkspace(apiKey, workspaceName, workspaceId);
+
+        var projectIdA = projectResourceClient.createProject("project-" + UUID.randomUUID(), apiKey, workspaceName);
+        var projectIdB = projectResourceClient.createProject("project-" + UUID.randomUUID(), apiKey, workspaceName);
+
+        String sharedName = "shared-dataset-" + UUID.randomUUID();
+
+        var datasetA = buildDataset().toBuilder()
+                .id(null)
+                .name(sharedName)
+                .projectId(projectIdA)
+                .build();
+
+        var datasetB = buildDataset().toBuilder()
+                .id(null)
+                .name(sharedName)
+                .projectId(projectIdB)
+                .build();
+
+        var idA = datasetResourceClient.createDataset(datasetA, apiKey, workspaceName);
+        var idB = datasetResourceClient.createDataset(datasetB, apiKey, workspaceName);
+
+        assertThat(idA).isNotEqualTo(idB);
+
+        var fetchedA = datasetResourceClient.getDatasetById(idA, apiKey, workspaceName);
+        var fetchedB = datasetResourceClient.getDatasetById(idB, apiKey, workspaceName);
+        assertThat(fetchedA.name()).isEqualTo(sharedName);
+        assertThat(fetchedB.name()).isEqualTo(sharedName);
+        assertThat(fetchedA.projectId()).isEqualTo(projectIdA);
+        assertThat(fetchedB.projectId()).isEqualTo(projectIdB);
+    }
+
+    @Test
+    @DisplayName("Create dataset with same name in same project returns 409")
+    void createDataset__sameNameSameProject__returns409() {
+        String apiKey = UUID.randomUUID().toString();
+        String workspaceName = UUID.randomUUID().toString();
+        String workspaceId = UUID.randomUUID().toString();
+        mockTargetWorkspace(apiKey, workspaceName, workspaceId);
+
+        var projectId = projectResourceClient.createProject("project-" + UUID.randomUUID(), apiKey, workspaceName);
+
+        String sharedName = "dup-dataset-" + UUID.randomUUID();
+
+        var dataset1 = buildDataset().toBuilder()
+                .id(null)
+                .name(sharedName)
+                .projectId(projectId)
+                .build();
+
+        datasetResourceClient.createDataset(dataset1, apiKey, workspaceName);
+
+        var dataset2 = buildDataset().toBuilder()
+                .id(null)
+                .name(sharedName)
+                .projectId(projectId)
+                .build();
+
+        try (var response = datasetResourceClient.callCreateDataset(dataset2, apiKey, workspaceName)) {
+            assertThat(response.getStatus()).isEqualTo(409);
+        }
+    }
+
+    @Test
+    @DisplayName("Create dataset with same name as workspace-level and project-scoped succeeds")
+    void createDataset__sameNameWorkspaceLevelAndProjectScoped__succeeds() {
+        String apiKey = UUID.randomUUID().toString();
+        String workspaceName = UUID.randomUUID().toString();
+        String workspaceId = UUID.randomUUID().toString();
+        mockTargetWorkspace(apiKey, workspaceName, workspaceId);
+
+        var projectId = projectResourceClient.createProject("project-" + UUID.randomUUID(), apiKey, workspaceName);
+
+        String sharedName = "mixed-dataset-" + UUID.randomUUID();
+
+        var workspaceDataset = buildDataset().toBuilder()
+                .id(null)
+                .name(sharedName)
+                .projectId(null)
+                .build();
+
+        var projectDataset = buildDataset().toBuilder()
+                .id(null)
+                .name(sharedName)
+                .projectId(projectId)
+                .build();
+
+        var wsId = datasetResourceClient.createDataset(workspaceDataset, apiKey, workspaceName);
+        var projId = datasetResourceClient.createDataset(projectDataset, apiKey, workspaceName);
+
+        assertThat(wsId).isNotEqualTo(projId);
+    }
+
+    @Test
+    @DisplayName("Create two workspace-level datasets with same name returns 409")
+    void createDataset__sameNameBothWorkspaceLevel__returns409() {
+        String apiKey = UUID.randomUUID().toString();
+        String workspaceName = UUID.randomUUID().toString();
+        String workspaceId = UUID.randomUUID().toString();
+        mockTargetWorkspace(apiKey, workspaceName, workspaceId);
+
+        String sharedName = "ws-dup-dataset-" + UUID.randomUUID();
+
+        var dataset1 = buildDataset().toBuilder()
+                .id(null)
+                .name(sharedName)
+                .projectId(null)
+                .build();
+
+        datasetResourceClient.createDataset(dataset1, apiKey, workspaceName);
+
+        var dataset2 = buildDataset().toBuilder()
+                .id(null)
+                .name(sharedName)
+                .projectId(null)
+                .build();
+
+        try (var response = datasetResourceClient.callCreateDataset(dataset2, apiKey, workspaceName)) {
+            assertThat(response.getStatus()).isEqualTo(409);
+        }
+    }
+
+    @Test
     @DisplayName("Put dataset items with project_name implicitly creates dataset scoped to that project")
     void putDatasetItemsWithProjectNameScopesDatasetToProject() {
         String apiKey = UUID.randomUUID().toString();

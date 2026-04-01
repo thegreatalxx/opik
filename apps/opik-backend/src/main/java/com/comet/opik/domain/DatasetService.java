@@ -182,9 +182,18 @@ class DatasetServiceImpl implements DatasetService {
             UUID projectId) {
         var dataset = template.inTransaction(READ_ONLY, handle -> {
             var dao = handle.attach(DatasetDAO.class);
-            var result = dao.findByName(workspaceId, name, projectId);
-            if (result.isEmpty() && projectId != null) {
-                result = dao.findByName(workspaceId, name, null);
+            Optional<Dataset> result;
+            if (projectId != null) {
+                result = dao.findByNameProjectScoped(workspaceId, name, projectId);
+                if (result.isEmpty()) {
+                    // Backward compat: find workspace-level dataset (v1 created, no project_id)
+                    result = dao.findByNameWorkspaceLevel(workspaceId, name);
+                    result.ifPresent(d -> log.info(
+                            "Dataset '{}' not found in project '{}', using workspace-level dataset '{}'",
+                            name, projectId, d.id()));
+                }
+            } else {
+                result = dao.findByNameWorkspaceLevel(workspaceId, name);
             }
             return result;
         });
@@ -225,7 +234,7 @@ class DatasetServiceImpl implements DatasetService {
             return Mono.fromCallable(() -> getOrCreate(workspaceId, datasetName, userName, projectId))
                     .subscribeOn(Schedulers.boundedElastic());
         })
-                .onErrorResume(throwable -> handleDatasetCreationError(throwable, datasetName)
+                .onErrorResume(throwable -> handleDatasetCreationError(throwable, datasetName, projectId)
                         .map(Dataset::id));
     }
 
@@ -321,7 +330,8 @@ class DatasetServiceImpl implements DatasetService {
         Dataset dataset = template.inTransaction(READ_ONLY, handle -> {
             var dao = handle.attach(DatasetDAO.class);
 
-            Dataset d = dao.findByName(workspaceId, name, null).orElseThrow(this::newNotFoundException);
+            Dataset d = dao.findByNameWorkspaceLevel(workspaceId, name)
+                    .orElseThrow(this::newNotFoundException);
 
             log.info("Found dataset with name '{}', id '{}', workspaceId '{}'", name, d.id(), workspaceId);
             return d;
@@ -336,17 +346,21 @@ class DatasetServiceImpl implements DatasetService {
         Dataset dataset = template.inTransaction(READ_ONLY, handle -> {
             var dao = handle.attach(DatasetDAO.class);
 
-            return dao.findByName(workspaceId, name, projectId)
-                    .or(() -> {
-                        if (projectId == null) {
-                            return Optional.empty();
-                        }
-                        return dao.findByName(workspaceId, name, null).map(d -> {
-                            requestContext.get().setWorkspaceFallbackFor("Dataset", name);
-                            return d;
-                        });
-                    })
-                    .orElseThrow(this::newNotFoundException);
+            Optional<Dataset> result;
+            if (projectId != null) {
+                result = dao.findByNameProjectScoped(workspaceId, name, projectId);
+                if (result.isEmpty()) {
+                    // Backward compat: find workspace-level dataset (v1 created, no project_id)
+                    result = dao.findByNameWorkspaceLevel(workspaceId, name).map(d -> {
+                        requestContext.get().setWorkspaceFallbackFor("Dataset", name);
+                        return d;
+                    });
+                }
+            } else {
+                result = dao.findByNameWorkspaceLevel(workspaceId, name);
+            }
+
+            return result.orElseThrow(this::newNotFoundException);
         });
 
         log.info("Found dataset with name '{}', id '{}', workspaceId '{}', projectId '{}'",
@@ -397,13 +411,13 @@ class DatasetServiceImpl implements DatasetService {
     public void delete(@NonNull DatasetIdentifier identifier) {
         String workspaceId = requestContext.get().getWorkspaceId();
 
-        Dataset dataset = findByName(workspaceId, identifier.datasetName(), Visibility.PRIVATE);
+        Dataset dataset = findByName(workspaceId, identifier, Visibility.PRIVATE);
 
         template.inTransaction(WRITE, handle -> {
             deleteDatasetVersionData(handle, Set.of(dataset.id()), workspaceId);
 
             var datasetDao = handle.attach(DatasetDAO.class);
-            datasetDao.delete(workspaceId, identifier.datasetName());
+            datasetDao.delete(dataset.id(), workspaceId);
             return null;
         });
 
@@ -840,12 +854,12 @@ class DatasetServiceImpl implements DatasetService {
                 .orElseThrow(this::newNotFoundException);
     }
 
-    private Mono<Dataset> handleDatasetCreationError(Throwable throwable, String datasetName) {
+    private Mono<Dataset> handleDatasetCreationError(Throwable throwable, String datasetName, UUID projectId) {
         if (throwable instanceof EntityAlreadyExistsException) {
             return Mono.deferContextual(ctx -> {
                 String workspaceId = ctx.get(RequestContext.WORKSPACE_ID);
 
-                return Mono.fromCallable(() -> findByName(workspaceId, datasetName, Visibility.PRIVATE))
+                return Mono.fromCallable(() -> findByName(workspaceId, datasetName, projectId, Visibility.PRIVATE))
                         .subscribeOn(Schedulers.boundedElastic());
             });
         }

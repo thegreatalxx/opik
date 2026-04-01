@@ -201,12 +201,25 @@ public interface DatasetDAO {
             @Define("filters") String filters,
             @BindMap Map<String, Object> filterMapping);
 
+    /**
+     * @deprecated Use {@link #findByNameWorkspaceLevel} or {@link #findByNameProjectScoped} instead.
+     * This method is ambiguous when projectId is null: it matches datasets in any project.
+     */
+    @Deprecated
     @SqlQuery("SELECT * FROM datasets WHERE workspace_id = :workspace_id AND name = :name" +
             " <if(project_id)> AND project_id = :project_id <endif>")
     @UseStringTemplateEngine
     @AllowUnusedBindings
     Optional<Dataset> findByName(@Bind("workspace_id") String workspaceId, @Bind("name") String name,
             @Define("project_id") @Bind("project_id") UUID projectId);
+
+    @SqlQuery("SELECT * FROM datasets WHERE workspace_id = :workspace_id AND name = :name AND project_id IS NULL")
+    Optional<Dataset> findByNameWorkspaceLevel(@Bind("workspace_id") String workspaceId,
+            @Bind("name") String name);
+
+    @SqlQuery("SELECT * FROM datasets WHERE workspace_id = :workspace_id AND name = :name AND project_id = :project_id")
+    Optional<Dataset> findByNameProjectScoped(@Bind("workspace_id") String workspaceId,
+            @Bind("name") String name, @Bind("project_id") UUID projectId);
 
     @SqlQuery("SELECT id FROM datasets WHERE workspace_id = :workspace_id AND name LIKE CONCAT('%', :name, '%') ESCAPE '\\\\'")
     List<UUID> findIdsByPartialName(@Bind("workspace_id") String workspaceId, @Bind("name") String name);
