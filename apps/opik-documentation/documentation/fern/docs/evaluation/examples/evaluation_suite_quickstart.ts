@@ -23,6 +23,7 @@ const openai = new OpenAI();
 // Step 1 — Create a suite
 const suite = await EvaluationSuite.getOrCreate(client, {
   name: "customer-support-qa",
+  projectName: "eval-suites-demo",
   assertions: [
     "The response is grounded in the provided documentation context",
     "The response directly addresses the user's question",
@@ -85,12 +86,8 @@ const PROMPT_V1 = "You are a helpful assistant. Be as detailed as possible.";
 const PROMPT_V2 =
   "You are a concise assistant. Answer based ONLY on the provided context.";
 
-const resultV1 = await suite.run(makeTask(PROMPT_V1), {
-  projectName: "eval-suites-demo",
-});
-const resultV2 = await suite.run(makeTask(PROMPT_V2), {
-  projectName: "eval-suites-demo",
-});
+const resultV1 = await suite.run(makeTask(PROMPT_V1));
+const resultV2 = await suite.run(makeTask(PROMPT_V2));
 
 console.log(`\nv1 pass rate: ${((resultV1.passRate ?? 0) * 100).toFixed(0)}%`);
 console.log(`v2 pass rate: ${((resultV2.passRate ?? 0) * 100).toFixed(0)}%`);
