@@ -17,6 +17,11 @@ export interface GetBlueprintOptions {
   maskId?: string;
 }
 
+/**
+ * @internal
+ * Do not use directly. Use {@link OpikClient.getAgentConfigVersion} and
+ * {@link OpikClient.registerAgentConfig} instead.
+ */
 export class AgentConfigManager {
   private readonly projectName: string;
   private readonly opik: OpikClient;

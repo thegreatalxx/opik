@@ -28,8 +28,7 @@ export { TracesAnnotationQueue, ThreadsAnnotationQueue } from "@/annotation-queu
 export type { AnnotationQueuePublicScope as AnnotationQueueScope } from "@/rest_api/api/types/AnnotationQueuePublicScope";
 
 // AgentConfig exports
-export { Blueprint, AgentConfigManager, agentConfigContext } from "@/agent-config";
-export type { CreateBlueprintOptions, GetBlueprintOptions, AgentConfig, FieldMeta } from "@/agent-config";
+export type { AgentConfig, FieldMeta } from "@/agent-config";
 
 // Runner exports
 export { activateRunner } from "@/runner/activate";

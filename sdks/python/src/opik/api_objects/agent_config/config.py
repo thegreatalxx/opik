@@ -12,8 +12,12 @@ from .blueprint import Blueprint
 from .. import type_helpers
 
 
-class AgentConfigManager:
-    """Project-level agent config entity — internal REST operations."""
+class _AgentConfigManager:
+    """Internal class — do not use directly.
+
+    Use :meth:`opik.Opik.get_agent_config` and :meth:`opik.Opik.register_agent_config`
+    instead.
+    """
 
     def __init__(
         self,

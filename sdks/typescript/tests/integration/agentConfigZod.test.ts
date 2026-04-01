@@ -5,9 +5,9 @@
  */
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { z } from "zod";
-import { Opik, track, agentConfigContext, Prompt } from "@/index";
+import { Opik, track, Prompt } from "@/index";
 import { ChatPrompt } from "@/prompt/ChatPrompt";
-import { AgentConfigManager } from "@/agent-config";
+import { AgentConfigManager, agentConfigContext } from "@/agent-config";
 import { getTrackContext, getTrackOpikClient } from "@/decorators/track";
 import {
   shouldRunIntegrationTests,

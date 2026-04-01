@@ -44,7 +44,7 @@ from .experiment import rest_operations as experiment_rest_operations
 from . import prompt as prompt_module
 from .prompt import client as prompt_client
 from .agent_config.base import AgentConfig
-from .agent_config.config import AgentConfigManager
+from .agent_config.config import _AgentConfigManager
 from .threads import threads_client
 from .trace import migration as trace_migration, trace_client
 from .. import config as opik_config
@@ -2621,7 +2621,7 @@ class Opik:
                 f"got {type(config).__name__}"
             )
 
-        manager = AgentConfigManager(
+        manager = _AgentConfigManager(
             project_name=project_name or self._project_name,
             rest_client_=self._rest_client,
         )
@@ -2679,7 +2679,7 @@ class Opik:
             env = "prod"
 
         resolved_project = project_name or self._project_name
-        manager = AgentConfigManager(
+        manager = _AgentConfigManager(
             project_name=resolved_project,
             rest_client_=self._rest_client,
         )
