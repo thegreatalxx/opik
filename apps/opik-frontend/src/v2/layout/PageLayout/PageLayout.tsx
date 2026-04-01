@@ -11,8 +11,7 @@ import { FeatureToggleKeys } from "@/types/feature-toggles";
 import LayoutDialogs from "@/v2/layout/LayoutDialogs";
 import { PortalContainerProvider } from "@/lib/portal-container";
 import SilentErrorBoundary from "@/shared/SilentErrorBoundary/SilentErrorBoundary";
-
-const MOBILE_BREAKPOINT = 1024;
+import { useMediaQuery } from "@/hooks/useMediaQuery";
 
 const PageLayout = () => {
   const [hostContainer, setHostContainer] = useState<HTMLDivElement | null>(
@@ -38,8 +37,7 @@ const PageLayout = () => {
 
   const showAssistantSidebar = !!AssistantSidebar;
 
-  const isMobile =
-    typeof window !== "undefined" && window.innerWidth < MOBILE_BREAKPOINT;
+  const isMobile = useMediaQuery("(max-width: 1023px)");
   const expanded = isMobile ? false : storedExpanded;
 
   const handleSidebarWidthChange = useCallback((width: number) => {

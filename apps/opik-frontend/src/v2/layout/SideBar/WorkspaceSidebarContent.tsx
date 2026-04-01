@@ -48,13 +48,22 @@ const WorkspaceSidebarContent: React.FC<WorkspaceSidebarContentProps> = ({
   ) : null;
 
   const handleBackToProject = () => {
-    navigate({
-      to: "/$workspaceName/projects/$projectId/home",
-      params: { workspaceName, projectId: activeProjectId! },
-    });
+    if (activeProjectId) {
+      navigate({
+        to: "/$workspaceName/projects/$projectId/home",
+        params: { workspaceName, projectId: activeProjectId },
+      });
+    } else {
+      navigate({
+        to: "/$workspaceName",
+        params: { workspaceName },
+      });
+    }
   };
 
-  const backButtonLabel = `Back to ${activeProject?.name ?? "project"}`;
+  const backButtonLabel = activeProject
+    ? `Back to ${activeProject.name}`
+    : "Back to project";
 
   const backButton = expanded ? (
     <Button
