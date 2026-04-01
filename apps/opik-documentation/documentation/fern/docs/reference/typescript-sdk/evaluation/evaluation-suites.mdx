@@ -148,12 +148,6 @@ console.log(`v2 pass rate: ${((resultV2.passRate ?? 0) * 100).toFixed(0)}%`);
 await client.flush();
 ```
 
-Each run displays a summary in the console with a clickable link to the Opik dashboard:
-
-<Frame caption="Terminal output after running the evaluation suite">
-  <img src="/img/evaluation/terminal_eval_output.png" />
-</Frame>
-
 Each run creates a separate experiment in Opik, making it easy to compare results in the dashboard:
 
 <Frame caption="Experiment items with pass/fail results per test case">
