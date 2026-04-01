@@ -1,6 +1,7 @@
 import {
   Bell,
   Blocks,
+  Bot,
   ChartLine,
   FileTerminal,
   FlaskConical,
@@ -182,8 +183,21 @@ export const getWorkspaceMenuItems = ({
   return [
     {
       id: "workspace",
-      label: "Workspace",
       items: [
+        {
+          id: "configuration",
+          path: "/$workspaceName/configuration",
+          type: MENU_ITEM_TYPE.router,
+          icon: Settings2,
+          label: "Configuration",
+        },
+        {
+          id: "projects",
+          path: "/$workspaceName/projects",
+          type: MENU_ITEM_TYPE.router,
+          icon: Bot,
+          label: "Projects",
+        },
         ...(canViewDashboards
           ? [
               {
@@ -195,13 +209,6 @@ export const getWorkspaceMenuItems = ({
               },
             ]
           : []),
-        {
-          id: "configuration",
-          path: "/$workspaceName/configuration",
-          type: MENU_ITEM_TYPE.router,
-          icon: Settings2,
-          label: "Configuration",
-        },
       ],
     },
   ];
