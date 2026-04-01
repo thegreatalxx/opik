@@ -22,7 +22,7 @@ openai_client = track_openai(OpenAI())
 # Step 1 — Create a suite
 # ---------------------------------------------------------------------------
 
-opik_client = opik.Opik()
+opik_client = opik.Opik(project_name="qa-bot-eval")
 
 suite = opik_client.get_or_create_evaluation_suite(
     name="acme-cloud-qa",
