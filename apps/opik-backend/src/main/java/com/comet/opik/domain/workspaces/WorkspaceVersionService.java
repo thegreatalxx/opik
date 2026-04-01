@@ -162,12 +162,14 @@ abstract class AbstractWorkspaceVersionService implements WorkspaceVersionServic
             String userName) {
         if (authSuggestedVersion == OpikVersion.VERSION_2) {
             log.info("Locked via auth one-way gate, workspaceId '{}', version '{}'", workspaceId, authSuggestedVersion);
-            return storeAndReturn(workspaceId, OpikVersion.VERSION_2, userName);
+            return storeOpikVersion(workspaceId, OpikVersion.VERSION_2, userName)
+                    .thenReturn(buildResponse(OpikVersion.VERSION_2));
         }
         return getStoredOpikVersion(workspaceId)
                 .flatMap(stored -> {
                     if (stored.isPresent() && stored.get() == OpikVersion.VERSION_2) {
-                        log.info("Locked via stored V2 latch, workspaceId '{}'", workspaceId);
+                        log.info("Previous workspace determination found as '{}' for workspace '{}'",
+                                stored.get().getValue(), workspaceId);
                         return Mono.just(buildResponse(OpikVersion.VERSION_2));
                     }
                     return checkEntities(workspaceId, userName);
@@ -182,13 +184,14 @@ abstract class AbstractWorkspaceVersionService implements WorkspaceVersionServic
                 experimentDAO.hasVersion1Experiments(workspaceId, DemoData.EXPERIMENTS))
                 .any(found -> found)
                 .flatMap(found -> {
-                    var opikVersion = found ? OpikVersion.VERSION_1 : OpikVersion.VERSION_2;
+                    var version = found ? OpikVersion.VERSION_1 : OpikVersion.VERSION_2;
                     log.info("Workspace version determined as '{}' for workspace '{}' (hasVersion1Entities={})",
-                            opikVersion.getValue(), workspaceId, found);
-                    if (opikVersion == OpikVersion.VERSION_2) {
-                        return storeAndReturn(workspaceId, OpikVersion.VERSION_2, userName);
+                            version.getValue(), workspaceId, found);
+                    if (version == OpikVersion.VERSION_2) {
+                        return storeOpikVersion(workspaceId, OpikVersion.VERSION_2, userName)
+                                .thenReturn(buildResponse(OpikVersion.VERSION_2));
                     }
-                    return Mono.just(buildResponse(opikVersion));
+                    return Mono.just(buildResponse(version));
                 });
     }
 
@@ -198,14 +201,13 @@ abstract class AbstractWorkspaceVersionService implements WorkspaceVersionServic
                 .subscribeOn(Schedulers.boundedElastic());
     }
 
-    private Mono<WorkspaceVersion> storeAndReturn(String workspaceId, OpikVersion opikVersion, String userName) {
-        return Mono.fromCallable(() -> {
+    private Mono<Void> storeOpikVersion(String workspaceId, OpikVersion opikVersion, String userName) {
+        return Mono.<Void>fromRunnable(() -> {
             transactionTemplate.inTransaction(WRITE, handle -> {
                 handle.attach(WorkspaceDAO.class).upsertOpikVersion(workspaceId, opikVersion, userName);
                 return null;
             });
             log.info("Stored workspace version '{}' for workspace '{}'", opikVersion.getValue(), workspaceId);
-            return buildResponse(opikVersion);
         }).subscribeOn(Schedulers.boundedElastic());
     }
 
