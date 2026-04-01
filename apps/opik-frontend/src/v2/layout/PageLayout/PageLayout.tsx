@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Outlet } from "@tanstack/react-router";
 import SideBar from "@/v2/layout/SideBar/SideBar";
 import TopBar from "@/v2/layout/TopBar/TopBar";
-import SidebarToggle from "@/v2/layout/TopBar/SidebarToggle";
 import useLocalStorageState from "use-local-storage-state";
 import usePluginsStore from "@/store/PluginsStore";
 import WelcomeWizardDialog from "@/v2/pages-shared/WelcomeWizard/WelcomeWizardDialog";
@@ -10,19 +9,19 @@ import useWelcomeWizardStatus from "@/api/welcome-wizard/useWelcomeWizardStatus"
 import { useIsFeatureEnabled } from "@/contexts/feature-toggles-provider";
 import { FeatureToggleKeys } from "@/types/feature-toggles";
 import LayoutDialogs from "@/v2/layout/LayoutDialogs";
-import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { PortalContainerProvider } from "@/lib/portal-container";
 import SilentErrorBoundary from "@/shared/SilentErrorBoundary/SilentErrorBoundary";
+
+const MOBILE_BREAKPOINT = 1024;
 
 const PageLayout = () => {
   const [hostContainer, setHostContainer] = useState<HTMLDivElement | null>(
     null,
   );
-  const [storedPinned = true, setStoredPinned] =
-    useLocalStorageState<boolean>("sidebar-pinned");
+  const [storedExpanded = true, setStoredExpanded] =
+    useLocalStorageState<boolean>("sidebar-expanded");
   const [bannerHeight, setBannerHeight] = useState(0);
   const [showWelcomeWizard, setShowWelcomeWizard] = useState(false);
-  const [overlayOpen, setOverlayOpen] = useState(false);
   const [assistantSidebarWidth, setAssistantSidebarWidth] = useState(0);
   const sidebarWrapperRef = useRef<HTMLDivElement>(null);
 
@@ -39,16 +38,9 @@ const PageLayout = () => {
 
   const showAssistantSidebar = !!AssistantSidebar;
 
-  const isMobile = useMediaQuery("(max-width: 1023px)");
-  const pinned = isMobile ? false : storedPinned;
-
-  const handleTogglePin = useCallback(() => {
-    setStoredPinned((prev) => !prev);
-  }, [setStoredPinned]);
-
-  const handleToggleOverlay = useCallback(() => {
-    setOverlayOpen((prev) => !prev);
-  }, []);
+  const isMobile =
+    typeof window !== "undefined" && window.innerWidth < MOBILE_BREAKPOINT;
+  const expanded = isMobile ? false : storedExpanded;
 
   const handleSidebarWidthChange = useCallback((width: number) => {
     if (sidebarWrapperRef.current) {
@@ -82,7 +74,7 @@ const PageLayout = () => {
       style={
         {
           "--banner-height": `${bannerHeight}px`,
-          "--sidebar-width": pinned ? "240px" : "0px",
+          "--sidebar-width": expanded ? "240px" : "54px",
           "--assistant-sidebar-width": `${
             showAssistantSidebar ? assistantSidebarWidth : 0
           }px`,
@@ -99,25 +91,9 @@ const PageLayout = () => {
               <RetentionBanner onChangeHeight={setBannerHeight} />
             ) : null}
 
-            <SideBar
-              pinned={pinned}
-              onTogglePin={handleTogglePin}
-              overlayOpen={overlayOpen}
-              onOverlayOpenChange={setOverlayOpen}
-              isMobile={isMobile}
-            />
+            <SideBar expanded={expanded} setExpanded={setStoredExpanded} />
             <main className="comet-content-inset absolute bottom-0 right-0 top-[var(--banner-height)] flex transition-all">
-              <TopBar
-                startSlot={
-                  !pinned ? (
-                    <SidebarToggle
-                      onToggle={
-                        isMobile ? handleToggleOverlay : handleTogglePin
-                      }
-                    />
-                  ) : undefined
-                }
-              />
+              <TopBar />
               <section className="comet-header-inset absolute inset-x-0 bottom-0 overflow-auto bg-soft-background px-6">
                 <Outlet />
               </section>

@@ -42,7 +42,13 @@ import ConfirmDialog from "@/shared/ConfirmDialog/ConfirmDialog";
 import TooltipWrapper from "@/shared/TooltipWrapper/TooltipWrapper";
 import AddEditProjectDialog from "@/v2/pages/ProjectsPage/AddEditProjectDialog";
 
-const ProjectSelector: React.FC = () => {
+interface ProjectSelectorProps {
+  expanded?: boolean;
+}
+
+const ProjectSelector: React.FC<ProjectSelectorProps> = ({
+  expanded = true,
+}) => {
   useActiveProjectInitializer();
 
   const [open, setOpen] = useState(false);
@@ -84,38 +90,55 @@ const ProjectSelector: React.FC = () => {
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverAnchor asChild>
         <PopoverTrigger asChild>
-          <button
-            className={cn(
-              "flex w-full items-center gap-1 rounded-md px-2 py-1",
-              open ? "bg-primary-foreground" : "hover:bg-primary-foreground",
-            )}
-          >
-            {isLoading ? (
-              <>
-                <Spinner size="xs" />
-                <span className="comet-body-s flex-1 text-left text-muted-slate">
-                  Loading…
-                </span>
-              </>
-            ) : activeProject ? (
-              <TooltipWrapper content={activeProject.name}>
-                <span className="comet-body-s-accented flex-1 truncate text-left text-foreground">
-                  {activeProject.name}
-                </span>
-              </TooltipWrapper>
-            ) : (
-              <span className="comet-body-s-accented flex-1 truncate text-left text-muted-slate">
-                Select project
-              </span>
-            )}
-            <span className="shrink-0 text-muted-slate">
-              {open ? (
-                <ChevronUp className="size-3.5" />
-              ) : (
-                <ChevronDown className="size-3.5" />
+          {expanded ? (
+            <button
+              className={cn(
+                "flex w-full items-center gap-1 rounded-md px-2 py-1",
+                open ? "bg-primary-foreground" : "hover:bg-primary-foreground",
               )}
-            </span>
-          </button>
+            >
+              {isLoading ? (
+                <>
+                  <Spinner size="xs" />
+                  <span className="comet-body-s flex-1 text-left text-muted-slate">
+                    Loading…
+                  </span>
+                </>
+              ) : activeProject ? (
+                <TooltipWrapper content={activeProject.name}>
+                  <span className="comet-body-s-accented flex-1 truncate text-left text-foreground">
+                    {activeProject.name}
+                  </span>
+                </TooltipWrapper>
+              ) : (
+                <span className="comet-body-s-accented flex-1 truncate text-left text-muted-slate">
+                  Select project
+                </span>
+              )}
+              <span className="shrink-0 text-muted-slate">
+                {open ? (
+                  <ChevronUp className="size-3.5" />
+                ) : (
+                  <ChevronDown className="size-3.5" />
+                )}
+              </span>
+            </button>
+          ) : (
+            <button
+              className={cn(
+                "flex size-7 items-center justify-center rounded-md py-1",
+                open ? "bg-primary-foreground" : "hover:bg-primary-foreground",
+              )}
+            >
+              {isLoading ? (
+                <Spinner size="xs" />
+              ) : open ? (
+                <ChevronUp className="size-3.5 text-foreground" />
+              ) : (
+                <ChevronDown className="size-3.5 text-foreground" />
+              )}
+            </button>
+          )}
         </PopoverTrigger>
       </PopoverAnchor>
       <PopoverContent
