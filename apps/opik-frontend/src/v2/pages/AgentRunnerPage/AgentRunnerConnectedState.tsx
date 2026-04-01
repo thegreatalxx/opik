@@ -11,7 +11,6 @@ type AgentRunnerConnectedStateProps = {
   runner: LocalRunner;
   onRun: (inputs: Record<string, unknown>, maskId?: string) => void;
   isRunning: boolean;
-  result: React.ReactNode;
 };
 
 const AgentRunnerConnectedState: React.FC<AgentRunnerConnectedStateProps> = ({
@@ -19,7 +18,6 @@ const AgentRunnerConnectedState: React.FC<AgentRunnerConnectedStateProps> = ({
   runner,
   onRun,
   isRunning,
-  result,
 }) => {
   const [activeTab, setActiveTab] = useState("input");
 
@@ -33,18 +31,21 @@ const AgentRunnerConnectedState: React.FC<AgentRunnerConnectedStateProps> = ({
   return (
     <div className="flex flex-1 flex-col">
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <div className="border-b px-6">
-          <TabsList variant="underline">
-            <TabsTrigger value="input" variant="underline">
-              Input
-            </TabsTrigger>
-            <TabsTrigger value="configuration" variant="underline">
-              Configuration
-            </TabsTrigger>
-          </TabsList>
-        </div>
+        <TabsList variant="underline" className="px-4">
+          <TabsTrigger value="input" variant="underline">
+            Input
+          </TabsTrigger>
+          <TabsTrigger value="configuration" variant="underline">
+            Configuration
+          </TabsTrigger>
+        </TabsList>
 
-        <TabsContent value="input" className="flex-1 p-6">
+        <TabsContent
+          value="input"
+          className="flex-1 px-4"
+          forceMount
+          hidden={activeTab !== "input"}
+        >
           <AgentRunnerInputForm
             fields={inputFields}
             onSubmit={onRun}
@@ -52,7 +53,12 @@ const AgentRunnerConnectedState: React.FC<AgentRunnerConnectedStateProps> = ({
           />
         </TabsContent>
 
-        <TabsContent value="configuration" className="flex-1 p-6">
+        <TabsContent
+          value="configuration"
+          className="flex-1 px-4"
+          forceMount
+          hidden={activeTab !== "configuration"}
+        >
           {latestConfig ? (
             <div>
               <div className="mb-4">
@@ -73,9 +79,6 @@ const AgentRunnerConnectedState: React.FC<AgentRunnerConnectedStateProps> = ({
           )}
         </TabsContent>
       </Tabs>
-
-      {/* Result section */}
-      <div className="border-t p-6">{result}</div>
     </div>
   );
 };
