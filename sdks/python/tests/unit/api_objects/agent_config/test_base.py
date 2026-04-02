@@ -273,9 +273,7 @@ class TestCreateAgentConfigVersion:
             name="v3-optimized",
             type="blueprint",
             values=[
-                AgentConfigValuePublic(
-                    key="MyConfig.temp", type="float", value="0.3"
-                ),
+                AgentConfigValuePublic(key="MyConfig.temp", type="float", value="0.3"),
                 AgentConfigValuePublic(
                     key="MyConfig.model", type="string", value="gpt-4o"
                 ),
