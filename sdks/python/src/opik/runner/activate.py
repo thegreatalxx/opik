@@ -5,13 +5,19 @@ import os
 import signal
 import threading
 
-from rich.console import Console
-from rich.text import Text
+from pathlib import Path
 
 from .. import Opik
 from ..rest_api.types.agent import Agent
 from ..rest_api.types.param import Param
-from . import prefixed_output, registry
+from . import registry
+from .bridge_api import BridgeApiClient
+from .bridge_handlers.edit_file import EditFileHandler
+from .bridge_handlers.list_files import ListFilesHandler
+from .bridge_handlers.read_file import ReadFileHandler
+from .bridge_handlers.search_files import SearchFilesHandler
+from .bridge_handlers.write_file import WriteFileHandler
+from .bridge_loop import BridgePollLoop
 from .in_process_loop import InProcessRunnerLoop
 
 LOGGER = logging.getLogger(__name__)
@@ -62,10 +68,6 @@ def _run(shutdown_event: threading.Event) -> None:
         )
         return
 
-    _print_banner(runner_id, project_name)
-
-    prefixed_output.install()
-
     client = Opik(_show_misconfiguration_message=False)
     api = client.rest_client
 
@@ -95,25 +97,37 @@ def _run(shutdown_event: threading.Event) -> None:
             request={name: _to_payload(entry) for name, entry in entrypoints.items()},
         )
 
-    LOGGER.info("Runner activated")
+    LOGGER.debug("Runner activated")
 
-    loop = InProcessRunnerLoop(api, runner_id, shutdown_event)
+    repo_root = Path(os.environ.get("OPIK_REPO_ROOT", os.getcwd()))
+    handlers = {
+        "read_file": ReadFileHandler(repo_root),
+        "write_file": WriteFileHandler(repo_root),
+        "edit_file": EditFileHandler(repo_root),
+        "list_files": ListFilesHandler(repo_root),
+        "search_files": SearchFilesHandler(repo_root),
+    }
+    bridge_api = BridgeApiClient(api)
+    bridge_loop = BridgePollLoop(
+        api=bridge_api,
+        runner_id=runner_id,
+        repo_root=repo_root,
+        handlers=handlers,
+        shutdown_event=shutdown_event,
+    )
+
+    bridge_thread = threading.Thread(
+        target=bridge_loop.run,
+        name="bridge-poll",
+        daemon=True,
+    )
+    bridge_thread.start()
+
+    loop = InProcessRunnerLoop(
+        api, runner_id, shutdown_event, bridge_loop=bridge_loop
+    )
 
     try:
         loop.run()
     finally:
         client.end()
-
-
-def _print_banner(runner_id: str, project_name: str) -> None:
-    console = Console()
-
-    info = Text()
-    info.append("   ")
-    info.append("\u2800\u20dd", style="rgb(224,62,45)")
-    info.append("opik  ", style="bold")
-    info.append(f"runner: {runner_id}", style="dim")
-    if project_name:
-        info.append(f"  project: {project_name}", style="dim")
-    console.print(info)
-    console.print()

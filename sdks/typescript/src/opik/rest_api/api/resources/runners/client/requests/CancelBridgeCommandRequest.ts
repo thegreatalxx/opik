@@ -4,4 +4,4 @@
  * @example
  *     {}
  */
-export type HeartbeatRequest = {};
+export type CancelBridgeCommandRequest = {};

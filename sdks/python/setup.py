@@ -59,6 +59,7 @@ setup(
         "tqdm",
         "uuid6",
         "jinja2",
+        "watchfiles>=0.20.0",
     ],
     extras_require={
         "proxy": [

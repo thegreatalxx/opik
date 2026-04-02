@@ -2,6 +2,6 @@
 
 # isort: skip_file
 
-from .types import LocalRunnerJobResultRequestStatus
+from .types import BridgeCommandResultRequestStatus, LocalRunnerJobResultRequestStatus
 
-__all__ = ["LocalRunnerJobResultRequestStatus"]
+__all__ = ["BridgeCommandResultRequestStatus", "LocalRunnerJobResultRequestStatus"]

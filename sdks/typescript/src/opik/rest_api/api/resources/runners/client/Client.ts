@@ -203,6 +203,88 @@ export class RunnersClient {
     }
 
     /**
+     * Cancel a pending or active bridge command
+     *
+     * @param {string} runnerId
+     * @param {string} commandId
+     * @param {OpikApi.CancelBridgeCommandRequest} request
+     * @param {RunnersClient.RequestOptions} requestOptions - Request-specific configuration.
+     *
+     * @throws {@link OpikApi.NotFoundError}
+     * @throws {@link OpikApi.ConflictError}
+     *
+     * @example
+     *     await client.runners.cancelBridgeCommand("runnerId", "commandId")
+     */
+    public cancelBridgeCommand(
+        runnerId: string,
+        commandId: string,
+        request: OpikApi.CancelBridgeCommandRequest = {},
+        requestOptions?: RunnersClient.RequestOptions,
+    ): core.HttpResponsePromise<void> {
+        return core.HttpResponsePromise.fromPromise(
+            this.__cancelBridgeCommand(runnerId, commandId, request, requestOptions),
+        );
+    }
+
+    private async __cancelBridgeCommand(
+        runnerId: string,
+        commandId: string,
+        _request: OpikApi.CancelBridgeCommandRequest = {},
+        requestOptions?: RunnersClient.RequestOptions,
+    ): Promise<core.WithRawResponse<void>> {
+        const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
+            this._options?.headers,
+            mergeOnlyDefinedHeaders({
+                "Comet-Workspace": requestOptions?.workspaceName ?? this._options?.workspaceName,
+            }),
+            requestOptions?.headers,
+        );
+        const _response = await core.fetcher({
+            url: core.url.join(
+                (await core.Supplier.get(this._options.baseUrl)) ??
+                    (await core.Supplier.get(this._options.environment)) ??
+                    environments.OpikApiEnvironment.Default,
+                `v1/private/local-runners/${core.url.encodePathParam(runnerId)}/bridge/commands/${core.url.encodePathParam(commandId)}/cancel`,
+            ),
+            method: "POST",
+            headers: _headers,
+            queryParameters: requestOptions?.queryParams,
+            timeoutMs: (requestOptions?.timeoutInSeconds ?? this._options?.timeoutInSeconds ?? 60) * 1000,
+            maxRetries: requestOptions?.maxRetries ?? this._options?.maxRetries,
+            withCredentials: true,
+            abortSignal: requestOptions?.abortSignal,
+            fetchFn: this._options?.fetch,
+            logging: this._options.logging,
+        });
+        if (_response.ok) {
+            return { data: undefined, rawResponse: _response.rawResponse };
+        }
+
+        if (_response.error.reason === "status-code") {
+            switch (_response.error.statusCode) {
+                case 404:
+                    throw new OpikApi.NotFoundError(_response.error.body, _response.rawResponse);
+                case 409:
+                    throw new OpikApi.ConflictError(_response.error.body, _response.rawResponse);
+                default:
+                    throw new errors.OpikApiError({
+                        statusCode: _response.error.statusCode,
+                        body: _response.error.body,
+                        rawResponse: _response.rawResponse,
+                    });
+            }
+        }
+
+        return handleNonStatusCodeError(
+            _response.error,
+            _response.rawResponse,
+            "POST",
+            "/v1/private/local-runners/{runnerId}/bridge/commands/{commandId}/cancel",
+        );
+    }
+
+    /**
      * Cancel a pending or running local runner job
      *
      * @param {string} jobId
@@ -540,6 +622,99 @@ export class RunnersClient {
     }
 
     /**
+     * Get bridge command status or long-poll for result
+     *
+     * @param {string} runnerId
+     * @param {string} commandId
+     * @param {OpikApi.GetBridgeCommandRequest} request
+     * @param {RunnersClient.RequestOptions} requestOptions - Request-specific configuration.
+     *
+     * @throws {@link OpikApi.NotFoundError}
+     *
+     * @example
+     *     await client.runners.getBridgeCommand("runnerId", "commandId")
+     */
+    public getBridgeCommand(
+        runnerId: string,
+        commandId: string,
+        request: OpikApi.GetBridgeCommandRequest = {},
+        requestOptions?: RunnersClient.RequestOptions,
+    ): core.HttpResponsePromise<OpikApi.BridgeCommand> {
+        return core.HttpResponsePromise.fromPromise(
+            this.__getBridgeCommand(runnerId, commandId, request, requestOptions),
+        );
+    }
+
+    private async __getBridgeCommand(
+        runnerId: string,
+        commandId: string,
+        request: OpikApi.GetBridgeCommandRequest = {},
+        requestOptions?: RunnersClient.RequestOptions,
+    ): Promise<core.WithRawResponse<OpikApi.BridgeCommand>> {
+        const { wait, timeout } = request;
+        const _queryParams: Record<string, unknown> = {
+            wait,
+            timeout,
+        };
+        const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
+            this._options?.headers,
+            mergeOnlyDefinedHeaders({
+                "Comet-Workspace": requestOptions?.workspaceName ?? this._options?.workspaceName,
+            }),
+            requestOptions?.headers,
+        );
+        const _response = await core.fetcher({
+            url: core.url.join(
+                (await core.Supplier.get(this._options.baseUrl)) ??
+                    (await core.Supplier.get(this._options.environment)) ??
+                    environments.OpikApiEnvironment.Default,
+                `v1/private/local-runners/${core.url.encodePathParam(runnerId)}/bridge/commands/${core.url.encodePathParam(commandId)}`,
+            ),
+            method: "GET",
+            headers: _headers,
+            queryParameters: { ..._queryParams, ...requestOptions?.queryParams },
+            timeoutMs: (requestOptions?.timeoutInSeconds ?? this._options?.timeoutInSeconds ?? 60) * 1000,
+            maxRetries: requestOptions?.maxRetries ?? this._options?.maxRetries,
+            withCredentials: true,
+            abortSignal: requestOptions?.abortSignal,
+            fetchFn: this._options?.fetch,
+            logging: this._options.logging,
+        });
+        if (_response.ok) {
+            return {
+                data: serializers.BridgeCommand.parseOrThrow(_response.body, {
+                    unrecognizedObjectKeys: "passthrough",
+                    allowUnrecognizedUnionMembers: true,
+                    allowUnrecognizedEnumValues: true,
+                    skipValidation: true,
+                    breadcrumbsPrefix: ["response"],
+                }),
+                rawResponse: _response.rawResponse,
+            };
+        }
+
+        if (_response.error.reason === "status-code") {
+            switch (_response.error.statusCode) {
+                case 404:
+                    throw new OpikApi.NotFoundError(_response.error.body, _response.rawResponse);
+                default:
+                    throw new errors.OpikApiError({
+                        statusCode: _response.error.statusCode,
+                        body: _response.error.body,
+                        rawResponse: _response.rawResponse,
+                    });
+            }
+        }
+
+        return handleNonStatusCodeError(
+            _response.error,
+            _response.rawResponse,
+            "GET",
+            "/v1/private/local-runners/{runnerId}/bridge/commands/{commandId}",
+        );
+    }
+
+    /**
      * Get a single local runner job's status and results
      *
      * @param {string} jobId
@@ -709,7 +884,7 @@ export class RunnersClient {
      * Refresh local runner heartbeat
      *
      * @param {string} runnerId
-     * @param {OpikApi.HeartbeatRequest} request
+     * @param {OpikApi.LocalRunnerHeartbeatRequest} request
      * @param {RunnersClient.RequestOptions} requestOptions - Request-specific configuration.
      *
      * @throws {@link OpikApi.NotFoundError}
@@ -720,7 +895,7 @@ export class RunnersClient {
      */
     public heartbeat(
         runnerId: string,
-        request: OpikApi.HeartbeatRequest = {},
+        request: OpikApi.LocalRunnerHeartbeatRequest = {},
         requestOptions?: RunnersClient.RequestOptions,
     ): core.HttpResponsePromise<OpikApi.LocalRunnerHeartbeatResponse> {
         return core.HttpResponsePromise.fromPromise(this.__heartbeat(runnerId, request, requestOptions));
@@ -728,7 +903,7 @@ export class RunnersClient {
 
     private async __heartbeat(
         runnerId: string,
-        _request: OpikApi.HeartbeatRequest = {},
+        request: OpikApi.LocalRunnerHeartbeatRequest = {},
         requestOptions?: RunnersClient.RequestOptions,
     ): Promise<core.WithRawResponse<OpikApi.LocalRunnerHeartbeatResponse>> {
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
@@ -747,7 +922,13 @@ export class RunnersClient {
             ),
             method: "POST",
             headers: _headers,
+            contentType: "application/json",
             queryParameters: requestOptions?.queryParams,
+            requestType: "json",
+            body: serializers.LocalRunnerHeartbeatRequest.jsonOrThrow(request, {
+                unrecognizedObjectKeys: "strip",
+                omitUndefined: true,
+            }),
             timeoutMs: (requestOptions?.timeoutInSeconds ?? this._options?.timeoutInSeconds ?? 60) * 1000,
             maxRetries: requestOptions?.maxRetries ?? this._options?.maxRetries,
             withCredentials: true,
@@ -973,6 +1154,104 @@ export class RunnersClient {
     }
 
     /**
+     * Long-poll for pending bridge commands
+     *
+     * @param {string} runnerId
+     * @param {OpikApi.BridgeNextRequest} request
+     * @param {RunnersClient.RequestOptions} requestOptions - Request-specific configuration.
+     *
+     * @throws {@link OpikApi.GoneError}
+     *
+     * @example
+     *     await client.runners.nextBridgeCommands("runnerId")
+     */
+    public nextBridgeCommands(
+        runnerId: string,
+        request: OpikApi.BridgeNextRequest = {},
+        requestOptions?: RunnersClient.RequestOptions,
+    ): core.HttpResponsePromise<OpikApi.BridgeNextResponse> {
+        return core.HttpResponsePromise.fromPromise(this.__nextBridgeCommands(runnerId, request, requestOptions));
+    }
+
+    private async __nextBridgeCommands(
+        runnerId: string,
+        request: OpikApi.BridgeNextRequest = {},
+        requestOptions?: RunnersClient.RequestOptions,
+    ): Promise<core.WithRawResponse<OpikApi.BridgeNextResponse>> {
+        const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
+            this._options?.headers,
+            mergeOnlyDefinedHeaders({
+                "Comet-Workspace": requestOptions?.workspaceName ?? this._options?.workspaceName,
+            }),
+            requestOptions?.headers,
+        );
+        const _response = await core.fetcher({
+            url: core.url.join(
+                (await core.Supplier.get(this._options.baseUrl)) ??
+                    (await core.Supplier.get(this._options.environment)) ??
+                    environments.OpikApiEnvironment.Default,
+                `v1/private/local-runners/${core.url.encodePathParam(runnerId)}/bridge/next`,
+            ),
+            method: "POST",
+            headers: _headers,
+            contentType: "application/json",
+            queryParameters: requestOptions?.queryParams,
+            requestType: "json",
+            body: serializers.BridgeNextRequest.jsonOrThrow(request, {
+                unrecognizedObjectKeys: "strip",
+                omitUndefined: true,
+            }),
+            timeoutMs: (requestOptions?.timeoutInSeconds ?? this._options?.timeoutInSeconds ?? 60) * 1000,
+            maxRetries: requestOptions?.maxRetries ?? this._options?.maxRetries,
+            withCredentials: true,
+            abortSignal: requestOptions?.abortSignal,
+            fetchFn: this._options?.fetch,
+            logging: this._options.logging,
+        });
+        if (_response.ok) {
+            return {
+                data: serializers.BridgeNextResponse.parseOrThrow(_response.body, {
+                    unrecognizedObjectKeys: "passthrough",
+                    allowUnrecognizedUnionMembers: true,
+                    allowUnrecognizedEnumValues: true,
+                    skipValidation: true,
+                    breadcrumbsPrefix: ["response"],
+                }),
+                rawResponse: _response.rawResponse,
+            };
+        }
+
+        if (_response.error.reason === "status-code") {
+            switch (_response.error.statusCode) {
+                case 410:
+                    throw new OpikApi.GoneError(
+                        serializers.ErrorMessage.parseOrThrow(_response.error.body, {
+                            unrecognizedObjectKeys: "passthrough",
+                            allowUnrecognizedUnionMembers: true,
+                            allowUnrecognizedEnumValues: true,
+                            skipValidation: true,
+                            breadcrumbsPrefix: ["response"],
+                        }),
+                        _response.rawResponse,
+                    );
+                default:
+                    throw new errors.OpikApiError({
+                        statusCode: _response.error.statusCode,
+                        body: _response.error.body,
+                        rawResponse: _response.rawResponse,
+                    });
+            }
+        }
+
+        return handleNonStatusCodeError(
+            _response.error,
+            _response.rawResponse,
+            "POST",
+            "/v1/private/local-runners/{runnerId}/bridge/next",
+        );
+    }
+
+    /**
      * Long-poll for the next pending local runner job
      *
      * @param {string} runnerId
@@ -1052,6 +1331,196 @@ export class RunnersClient {
             _response.rawResponse,
             "POST",
             "/v1/private/local-runners/{runnerId}/jobs/next",
+        );
+    }
+
+    /**
+     * Full replace of the runner's instrumentation checklist
+     *
+     * @param {string} runnerId
+     * @param {OpikApi.PutChecklistRequest} request
+     * @param {RunnersClient.RequestOptions} requestOptions - Request-specific configuration.
+     *
+     * @throws {@link OpikApi.NotFoundError}
+     * @throws {@link OpikApi.ContentTooLargeError}
+     *
+     * @example
+     *     await client.runners.putChecklist("runnerId", {
+     *         body: {}
+     *     })
+     */
+    public putChecklist(
+        runnerId: string,
+        request: OpikApi.PutChecklistRequest,
+        requestOptions?: RunnersClient.RequestOptions,
+    ): core.HttpResponsePromise<void> {
+        return core.HttpResponsePromise.fromPromise(this.__putChecklist(runnerId, request, requestOptions));
+    }
+
+    private async __putChecklist(
+        runnerId: string,
+        request: OpikApi.PutChecklistRequest,
+        requestOptions?: RunnersClient.RequestOptions,
+    ): Promise<core.WithRawResponse<void>> {
+        const { body: _body } = request;
+        const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
+            this._options?.headers,
+            mergeOnlyDefinedHeaders({
+                "Comet-Workspace": requestOptions?.workspaceName ?? this._options?.workspaceName,
+            }),
+            requestOptions?.headers,
+        );
+        const _response = await core.fetcher({
+            url: core.url.join(
+                (await core.Supplier.get(this._options.baseUrl)) ??
+                    (await core.Supplier.get(this._options.environment)) ??
+                    environments.OpikApiEnvironment.Default,
+                `v1/private/local-runners/${core.url.encodePathParam(runnerId)}/checklist`,
+            ),
+            method: "PUT",
+            headers: _headers,
+            contentType: "application/json",
+            queryParameters: requestOptions?.queryParams,
+            requestType: "json",
+            body: serializers.RunnerChecklist.jsonOrThrow(_body, {
+                unrecognizedObjectKeys: "strip",
+                omitUndefined: true,
+            }),
+            timeoutMs: (requestOptions?.timeoutInSeconds ?? this._options?.timeoutInSeconds ?? 60) * 1000,
+            maxRetries: requestOptions?.maxRetries ?? this._options?.maxRetries,
+            withCredentials: true,
+            abortSignal: requestOptions?.abortSignal,
+            fetchFn: this._options?.fetch,
+            logging: this._options.logging,
+        });
+        if (_response.ok) {
+            return { data: undefined, rawResponse: _response.rawResponse };
+        }
+
+        if (_response.error.reason === "status-code") {
+            switch (_response.error.statusCode) {
+                case 404:
+                    throw new OpikApi.NotFoundError(_response.error.body, _response.rawResponse);
+                case 413:
+                    throw new OpikApi.ContentTooLargeError(
+                        serializers.ErrorMessage.parseOrThrow(_response.error.body, {
+                            unrecognizedObjectKeys: "passthrough",
+                            allowUnrecognizedUnionMembers: true,
+                            allowUnrecognizedEnumValues: true,
+                            skipValidation: true,
+                            breadcrumbsPrefix: ["response"],
+                        }),
+                        _response.rawResponse,
+                    );
+                default:
+                    throw new errors.OpikApiError({
+                        statusCode: _response.error.statusCode,
+                        body: _response.error.body,
+                        rawResponse: _response.rawResponse,
+                    });
+            }
+        }
+
+        return handleNonStatusCodeError(
+            _response.error,
+            _response.rawResponse,
+            "PUT",
+            "/v1/private/local-runners/{runnerId}/checklist",
+        );
+    }
+
+    /**
+     * Partial update of the runner's instrumentation checklist
+     *
+     * @param {string} runnerId
+     * @param {OpikApi.PatchChecklistRequest} request
+     * @param {RunnersClient.RequestOptions} requestOptions - Request-specific configuration.
+     *
+     * @throws {@link OpikApi.NotFoundError}
+     * @throws {@link OpikApi.ContentTooLargeError}
+     *
+     * @example
+     *     await client.runners.patchChecklist("runnerId", {
+     *         body: {}
+     *     })
+     */
+    public patchChecklist(
+        runnerId: string,
+        request: OpikApi.PatchChecklistRequest,
+        requestOptions?: RunnersClient.RequestOptions,
+    ): core.HttpResponsePromise<void> {
+        return core.HttpResponsePromise.fromPromise(this.__patchChecklist(runnerId, request, requestOptions));
+    }
+
+    private async __patchChecklist(
+        runnerId: string,
+        request: OpikApi.PatchChecklistRequest,
+        requestOptions?: RunnersClient.RequestOptions,
+    ): Promise<core.WithRawResponse<void>> {
+        const { body: _body } = request;
+        const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
+            this._options?.headers,
+            mergeOnlyDefinedHeaders({
+                "Comet-Workspace": requestOptions?.workspaceName ?? this._options?.workspaceName,
+            }),
+            requestOptions?.headers,
+        );
+        const _response = await core.fetcher({
+            url: core.url.join(
+                (await core.Supplier.get(this._options.baseUrl)) ??
+                    (await core.Supplier.get(this._options.environment)) ??
+                    environments.OpikApiEnvironment.Default,
+                `v1/private/local-runners/${core.url.encodePathParam(runnerId)}/checklist`,
+            ),
+            method: "PATCH",
+            headers: _headers,
+            contentType: "application/json",
+            queryParameters: requestOptions?.queryParams,
+            requestType: "json",
+            body: serializers.RunnerChecklist.jsonOrThrow(_body, {
+                unrecognizedObjectKeys: "strip",
+                omitUndefined: true,
+            }),
+            timeoutMs: (requestOptions?.timeoutInSeconds ?? this._options?.timeoutInSeconds ?? 60) * 1000,
+            maxRetries: requestOptions?.maxRetries ?? this._options?.maxRetries,
+            withCredentials: true,
+            abortSignal: requestOptions?.abortSignal,
+            fetchFn: this._options?.fetch,
+            logging: this._options.logging,
+        });
+        if (_response.ok) {
+            return { data: undefined, rawResponse: _response.rawResponse };
+        }
+
+        if (_response.error.reason === "status-code") {
+            switch (_response.error.statusCode) {
+                case 404:
+                    throw new OpikApi.NotFoundError(_response.error.body, _response.rawResponse);
+                case 413:
+                    throw new OpikApi.ContentTooLargeError(
+                        serializers.ErrorMessage.parseOrThrow(_response.error.body, {
+                            unrecognizedObjectKeys: "passthrough",
+                            allowUnrecognizedUnionMembers: true,
+                            allowUnrecognizedEnumValues: true,
+                            skipValidation: true,
+                            breadcrumbsPrefix: ["response"],
+                        }),
+                        _response.rawResponse,
+                    );
+                default:
+                    throw new errors.OpikApiError({
+                        statusCode: _response.error.statusCode,
+                        body: _response.error.body,
+                        rawResponse: _response.rawResponse,
+                    });
+            }
+        }
+
+        return handleNonStatusCodeError(
+            _response.error,
+            _response.rawResponse,
+            "PATCH",
+            "/v1/private/local-runners/{runnerId}/checklist",
         );
     }
 
@@ -1144,6 +1613,96 @@ export class RunnersClient {
     }
 
     /**
+     * Report completion or failure of a bridge command
+     *
+     * @param {string} runnerId
+     * @param {string} commandId
+     * @param {OpikApi.BridgeCommandResultRequest} request
+     * @param {RunnersClient.RequestOptions} requestOptions - Request-specific configuration.
+     *
+     * @throws {@link OpikApi.NotFoundError}
+     * @throws {@link OpikApi.ConflictError}
+     *
+     * @example
+     *     await client.runners.reportBridgeCommandResult("runnerId", "commandId", {
+     *         status: "pending"
+     *     })
+     */
+    public reportBridgeCommandResult(
+        runnerId: string,
+        commandId: string,
+        request: OpikApi.BridgeCommandResultRequest,
+        requestOptions?: RunnersClient.RequestOptions,
+    ): core.HttpResponsePromise<void> {
+        return core.HttpResponsePromise.fromPromise(
+            this.__reportBridgeCommandResult(runnerId, commandId, request, requestOptions),
+        );
+    }
+
+    private async __reportBridgeCommandResult(
+        runnerId: string,
+        commandId: string,
+        request: OpikApi.BridgeCommandResultRequest,
+        requestOptions?: RunnersClient.RequestOptions,
+    ): Promise<core.WithRawResponse<void>> {
+        const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
+            this._options?.headers,
+            mergeOnlyDefinedHeaders({
+                "Comet-Workspace": requestOptions?.workspaceName ?? this._options?.workspaceName,
+            }),
+            requestOptions?.headers,
+        );
+        const _response = await core.fetcher({
+            url: core.url.join(
+                (await core.Supplier.get(this._options.baseUrl)) ??
+                    (await core.Supplier.get(this._options.environment)) ??
+                    environments.OpikApiEnvironment.Default,
+                `v1/private/local-runners/${core.url.encodePathParam(runnerId)}/bridge/commands/${core.url.encodePathParam(commandId)}/result`,
+            ),
+            method: "POST",
+            headers: _headers,
+            contentType: "application/json",
+            queryParameters: requestOptions?.queryParams,
+            requestType: "json",
+            body: serializers.BridgeCommandResultRequest.jsonOrThrow(request, {
+                unrecognizedObjectKeys: "strip",
+                omitUndefined: true,
+            }),
+            timeoutMs: (requestOptions?.timeoutInSeconds ?? this._options?.timeoutInSeconds ?? 60) * 1000,
+            maxRetries: requestOptions?.maxRetries ?? this._options?.maxRetries,
+            withCredentials: true,
+            abortSignal: requestOptions?.abortSignal,
+            fetchFn: this._options?.fetch,
+            logging: this._options.logging,
+        });
+        if (_response.ok) {
+            return { data: undefined, rawResponse: _response.rawResponse };
+        }
+
+        if (_response.error.reason === "status-code") {
+            switch (_response.error.statusCode) {
+                case 404:
+                    throw new OpikApi.NotFoundError(_response.error.body, _response.rawResponse);
+                case 409:
+                    throw new OpikApi.ConflictError(_response.error.body, _response.rawResponse);
+                default:
+                    throw new errors.OpikApiError({
+                        statusCode: _response.error.statusCode,
+                        body: _response.error.body,
+                        rawResponse: _response.rawResponse,
+                    });
+            }
+        }
+
+        return handleNonStatusCodeError(
+            _response.error,
+            _response.rawResponse,
+            "POST",
+            "/v1/private/local-runners/{runnerId}/bridge/commands/{commandId}/result",
+        );
+    }
+
+    /**
      * Report local runner job completion or failure
      *
      * @param {string} jobId
@@ -1225,6 +1784,115 @@ export class RunnersClient {
             _response.rawResponse,
             "POST",
             "/v1/private/local-runners/jobs/{jobId}/results",
+        );
+    }
+
+    /**
+     * Submit a bridge command for execution on the local runner
+     *
+     * @param {string} runnerId
+     * @param {OpikApi.CreateBridgeCommandRequest} request
+     * @param {RunnersClient.RequestOptions} requestOptions - Request-specific configuration.
+     *
+     * @throws {@link OpikApi.NotFoundError}
+     * @throws {@link OpikApi.ConflictError}
+     * @throws {@link OpikApi.TooManyRequestsError}
+     *
+     * @example
+     *     await client.runners.submitBridgeCommand("runnerId", {
+     *         type: "type",
+     *         args: {
+     *             "key": "value"
+     *         }
+     *     })
+     */
+    public submitBridgeCommand(
+        runnerId: string,
+        request: OpikApi.CreateBridgeCommandRequest,
+        requestOptions?: RunnersClient.RequestOptions,
+    ): core.HttpResponsePromise<OpikApi.CreateBridgeCommandResponse> {
+        return core.HttpResponsePromise.fromPromise(this.__submitBridgeCommand(runnerId, request, requestOptions));
+    }
+
+    private async __submitBridgeCommand(
+        runnerId: string,
+        request: OpikApi.CreateBridgeCommandRequest,
+        requestOptions?: RunnersClient.RequestOptions,
+    ): Promise<core.WithRawResponse<OpikApi.CreateBridgeCommandResponse>> {
+        const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
+            this._options?.headers,
+            mergeOnlyDefinedHeaders({
+                "Comet-Workspace": requestOptions?.workspaceName ?? this._options?.workspaceName,
+            }),
+            requestOptions?.headers,
+        );
+        const _response = await core.fetcher({
+            url: core.url.join(
+                (await core.Supplier.get(this._options.baseUrl)) ??
+                    (await core.Supplier.get(this._options.environment)) ??
+                    environments.OpikApiEnvironment.Default,
+                `v1/private/local-runners/${core.url.encodePathParam(runnerId)}/bridge/commands`,
+            ),
+            method: "POST",
+            headers: _headers,
+            contentType: "application/json",
+            queryParameters: requestOptions?.queryParams,
+            requestType: "json",
+            body: serializers.CreateBridgeCommandRequest.jsonOrThrow(request, {
+                unrecognizedObjectKeys: "strip",
+                omitUndefined: true,
+            }),
+            timeoutMs: (requestOptions?.timeoutInSeconds ?? this._options?.timeoutInSeconds ?? 60) * 1000,
+            maxRetries: requestOptions?.maxRetries ?? this._options?.maxRetries,
+            withCredentials: true,
+            abortSignal: requestOptions?.abortSignal,
+            fetchFn: this._options?.fetch,
+            logging: this._options.logging,
+        });
+        if (_response.ok) {
+            return {
+                data: serializers.CreateBridgeCommandResponse.parseOrThrow(_response.body, {
+                    unrecognizedObjectKeys: "passthrough",
+                    allowUnrecognizedUnionMembers: true,
+                    allowUnrecognizedEnumValues: true,
+                    skipValidation: true,
+                    breadcrumbsPrefix: ["response"],
+                }),
+                rawResponse: _response.rawResponse,
+            };
+        }
+
+        if (_response.error.reason === "status-code") {
+            switch (_response.error.statusCode) {
+                case 404:
+                    throw new OpikApi.NotFoundError(_response.error.body, _response.rawResponse);
+                case 409:
+                    throw new OpikApi.ConflictError(_response.error.body, _response.rawResponse);
+                case 429:
+                    throw new OpikApi.TooManyRequestsError(
+                        serializers.ErrorMessage.parseOrThrow(_response.error.body, {
+                            unrecognizedObjectKeys: "passthrough",
+                            allowUnrecognizedUnionMembers: true,
+                            allowUnrecognizedEnumValues: true,
+                            skipValidation: true,
+                            breadcrumbsPrefix: ["response"],
+                        }),
+                        _response.rawResponse,
+                    );
+                default:
+                    throw new errors.OpikApiError({
+                        statusCode: _response.error.statusCode,
+                        body: _response.error.body,
+                        rawResponse: _response.rawResponse,
+                    });
+            }
+        }
+
+        return handleNonStatusCodeError(
+            _response.error,
+            _response.rawResponse,
+            "POST",
+            "/v1/private/local-runners/{runnerId}/bridge/commands",
         );
     }
 }

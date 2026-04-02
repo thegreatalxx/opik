@@ -33,7 +33,7 @@ type PluginStore = {
   setupPlugins: (folderName: string) => Promise<void>;
 };
 
-const VALID_PLUGIN_FOLDER_NAMES = ["comet"];
+const VALID_PLUGIN_FOLDER_NAMES = ["comet", "development"];
 const PLUGIN_NAMES = [
   "UserMenu",
   "InviteUsersForm",
@@ -89,6 +89,10 @@ const usePluginsStore = create<PluginStore>((set) => ({
         continue;
       }
     }
+
+    set((state) => ({
+      WorkspacePreloader: state.WorkspacePreloader ?? WorkspacePreloader,
+    }));
   },
 }));
 

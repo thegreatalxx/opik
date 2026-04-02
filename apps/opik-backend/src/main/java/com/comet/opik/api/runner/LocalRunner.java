@@ -21,7 +21,9 @@ public record LocalRunner(
         UUID projectId,
         LocalRunnerStatus status,
         Instant connectedAt,
-        List<Agent> agents) {
+        List<Agent> agents,
+        List<String> capabilities,
+        RunnerChecklist checklist) {
 
     @Builder(toBuilder = true)
     @JsonIgnoreProperties(ignoreUnknown = true)

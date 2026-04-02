@@ -5,6 +5,7 @@
 from .bad_gateway_error import BadGatewayError
 from .bad_request_error import BadRequestError
 from .conflict_error import ConflictError
+from .content_too_large_error import ContentTooLargeError
 from .forbidden_error import ForbiddenError
 from .gone_error import GoneError
 from .internal_server_error import InternalServerError
@@ -19,6 +20,7 @@ __all__ = [
     "BadGatewayError",
     "BadRequestError",
     "ConflictError",
+    "ContentTooLargeError",
     "ForbiddenError",
     "GoneError",
     "InternalServerError",

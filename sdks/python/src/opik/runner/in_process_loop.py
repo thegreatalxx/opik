@@ -8,6 +8,7 @@ import logging
 import random
 import threading
 import time
+import typing
 from typing import Callable, Optional
 
 from ..api_objects.agent_config.context import agent_config_context
@@ -18,6 +19,9 @@ from ..rest_api.types.local_runner_job import LocalRunnerJob
 from . import registry
 from .context import reset_job_id, set_job_id
 from .log_streamer import LogStreamer
+
+if typing.TYPE_CHECKING:
+    from .bridge_loop import BridgePollLoop
 
 LOGGER = logging.getLogger(__name__)
 
@@ -50,12 +54,14 @@ class InProcessRunnerLoop:
         shutdown_event: threading.Event,
         heartbeat_interval_seconds: float = 5.0,
         backoff_cap_seconds: float = 30.0,
+        bridge_loop: Optional["BridgePollLoop"] = None,
     ) -> None:
         self._api = api
         self._runner_id = runner_id
         self._shutdown_event = shutdown_event
         self._heartbeat_interval_seconds = heartbeat_interval_seconds
         self._backoff_cap_seconds = backoff_cap_seconds
+        self._bridge_loop = bridge_loop
         self._cancelled_jobs: collections.OrderedDict[str, float] = (
             collections.OrderedDict()
         )
@@ -127,9 +133,18 @@ class InProcessRunnerLoop:
                 self._loop.call_soon_threadsafe(self._job_queue.put_nowait, job)
 
     def _heartbeat_loop(self) -> None:
+        capabilities = ["jobs", "bridge"] if self._bridge_loop else ["jobs"]
+
         while not self._shutdown_event.is_set():
             try:
-                resp = self._api.runners.heartbeat(self._runner_id)
+                resp = self._api.runners.heartbeat(
+                    self._runner_id,
+                    request_options={
+                        "additional_body_parameters": {
+                            "capabilities": capabilities,
+                        },
+                    },
+                )
 
                 cancelled_job_ids = resp.cancelled_job_ids or []
                 now = time.monotonic()
@@ -137,6 +152,15 @@ class InProcessRunnerLoop:
                     for jid in cancelled_job_ids:
                         self._cancelled_jobs[jid] = now
                     self._prune_cancelled_jobs(now)
+
+                if self._bridge_loop:
+                    cancelled_command_ids = getattr(
+                        resp, "cancelled_command_ids", None
+                    ) or []
+                    if cancelled_command_ids:
+                        self._bridge_loop.add_cancelled_commands(
+                            cancelled_command_ids
+                        )
 
             except ApiError as e:
                 if e.status_code == 410:

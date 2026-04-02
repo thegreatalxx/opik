@@ -2,4 +2,5 @@
 
 export interface LocalRunnerHeartbeatResponse {
     cancelledJobIds?: string[];
+    cancelledCommandIds?: string[];
 }

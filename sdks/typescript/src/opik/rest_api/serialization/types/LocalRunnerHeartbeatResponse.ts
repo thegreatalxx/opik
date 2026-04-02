@@ -12,10 +12,15 @@ export const LocalRunnerHeartbeatResponse: core.serialization.ObjectSchema<
         "cancelled_job_ids",
         core.serialization.list(core.serialization.string()).optional(),
     ),
+    cancelledCommandIds: core.serialization.property(
+        "cancelled_command_ids",
+        core.serialization.list(core.serialization.string()).optional(),
+    ),
 });
 
 export declare namespace LocalRunnerHeartbeatResponse {
     export interface Raw {
         cancelled_job_ids?: string[] | null;
+        cancelled_command_ids?: string[] | null;
     }
 }

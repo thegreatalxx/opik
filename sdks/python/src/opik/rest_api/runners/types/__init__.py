@@ -2,6 +2,7 @@
 
 # isort: skip_file
 
+from .bridge_command_result_request_status import BridgeCommandResultRequestStatus
 from .local_runner_job_result_request_status import LocalRunnerJobResultRequestStatus
 
-__all__ = ["LocalRunnerJobResultRequestStatus"]
+__all__ = ["BridgeCommandResultRequestStatus", "LocalRunnerJobResultRequestStatus"]

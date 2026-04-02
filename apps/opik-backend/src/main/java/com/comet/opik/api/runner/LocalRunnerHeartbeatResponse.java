@@ -12,5 +12,6 @@ import java.util.UUID;
 @JsonIgnoreProperties(ignoreUnknown = true)
 @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
 public record LocalRunnerHeartbeatResponse(
-        List<UUID> cancelledJobIds) {
+        List<UUID> cancelledJobIds,
+        List<UUID> cancelledCommandIds) {
 }

@@ -4,7 +4,13 @@ import typing
 
 from ..core.client_wrapper import AsyncClientWrapper, SyncClientWrapper
 from ..core.request_options import RequestOptions
+from ..types.bridge_command import BridgeCommand
+from ..types.bridge_command_error import BridgeCommandError
+from ..types.bridge_next_response import BridgeNextResponse
+from ..types.create_bridge_command_response import CreateBridgeCommandResponse
+from ..types.instrumentation import Instrumentation
 from ..types.json_node import JsonNode
+from ..types.last_crash import LastCrash
 from ..types.local_runner import LocalRunner
 from ..types.local_runner_connect_response import LocalRunnerConnectResponse
 from ..types.local_runner_heartbeat_response import LocalRunnerHeartbeatResponse
@@ -15,6 +21,7 @@ from ..types.local_runner_log_entry import LocalRunnerLogEntry
 from ..types.local_runner_page import LocalRunnerPage
 from ..types.local_runner_pair_response import LocalRunnerPairResponse
 from .raw_client import AsyncRawRunnersClient, RawRunnersClient
+from .types.bridge_command_result_request_status import BridgeCommandResultRequestStatus
 from .types.local_runner_job_result_request_status import LocalRunnerJobResultRequestStatus
 
 # this is used as the default value for optional parameters
@@ -100,6 +107,34 @@ class RunnersClient:
         client.runners.append_job_logs(job_id='jobId', request=[LocalRunnerLogEntry(stream='stream', text='text', )], )
         """
         _response = self._raw_client.append_job_logs(job_id, request=request, request_options=request_options)
+        return _response.data
+
+    def cancel_bridge_command(
+        self, runner_id: str, command_id: str, *, request_options: typing.Optional[RequestOptions] = None
+    ) -> None:
+        """
+        Cancel a pending or active bridge command
+
+        Parameters
+        ----------
+        runner_id : str
+
+        command_id : str
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        None
+
+        Examples
+        --------
+        from Opik import OpikApi
+        client = OpikApi(api_key="YOUR_API_KEY", workspace_name="YOUR_WORKSPACE_NAME", )
+        client.runners.cancel_bridge_command(runner_id='runnerId', command_id='commandId', )
+        """
+        _response = self._raw_client.cancel_bridge_command(runner_id, command_id, request_options=request_options)
         return _response.data
 
     def cancel_job(self, job_id: str, *, request_options: typing.Optional[RequestOptions] = None) -> None:
@@ -232,6 +267,47 @@ class RunnersClient:
         _response = self._raw_client.generate_pairing_code(project_id=project_id, request_options=request_options)
         return _response.data
 
+    def get_bridge_command(
+        self,
+        runner_id: str,
+        command_id: str,
+        *,
+        wait: typing.Optional[bool] = None,
+        timeout: typing.Optional[int] = None,
+        request_options: typing.Optional[RequestOptions] = None,
+    ) -> BridgeCommand:
+        """
+        Get bridge command status or long-poll for result
+
+        Parameters
+        ----------
+        runner_id : str
+
+        command_id : str
+
+        wait : typing.Optional[bool]
+
+        timeout : typing.Optional[int]
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        BridgeCommand
+            Command details
+
+        Examples
+        --------
+        from Opik import OpikApi
+        client = OpikApi(api_key="YOUR_API_KEY", workspace_name="YOUR_WORKSPACE_NAME", )
+        client.runners.get_bridge_command(runner_id='runnerId', command_id='commandId', )
+        """
+        _response = self._raw_client.get_bridge_command(
+            runner_id, command_id, wait=wait, timeout=timeout, request_options=request_options
+        )
+        return _response.data
+
     def get_job(self, job_id: str, *, request_options: typing.Optional[RequestOptions] = None) -> LocalRunnerJob:
         """
         Get a single local runner job's status and results
@@ -283,7 +359,11 @@ class RunnersClient:
         return _response.data
 
     def heartbeat(
-        self, runner_id: str, *, request_options: typing.Optional[RequestOptions] = None
+        self,
+        runner_id: str,
+        *,
+        capabilities: typing.Optional[typing.Sequence[str]] = OMIT,
+        request_options: typing.Optional[RequestOptions] = None,
     ) -> LocalRunnerHeartbeatResponse:
         """
         Refresh local runner heartbeat
@@ -291,6 +371,8 @@ class RunnersClient:
         Parameters
         ----------
         runner_id : str
+
+        capabilities : typing.Optional[typing.Sequence[str]]
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -306,7 +388,7 @@ class RunnersClient:
         client = OpikApi(api_key="YOUR_API_KEY", workspace_name="YOUR_WORKSPACE_NAME", )
         client.runners.heartbeat(runner_id='runnerId', )
         """
-        _response = self._raw_client.heartbeat(runner_id, request_options=request_options)
+        _response = self._raw_client.heartbeat(runner_id, capabilities=capabilities, request_options=request_options)
         return _response.data
 
     def list_jobs(
@@ -388,6 +470,41 @@ class RunnersClient:
         )
         return _response.data
 
+    def next_bridge_commands(
+        self,
+        runner_id: str,
+        *,
+        max_commands: typing.Optional[int] = OMIT,
+        request_options: typing.Optional[RequestOptions] = None,
+    ) -> BridgeNextResponse:
+        """
+        Long-poll for pending bridge commands
+
+        Parameters
+        ----------
+        runner_id : str
+
+        max_commands : typing.Optional[int]
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        BridgeNextResponse
+            Commands available
+
+        Examples
+        --------
+        from Opik import OpikApi
+        client = OpikApi(api_key="YOUR_API_KEY", workspace_name="YOUR_WORKSPACE_NAME", )
+        client.runners.next_bridge_commands(runner_id='runnerId', )
+        """
+        _response = self._raw_client.next_bridge_commands(
+            runner_id, max_commands=max_commands, request_options=request_options
+        )
+        return _response.data
+
     def next_job(self, runner_id: str, *, request_options: typing.Optional[RequestOptions] = None) -> LocalRunnerJob:
         """
         Long-poll for the next pending local runner job
@@ -411,6 +528,118 @@ class RunnersClient:
         client.runners.next_job(runner_id='runnerId', )
         """
         _response = self._raw_client.next_job(runner_id, request_options=request_options)
+        return _response.data
+
+    def put_checklist(
+        self,
+        runner_id: str,
+        *,
+        command: typing.Optional[str] = OMIT,
+        file_tree: typing.Optional[str] = OMIT,
+        instrumentation: typing.Optional[Instrumentation] = OMIT,
+        instrumentation_matches: typing.Optional[typing.Sequence[str]] = OMIT,
+        child_status: typing.Optional[str] = OMIT,
+        last_crash: typing.Optional[LastCrash] = OMIT,
+        request_options: typing.Optional[RequestOptions] = None,
+    ) -> None:
+        """
+        Full replace of the runner's instrumentation checklist
+
+        Parameters
+        ----------
+        runner_id : str
+
+        command : typing.Optional[str]
+
+        file_tree : typing.Optional[str]
+
+        instrumentation : typing.Optional[Instrumentation]
+
+        instrumentation_matches : typing.Optional[typing.Sequence[str]]
+
+        child_status : typing.Optional[str]
+
+        last_crash : typing.Optional[LastCrash]
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        None
+
+        Examples
+        --------
+        from Opik import OpikApi
+        client = OpikApi(api_key="YOUR_API_KEY", workspace_name="YOUR_WORKSPACE_NAME", )
+        client.runners.put_checklist(runner_id='runnerId', )
+        """
+        _response = self._raw_client.put_checklist(
+            runner_id,
+            command=command,
+            file_tree=file_tree,
+            instrumentation=instrumentation,
+            instrumentation_matches=instrumentation_matches,
+            child_status=child_status,
+            last_crash=last_crash,
+            request_options=request_options,
+        )
+        return _response.data
+
+    def patch_checklist(
+        self,
+        runner_id: str,
+        *,
+        command: typing.Optional[str] = OMIT,
+        file_tree: typing.Optional[str] = OMIT,
+        instrumentation: typing.Optional[Instrumentation] = OMIT,
+        instrumentation_matches: typing.Optional[typing.Sequence[str]] = OMIT,
+        child_status: typing.Optional[str] = OMIT,
+        last_crash: typing.Optional[LastCrash] = OMIT,
+        request_options: typing.Optional[RequestOptions] = None,
+    ) -> None:
+        """
+        Partial update of the runner's instrumentation checklist
+
+        Parameters
+        ----------
+        runner_id : str
+
+        command : typing.Optional[str]
+
+        file_tree : typing.Optional[str]
+
+        instrumentation : typing.Optional[Instrumentation]
+
+        instrumentation_matches : typing.Optional[typing.Sequence[str]]
+
+        child_status : typing.Optional[str]
+
+        last_crash : typing.Optional[LastCrash]
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        None
+
+        Examples
+        --------
+        from Opik import OpikApi
+        client = OpikApi(api_key="YOUR_API_KEY", workspace_name="YOUR_WORKSPACE_NAME", )
+        client.runners.patch_checklist(runner_id='runnerId', )
+        """
+        _response = self._raw_client.patch_checklist(
+            runner_id,
+            command=command,
+            file_tree=file_tree,
+            instrumentation=instrumentation,
+            instrumentation_matches=instrumentation_matches,
+            child_status=child_status,
+            last_crash=last_crash,
+            request_options=request_options,
+        )
         return _response.data
 
     def register_agents(
@@ -444,6 +673,58 @@ class RunnersClient:
         }, )
         """
         _response = self._raw_client.register_agents(runner_id, request=request, request_options=request_options)
+        return _response.data
+
+    def report_bridge_command_result(
+        self,
+        runner_id: str,
+        command_id: str,
+        *,
+        status: BridgeCommandResultRequestStatus,
+        result: typing.Optional[JsonNode] = OMIT,
+        error: typing.Optional[BridgeCommandError] = OMIT,
+        duration_ms: typing.Optional[int] = OMIT,
+        request_options: typing.Optional[RequestOptions] = None,
+    ) -> None:
+        """
+        Report completion or failure of a bridge command
+
+        Parameters
+        ----------
+        runner_id : str
+
+        command_id : str
+
+        status : BridgeCommandResultRequestStatus
+
+        result : typing.Optional[JsonNode]
+
+        error : typing.Optional[BridgeCommandError]
+
+        duration_ms : typing.Optional[int]
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        None
+
+        Examples
+        --------
+        from Opik import OpikApi
+        client = OpikApi(api_key="YOUR_API_KEY", workspace_name="YOUR_WORKSPACE_NAME", )
+        client.runners.report_bridge_command_result(runner_id='runnerId', command_id='commandId', status="pending", )
+        """
+        _response = self._raw_client.report_bridge_command_result(
+            runner_id,
+            command_id,
+            status=status,
+            result=result,
+            error=error,
+            duration_ms=duration_ms,
+            request_options=request_options,
+        )
         return _response.data
 
     def report_job_result(
@@ -486,6 +767,48 @@ class RunnersClient:
         """
         _response = self._raw_client.report_job_result(
             job_id, status=status, result=result, error=error, trace_id=trace_id, request_options=request_options
+        )
+        return _response.data
+
+    def submit_bridge_command(
+        self,
+        runner_id: str,
+        *,
+        type: str,
+        args: JsonNode,
+        timeout_seconds: typing.Optional[int] = OMIT,
+        request_options: typing.Optional[RequestOptions] = None,
+    ) -> CreateBridgeCommandResponse:
+        """
+        Submit a bridge command for execution on the local runner
+
+        Parameters
+        ----------
+        runner_id : str
+
+        type : str
+
+        args : JsonNode
+
+        timeout_seconds : typing.Optional[int]
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        CreateBridgeCommandResponse
+            Command created
+
+        Examples
+        --------
+        from Opik import OpikApi
+        client = OpikApi(api_key="YOUR_API_KEY", workspace_name="YOUR_WORKSPACE_NAME", )
+        client.runners.submit_bridge_command(runner_id='runnerId', type='type', args={'key': 'value'
+        }, )
+        """
+        _response = self._raw_client.submit_bridge_command(
+            runner_id, type=type, args=args, timeout_seconds=timeout_seconds, request_options=request_options
         )
         return _response.data
 
@@ -575,6 +898,37 @@ class AsyncRunnersClient:
         asyncio.run(main())
         """
         _response = await self._raw_client.append_job_logs(job_id, request=request, request_options=request_options)
+        return _response.data
+
+    async def cancel_bridge_command(
+        self, runner_id: str, command_id: str, *, request_options: typing.Optional[RequestOptions] = None
+    ) -> None:
+        """
+        Cancel a pending or active bridge command
+
+        Parameters
+        ----------
+        runner_id : str
+
+        command_id : str
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        None
+
+        Examples
+        --------
+        from Opik import AsyncOpikApi
+        import asyncio
+        client = AsyncOpikApi(api_key="YOUR_API_KEY", workspace_name="YOUR_WORKSPACE_NAME", )
+        async def main() -> None:
+            await client.runners.cancel_bridge_command(runner_id='runnerId', command_id='commandId', )
+        asyncio.run(main())
+        """
+        _response = await self._raw_client.cancel_bridge_command(runner_id, command_id, request_options=request_options)
         return _response.data
 
     async def cancel_job(self, job_id: str, *, request_options: typing.Optional[RequestOptions] = None) -> None:
@@ -719,6 +1073,50 @@ class AsyncRunnersClient:
         _response = await self._raw_client.generate_pairing_code(project_id=project_id, request_options=request_options)
         return _response.data
 
+    async def get_bridge_command(
+        self,
+        runner_id: str,
+        command_id: str,
+        *,
+        wait: typing.Optional[bool] = None,
+        timeout: typing.Optional[int] = None,
+        request_options: typing.Optional[RequestOptions] = None,
+    ) -> BridgeCommand:
+        """
+        Get bridge command status or long-poll for result
+
+        Parameters
+        ----------
+        runner_id : str
+
+        command_id : str
+
+        wait : typing.Optional[bool]
+
+        timeout : typing.Optional[int]
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        BridgeCommand
+            Command details
+
+        Examples
+        --------
+        from Opik import AsyncOpikApi
+        import asyncio
+        client = AsyncOpikApi(api_key="YOUR_API_KEY", workspace_name="YOUR_WORKSPACE_NAME", )
+        async def main() -> None:
+            await client.runners.get_bridge_command(runner_id='runnerId', command_id='commandId', )
+        asyncio.run(main())
+        """
+        _response = await self._raw_client.get_bridge_command(
+            runner_id, command_id, wait=wait, timeout=timeout, request_options=request_options
+        )
+        return _response.data
+
     async def get_job(self, job_id: str, *, request_options: typing.Optional[RequestOptions] = None) -> LocalRunnerJob:
         """
         Get a single local runner job's status and results
@@ -778,7 +1176,11 @@ class AsyncRunnersClient:
         return _response.data
 
     async def heartbeat(
-        self, runner_id: str, *, request_options: typing.Optional[RequestOptions] = None
+        self,
+        runner_id: str,
+        *,
+        capabilities: typing.Optional[typing.Sequence[str]] = OMIT,
+        request_options: typing.Optional[RequestOptions] = None,
     ) -> LocalRunnerHeartbeatResponse:
         """
         Refresh local runner heartbeat
@@ -786,6 +1188,8 @@ class AsyncRunnersClient:
         Parameters
         ----------
         runner_id : str
+
+        capabilities : typing.Optional[typing.Sequence[str]]
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -804,7 +1208,9 @@ class AsyncRunnersClient:
             await client.runners.heartbeat(runner_id='runnerId', )
         asyncio.run(main())
         """
-        _response = await self._raw_client.heartbeat(runner_id, request_options=request_options)
+        _response = await self._raw_client.heartbeat(
+            runner_id, capabilities=capabilities, request_options=request_options
+        )
         return _response.data
 
     async def list_jobs(
@@ -892,6 +1298,44 @@ class AsyncRunnersClient:
         )
         return _response.data
 
+    async def next_bridge_commands(
+        self,
+        runner_id: str,
+        *,
+        max_commands: typing.Optional[int] = OMIT,
+        request_options: typing.Optional[RequestOptions] = None,
+    ) -> BridgeNextResponse:
+        """
+        Long-poll for pending bridge commands
+
+        Parameters
+        ----------
+        runner_id : str
+
+        max_commands : typing.Optional[int]
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        BridgeNextResponse
+            Commands available
+
+        Examples
+        --------
+        from Opik import AsyncOpikApi
+        import asyncio
+        client = AsyncOpikApi(api_key="YOUR_API_KEY", workspace_name="YOUR_WORKSPACE_NAME", )
+        async def main() -> None:
+            await client.runners.next_bridge_commands(runner_id='runnerId', )
+        asyncio.run(main())
+        """
+        _response = await self._raw_client.next_bridge_commands(
+            runner_id, max_commands=max_commands, request_options=request_options
+        )
+        return _response.data
+
     async def next_job(
         self, runner_id: str, *, request_options: typing.Optional[RequestOptions] = None
     ) -> LocalRunnerJob:
@@ -920,6 +1364,124 @@ class AsyncRunnersClient:
         asyncio.run(main())
         """
         _response = await self._raw_client.next_job(runner_id, request_options=request_options)
+        return _response.data
+
+    async def put_checklist(
+        self,
+        runner_id: str,
+        *,
+        command: typing.Optional[str] = OMIT,
+        file_tree: typing.Optional[str] = OMIT,
+        instrumentation: typing.Optional[Instrumentation] = OMIT,
+        instrumentation_matches: typing.Optional[typing.Sequence[str]] = OMIT,
+        child_status: typing.Optional[str] = OMIT,
+        last_crash: typing.Optional[LastCrash] = OMIT,
+        request_options: typing.Optional[RequestOptions] = None,
+    ) -> None:
+        """
+        Full replace of the runner's instrumentation checklist
+
+        Parameters
+        ----------
+        runner_id : str
+
+        command : typing.Optional[str]
+
+        file_tree : typing.Optional[str]
+
+        instrumentation : typing.Optional[Instrumentation]
+
+        instrumentation_matches : typing.Optional[typing.Sequence[str]]
+
+        child_status : typing.Optional[str]
+
+        last_crash : typing.Optional[LastCrash]
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        None
+
+        Examples
+        --------
+        from Opik import AsyncOpikApi
+        import asyncio
+        client = AsyncOpikApi(api_key="YOUR_API_KEY", workspace_name="YOUR_WORKSPACE_NAME", )
+        async def main() -> None:
+            await client.runners.put_checklist(runner_id='runnerId', )
+        asyncio.run(main())
+        """
+        _response = await self._raw_client.put_checklist(
+            runner_id,
+            command=command,
+            file_tree=file_tree,
+            instrumentation=instrumentation,
+            instrumentation_matches=instrumentation_matches,
+            child_status=child_status,
+            last_crash=last_crash,
+            request_options=request_options,
+        )
+        return _response.data
+
+    async def patch_checklist(
+        self,
+        runner_id: str,
+        *,
+        command: typing.Optional[str] = OMIT,
+        file_tree: typing.Optional[str] = OMIT,
+        instrumentation: typing.Optional[Instrumentation] = OMIT,
+        instrumentation_matches: typing.Optional[typing.Sequence[str]] = OMIT,
+        child_status: typing.Optional[str] = OMIT,
+        last_crash: typing.Optional[LastCrash] = OMIT,
+        request_options: typing.Optional[RequestOptions] = None,
+    ) -> None:
+        """
+        Partial update of the runner's instrumentation checklist
+
+        Parameters
+        ----------
+        runner_id : str
+
+        command : typing.Optional[str]
+
+        file_tree : typing.Optional[str]
+
+        instrumentation : typing.Optional[Instrumentation]
+
+        instrumentation_matches : typing.Optional[typing.Sequence[str]]
+
+        child_status : typing.Optional[str]
+
+        last_crash : typing.Optional[LastCrash]
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        None
+
+        Examples
+        --------
+        from Opik import AsyncOpikApi
+        import asyncio
+        client = AsyncOpikApi(api_key="YOUR_API_KEY", workspace_name="YOUR_WORKSPACE_NAME", )
+        async def main() -> None:
+            await client.runners.patch_checklist(runner_id='runnerId', )
+        asyncio.run(main())
+        """
+        _response = await self._raw_client.patch_checklist(
+            runner_id,
+            command=command,
+            file_tree=file_tree,
+            instrumentation=instrumentation,
+            instrumentation_matches=instrumentation_matches,
+            child_status=child_status,
+            last_crash=last_crash,
+            request_options=request_options,
+        )
         return _response.data
 
     async def register_agents(
@@ -956,6 +1518,61 @@ class AsyncRunnersClient:
         asyncio.run(main())
         """
         _response = await self._raw_client.register_agents(runner_id, request=request, request_options=request_options)
+        return _response.data
+
+    async def report_bridge_command_result(
+        self,
+        runner_id: str,
+        command_id: str,
+        *,
+        status: BridgeCommandResultRequestStatus,
+        result: typing.Optional[JsonNode] = OMIT,
+        error: typing.Optional[BridgeCommandError] = OMIT,
+        duration_ms: typing.Optional[int] = OMIT,
+        request_options: typing.Optional[RequestOptions] = None,
+    ) -> None:
+        """
+        Report completion or failure of a bridge command
+
+        Parameters
+        ----------
+        runner_id : str
+
+        command_id : str
+
+        status : BridgeCommandResultRequestStatus
+
+        result : typing.Optional[JsonNode]
+
+        error : typing.Optional[BridgeCommandError]
+
+        duration_ms : typing.Optional[int]
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        None
+
+        Examples
+        --------
+        from Opik import AsyncOpikApi
+        import asyncio
+        client = AsyncOpikApi(api_key="YOUR_API_KEY", workspace_name="YOUR_WORKSPACE_NAME", )
+        async def main() -> None:
+            await client.runners.report_bridge_command_result(runner_id='runnerId', command_id='commandId', status="pending", )
+        asyncio.run(main())
+        """
+        _response = await self._raw_client.report_bridge_command_result(
+            runner_id,
+            command_id,
+            status=status,
+            result=result,
+            error=error,
+            duration_ms=duration_ms,
+            request_options=request_options,
+        )
         return _response.data
 
     async def report_job_result(
@@ -1001,5 +1618,50 @@ class AsyncRunnersClient:
         """
         _response = await self._raw_client.report_job_result(
             job_id, status=status, result=result, error=error, trace_id=trace_id, request_options=request_options
+        )
+        return _response.data
+
+    async def submit_bridge_command(
+        self,
+        runner_id: str,
+        *,
+        type: str,
+        args: JsonNode,
+        timeout_seconds: typing.Optional[int] = OMIT,
+        request_options: typing.Optional[RequestOptions] = None,
+    ) -> CreateBridgeCommandResponse:
+        """
+        Submit a bridge command for execution on the local runner
+
+        Parameters
+        ----------
+        runner_id : str
+
+        type : str
+
+        args : JsonNode
+
+        timeout_seconds : typing.Optional[int]
+
+        request_options : typing.Optional[RequestOptions]
+            Request-specific configuration.
+
+        Returns
+        -------
+        CreateBridgeCommandResponse
+            Command created
+
+        Examples
+        --------
+        from Opik import AsyncOpikApi
+        import asyncio
+        client = AsyncOpikApi(api_key="YOUR_API_KEY", workspace_name="YOUR_WORKSPACE_NAME", )
+        async def main() -> None:
+            await client.runners.submit_bridge_command(runner_id='runnerId', type='type', args={'key': 'value'
+            }, )
+        asyncio.run(main())
+        """
+        _response = await self._raw_client.submit_bridge_command(
+            runner_id, type=type, args=args, timeout_seconds=timeout_seconds, request_options=request_options
         )
         return _response.data

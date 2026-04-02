@@ -1,6 +1,12 @@
 package com.comet.opik.domain;
 
 import com.comet.opik.api.error.ErrorMessage;
+import com.comet.opik.api.runner.BridgeCommand;
+import com.comet.opik.api.runner.BridgeCommandError;
+import com.comet.opik.api.runner.BridgeCommandResultRequest;
+import com.comet.opik.api.runner.BridgeCommandStatus;
+import com.comet.opik.api.runner.BridgeNextResponse;
+import com.comet.opik.api.runner.CreateBridgeCommandRequest;
 import com.comet.opik.api.runner.CreateLocalRunnerJobRequest;
 import com.comet.opik.api.runner.LocalRunner;
 import com.comet.opik.api.runner.LocalRunnerConnectRequest;
@@ -13,6 +19,7 @@ import com.comet.opik.api.runner.LocalRunnerJobStatus;
 import com.comet.opik.api.runner.LocalRunnerLogEntry;
 import com.comet.opik.api.runner.LocalRunnerPairResponse;
 import com.comet.opik.api.runner.LocalRunnerStatus;
+import com.comet.opik.api.runner.RunnerChecklist;
 import com.comet.opik.infrastructure.LocalRunnerConfig;
 import com.comet.opik.infrastructure.redis.StringRedisClient;
 import com.comet.opik.utils.JsonUtils;
@@ -29,8 +36,11 @@ import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.RandomUtils;
+import org.redisson.api.RAtomicLong;
 import org.redisson.api.RBatch;
 import org.redisson.api.RBlockingDeque;
+import org.redisson.api.RBlockingQueue;
+import org.redisson.api.RBlockingQueueReactive;
 import org.redisson.api.RBucket;
 import org.redisson.api.RList;
 import org.redisson.api.RMap;
@@ -65,7 +75,26 @@ public interface LocalRunnerService {
 
     void registerAgents(UUID runnerId, String workspaceId, String userName, Map<String, LocalRunner.Agent> agents);
 
-    LocalRunnerHeartbeatResponse heartbeat(UUID runnerId, String workspaceId, String userName);
+    void putChecklist(UUID runnerId, String workspaceId, String userName, RunnerChecklist checklist);
+
+    void patchChecklist(UUID runnerId, String workspaceId, String userName, RunnerChecklist patch);
+
+    LocalRunnerHeartbeatResponse heartbeat(UUID runnerId, String workspaceId, String userName,
+            List<String> capabilities);
+
+    UUID createBridgeCommand(UUID runnerId, String workspaceId, String userName, CreateBridgeCommandRequest request);
+
+    Mono<BridgeNextResponse> nextBridgeCommands(UUID runnerId, String workspaceId, String userName, int maxCommands);
+
+    void reportBridgeCommandResult(UUID runnerId, UUID commandId, String workspaceId, String userName,
+            BridgeCommandResultRequest result);
+
+    void cancelBridgeCommand(UUID runnerId, UUID commandId, String workspaceId, String userName);
+
+    BridgeCommand getBridgeCommand(UUID runnerId, UUID commandId, String workspaceId, String userName);
+
+    Mono<BridgeCommand> awaitBridgeCommand(UUID runnerId, UUID commandId, String workspaceId, String userName,
+            int timeoutSeconds);
 
     UUID createJob(String workspaceId, String userName, CreateLocalRunnerJobRequest request);
 
@@ -152,6 +181,54 @@ class LocalRunnerServiceImpl implements LocalRunnerService {
     private static String runnerCancellationsKey(UUID runnerId) {
         return "opik:runners:runner:" + runnerId + ":cancellations";
     }
+
+    private static String bridgeCommandKey(UUID commandId) {
+        return "opik:runners:bridge:" + commandId;
+    }
+
+    private static String bridgeCommandDoneKey(UUID commandId) {
+        return "opik:runners:bridge:" + commandId + ":done";
+    }
+
+    private static String bridgePendingKey(UUID runnerId) {
+        return "opik:runners:bridge:" + runnerId + ":pending";
+    }
+
+    private static String bridgeActiveKey(UUID runnerId) {
+        return "opik:runners:bridge:" + runnerId + ":active";
+    }
+
+    private static String bridgeCancellationsKey(UUID runnerId) {
+        return "opik:runners:bridge:" + runnerId + ":cancellations";
+    }
+
+    private static String bridgeRateKey(UUID runnerId, long epochMinute) {
+        return "opik:runners:bridge:" + runnerId + ":rate:" + epochMinute;
+    }
+
+    private static String bridgeWriteRateKey(UUID runnerId, long epochMinute) {
+        return "opik:runners:bridge:" + runnerId + ":rate:write:" + epochMinute;
+    }
+
+    private static final Set<String> WRITE_COMMAND_TYPES = Set.of("write_file", "edit_file");
+
+    private static final Set<BridgeCommandStatus> TERMINAL_BRIDGE_STATUSES = Set.of(
+            BridgeCommandStatus.COMPLETED, BridgeCommandStatus.FAILED,
+            BridgeCommandStatus.TIMED_OUT, BridgeCommandStatus.CANCELLED);
+
+    private static final String FIELD_COMMAND_ID = "command_id";
+    private static final String FIELD_TYPE = "type";
+    private static final String FIELD_ARGS = "args";
+    private static final String FIELD_TIMEOUT_SECONDS = "timeout_seconds";
+    private static final String FIELD_SUBMITTED_AT = "submitted_at";
+    private static final String FIELD_PICKED_UP_AT = "picked_up_at";
+    private static final String FIELD_DURATION_MS = "duration_ms";
+    private static final String FIELD_CAPABILITIES = "capabilities";
+
+    private static final String FIELD_CHECKLIST = "checklist";
+    private static final int MAX_CHECKLIST_SIZE_BYTES = 200 * 1024;
+
+    private static final List<String> DEFAULT_CAPABILITIES = List.of("jobs");
 
     private static final Set<LocalRunnerJobStatus> TERMINAL_JOB_STATUSES = Set.of(LocalRunnerJobStatus.COMPLETED,
             LocalRunnerJobStatus.FAILED);
@@ -314,8 +391,90 @@ class LocalRunnerServiceImpl implements LocalRunnerService {
     }
 
     @Override
+    public void putChecklist(@NonNull UUID runnerId, @NonNull String workspaceId, @NonNull String userName,
+            @NonNull RunnerChecklist checklist) {
+        validateRunnerOwnership(runnerId, workspaceId, userName);
+
+        String json = JsonUtils.writeValueAsString(checklist);
+        if (json.getBytes(java.nio.charset.StandardCharsets.UTF_8).length > MAX_CHECKLIST_SIZE_BYTES) {
+            throw new ClientErrorException(Response.status(413)
+                    .entity(new ErrorMessage(List.of("Checklist exceeds maximum size of 200KB")))
+                    .build());
+        }
+
+        RMap<String, String> runnerMap = redisClient.getMap(runnerKey(runnerId));
+        if (!runnerMap.isExists()) {
+            throw new NotFoundException("Runner not found: " + runnerId);
+        }
+        runnerMap.put(FIELD_CHECKLIST, json);
+    }
+
+    @Override
+    public void patchChecklist(@NonNull UUID runnerId, @NonNull String workspaceId, @NonNull String userName,
+            @NonNull RunnerChecklist patch) {
+        validateRunnerOwnership(runnerId, workspaceId, userName);
+
+        RMap<String, String> runnerMap = redisClient.getMap(runnerKey(runnerId));
+        String existing = runnerMap.get(FIELD_CHECKLIST);
+        if (existing == null) {
+            throw new NotFoundException("Checklist not found for runner: " + runnerId);
+        }
+
+        RunnerChecklist current = JsonUtils.readValue(existing, RunnerChecklist.class);
+        RunnerChecklist merged = mergeChecklist(current, patch);
+
+        String json = JsonUtils.writeValueAsString(merged);
+        if (json.getBytes(java.nio.charset.StandardCharsets.UTF_8).length > MAX_CHECKLIST_SIZE_BYTES) {
+            throw new ClientErrorException(Response.status(413)
+                    .entity(new ErrorMessage(List.of("Checklist exceeds maximum size of 200KB")))
+                    .build());
+        }
+
+        runnerMap.put(FIELD_CHECKLIST, json);
+    }
+
+    private RunnerChecklist mergeChecklist(RunnerChecklist current, RunnerChecklist patch) {
+        var builder = current.toBuilder();
+
+        if (patch.command() != null) {
+            builder.command(patch.command());
+        }
+        if (patch.fileTree() != null) {
+            builder.fileTree(patch.fileTree());
+        }
+        if (patch.instrumentationMatches() != null) {
+            builder.instrumentationMatches(patch.instrumentationMatches());
+        }
+        if (patch.instrumentation() != null) {
+            RunnerChecklist.Instrumentation currentInstr = current.instrumentation();
+            RunnerChecklist.Instrumentation patchInstr = patch.instrumentation();
+
+            if (currentInstr == null) {
+                builder.instrumentation(patchInstr);
+            } else {
+                builder.instrumentation(RunnerChecklist.Instrumentation.builder()
+                        .tracing(patchInstr.tracing() != null ? patchInstr.tracing() : currentInstr.tracing())
+                        .entrypoint(
+                                patchInstr.entrypoint() != null ? patchInstr.entrypoint() : currentInstr.entrypoint())
+                        .configuration(patchInstr.configuration() != null
+                                ? patchInstr.configuration()
+                                : currentInstr.configuration())
+                        .build());
+            }
+        }
+        if (patch.childStatus() != null) {
+            builder.childStatus(patch.childStatus());
+        }
+        if (patch.lastCrash() != null) {
+            builder.lastCrash(patch.lastCrash());
+        }
+
+        return builder.build();
+    }
+
+    @Override
     public LocalRunnerHeartbeatResponse heartbeat(@NonNull UUID runnerId, @NonNull String workspaceId,
-            @NonNull String userName) {
+            @NonNull String userName, List<String> capabilities) {
         if (!isRunnerOwnedByUser(runnerId, workspaceId, userName)) {
             throw new ClientErrorException(Response.status(Response.Status.GONE)
                     .entity(new ErrorMessage(List.of("Runner not found: " + runnerId)))
@@ -340,6 +499,9 @@ class LocalRunnerServiceImpl implements LocalRunnerService {
 
         setHeartbeat(runnerId);
 
+        List<String> resolvedCapabilities = capabilities != null ? capabilities : DEFAULT_CAPABILITIES;
+        runnerMap.put(FIELD_CAPABILITIES, JsonUtils.writeValueAsString(resolvedCapabilities));
+
         RList<String> activeJobs = redisClient.getList(
                 activeJobsKey(runnerId));
         List<String> activeJobIds = activeJobs.readAll();
@@ -359,8 +521,14 @@ class LocalRunnerServiceImpl implements LocalRunnerService {
         Set<String> cancelledIds = cancellations.readAll();
         cancellations.delete();
 
+        RSet<String> bridgeCancellations = redisClient.getSet(
+                bridgeCancellationsKey(runnerId));
+        Set<String> cancelledCommandIds = bridgeCancellations.readAll();
+        bridgeCancellations.delete();
+
         return LocalRunnerHeartbeatResponse.builder()
                 .cancelledJobIds(cancelledIds.stream().map(UUID::fromString).toList())
+                .cancelledCommandIds(cancelledCommandIds.stream().map(UUID::fromString).toList())
                 .build();
     }
 
@@ -692,6 +860,12 @@ class LocalRunnerServiceImpl implements LocalRunnerService {
             } catch (Exception e) {
                 log.error("Failed to reap stuck jobs for runner '{}' in workspace '{}'", runnerId, workspaceId, e);
             }
+            try {
+                reapStuckBridgeCommands(runnerId);
+            } catch (Exception e) {
+                log.error("Failed to reap stuck bridge commands for runner '{}' in workspace '{}'", runnerId,
+                        workspaceId, e);
+            }
             remaining--;
         }
 
@@ -725,6 +899,7 @@ class LocalRunnerServiceImpl implements LocalRunnerService {
         }
 
         failOrphanedJobs(runnerId);
+        reapBridgeCommands(runnerId);
 
         if (shouldPurge) {
             purgeRunner(runnerId, workspaceId, runnerMap.get(FIELD_USER_NAME));
@@ -826,7 +1001,10 @@ class LocalRunnerServiceImpl implements LocalRunnerService {
                 runnerHeartbeatKey(runnerId),
                 runnerCancellationsKey(runnerId),
                 pendingJobsKey(runnerId),
-                activeJobsKey(runnerId));
+                activeJobsKey(runnerId),
+                bridgePendingKey(runnerId),
+                bridgeActiveKey(runnerId),
+                bridgeCancellationsKey(runnerId));
 
         if (userName != null) {
             removeRunnerFromWorkspace(workspaceId, userName, runnerId);
@@ -1001,6 +1179,9 @@ class LocalRunnerServiceImpl implements LocalRunnerService {
                 ? Instant.parse(fields.get(FIELD_CONNECTED_AT))
                 : null;
 
+        List<String> capabilities = parseCapabilities(fields.get(FIELD_CAPABILITIES));
+        RunnerChecklist checklist = parseChecklist(fields.get(FIELD_CHECKLIST));
+
         return LocalRunner.builder()
                 .id(runnerId)
                 .name(fields.get(FIELD_NAME))
@@ -1008,6 +1189,8 @@ class LocalRunnerServiceImpl implements LocalRunnerService {
                 .status(status)
                 .connectedAt(connectedAt)
                 .agents(agents)
+                .capabilities(capabilities)
+                .checklist(checklist)
                 .build();
     }
 
@@ -1100,6 +1283,437 @@ class LocalRunnerServiceImpl implements LocalRunnerService {
             }
         }
         return null;
+    }
+
+    private RunnerChecklist parseChecklist(String value) {
+        if (value == null) {
+            return null;
+        }
+        try {
+            return JsonUtils.readValue(value, RunnerChecklist.class);
+        } catch (Exception e) {
+            log.warn("Failed to parse checklist: {}", e.getMessage());
+            return null;
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<String> parseCapabilities(String value) {
+        if (value == null) {
+            return DEFAULT_CAPABILITIES;
+        }
+        try {
+            return JsonUtils.readValue(value, List.class);
+        } catch (Exception e) {
+            return DEFAULT_CAPABILITIES;
+        }
+    }
+
+    private boolean hasCapability(UUID runnerId, String capability) {
+        RMap<String, String> runnerMap = redisClient.getMap(runnerKey(runnerId));
+        String capabilitiesJson = runnerMap.get(FIELD_CAPABILITIES);
+        List<String> caps = parseCapabilities(capabilitiesJson);
+        return caps.contains(capability);
+    }
+
+    private BridgeCommandStatus parseBridgeCommandStatus(String value) {
+        if (value == null) {
+            return null;
+        }
+        for (BridgeCommandStatus s : BridgeCommandStatus.values()) {
+            if (s.getValue().equals(value)) {
+                return s;
+            }
+        }
+        return null;
+    }
+
+    private BridgeCommand buildBridgeCommand(Map<String, String> fields) {
+        return BridgeCommand.builder()
+                .commandId(parseUUID(fields.get(FIELD_COMMAND_ID)))
+                .runnerId(parseUUID(fields.get(FIELD_RUNNER_ID)))
+                .type(fields.get(FIELD_TYPE))
+                .status(parseBridgeCommandStatus(fields.get(FIELD_STATUS)))
+                .args(parseJsonNode(fields.get(FIELD_ARGS)))
+                .result(parseJsonNode(fields.get(FIELD_RESULT)))
+                .error(parseBridgeError(fields.get(FIELD_ERROR)))
+                .timeoutSeconds(parseIntValue(fields.get(FIELD_TIMEOUT_SECONDS)))
+                .submittedAt(parseInstant(fields.get(FIELD_SUBMITTED_AT)))
+                .pickedUpAt(parseInstant(fields.get(FIELD_PICKED_UP_AT)))
+                .completedAt(parseInstant(fields.get(FIELD_COMPLETED_AT)))
+                .durationMs(parseLongValue(fields.get(FIELD_DURATION_MS)))
+                .build();
+    }
+
+    private BridgeCommandError parseBridgeError(String value) {
+        if (value == null) {
+            return null;
+        }
+        return JsonUtils.readValue(value, BridgeCommandError.class);
+    }
+
+    private Long parseLongValue(String value) {
+        if (value == null) {
+            return null;
+        }
+        try {
+            return Long.parseLong(value);
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
+    private void checkBridgeRateLimit(UUID runnerId, String commandType) {
+        long epochMinute = Instant.now().getEpochSecond() / 60;
+
+        RAtomicLong rateCounter = redisClient.getAtomicLong(bridgeRateKey(runnerId, epochMinute));
+        long count = rateCounter.incrementAndGet();
+        if (count == 1) {
+            rateCounter.expire(Duration.ofSeconds(120));
+        }
+        if (count > runnerConfig.getMaxBridgeCommandsPerMinute()) {
+            throw new ClientErrorException(Response.status(429)
+                    .entity(new ErrorMessage(List.of("Rate limit exceeded")))
+                    .build());
+        }
+
+        if (WRITE_COMMAND_TYPES.contains(commandType)) {
+            RAtomicLong writeRateCounter = redisClient.getAtomicLong(bridgeWriteRateKey(runnerId, epochMinute));
+            long writeCount = writeRateCounter.incrementAndGet();
+            if (writeCount == 1) {
+                writeRateCounter.expire(Duration.ofSeconds(120));
+            }
+            if (writeCount > runnerConfig.getMaxWriteBridgeCommandsPerMinute()) {
+                throw new ClientErrorException(Response.status(429)
+                        .entity(new ErrorMessage(List.of("Write rate limit exceeded")))
+                        .build());
+            }
+        }
+    }
+
+    private void writeDoneSentinel(UUID commandId) {
+        RBlockingQueue<String> doneQueue = redisClient.getBlockingQueue(bridgeCommandDoneKey(commandId));
+        doneQueue.offer("done");
+        doneQueue.expire(Duration.ofHours(1));
+    }
+
+    @Override
+    public UUID createBridgeCommand(@NonNull UUID runnerId, @NonNull String workspaceId, @NonNull String userName,
+            @NonNull CreateBridgeCommandRequest request) {
+        validateRunnerOwnership(runnerId, workspaceId, userName);
+
+        if (!isRunnerAlive(runnerId)) {
+            throw new NotFoundException(Response.status(Response.Status.NOT_FOUND)
+                    .entity(new ErrorMessage(List.of("Runner is not connected")))
+                    .build());
+        }
+
+        if (!hasCapability(runnerId, "bridge")) {
+            throw new ClientErrorException(Response.status(Response.Status.CONFLICT)
+                    .entity(new ErrorMessage(List.of("Runner does not support bridge commands")))
+                    .build());
+        }
+
+        RBlockingDeque<String> pendingDeque = redisClient.getBlockingDeque(bridgePendingKey(runnerId));
+        if (pendingDeque.size() >= runnerConfig.getMaxPendingBridgeCommandsPerRunner()) {
+            throw new ClientErrorException(Response.status(429)
+                    .entity(new ErrorMessage(List.of("Too many pending commands")))
+                    .build());
+        }
+
+        checkBridgeRateLimit(runnerId, request.type());
+
+        UUID commandId = idGenerator.generateId();
+        String now = Instant.now().toString();
+        int timeout = request.timeoutSeconds() != null
+                ? request.timeoutSeconds()
+                : (int) runnerConfig.getBridgeCommandDefaultTimeout().toSeconds();
+
+        Map<String, String> commandFields = new HashMap<>();
+        commandFields.put(FIELD_COMMAND_ID, commandId.toString());
+        commandFields.put(FIELD_RUNNER_ID, runnerId.toString());
+        commandFields.put(FIELD_WORKSPACE_ID, workspaceId);
+        commandFields.put(FIELD_TYPE, request.type());
+        commandFields.put(FIELD_ARGS, JsonUtils.writeValueAsString(request.args()));
+        commandFields.put(FIELD_STATUS, BridgeCommandStatus.PENDING.getValue());
+        commandFields.put(FIELD_TIMEOUT_SECONDS, String.valueOf(timeout));
+        commandFields.put(FIELD_SUBMITTED_AT, now);
+
+        RMap<String, String> commandMap = redisClient.getMap(bridgeCommandKey(commandId));
+        commandMap.putAll(commandFields);
+        commandMap.expire(Duration.ofSeconds(timeout + 30));
+
+        pendingDeque.add(commandId.toString());
+
+        return commandId;
+    }
+
+    @Override
+    public Mono<BridgeNextResponse> nextBridgeCommands(@NonNull UUID runnerId, @NonNull String workspaceId,
+            @NonNull String userName, int maxCommands) {
+        validateRunnerOwnership(runnerId, workspaceId, userName);
+
+        if (!isRunnerAlive(runnerId)) {
+            throw new ClientErrorException(Response.status(Response.Status.GONE)
+                    .entity(new ErrorMessage(List.of("Runner has been evicted")))
+                    .build());
+        }
+
+        String pendingKey = bridgePendingKey(runnerId);
+
+        RBlockingDeque<String> blockingDeque = redisClient.getBlockingDeque(pendingKey);
+        Duration timeout = Duration.ofSeconds(runnerConfig.getBridgeNextPollTimeout().toSeconds());
+
+        return Mono.defer(() -> Mono.fromCompletionStage(
+                blockingDeque.pollFirstAsync(timeout.toSeconds(), java.util.concurrent.TimeUnit.SECONDS)))
+                .filter(firstId -> firstId != null)
+                .flatMap(firstId -> Mono.fromCallable(() -> drainAndPickUpBridgeCommands(
+                        firstId, runnerId, blockingDeque, maxCommands))
+                        .subscribeOn(reactor.core.scheduler.Schedulers.boundedElastic()))
+                .defaultIfEmpty(BridgeNextResponse.builder().commands(List.of()).build());
+    }
+
+    private BridgeNextResponse drainAndPickUpBridgeCommands(String firstId, UUID runnerId,
+            RBlockingDeque<String> blockingDeque, int maxCommands) {
+        List<String> commandIds = new ArrayList<>();
+        commandIds.add(firstId);
+
+        RSet<String> activeSet = redisClient.getSet(bridgeActiveKey(runnerId));
+        activeSet.add(firstId);
+
+        for (int i = 1; i < maxCommands; i++) {
+            String next = blockingDeque.poll();
+            if (next == null) {
+                break;
+            }
+            activeSet.add(next);
+            commandIds.add(next);
+        }
+
+        String now = Instant.now().toString();
+        List<BridgeNextResponse.BridgeCommandItem> items = new ArrayList<>();
+
+        for (String cmdIdStr : commandIds) {
+            UUID commandId = UUID.fromString(cmdIdStr);
+            RMap<String, String> cmdMap = redisClient.getMap(bridgeCommandKey(commandId));
+            cmdMap.put(FIELD_STATUS, BridgeCommandStatus.PICKED_UP.getValue());
+            cmdMap.put(FIELD_PICKED_UP_AT, now);
+
+            Map<String, String> fields = cmdMap.readAllMap();
+            items.add(BridgeNextResponse.BridgeCommandItem.builder()
+                    .commandId(commandId)
+                    .type(fields.get(FIELD_TYPE))
+                    .args(parseJsonNode(fields.get(FIELD_ARGS)))
+                    .timeoutSeconds(parseIntValue(fields.get(FIELD_TIMEOUT_SECONDS)))
+                    .submittedAt(parseInstant(fields.get(FIELD_SUBMITTED_AT)))
+                    .build());
+        }
+
+        return BridgeNextResponse.builder().commands(items).build();
+    }
+
+    @Override
+    public void reportBridgeCommandResult(@NonNull UUID runnerId, @NonNull UUID commandId,
+            @NonNull String workspaceId, @NonNull String userName,
+            @NonNull BridgeCommandResultRequest result) {
+        validateRunnerOwnership(runnerId, workspaceId, userName);
+
+        RMap<String, String> cmdMap = redisClient.getMap(bridgeCommandKey(commandId));
+        Map<String, String> fields = cmdMap.readAllMap();
+
+        if (fields.isEmpty()) {
+            throw new NotFoundException("Command not found: " + commandId);
+        }
+        if (!runnerId.toString().equals(fields.get(FIELD_RUNNER_ID))) {
+            throw new NotFoundException("Command not found: " + commandId);
+        }
+
+        BridgeCommandStatus current = parseBridgeCommandStatus(fields.get(FIELD_STATUS));
+        if (current != null && TERMINAL_BRIDGE_STATUSES.contains(current)) {
+            throw new ClientErrorException(Response.status(Response.Status.CONFLICT)
+                    .entity(new ErrorMessage(List.of("Command already completed")))
+                    .build());
+        }
+
+        cmdMap.put(FIELD_STATUS, result.status().getValue());
+        cmdMap.put(FIELD_COMPLETED_AT, Instant.now().toString());
+        if (result.result() != null) {
+            cmdMap.put(FIELD_RESULT, JsonUtils.writeValueAsString(result.result()));
+        }
+        if (result.error() != null) {
+            cmdMap.put(FIELD_ERROR, JsonUtils.writeValueAsString(result.error()));
+        }
+        if (result.durationMs() != null) {
+            cmdMap.put(FIELD_DURATION_MS, result.durationMs().toString());
+        }
+
+        RSet<String> activeSet = redisClient.getSet(bridgeActiveKey(runnerId));
+        activeSet.remove(commandId.toString());
+
+        Duration retention = runnerConfig.getBridgeResultRetentionTtl().toJavaDuration();
+        cmdMap.expire(retention);
+
+        writeDoneSentinel(commandId);
+    }
+
+    @Override
+    public void cancelBridgeCommand(@NonNull UUID runnerId, @NonNull UUID commandId,
+            @NonNull String workspaceId, @NonNull String userName) {
+        validateRunnerOwnership(runnerId, workspaceId, userName);
+
+        RMap<String, String> cmdMap = redisClient.getMap(bridgeCommandKey(commandId));
+        Map<String, String> fields = cmdMap.readAllMap();
+
+        if (fields.isEmpty()) {
+            throw new NotFoundException("Command not found: " + commandId);
+        }
+
+        BridgeCommandStatus current = parseBridgeCommandStatus(fields.get(FIELD_STATUS));
+        if (current != null && TERMINAL_BRIDGE_STATUSES.contains(current)) {
+            throw new ClientErrorException(Response.status(Response.Status.CONFLICT)
+                    .entity(new ErrorMessage(List.of("Command already in terminal state")))
+                    .build());
+        }
+
+        cmdMap.put(FIELD_STATUS, BridgeCommandStatus.CANCELLED.getValue());
+        cmdMap.put(FIELD_COMPLETED_AT, Instant.now().toString());
+
+        if (current == BridgeCommandStatus.PENDING) {
+            RBlockingDeque<String> pendingDeque = redisClient.getBlockingDeque(bridgePendingKey(runnerId));
+            pendingDeque.remove(commandId.toString());
+        } else if (current == BridgeCommandStatus.PICKED_UP) {
+            RSet<String> bridgeCancellations = redisClient.getSet(bridgeCancellationsKey(runnerId));
+            bridgeCancellations.add(commandId.toString());
+        }
+
+        Duration retention = runnerConfig.getBridgeResultRetentionTtl().toJavaDuration();
+        cmdMap.expire(retention);
+
+        writeDoneSentinel(commandId);
+    }
+
+    @Override
+    public BridgeCommand getBridgeCommand(@NonNull UUID runnerId, @NonNull UUID commandId,
+            @NonNull String workspaceId, @NonNull String userName) {
+        validateRunnerOwnership(runnerId, workspaceId, userName);
+
+        RMap<String, String> cmdMap = redisClient.getMap(bridgeCommandKey(commandId));
+        Map<String, String> fields = cmdMap.readAllMap();
+
+        if (fields.isEmpty()) {
+            throw new NotFoundException("Command not found: " + commandId);
+        }
+        if (!workspaceId.equals(fields.get(FIELD_WORKSPACE_ID))) {
+            throw new NotFoundException("Command not found: " + commandId);
+        }
+
+        return buildBridgeCommand(fields);
+    }
+
+    @Override
+    public Mono<BridgeCommand> awaitBridgeCommand(@NonNull UUID runnerId, @NonNull UUID commandId,
+            @NonNull String workspaceId, @NonNull String userName, int timeoutSeconds) {
+        validateRunnerOwnership(runnerId, workspaceId, userName);
+
+        RMap<String, String> cmdMap = redisClient.getMap(bridgeCommandKey(commandId));
+        Map<String, String> fields = cmdMap.readAllMap();
+
+        if (fields.isEmpty()) {
+            throw new NotFoundException("Command not found: " + commandId);
+        }
+        if (!workspaceId.equals(fields.get(FIELD_WORKSPACE_ID))) {
+            throw new NotFoundException("Command not found: " + commandId);
+        }
+
+        BridgeCommandStatus current = parseBridgeCommandStatus(fields.get(FIELD_STATUS));
+        if (current != null && TERMINAL_BRIDGE_STATUSES.contains(current)) {
+            return Mono.just(buildBridgeCommand(fields));
+        }
+
+        RBlockingQueueReactive<String> doneQueue = reactiveRedisClient.getBlockingQueue(
+                bridgeCommandDoneKey(commandId), StringCodec.INSTANCE);
+
+        return doneQueue.poll(timeoutSeconds, java.util.concurrent.TimeUnit.SECONDS)
+                .then(Mono.defer(() -> {
+                    RMapReactive<String, String> reactiveMap = reactiveRedisClient.getMap(
+                            bridgeCommandKey(commandId), StringCodec.INSTANCE);
+                    return reactiveMap.readAllMap().map(this::buildBridgeCommand);
+                }))
+                .switchIfEmpty(Mono.defer(() -> {
+                    RMapReactive<String, String> reactiveMap = reactiveRedisClient.getMap(
+                            bridgeCommandKey(commandId), StringCodec.INSTANCE);
+                    return reactiveMap.readAllMap().map(this::buildBridgeCommand);
+                }));
+    }
+
+    private void reapBridgeCommands(UUID runnerId) {
+        RBlockingDeque<String> pendingDeque = redisClient.getBlockingDeque(bridgePendingKey(runnerId));
+        List<String> pendingIds = pendingDeque.readAll();
+        for (String cmdIdStr : pendingIds) {
+            UUID commandId = UUID.fromString(cmdIdStr);
+            failBridgeCommand(commandId, "Runner disconnected");
+        }
+        pendingDeque.delete();
+
+        RSet<String> activeSet = redisClient.getSet(bridgeActiveKey(runnerId));
+        Set<String> activeIds = activeSet.readAll();
+        for (String cmdIdStr : activeIds) {
+            UUID commandId = UUID.fromString(cmdIdStr);
+            failBridgeCommand(commandId, "Runner disconnected");
+        }
+        activeSet.delete();
+
+        redisClient.getSet(bridgeCancellationsKey(runnerId)).delete();
+    }
+
+    private void reapStuckBridgeCommands(UUID runnerId) {
+        RSet<String> activeSet = redisClient.getSet(bridgeActiveKey(runnerId));
+        Set<String> activeIds = activeSet.readAll();
+        Instant now = Instant.now();
+
+        for (String cmdIdStr : activeIds) {
+            UUID commandId = UUID.fromString(cmdIdStr);
+            RMap<String, String> cmdMap = redisClient.getMap(bridgeCommandKey(commandId));
+            if (!cmdMap.isExists()) {
+                activeSet.remove(cmdIdStr);
+                continue;
+            }
+
+            String pickedUpAtStr = cmdMap.get(FIELD_PICKED_UP_AT);
+            if (pickedUpAtStr == null) {
+                continue;
+            }
+
+            Instant pickedUpAt = Instant.parse(pickedUpAtStr);
+            int timeout = parseIntValue(cmdMap.get(FIELD_TIMEOUT_SECONDS));
+            if (timeout == 0) {
+                timeout = (int) runnerConfig.getBridgeCommandDefaultTimeout().toSeconds();
+            }
+
+            if (Duration.between(pickedUpAt, now).getSeconds() > timeout + 10) {
+                log.warn("Bridge command {} on runner {} exceeded timeout of {}s", commandId, runnerId, timeout);
+                failBridgeCommand(commandId, "Command timed out");
+                activeSet.remove(cmdIdStr);
+            }
+        }
+    }
+
+    private void failBridgeCommand(UUID commandId, String reason) {
+        RMap<String, String> cmdMap = redisClient.getMap(bridgeCommandKey(commandId));
+        if (!cmdMap.isExists()) {
+            return;
+        }
+        String status = cmdMap.get(FIELD_STATUS);
+        BridgeCommandStatus current = parseBridgeCommandStatus(status);
+        if (current != null && TERMINAL_BRIDGE_STATUSES.contains(current)) {
+            return;
+        }
+        cmdMap.put(FIELD_STATUS, BridgeCommandStatus.TIMED_OUT.getValue());
+        cmdMap.put(FIELD_COMPLETED_AT, Instant.now().toString());
+        cmdMap.put(FIELD_ERROR, JsonUtils.writeValueAsString(
+                BridgeCommandError.builder().code("timeout").message(reason).build()));
+        cmdMap.expire(runnerConfig.getBridgeResultRetentionTtl().toJavaDuration());
+        writeDoneSentinel(commandId);
     }
 
     private int resolveAgentTimeout(UUID runnerId, String agentName) {

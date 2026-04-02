@@ -8,10 +8,10 @@ from opik.rest_api.types.local_runner_connect_response import LocalRunnerConnect
 
 
 class TestConnect:
-    @patch("opik.cli.connect.os.execvpe")
+    @patch("opik.cli.connect.Supervisor")
     @patch("opik.cli.connect.Opik")
     def test_connect__with_pair_code__calls_connect_runner(
-        self, mock_opik_cls, mock_execvpe
+        self, mock_opik_cls, mock_sup_cls
     ):
         client = MagicMock()
         api = MagicMock()
@@ -23,6 +23,7 @@ class TestConnect:
         )
         client.rest_client = api
         mock_opik_cls.return_value = client
+        mock_sup_cls.return_value.run = MagicMock()
 
         runner = CliRunner()
         result = runner.invoke(cli, ["connect", "--pair", "ABCD", "echo", "hello"])
@@ -32,10 +33,10 @@ class TestConnect:
         call_kwargs = api.runners.connect_runner.call_args[1]
         assert call_kwargs["pairing_code"] == "ABCD"
 
-    @patch("opik.cli.connect.os.execvpe")
+    @patch("opik.cli.connect.Supervisor")
     @patch("opik.cli.connect.Opik")
-    def test_connect__with_command__sets_env_and_execs(
-        self, mock_opik_cls, mock_execvpe
+    def test_connect__with_command__creates_supervisor(
+        self, mock_opik_cls, mock_sup_cls
     ):
         client = MagicMock()
         api = MagicMock()
@@ -45,24 +46,24 @@ class TestConnect:
         )
         client.rest_client = api
         mock_opik_cls.return_value = client
+        mock_sup_cls.return_value.run = MagicMock()
 
         runner = CliRunner()
         result = runner.invoke(cli, ["connect", "--pair", "CODE", "python", "myapp.py"])
         assert result.exit_code == 0
 
-        mock_execvpe.assert_called_once()
-        args = mock_execvpe.call_args
-        assert args[0][0] == "python"
-        assert args[0][1] == ["python", "myapp.py"]
-        env = args[0][2]
-        assert env["OPIK_RUNNER_MODE"] == "true"
-        assert env["OPIK_RUNNER_ID"] == "r-xyz"
-        assert env["OPIK_PROJECT_NAME"] == "proj"
+        mock_sup_cls.assert_called_once()
+        call_kwargs = mock_sup_cls.call_args[1]
+        assert call_kwargs["command"] == ["python", "myapp.py"]
+        assert call_kwargs["runner_id"] == "r-xyz"
+        assert call_kwargs["env"]["OPIK_RUNNER_MODE"] == "true"
+        assert call_kwargs["env"]["OPIK_RUNNER_ID"] == "r-xyz"
+        assert call_kwargs["env"]["OPIK_PROJECT_NAME"] == "proj"
 
-    @patch("opik.cli.connect.os.execvpe")
+    @patch("opik.cli.connect.Supervisor")
     @patch("opik.cli.connect.Opik")
     def test_connect__network_failure__shows_clean_error(
-        self, mock_opik_cls, mock_execvpe
+        self, mock_opik_cls, mock_sup_cls
     ):
         client = MagicMock()
         config = MagicMock()
