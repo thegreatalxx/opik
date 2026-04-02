@@ -40,7 +40,8 @@ def test_multi_class_and_field_removal_dedup__happyflow(
     opik_client: opik.Opik,
     project_name: str,
 ):
-    """Publishing a second config class or removing a field must not create duplicate versions."""
+    """create_agent_config_version never overwrites an existing config.
+    Once the first version exists, subsequent calls always defer to it."""
 
     class ConfigA(opik.AgentConfig):
         temperature: float
@@ -49,26 +50,29 @@ def test_multi_class_and_field_removal_dedup__happyflow(
     class ConfigB(opik.AgentConfig):
         retries: int
 
-    # Publish both classes into the same project — each creates one new version.
-    opik_client.create_agent_config_version(
+    # First publish creates v1.
+    v1_name = opik_client.create_agent_config_version(
         ConfigA(temperature=0.5, model="gpt-4"), project_name=project_name
     )
+
+    # Second publish with a different class defers to existing — no new version.
     v_after_b = opik_client.create_agent_config_version(
         ConfigB(retries=3), project_name=project_name
     )
+    assert v_after_b == v1_name, (
+        "existing config is authoritative — different class should be a no-op"
+    )
 
-    # Re-publishing ConfigA with the same values must be a no-op. The latest blueprint
-    # now contains both ConfigA and ConfigB keys, but ConfigA values are unchanged so
-    # it should return the current latest version rather than creating a new one.
+    # Re-publishing ConfigA with the same values is also a no-op.
     get_global_registry().clear()
     v_a_again = opik_client.create_agent_config_version(
         ConfigA(temperature=0.5, model="gpt-4"), project_name=project_name
     )
-    assert v_a_again == v_after_b, (
-        "same values after another class was added should be a no-op"
+    assert v_a_again == v1_name, (
+        "same values should be a no-op"
     )
 
-    # Publish ConfigA with the model field removed locally — remaining value unchanged.
+    # Publish ConfigA with the model field removed locally — still a no-op.
     class ConfigA(opik.AgentConfig):  # type: ignore[no-redef]
         temperature: float
 
@@ -76,12 +80,100 @@ def test_multi_class_and_field_removal_dedup__happyflow(
     v_a_reduced = opik_client.create_agent_config_version(
         ConfigA(temperature=0.5), project_name=project_name
     )
-    assert v_a_reduced == v_after_b, (
-        "removing a field whose value is unchanged should be a no-op"
+    assert v_a_reduced == v1_name, (
+        "removing a field should be a no-op"
     )
 
-    # Confirm history has exactly 2 entries (one per class, no duplicates).
+    # Confirm history has exactly 1 entry — no overwrites happened.
     project_id = opik_client.rest_client.projects.retrieve_project(name=project_name).id
+    history = opik_client.rest_client.agent_configs.get_blueprint_history(
+        project_id=project_id
+    ).content
+    assert len(history) == 1
+
+
+def test_explicit_update_creates_new_version__happyflow(
+    opik_client: opik.Opik,
+    project_name: str,
+):
+    """create_agent_config_version seeds v1, then update_blueprint (the path the
+    optimizer takes) creates v2.  Fetching latest must return v2 values while
+    fetching v1 by name still returns the original values."""
+
+    class MyConfig(opik.AgentConfig):
+        temperature: float
+        model: str
+
+    # Seed v1 via create_agent_config_version.
+    v1_name = opik_client.create_agent_config_version(
+        MyConfig(temperature=0.5, model="gpt-4o-mini"), project_name=project_name
+    )
+
+    # Simulate what the optimizer does: fetch latest, tweak values, publish via
+    # update_blueprint.
+    get_global_registry().clear()
+    manager = AgentConfigManager(
+        project_name=project_name,
+        rest_client_=opik_client.rest_client,
+    )
+    field_types = {"MyConfig.temperature": "float", "MyConfig.model": "string"}
+    v2_bp = manager.update_blueprint(
+        fields_with_values={
+            "MyConfig.temperature": "0.2",
+            "MyConfig.model": "gpt-4o",
+        },
+        description="Optimized config",
+        field_types=field_types,
+    )
+    assert v2_bp.name != v1_name
+
+    # History should now have 2 entries.
+    project_id = opik_client.rest_client.projects.retrieve_project(name=project_name).id
+    history = opik_client.rest_client.agent_configs.get_blueprint_history(
+        project_id=project_id
+    ).content
+    assert len(history) == 2
+
+    # latest returns v2 values.
+    get_global_registry().clear()
+
+    @opik.track(project_name=project_name)
+    def fetch_latest():
+        return opik_client.get_agent_config(
+            fallback=MyConfig(temperature=0.0, model="fallback"),
+            project_name=project_name,
+            latest=True,
+        )
+
+    latest = fetch_latest()
+    assert latest.temperature == pytest.approx(0.2)
+    assert latest.model == "gpt-4o"
+
+    # v1 by name still returns original values.
+    get_global_registry().clear()
+
+    @opik.track(project_name=project_name)
+    def fetch_v1():
+        return opik_client.get_agent_config(
+            fallback=MyConfig(temperature=0.0, model="fallback"),
+            project_name=project_name,
+            version=v1_name,
+        )
+
+    v1 = fetch_v1()
+    assert v1.temperature == pytest.approx(0.5)
+    assert v1.model == "gpt-4o-mini"
+
+    # Re-running create_agent_config_version with defaults must NOT revert v2.
+    get_global_registry().clear()
+    v_after_restart = opik_client.create_agent_config_version(
+        MyConfig(temperature=0.5, model="gpt-4o-mini"), project_name=project_name
+    )
+    assert v_after_restart == v2_bp.name, (
+        "startup must not overwrite optimizer's version"
+    )
+
+    # Still 2 entries — no new version created.
     history = opik_client.rest_client.agent_configs.get_blueprint_history(
         project_id=project_id
     ).content
@@ -92,7 +184,8 @@ def test_publish_version_and_retrieve__happyflow(
     opik_client: opik.Opik,
     project_name: str,
 ):
-    """Core lifecycle: publish, dedup, new version, get by latest / version name / env."""
+    """Core lifecycle: publish, dedup, retrieve by latest / version name / env.
+    create_agent_config_version never overwrites — different values are a no-op."""
 
     class MyConfig(opik.AgentConfig):
         temperature: Annotated[float, "Sampling temperature"]
@@ -135,15 +228,27 @@ def test_publish_version_and_retrieve__happyflow(
         == 1
     )
 
-    # Publishing different values (hint filled in) creates a new version.
+    # Publishing different values defers to existing — no new version created.
     get_global_registry().clear()
     v2_name = opik_client.create_agent_config_version(
         MyConfig(temperature=0.8, model="gpt-4", hint="use chain-of-thought"),
         project_name=project_name,
     )
-    assert v2_name != v1_name
+    assert v2_name == v1_name, (
+        "existing config is authoritative — different values should be a no-op"
+    )
 
-    # latest=True returns v2; hint is now a real value.
+    # Still only 1 entry in history.
+    assert (
+        len(
+            opik_client.rest_client.agent_configs.get_blueprint_history(
+                project_id=project_id
+            ).content
+        )
+        == 1
+    )
+
+    # latest=True returns v1 (the only version).
     get_global_registry().clear()
 
     @opik.track(project_name=project_name)
@@ -155,11 +260,11 @@ def test_publish_version_and_retrieve__happyflow(
         )
 
     latest = fetch_latest()
-    assert latest.temperature == pytest.approx(0.8)
-    assert latest.model == "gpt-4"
-    assert latest.hint == "use chain-of-thought"
+    assert latest.temperature == pytest.approx(0.5)
+    assert latest.model == "gpt-3.5"
+    assert latest.hint is None
 
-    # version= by name returns v1; hint must be None as originally published.
+    # version= by name returns v1.
     get_global_registry().clear()
 
     @opik.track(project_name=project_name)
@@ -174,20 +279,7 @@ def test_publish_version_and_retrieve__happyflow(
     assert by_name.temperature == pytest.approx(0.5)
     assert by_name.hint is None
 
-    # Deploy v1 to prod; env= fetch returns v1 despite v2 being latest.
-    get_global_registry().clear()
-
-    @opik.track(project_name=project_name)
-    def fetch_v1_for_deploy():
-        return opik_client.get_agent_config(
-            fallback=MyConfig(temperature=0.0, model="fallback", hint=None),
-            project_name=project_name,
-            version=v1_name,
-        )
-
-    v1_cfg = fetch_v1_for_deploy()
-    v1_cfg.deploy_to("prod")
-
+    # env= fetch returns v1 (auto-tagged as prod).
     get_global_registry().clear()
 
     @opik.track(project_name=project_name)
