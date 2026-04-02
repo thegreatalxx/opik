@@ -187,6 +187,10 @@ class AgentConfig:
         latest = manager.get_blueprint(field_types=field_types)
 
         if latest is not None:
+            # The remote version is authoritative — it may have been tuned by
+            # the optimizer or updated through the UI.  Publishing the local
+            # defaults here would overwrite those improvements, so we always
+            # defer to whatever is already on the server.
             bp = latest
         else:
             try:
@@ -203,7 +207,12 @@ class AgentConfig:
                 if latest is not None:
                     bp = latest
                 else:
-                    raise
+                    raise RuntimeError(
+                        "Agent config creation returned 409 Conflict but "
+                        "re-fetching the latest blueprint returned None. "
+                        "This is unexpected — the config may have been deleted "
+                        "between the create and re-fetch calls."
+                    ) from e
 
         self._state.manager = manager
         self._state.blueprint_id = bp.id
