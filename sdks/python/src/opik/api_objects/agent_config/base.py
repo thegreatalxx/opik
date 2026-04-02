@@ -189,12 +189,9 @@ class AgentConfig:
         if latest is not None and self._matches_blueprint(latest, fields_with_values):
             bp = latest
         elif latest is not None:
-            # There's another blueprint and the values don't match
-            bp = manager.update_blueprint(
-                fields_with_values=fields_with_values,
-                description=description,
-                field_types=field_types,
-            )
+            # A version exists with different values (e.g. from the optimizer).
+            # Do not overwrite it — the existing version takes precedence.
+            bp = latest
         else:
             try:
                 bp = manager.create_blueprint(
@@ -205,18 +202,12 @@ class AgentConfig:
             except rest_api_core.ApiError as e:
                 if e.status_code != 409:
                     raise
-                # A parallel caller created the config first — re-fetch and compare.
+                # A parallel caller created the config first — re-fetch and use it.
                 latest = manager.get_blueprint(field_types=field_types)
-                if latest is not None and self._matches_blueprint(
-                    latest, fields_with_values
-                ):
+                if latest is not None:
                     bp = latest
                 else:
-                    bp = manager.update_blueprint(
-                        fields_with_values=fields_with_values,
-                        description=description,
-                        field_types=field_types,
-                    )
+                    raise
 
         self._state.manager = manager
         self._state.blueprint_id = bp.id
