@@ -186,11 +186,7 @@ class AgentConfig:
 
         latest = manager.get_blueprint(field_types=field_types)
 
-        if latest is not None and self._matches_blueprint(latest, fields_with_values):
-            bp = latest
-        elif latest is not None:
-            # A version exists with different values (e.g. from the optimizer).
-            # Do not overwrite it — the existing version takes precedence.
+        if latest is not None:
             bp = latest
         else:
             try:
