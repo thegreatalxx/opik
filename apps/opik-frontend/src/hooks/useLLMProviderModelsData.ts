@@ -308,6 +308,10 @@ export const PROVIDER_MODELS: PROVIDER_MODELS_TYPE = {
       label: "arcee-ai/trinity-large-preview:free",
     },
     {
+      value: PROVIDER_MODEL_TYPE.ARCEE_AI_TRINITY_LARGE_THINKING,
+      label: "arcee-ai/trinity-large-thinking",
+    },
+    {
       value: PROVIDER_MODEL_TYPE.ARCEE_AI_TRINITY_MINI,
       label: "arcee-ai/trinity-mini",
     },
@@ -1689,6 +1693,10 @@ export const PROVIDER_MODELS: PROVIDER_MODELS_TYPE = {
       label: "reka/reka-edge",
     },
     {
+      value: PROVIDER_MODEL_TYPE.REKAAI_REKA_EDGE,
+      label: "rekaai/reka-edge",
+    },
+    {
       value: PROVIDER_MODEL_TYPE.REKAAI_REKA_FLASH_3,
       label: "rekaai/reka-flash-3",
     },
@@ -1903,6 +1911,10 @@ export const PROVIDER_MODELS: PROVIDER_MODELS_TYPE = {
     {
       value: PROVIDER_MODEL_TYPE.Z_AI_GLM_5_TURBO,
       label: "z-ai/glm-5-turbo",
+    },
+    {
+      value: PROVIDER_MODEL_TYPE.Z_AI_GLM_5V_TURBO,
+      label: "z-ai/glm-5v-turbo",
     },
   ],
 

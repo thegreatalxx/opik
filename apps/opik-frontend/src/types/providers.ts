@@ -145,6 +145,7 @@ export enum PROVIDER_MODEL_TYPE {
   ARCEE_AI_MAESTRO_REASONING = "arcee-ai/maestro-reasoning",
   ARCEE_AI_SPOTLIGHT = "arcee-ai/spotlight",
   ARCEE_AI_TRINITY_LARGE_PREVIEW_FREE = "arcee-ai/trinity-large-preview:free",
+  ARCEE_AI_TRINITY_LARGE_THINKING = "arcee-ai/trinity-large-thinking",
   ARCEE_AI_TRINITY_MINI = "arcee-ai/trinity-mini",
   ARCEE_AI_TRINITY_MINI_FREE = "arcee-ai/trinity-mini:free",
   ARCEE_AI_VIRTUOSO_LARGE = "arcee-ai/virtuoso-large",
@@ -490,6 +491,7 @@ export enum PROVIDER_MODEL_TYPE {
   QWEN_QWQ_32B = "qwen/qwq-32b",
   RAIFLE_SORCERERLM_8X22B = "raifle/sorcererlm-8x22b",
   REKA_REKA_EDGE = "reka/reka-edge",
+  REKAAI_REKA_EDGE = "rekaai/reka-edge",
   REKAAI_REKA_FLASH_3 = "rekaai/reka-flash-3",
   RELACE_RELACE_APPLY_3 = "relace/relace-apply-3",
   RELACE_RELACE_SEARCH = "relace/relace-search",
@@ -544,6 +546,7 @@ export enum PROVIDER_MODEL_TYPE {
   Z_AI_GLM_4_7_FLASH = "z-ai/glm-4.7-flash",
   Z_AI_GLM_5 = "z-ai/glm-5",
   Z_AI_GLM_5_TURBO = "z-ai/glm-5-turbo",
+  Z_AI_GLM_5V_TURBO = "z-ai/glm-5v-turbo",
 
   //   <----- gemini
   AQA = "aqa",
