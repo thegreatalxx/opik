@@ -50,6 +50,7 @@ import EvaluationSuitesPage from "@/v2/pages/EvaluationSuitesPage/EvaluationSuit
 import EvaluationSuitePage from "@/v2/pages/EvaluationSuitePage/EvaluationSuitePage";
 import EvaluationSuiteItemsPage from "@/v2/pages/EvaluationSuiteItemsPage/EvaluationSuiteItemsPage";
 import ProjectHomePage from "@/v2/pages/ProjectHomePage/ProjectHomePage";
+import ProjectHomeSBSPage from "@/v2/pages/ProjectHomePage/ProjectHomeSBSPage";
 import TracesTabRedirect from "@/v2/redirect/TracesTabRedirect";
 import InsightsPage from "@/v2/pages/InsightsPage/InsightsPage";
 
@@ -176,6 +177,16 @@ const projectHomeRoute = createRoute({
   path: "/home",
   getParentRoute: () => projectScopedRoute,
   component: ProjectHomePage,
+  staticData: {
+    title: "Project home",
+  },
+});
+
+// ----------- project home side-by-side (project-scoped)
+const projectHomeSBSRoute = createRoute({
+  path: "/home_sbs",
+  getParentRoute: () => projectScopedRoute,
+  component: ProjectHomeSBSPage,
   staticData: {
     title: "Project home",
   },
@@ -542,6 +553,7 @@ const routeTree = rootRoute.addChildren([
         projectsListRoute,
         projectScopedRoute.addChildren([
           projectHomeRoute,
+          projectHomeSBSRoute,
           logsRoute,
           insightsRoute,
           tracesRedirectRoute,

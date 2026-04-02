@@ -42,7 +42,8 @@ const PageLayout = () => {
     },
   });
 
-  const showAssistantSidebar = !!AssistantSidebar && !isProjectHomePage;
+  const hasAssistantSidebar = !!AssistantSidebar;
+  const showAssistantSidebar = hasAssistantSidebar && !isProjectHomePage;
 
   const isMobile = useMediaQuery("(max-width: 1023px)");
   const expanded = isMobile ? false : storedExpanded;
@@ -113,8 +114,14 @@ const PageLayout = () => {
           </div>
         </PortalContainerProvider>
 
-        {showAssistantSidebar ? (
-          <div ref={sidebarWrapperRef} className="relative z-[1] w-0 shrink-0">
+        {hasAssistantSidebar ? (
+          <div
+            ref={sidebarWrapperRef}
+            className="relative z-[1] w-0 shrink-0"
+            style={{
+              display: showAssistantSidebar ? undefined : "none",
+            }}
+          >
             <SilentErrorBoundary>
               <AssistantSidebar onWidthChange={handleSidebarWidthChange} />
             </SilentErrorBoundary>

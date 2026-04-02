@@ -167,38 +167,79 @@ const FlywheelRing: React.FunctionComponent<{
     const particle = svg.querySelector(
       "#flywheel-particle",
     ) as SVGCircleElement | null;
-    if (!particle) return;
+    const trail = svg.querySelector(
+      "#flywheel-trail",
+    ) as SVGCircleElement | null;
+    if (!particle || !trail) return;
 
     const r = RING_RADIUS;
     const cx = SVG_CENTER_X;
     const cy = SVG_CENTER_Y;
     const stopAngle = n >= 4 ? null : NODE_ANGLES[n];
+    // Start position (top of ring, -90°)
+    const startX = cx + r * Math.cos((-90 * Math.PI) / 180);
+    const startY = cy + r * Math.sin((-90 * Math.PI) / 180);
     let angle = -90;
-    let pausing = false;
-    let pauseStart = 0;
+    let phase: "moving" | "pulsing" | "waiting" = "moving";
+    let phaseStart = 0;
+    const PULSE_DURATION = 600;
+    const WAIT_DURATION = 1000;
 
     function tick(ts: number) {
-      if (pausing) {
-        if (ts - pauseStart > 1000) {
-          pausing = false;
+      if (phase === "pulsing") {
+        const elapsed = ts - phaseStart;
+        // Pulse: grow from 6 to 14 and back, fade out
+        const t = elapsed / PULSE_DURATION;
+        const pulseR = 6 + 8 * Math.sin(t * Math.PI);
+        const pulseOpacity = 1 - t * 0.7;
+        particle!.setAttribute("r", String(pulseR));
+        particle!.setAttribute("opacity", String(Math.max(0, pulseOpacity)));
+        if (elapsed >= PULSE_DURATION) {
+          particle!.setAttribute("opacity", "0");
+          particle!.setAttribute("r", "6");
+          phase = "waiting";
+          phaseStart = ts;
+        }
+        animRef.current = requestAnimationFrame(tick);
+        return;
+      }
+
+      if (phase === "waiting") {
+        if (ts - phaseStart >= WAIT_DURATION) {
+          phase = "moving";
           angle = -90;
+          trail!.setAttribute("d", "");
+          trail!.setAttribute("opacity", "0");
           particle!.setAttribute("opacity", "1");
         }
         animRef.current = requestAnimationFrame(tick);
         return;
       }
-      angle += 1.5;
+
+      // phase === "moving"
+      angle += 0.5;
       const rad = (angle * Math.PI) / 180;
-      particle!.setAttribute("cx", String(cx + r * Math.cos(rad)));
-      particle!.setAttribute("cy", String(cy + r * Math.sin(rad)));
+      const endX = cx + r * Math.cos(rad);
+      const endY = cy + r * Math.sin(rad);
+      particle!.setAttribute("cx", String(endX));
+      particle!.setAttribute("cy", String(endY));
       particle!.setAttribute("opacity", "1");
+
+      // Build SVG arc from start to current particle position
+      const swept = angle + 90;
+      const largeArc = swept > 180 ? 1 : 0;
+      trail!.setAttribute(
+        "d",
+        `M ${startX} ${startY} A ${r} ${r} 0 ${largeArc} 1 ${endX} ${endY}`,
+      );
+      trail!.setAttribute("opacity", "1");
 
       if (n >= 4) {
         if (angle >= 270) angle = -90;
       } else if (stopAngle !== null && angle >= stopAngle) {
-        particle!.setAttribute("opacity", "0");
-        pausing = true;
-        pauseStart = ts;
+        phase = "pulsing";
+        phaseStart = ts;
+        trail!.setAttribute("opacity", "0");
       }
       animRef.current = requestAnimationFrame(tick);
     }
@@ -234,10 +275,18 @@ const FlywheelRing: React.FunctionComponent<{
             strokeLinecap="butt"
             strokeDasharray="140 488"
             strokeDashoffset={157 - i * 157}
-            opacity={connectedIndices.includes(i) ? 1 : 0.08}
-            style={{ transition: "opacity 0.5s" }}
+            opacity={0.08}
           />
         ))}
+        {/* Animated trail — arc path from top to particle */}
+        <path
+          id="flywheel-trail"
+          fill="none"
+          className="stroke-primary"
+          strokeWidth="12"
+          strokeLinecap="round"
+          opacity="0"
+        />
         {/* Traveling particle */}
         <circle
           id="flywheel-particle"
@@ -295,28 +344,6 @@ const FlywheelRing: React.FunctionComponent<{
               >
                 {NODE_LABELS[i]}
               </text>
-              {isNext && (
-                <circle
-                  cx={pos.cx}
-                  cy={pos.cy}
-                  r="6"
-                  className="fill-primary"
-                  opacity="0.2"
-                >
-                  <animate
-                    attributeName="r"
-                    values="6;14;6"
-                    dur="1.5s"
-                    repeatCount="indefinite"
-                  />
-                  <animate
-                    attributeName="opacity"
-                    values="0.3;0;0.3"
-                    dur="1.5s"
-                    repeatCount="indefinite"
-                  />
-                </circle>
-              )}
             </g>
           );
         })}

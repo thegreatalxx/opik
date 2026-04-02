@@ -32,7 +32,7 @@ const ProjectHomePage: React.FunctionComponent = () => {
       {/* Intro text */}
       <div className="text-center">
         <h2 className="comet-title-m text-foreground">
-          Hi, I&apos;m Ollie &ndash; I&apos;m a fully capable coding agent
+          Hi, I&apos;m Ollie - I&apos;m a fully capable coding agent
         </h2>
       </div>
 
