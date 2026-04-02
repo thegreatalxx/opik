@@ -11,8 +11,7 @@ from .api_objects.experiment.experiment_item import (
     ExperimentItemContent,
     ExperimentItemReferences,
 )
-from .api_objects.agent_config import AgentConfig, Blueprint
-from .api_objects.agent_config.context import agent_config_context
+from .api_objects.agent_config import AgentConfig
 from .exceptions import AgentConfigNotFound
 from .api_objects.opik_client import Opik
 from .api_objects.prompt import Prompt, ChatPrompt
@@ -83,8 +82,6 @@ __all__ = [
     "LocalRunnerTask",
     "AgentConfig",
     "AgentConfigNotFound",
-    "Blueprint",
-    "agent_config_context",
 ]
 
 sagemaker_auth.setup_aws_sagemaker_session_hook()
