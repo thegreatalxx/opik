@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useParams, useRouter } from "@tanstack/react-router";
+import { useParams, useRouter, useRouterState } from "@tanstack/react-router";
 import {
   AssistantSidebarBridge,
   BridgeContext,
@@ -205,6 +205,11 @@ function useBridgeContext(assistantBackendUrl: string): BridgeContext {
     { enabled: !!projectId },
   );
 
+  const isProjectHomePage = useRouterState({
+    select: (state) =>
+      /\/projects\/[^/]+\/home\/?$/.test(state.location.pathname),
+  });
+
   const workspaceId = workspace?.workspaceId ?? "";
   const projectName = project?.name ?? null;
   const resolvedProjectId = projectId ?? null;
@@ -221,6 +226,7 @@ function useBridgeContext(assistantBackendUrl: string): BridgeContext {
       baseApiUrl: BASE_API_URL,
       assistantBackendUrl,
       theme: "light",
+      mode: isProjectHomePage ? "onboarding" : "default",
     }),
     [
       workspaceId,
@@ -229,6 +235,7 @@ function useBridgeContext(assistantBackendUrl: string): BridgeContext {
       resolvedProjectId,
       projectName,
       assistantBackendUrl,
+      isProjectHomePage,
     ],
   );
 }

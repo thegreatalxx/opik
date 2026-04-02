@@ -1,6 +1,8 @@
 export type BridgeTheme = "light" | "dark";
 export type NotificationType = "success" | "error" | "info";
 
+export type AssistantMode = "default" | "onboarding";
+
 export interface BridgeContext {
   workspaceId: string;
   workspaceName: string;
@@ -10,6 +12,7 @@ export interface BridgeContext {
   baseApiUrl: string;
   assistantBackendUrl: string;
   theme: BridgeTheme;
+  mode?: AssistantMode;
 }
 
 /** Host → Sidebar events */

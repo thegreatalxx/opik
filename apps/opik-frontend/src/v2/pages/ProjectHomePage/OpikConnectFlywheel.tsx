@@ -13,19 +13,7 @@ import { Link, useParams } from "@tanstack/react-router";
 import { cn } from "@/lib/utils";
 import { Button } from "@/ui/button";
 import { Tag } from "@/ui/tag";
-
-type FlywheelConnectionState = [boolean, boolean, boolean, boolean];
-
-/**
- * Returns which flywheel components are connected.
- * Order: [Observability, Agent Config, Local Runner, Optimizer]
- *
- * TODO: Replace hardcoded state with actual feature-usage detection
- * (e.g. check whether the project has traces, configs, a paired runner, etc.)
- */
-function useFlywheelConnectionState(): FlywheelConnectionState {
-  return [true, false, false, false];
-}
+import type { OnboardingState } from "./useOnboardingState";
 
 const Code: React.FunctionComponent<{ children: React.ReactNode }> = ({
   children,
@@ -167,10 +155,8 @@ const NODE_ANGLES = [-90, 0, 90, 180];
 const FlywheelRing: React.FunctionComponent<{
   connectedIndices: number[];
   nextIndex: number;
-  percentage: number;
-  status: string;
   onNodeClick: (index: number) => void;
-}> = ({ connectedIndices, nextIndex, percentage, status, onNodeClick }) => {
+}> = ({ connectedIndices, nextIndex, onNodeClick }) => {
   const svgRef = useRef<SVGSVGElement>(null);
   const animRef = useRef<number>(0);
   const n = connectedIndices.length;
@@ -225,7 +211,7 @@ const FlywheelRing: React.FunctionComponent<{
 
   return (
     <div className="flex flex-col items-center">
-      <svg ref={svgRef} viewBox="0 0 440 370" className="w-full">
+      <svg ref={svgRef} viewBox="0 40 440 280" className="w-full">
         {/* Track ring */}
         <circle
           cx={SVG_CENTER_X}
@@ -262,34 +248,6 @@ const FlywheelRing: React.FunctionComponent<{
           strokeWidth="2"
           opacity="0"
         />
-        {/* Center disc */}
-        <circle
-          cx={SVG_CENTER_X}
-          cy={SVG_CENTER_Y}
-          r="64"
-          className="fill-background stroke-border"
-          strokeWidth="1"
-        />
-        <text
-          x={SVG_CENTER_X}
-          y={SVG_CENTER_Y - 6}
-          textAnchor="middle"
-          dominantBaseline="central"
-          fontSize="32"
-          fontWeight="600"
-          className="fill-foreground"
-        >
-          {percentage}%
-        </text>
-        <text
-          x={SVG_CENTER_X}
-          y={SVG_CENTER_Y + 18}
-          textAnchor="middle"
-          fontSize="11"
-          className="fill-muted-slate"
-        >
-          {status}
-        </text>
 
         {/* Nodes */}
         {FLYWHEEL_ITEMS.map((item, i) => {
@@ -363,21 +321,6 @@ const FlywheelRing: React.FunctionComponent<{
           );
         })}
       </svg>
-
-      {/* Progress bar */}
-      <div className="mt-2 w-full px-6">
-        <div className="h-[3px] overflow-hidden rounded-sm bg-border">
-          <div
-            className="h-full rounded-sm bg-primary transition-all duration-700"
-            style={{ width: `${percentage}%` }}
-          />
-        </div>
-        <div className="mt-1 flex justify-center">
-          <span className="comet-body-xs text-muted-slate">
-            {connectedIndices.length} of 4 completed
-          </span>
-        </div>
-      </div>
     </div>
   );
 };
@@ -465,56 +408,41 @@ const StepCard: React.FunctionComponent<StepCardProps> = ({
   );
 };
 
-const OpikConnectFlywheel: React.FunctionComponent = () => {
-  const [expanded, setExpanded] = useState<number | null>(null);
+interface OpikConnectFlywheelProps {
+  connectionState: OnboardingState;
+}
+
+const OpikConnectFlywheel: React.FunctionComponent<
+  OpikConnectFlywheelProps
+> = ({ connectionState }) => {
+  const [expanded, setExpanded] = useState<number | null | "none">("none");
   const { workspaceName, projectId } = useParams({ strict: false }) as {
     workspaceName: string;
     projectId: string;
   };
 
-  const conn = useFlywheelConnectionState();
-  const connectedIndices = conn
+  const connectedIndices = connectionState
     .map((v, i) => (v ? i : -1))
     .filter((v) => v >= 0);
-  const n = connectedIndices.length;
-  const percentage = n * 25;
-  const nextIndex = conn.indexOf(false);
-  const status =
-    n === 0
-      ? "Not started"
-      : n === 4
-        ? "Self-optimizing"
-        : `${n} of 4 connected`;
+  const nextIndex = connectionState.indexOf(false);
 
-  const handleNodeClick = useCallback(
-    (index: number) => {
-      setExpanded(expanded === index ? null : index);
-    },
-    [expanded],
-  );
-
-  const toggleCard = useCallback(
-    (index: number) => {
-      setExpanded(expanded === index ? null : index);
-    },
-    [expanded],
-  );
+  const toggleCard = useCallback((index: number) => {
+    setExpanded((prev) => (prev === index ? "none" : index));
+  }, []);
 
   return (
-    <div className="grid grid-cols-[minmax(280px,1fr)_minmax(0,2fr)] gap-6 rounded-lg border bg-background p-6">
+    <div className="grid grid-cols-[minmax(280px,2fr)_minmax(0,3fr)] gap-6 rounded-lg border bg-background p-6">
       <FlywheelRing
         connectedIndices={connectedIndices}
         nextIndex={nextIndex}
-        percentage={percentage}
-        status={status}
-        onNodeClick={handleNodeClick}
+        onNodeClick={toggleCard}
       />
 
       <div className="flex flex-col gap-1.5">
         {FLYWHEEL_ITEMS.map((item, i) => {
           const isConnected = connectedIndices.includes(i);
           const isNext = i === nextIndex;
-          const isOpen = expanded === i || (expanded === null && isNext);
+          const isOpen = expanded === i;
 
           return (
             <StepCard

@@ -1,9 +1,9 @@
-import React, { useCallback, useRef } from "react";
+import React, { useCallback, useMemo, useRef } from "react";
 import usePluginsStore from "@/store/PluginsStore";
 import SilentErrorBoundary from "@/shared/SilentErrorBoundary/SilentErrorBoundary";
 import OpikConnectFlywheel from "./OpikConnectFlywheel";
-
-const SUGGESTION_PILLS = ["Create an Eval", "Fix a problem", "Optimize Agent"];
+import SuggestionPills, { getSuggestionPills } from "./SuggestionPills";
+import { useOnboardingState } from "./useOnboardingState";
 
 const noop = () => {};
 
@@ -11,7 +11,13 @@ const ProjectHomePage: React.FunctionComponent = () => {
   const AssistantSidebar = usePluginsStore((state) => state.AssistantSidebar);
   const iframeContainerRef = useRef<HTMLDivElement>(null);
 
-  const handleSuggestionClick = useCallback((text: string) => {
+  const onboardingState = useOnboardingState();
+  const pills = useMemo(
+    () => getSuggestionPills(onboardingState),
+    [onboardingState],
+  );
+
+  const handlePillClick = useCallback((text: string) => {
     const iframe = iframeContainerRef.current?.querySelector("iframe");
     if (iframe?.contentWindow) {
       iframe.contentWindow.postMessage(
@@ -33,7 +39,7 @@ const ProjectHomePage: React.FunctionComponent = () => {
       {/* Inline OLLI assist iframe */}
       <div
         ref={iframeContainerRef}
-        className="mx-auto h-[560px] w-full max-w-5xl shrink-0 overflow-hidden rounded-lg border"
+        className="mx-auto h-[300px] w-full max-w-5xl shrink-0 overflow-hidden rounded-lg border"
       >
         {AssistantSidebar ? (
           <SilentErrorBoundary>
@@ -46,25 +52,15 @@ const ProjectHomePage: React.FunctionComponent = () => {
         )}
       </div>
 
-      {/* Suggestion pills */}
-      <div className="mx-auto flex flex-wrap justify-center gap-3">
-        {SUGGESTION_PILLS.map((text) => (
-          <button
-            key={text}
-            className="rounded-full border px-4 py-2 text-sm text-foreground transition-colors hover:bg-primary-foreground"
-            onClick={() => handleSuggestionClick(text)}
-          >
-            {text}
-          </button>
-        ))}
-      </div>
+      {/* Suggestion pills — derived from onboarding state */}
+      <SuggestionPills pills={pills} onPillClick={handlePillClick} />
 
       {/* Opik Connect Flywheel */}
       <div className="mx-auto mt-8 w-full max-w-5xl">
         <h3 className="comet-title-s mb-4 text-foreground">
           Your road to a self-optimizing agent
         </h3>
-        <OpikConnectFlywheel />
+        <OpikConnectFlywheel connectionState={onboardingState} />
       </div>
     </div>
   );
