@@ -13,7 +13,6 @@ from opik.api_objects.agent_config.context import agent_config_context
 from opik.api_objects.span import span_data as span_data_mod
 from opik.exceptions import AgentConfigNotFound, OpikException
 from opik.rest_api import core as rest_api_core
-from opik.rest_api.core import ApiError
 from opik.rest_api.errors import ConflictError
 from opik.rest_api.core.request_options import RequestOptions
 from opik.rest_api.types.agent_blueprint_public import AgentBlueprintPublic
@@ -381,7 +380,7 @@ class TestCreateAgentConfigVersion:
         # First get_latest_blueprint call: raise 404 (no blueprint yet, triggers create)
         # Second call after 409: return parallel caller's version
         mock_rest_client.agent_configs.get_latest_blueprint.side_effect = [
-            ApiError(status_code=404, body="not found"),
+            rest_api_core.ApiError(status_code=404, body="not found"),
             AgentBlueprintPublic(
                 id="bp-1",
                 name="v1",

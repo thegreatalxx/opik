@@ -207,12 +207,12 @@ class AgentConfig:
                 if latest is not None:
                     bp = latest
                 else:
-                    raise RuntimeError(
+                    logger.warning(
                         "Agent config creation returned 409 Conflict but "
                         "re-fetching the latest blueprint returned None. "
-                        "This is unexpected — the config may have been deleted "
-                        "between the create and re-fetch calls."
-                    ) from e
+                        "Treating as no-op."
+                    )
+                    return ""
 
         self._state.manager = manager
         self._state.blueprint_id = bp.id
