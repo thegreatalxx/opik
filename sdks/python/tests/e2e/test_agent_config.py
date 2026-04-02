@@ -110,11 +110,11 @@ def test_explicit_update_creates_new_version__happyflow(
         project_name=project_name,
         rest_client_=opik_client.rest_client,
     )
-    field_types = {"MyConfig.temperature": "float", "MyConfig.model": "string"}
+    field_types = {"MyConfig.temperature": float, "MyConfig.model": str}
     v2_bp = manager.update_blueprint(
         fields_with_values={
-            "MyConfig.temperature": "0.2",
-            "MyConfig.model": "gpt-4o",
+            "MyConfig.temperature": (float, 0.2, None),
+            "MyConfig.model": (str, "gpt-4o", None),
         },
         description="Optimized config",
         field_types=field_types,
