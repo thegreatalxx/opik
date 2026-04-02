@@ -80,8 +80,7 @@ public interface DatasetItemService {
 
     Mono<DatasetItemPage> getItems(int page, int size, DatasetItemSearchCriteria datasetItemSearchCriteria);
 
-    Flux<DatasetItem> getItems(String workspaceId, DatasetItemStreamRequest request,
-            List<DatasetItemFilter> filters, Visibility visibility);
+    Flux<DatasetItem> getItems(String workspaceId, DatasetItemStreamRequest request, List<DatasetItemFilter> filters);
 
     Mono<PageColumns> getOutputColumns(UUID datasetId, Set<UUID> experimentIds);
 
@@ -730,17 +729,16 @@ class DatasetItemServiceImpl implements DatasetItemService {
 
     @WithSpan
     public Flux<DatasetItem> getItems(@NonNull String workspaceId, @NonNull DatasetItemStreamRequest request,
-            @NonNull List<DatasetItemFilter> filters, Visibility visibility) {
+            @NonNull List<DatasetItemFilter> filters) {
         log.info("Getting dataset items for dataset '{}' (hasFilters={}), version='{}', workspaceId='{}'",
                 request.datasetName(), !filters.isEmpty(),
                 request.datasetVersion(), workspaceId);
 
-        return datasetService.resolveDatasetByName(
+        return datasetService.resolveDatasetByNameAsync(
                 DatasetIdentifier.builder()
                         .datasetName(request.datasetName())
                         .projectName(request.projectName())
-                        .build(),
-                visibility)
+                        .build())
                 .flatMap(dataset -> Mono.deferContextual(ctx -> {
                     // Ensure dataset is migrated if lazy migration is enabled
                     return ensureLazyMigration(dataset.id(), workspaceId)
@@ -1161,15 +1159,19 @@ class DatasetItemServiceImpl implements DatasetItemService {
     public Mono<DatasetItemPage> getItems(
             int page, int size, @NonNull DatasetItemSearchCriteria datasetItemSearchCriteria) {
 
-        // Verify dataset visibility
-        datasetService.findById(datasetItemSearchCriteria.datasetId());
-
         return Mono.deferContextual(ctx -> {
             String workspaceId = ctx.get(RequestContext.WORKSPACE_ID);
+            Visibility visibility = ctx.get(RequestContext.VISIBILITY);
 
-            // Ensure dataset is migrated if lazy migration is enabled
-            return ensureLazyMigration(datasetItemSearchCriteria.datasetId(), workspaceId)
-                    .then(Mono.defer(() -> getItemsInternal(page, size, datasetItemSearchCriteria)));
+            return Mono.fromCallable(
+                    () -> {
+                        datasetService.verifyVisibilityIfExists(datasetItemSearchCriteria.datasetId(), workspaceId,
+                                visibility);
+                        return datasetItemSearchCriteria.datasetId();
+                    })
+                    .subscribeOn(Schedulers.boundedElastic())
+                    .flatMap(__ -> ensureLazyMigration(datasetItemSearchCriteria.datasetId(), workspaceId)
+                            .then(Mono.defer(() -> getItemsInternal(page, size, datasetItemSearchCriteria))));
         });
     }
 
@@ -1285,7 +1287,10 @@ class DatasetItemServiceImpl implements DatasetItemService {
         Optional<UUID> fallbackVersionId = getFallbackVersionId(criteria.datasetId(), workspaceId);
 
         if (fallbackVersionId.isEmpty()) {
-            return Mono.just(DatasetItemPage.empty(page, sortingFactory.getSortableFields()));
+            log.info("No versions found for dataset '{}', falling back to legacy items for experiment items",
+                    criteria.datasetId());
+            return dao.getItems(criteria, page, size)
+                    .defaultIfEmpty(DatasetItemPage.empty(page, sortingFactory.getSortableFields()));
         }
 
         log.info(
