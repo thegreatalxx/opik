@@ -59,7 +59,9 @@ def test_multi_class_and_field_removal_dedup__happyflow(
     v_after_b = opik_client.create_agent_config_version(
         ConfigB(retries=3), project_name=project_name
     )
-    assert v_after_b == v1_name, "existing config is authoritative — different class should be a no-op"
+    assert v_after_b == v1_name, (
+        "existing config is authoritative — different class should be a no-op"
+    )
 
     # Re-publishing ConfigA with the same values is also a no-op.
     get_global_registry().clear()
@@ -163,7 +165,9 @@ def test_explicit_update_creates_new_version__happyflow(
     v_after_restart = opik_client.create_agent_config_version(
         MyConfig(temperature=0.5, model="gpt-4o-mini"), project_name=project_name
     )
-    assert v_after_restart == v2_bp.name, "startup must not overwrite optimizer's version"
+    assert v_after_restart == v2_bp.name, (
+        "startup must not overwrite optimizer's version"
+    )
 
     # Still 2 entries — no new version created.
     history = opik_client.rest_client.agent_configs.get_blueprint_history(
@@ -226,7 +230,9 @@ def test_publish_version_and_retrieve__happyflow(
         MyConfig(temperature=0.8, model="gpt-4", hint="use chain-of-thought"),
         project_name=project_name,
     )
-    assert v2_name == v1_name, "existing config is authoritative — different values should be a no-op"
+    assert v2_name == v1_name, (
+        "existing config is authoritative — different values should be a no-op"
+    )
 
     # Still only 1 entry in history.
     assert (
