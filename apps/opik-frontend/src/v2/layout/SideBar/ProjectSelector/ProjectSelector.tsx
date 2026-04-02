@@ -87,14 +87,14 @@ const ProjectSelector: React.FC<ProjectSelectorProps> = ({
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverAnchor asChild>
-        <PopoverTrigger asChild>
+        <div
+          className={cn(
+            "flex w-full items-center gap-2 rounded-md px-2 py-1.5",
+            open && "bg-primary-foreground",
+          )}
+        >
           {expanded ? (
-            <button
-              className={cn(
-                "flex w-full items-center gap-2 rounded-md px-2 py-1.5",
-                open && "bg-primary-foreground",
-              )}
-            >
+            <>
               {isLoading ? (
                 <>
                   <Spinner size="xs" />
@@ -113,23 +113,32 @@ const ProjectSelector: React.FC<ProjectSelectorProps> = ({
                     variant="owl"
                   />
                   <div className="flex min-w-0 flex-1 flex-col items-start">
-                    <div className="flex w-full items-center gap-0.5">
-                      <span className="comet-body-s text-light-slate">
-                        Project
-                      </span>
-                      <span className="shrink-0 text-light-slate">
-                        {open ? (
-                          <ChevronUp className="size-3.5" />
-                        ) : (
-                          <ChevronDown className="size-3.5" />
-                        )}
-                      </span>
-                    </div>
+                    <PopoverTrigger asChild>
+                      <button className="flex w-full items-center gap-0.5">
+                        <span className="comet-body-s text-light-slate">
+                          Project
+                        </span>
+                        <span className="shrink-0 text-light-slate">
+                          {open ? (
+                            <ChevronUp className="size-3.5" />
+                          ) : (
+                            <ChevronDown className="size-3.5" />
+                          )}
+                        </span>
+                      </button>
+                    </PopoverTrigger>
                     {activeProject ? (
                       <TooltipWrapper content={activeProject.name}>
-                        <span className="comet-body-s-accented w-full truncate text-left text-foreground hover:underline hover:underline-offset-4">
+                        <Link
+                          to="/$workspaceName/projects/$projectId/home"
+                          params={{
+                            workspaceName,
+                            projectId: activeProjectId!,
+                          }}
+                          className="comet-body-s-accented w-full truncate text-left text-foreground hover:underline hover:underline-offset-4"
+                        >
                           {activeProject.name}
-                        </span>
+                        </Link>
                       </TooltipWrapper>
                     ) : (
                       <span className="comet-body-s-accented truncate text-left text-muted-slate">
@@ -139,24 +148,28 @@ const ProjectSelector: React.FC<ProjectSelectorProps> = ({
                   </div>
                 </>
               )}
-            </button>
+            </>
           ) : (
-            <button
-              className={cn(
-                "flex size-7 items-center justify-center rounded-md py-1",
-                open ? "bg-primary-foreground" : "hover:bg-primary-foreground",
-              )}
-            >
-              {isLoading ? (
-                <Spinner size="xs" />
-              ) : open ? (
-                <ChevronUp className="size-3.5 text-foreground" />
-              ) : (
-                <ChevronDown className="size-3.5 text-foreground" />
-              )}
-            </button>
+            <PopoverTrigger asChild>
+              <button
+                className={cn(
+                  "flex size-7 items-center justify-center rounded-md py-1",
+                  open
+                    ? "bg-primary-foreground"
+                    : "hover:bg-primary-foreground",
+                )}
+              >
+                {isLoading ? (
+                  <Spinner size="xs" />
+                ) : open ? (
+                  <ChevronUp className="size-3.5 text-foreground" />
+                ) : (
+                  <ChevronDown className="size-3.5 text-foreground" />
+                )}
+              </button>
+            </PopoverTrigger>
           )}
-        </PopoverTrigger>
+        </div>
       </PopoverAnchor>
       <PopoverContent
         align="start"

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { Outlet } from "@tanstack/react-router";
+import { Outlet, useRouterState } from "@tanstack/react-router";
 import SideBar from "@/v2/layout/SideBar/SideBar";
 import TopBar from "@/v2/layout/TopBar/TopBar";
 import useLocalStorageState from "use-local-storage-state";
@@ -35,7 +35,14 @@ const PageLayout = () => {
   const RetentionBanner = usePluginsStore((state) => state.RetentionBanner);
   const AssistantSidebar = usePluginsStore((state) => state.AssistantSidebar);
 
-  const showAssistantSidebar = !!AssistantSidebar;
+  const isProjectHomePage = useRouterState({
+    select: (state) => {
+      const pathname = state.location.pathname;
+      return /\/projects\/[^/]+\/home\/?$/.test(pathname);
+    },
+  });
+
+  const showAssistantSidebar = !!AssistantSidebar && !isProjectHomePage;
 
   const isMobile = useMediaQuery("(max-width: 1023px)");
   const expanded = isMobile ? false : storedExpanded;
