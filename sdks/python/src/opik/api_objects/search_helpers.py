@@ -1,3 +1,4 @@
+import datetime as dt
 from typing import Optional, List, Callable, Any
 
 from opik import synchronization
@@ -29,6 +30,31 @@ def search_spans_with_filters(
         parsed_item_class=span_public.SpanPublic,
     )
 
+    return spans
+
+
+def search_spans_by_time_range(
+    rest_client: rest_api_client.OpikApi,
+    project_name: str,
+    from_time: dt.datetime,
+    to_time: dt.datetime,
+    truncate: bool,
+    max_results: Optional[int] = None,
+) -> List[span_public.SpanPublic]:
+    """Fetch all spans in a project within a time window."""
+    spans = rest_stream_parser.read_and_parse_full_stream(
+        read_source=lambda current_batch_size,
+        last_retrieved_id: rest_client.spans.search_spans(
+            project_name=project_name,
+            from_time=from_time,
+            to_time=to_time,
+            limit=current_batch_size,
+            truncate=truncate,
+            last_retrieved_id=last_retrieved_id,
+        ),
+        max_results=max_results,
+        parsed_item_class=span_public.SpanPublic,
+    )
     return spans
 
 

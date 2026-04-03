@@ -1,7 +1,7 @@
 """Project export functionality."""
 
 import sys
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from collections import defaultdict
 from contextlib import nullcontext
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -12,6 +12,7 @@ from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn
 
 import opik
+from opik.api_objects import search_helpers
 from opik.rest_api.core.api_error import ApiError
 from opik.rest_api.types.project_public import ProjectPublic
 from opik.rest_client_configurator import retry_decorator
@@ -27,9 +28,6 @@ from .utils import (
 )
 
 console = Console()
-
-# Maximum number of concurrent workers for parallel span fetching.
-MAX_WORKERS = 10
 
 
 def _print_oql_examples() -> None:
@@ -84,21 +82,25 @@ def _fetch_traces_page(
 
 
 @retry_decorator.opik_rest_retry
-def _fetch_spans(
+def _fetch_spans_bulk(
     client: opik.Opik,
-    trace: Any,
     project_name: str,
-) -> tuple:
-    """Fetch spans for a single trace. Returns (trace, spans).
+    from_time: datetime,
+    to_time: datetime,
+) -> list:
+    """Fetch all spans in a time range for the project.
 
-    Retries on transient errors (429, 5xx, network issues) via the shared
-    opik_rest_retry decorator; re-raises on permanent failures.
+    Uses from_time/to_time to bulk-fetch spans instead of per-trace calls,
+    reducing API requests ~100x. Retries on transient errors (429, 5xx,
+    network issues) via the shared opik_rest_retry decorator.
     """
-    return trace, client.search_spans(
+    return search_helpers.search_spans_by_time_range(
+        rest_client=client.rest_client,
         project_name=project_name,
-        trace_id=trace.id,
-        max_results=1000,
+        from_time=from_time,
+        to_time=to_time,
         truncate=False,
+        max_results=None,
     )
 
 
@@ -302,64 +304,98 @@ def export_traces(
                 else:
                     traces_to_fetch.append(trace)
 
-            # Step 2: Fetch spans in parallel for traces that need downloading.
+            # Step 2: Bulk-fetch spans for all traces that need downloading.
+            # Instead of one API call per trace, we fetch all spans in the
+            # time window covered by this batch and group them client-side.
             if traces_to_fetch:
-                with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
-                    future_to_trace = {
-                        executor.submit(
-                            _fetch_spans, client, trace, project_name
-                        ): trace
-                        for trace in traces_to_fetch
-                    }
-                    for future in as_completed(future_to_trace):
-                        trace = future_to_trace[future]
-                        try:
-                            _, spans = future.result()
-                            trace_data = {
-                                "trace": trace.model_dump(),
-                                "spans": [span.model_dump() for span in spans],
-                                "downloaded_at": datetime.now().isoformat(),
-                                "project_name": project_name,
-                            }
-                            file_path = project_dir / f"trace_{trace.id}.{ext}"
-                            try:
-                                if format.lower() == "csv":
-                                    write_csv_data(
-                                        trace_data, file_path, trace_to_csv_rows
-                                    )
-                                    if debug:
-                                        debug_print(
-                                            f"Wrote CSV file: {file_path}", debug
-                                        )
-                                else:
-                                    write_json_data(trace_data, file_path)
-                                    if debug:
-                                        debug_print(
-                                            f"Wrote JSON file: {file_path}", debug
-                                        )
-                                exported_count += 1
-                                total_processed += 1
-                                # Track in manifest and local set so subsequent
-                                # pages don't re-download the same trace.
-                                already_downloaded.add(trace.id)
-                                if manifest is not None:
-                                    manifest.mark_trace_downloaded(trace.id)
-                            except Exception as write_error:
-                                console.print(
-                                    f"[red]Error writing trace {trace.id} to file: {write_error}[/red]"
-                                )
-                                had_errors = True
-                                if debug:
-                                    import traceback
+                TIME_BUFFER = timedelta(minutes=1)
+                min_start = min(t.start_time for t in traces_to_fetch)
+                max_end = max(
+                    (t.end_time if t.end_time is not None else t.start_time)
+                    for t in traces_to_fetch
+                )
+                from_time = min_start - TIME_BUFFER
+                to_time = max_end + TIME_BUFFER
 
+                if debug:
+                    debug_print(
+                        f"DEBUG: Bulk fetching spans for {len(traces_to_fetch)} traces "
+                        f"(from_time={from_time.isoformat()}, to_time={to_time.isoformat()})",
+                        debug,
+                    )
+
+                try:
+                    all_spans = _fetch_spans_bulk(
+                        client, project_name, from_time, to_time
+                    )
+                    if debug:
+                        debug_print(
+                            f"DEBUG: Bulk fetch returned {len(all_spans)} spans",
+                            debug,
+                        )
+                except Exception as e:
+                    console.print(
+                        f"[red]Error fetching spans for batch: {e}[/red]"
+                    )
+                    had_errors = True
+                    total_processed += len(traces_to_fetch)
+                    current_page += 1
+                    continue
+
+                # Group spans by trace_id for O(1) lookup.
+                spans_by_trace: dict[str, list] = defaultdict(list)
+                for span in all_spans:
+                    if span.trace_id:
+                        spans_by_trace[span.trace_id].append(span)
+
+                for trace in traces_to_fetch:
+                    try:
+                        spans = spans_by_trace.get(trace.id, [])
+                        trace_data = {
+                            "trace": trace.model_dump(),
+                            "spans": [span.model_dump() for span in spans],
+                            "downloaded_at": datetime.now().isoformat(),
+                            "project_name": project_name,
+                        }
+                        file_path = project_dir / f"trace_{trace.id}.{ext}"
+                        try:
+                            if format.lower() == "csv":
+                                write_csv_data(
+                                    trace_data, file_path, trace_to_csv_rows
+                                )
+                                if debug:
                                     debug_print(
-                                        f"Traceback: {traceback.format_exc()}", debug
+                                        f"Wrote CSV file: {file_path}", debug
                                     )
-                        except Exception as e:
+                            else:
+                                write_json_data(trace_data, file_path)
+                                if debug:
+                                    debug_print(
+                                        f"Wrote JSON file: {file_path}", debug
+                                    )
+                            exported_count += 1
+                            total_processed += 1
+                            # Track in manifest and local set so subsequent
+                            # pages don't re-download the same trace.
+                            already_downloaded.add(trace.id)
+                            if manifest is not None:
+                                manifest.mark_trace_downloaded(trace.id)
+                        except Exception as write_error:
                             console.print(
-                                f"[red]Error exporting trace {trace.id}: {e}[/red]"
+                                f"[red]Error writing trace {trace.id} to file: {write_error}[/red]"
                             )
                             had_errors = True
+                            if debug:
+                                import traceback
+
+                                debug_print(
+                                    f"Traceback: {traceback.format_exc()}", debug
+                                )
+                    except Exception as e:
+                        console.print(
+                            f"[red]Error exporting trace {trace.id}: {e}[/red]"
+                        )
+                        had_errors = True
 
             # Update pagination for next iteration
             if traces:
