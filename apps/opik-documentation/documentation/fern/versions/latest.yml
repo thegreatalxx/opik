@@ -255,6 +255,27 @@ navigation:
               - page: Guaranteed availability
                 path: ../docs-v2/prompt_engineering/advanced/guaranted_availability.mdx
                 slug: guaranteed-availability
+      - section: Agent Development
+        slug: /agent-development
+        contents:
+          - page: Overview
+            path: ../docs-v2/agent_development/overview.mdx
+            slug: overview
+          - page: Concepts
+            path: ../docs-v2/agent_development/concepts.mdx
+            slug: concepts
+          - page: Opik Connect
+            path: ../docs-v2/agent_development/opik_connect.mdx
+            slug: opik-connect
+          - page: Agent Sandbox
+            path: ../docs-v2/agent_development/agent_sandbox.mdx
+            slug: agent-sandbox
+          - page: Ollie
+            path: ../docs-v2/agent_development/ollie.mdx
+            slug: ollie
+          - page: Agent Configuration
+            path: ../docs-v2/agent_development/agent_configuration.mdx
+            slug: agent-configuration
       - section: Production
         slug: /production
         contents:

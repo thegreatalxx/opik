@@ -1,0 +1,72 @@
+---
+headline: Ollie — Opik AI Assistant | Opik Documentation
+og:description: Use Ollie, Opik's built-in AI coding assistant, to analyze agent traces and get actionable suggestions for improving your agent.
+og:site_name: Opik Documentation
+og:title: Ollie — Opik AI Assistant
+title: Ollie
+---
+
+Ollie is Opik's built-in AI assistant — a full TUI (terminal user interface) integrated directly into the platform. Ollie analyzes your agent traces and provides actionable suggestions for improving prompts, tools, model selection, and overall agent performance.
+
+## What Ollie does
+
+Ollie sits in the development loop between running your agent and configuring the next iteration. After you execute a run in the [Agent Sandbox](/agent-development/agent-sandbox), Ollie can:
+
+- **Analyze traces** — Examine the full execution path of your agent, including every LLM call, tool invocation, and decision point
+- **Suggest prompt tweaks** — Identify issues in your prompts and recommend specific changes
+- **Identify failure patterns** — Spot common failure modes like hallucinations, incorrect tool usage, or unnecessary steps
+- **Recommend configuration changes** — Suggest adjustments to model parameters, tool selection, or agent architecture
+
+## Accessing Ollie
+
+Ollie is available in the trace detail panel. After running your agent (either from the Agent Sandbox or in production):
+
+1. Open a trace from the trace list or from the sandbox results
+2. Look for the Ollie section in the trace detail panel
+3. Start a conversation by typing your question or request
+
+## Using Ollie
+
+Ollie works as a conversational interface. You can ask questions about your trace, request analysis, or ask for specific improvements:
+
+**Example prompts:**
+
+- "Why did the agent make an extra LLM call in step 3?"
+- "How can I reduce the token usage of this trace?"
+- "What's wrong with the system prompt?"
+- "Suggest improvements to reduce latency"
+- "Why did the agent choose the wrong tool?"
+
+Ollie has full context of the trace including all spans, inputs, outputs, tool calls, and metadata. It uses this context to provide specific, actionable feedback rather than generic advice.
+
+## How Ollie fits in the development loop
+
+The typical workflow with Ollie follows this pattern:
+
+1. **Run** your agent in the Agent Sandbox with a test input
+2. **Inspect** the trace to understand the agent's behavior
+3. **Ask Ollie** to analyze the trace and suggest improvements
+4. **Apply** Ollie's suggestions to your agent configuration or code
+5. **Re-run** to verify the improvement
+
+This tight feedback loop lets you iterate on your agent much faster than manually reviewing traces and making changes.
+
+## Session management
+
+Each trace has its own Ollie conversation session. You can:
+
+- Continue a previous conversation by reopening the same trace
+- Start fresh by clearing the session
+- Provide feedback (thumbs up/down) on Ollie's responses to help improve the quality of suggestions
+
+## Capabilities
+
+Ollie can reason about:
+
+| Area | Examples |
+|------|----------|
+| **Prompt quality** | Ambiguous instructions, missing context, conflicting guidance |
+| **Tool usage** | Incorrect tool selection, missing tools, redundant tool calls |
+| **Performance** | Unnecessary LLM calls, high token usage, latency bottlenecks |
+| **Correctness** | Hallucinated outputs, wrong answers, incomplete responses |
+| **Architecture** | Agent flow issues, missing error handling, suboptimal step ordering |

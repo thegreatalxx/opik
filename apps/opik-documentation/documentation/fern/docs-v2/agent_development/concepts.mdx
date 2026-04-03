@@ -1,0 +1,109 @@
+---
+headline: Agent Development Concepts | Opik Documentation
+og:description: Understand the key concepts behind Opik's Agent Development Environment including runners, pairing, entrypoints, and agent configuration.
+og:site_name: Opik Documentation
+og:title: Agent Development Concepts — Opik
+title: Concepts
+---
+
+This page explains the key concepts behind the Agent Development Environment.
+
+## Entrypoints
+
+An **entrypoint** is a Python function decorated with `@opik.track(entrypoint=True)` that serves as the main entry point for your agent. When the `entrypoint` flag is set, Opik automatically:
+
+1. Registers the function in the local agent registry
+2. Activates the runner loop in the background
+3. Makes the agent available to receive jobs from the Opik platform
+
+```python
+import opik
+
+@opik.track(entrypoint=True)
+def my_agent(user_message: str, temperature: float = 0.7) -> str:
+    """Answer user questions using an LLM."""
+    # Your agent logic
+    return response
+```
+
+The function's name, parameters (with their types), and docstring are all sent to Opik and displayed in the Agent Sandbox UI. Parameter type annotations are used to generate the correct input form fields.
+
+## Local runners
+
+A **local runner** is a process on your machine that is connected to Opik and ready to execute agent jobs. When you run `opik connect`, the CLI:
+
+1. Exchanges the pairing code for runner credentials (runner ID, project, workspace)
+2. Sets environment variables (`OPIK_RUNNER_MODE`, `OPIK_RUNNER_ID`, `OPIK_PROJECT_NAME`)
+3. Launches your command in the modified environment
+
+The runner maintains a persistent connection to Opik through:
+
+- **Heartbeats** — Periodic signals that tell Opik the runner is still alive
+- **Job polling** — Long-polling on the `/jobs/next` endpoint to receive work
+- **Agent registration** — Syncing the list of available entrypoints with the backend
+
+If a runner stops sending heartbeats, Opik automatically marks it as disconnected.
+
+## Pairing
+
+**Pairing** is the one-time handshake that connects a local runner to a specific Opik project. The process works as follows:
+
+1. The Agent Sandbox UI generates a short-lived **pair code** (visible in the connection screen)
+2. You pass this code to `opik connect --pair <CODE>`
+3. The CLI exchanges the code for permanent runner credentials via the backend
+4. The runner is now associated with your project and workspace
+
+Pair codes expire after a short time window (displayed as a countdown in the UI) and are single-use.
+
+## Jobs
+
+A **job** is a single execution request sent from Opik to your local runner. Each job contains:
+
+- **Agent name** — Which entrypoint to invoke
+- **Inputs** — The parameters to pass to the function
+- **Configuration mask** (optional) — An agent configuration override
+
+Jobs go through the following lifecycle:
+
+```
+PENDING → RUNNING → COMPLETED
+                  → FAILED
+                  → CANCELLED
+```
+
+When a job completes, the result is sent back to Opik along with the trace ID for the execution.
+
+## Agent configuration
+
+**Agent configuration** is a versioned, server-side key-value store for your agent's parameters. Instead of hardcoding values like model name, temperature, or system prompt in your code, you can define them as an `AgentConfig` and manage them from the Opik UI.
+
+```python
+import opik
+from typing import Annotated
+
+class MyConfig(opik.AgentConfig):
+    model: str
+    temperature: Annotated[float, "Sampling temperature"]
+    system_prompt: Annotated[str, "The system prompt for the agent"]
+```
+
+Configuration versions are stored in Opik and can be:
+
+- **Published** — Create new versions with `create_agent_config_version()`
+- **Retrieved** — Fetch the latest or a specific version with `get_agent_config()`
+- **Deployed** — Tag a version with an environment (e.g., `"prod"`) using `deploy_to()`
+- **Overridden** — Apply a "mask" from the Agent Sandbox to test changes without modifying the published config
+
+The Agent Sandbox UI provides a **Configuration** tab where you can view and edit configuration values before running your agent.
+
+## Traces in the sandbox
+
+Every job execution in the Agent Sandbox produces a **trace** — the same trace you would see in the Observability section. The sandbox provides a streamlined view of:
+
+- **Response** — The agent's output
+- **Trajectory** — The full span tree showing every step the agent took
+- **Latency** — End-to-end duration
+- **Tokens** — Total token usage across all LLM calls
+- **Cost** — Estimated cost of the execution
+
+You can open the full trace detail panel directly from the sandbox results to inspect individual spans, LLM inputs/outputs, and tool calls.

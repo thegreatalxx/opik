@@ -1,0 +1,152 @@
+---
+headline: Agent Configuration | Opik Documentation
+og:description: Version and manage your agent's configuration with Opik's AgentConfig system for prompts, model parameters, and tools.
+og:site_name: Opik Documentation
+og:title: Agent Configuration — Opik
+title: Agent Configuration
+---
+
+Agent Configuration provides a versioned, server-side key-value store for your agent's parameters. Instead of hardcoding values like model name, temperature, or system prompt, you define them as an `AgentConfig` class and manage them from the Opik UI or SDK.
+
+## Why use Agent Configuration
+
+- **Version control** — Every configuration change creates a new version, so you can track what changed and when
+- **Environment management** — Tag versions with environments like `"staging"` or `"prod"` and deploy without code changes
+- **Sandbox integration** — Test configuration changes directly in the Agent Sandbox before publishing
+- **Trace metadata** — Configuration values are automatically attached to traces, so you can correlate agent behavior with specific settings
+
+## Defining a configuration
+
+Subclass `opik.AgentConfig` and declare typed fields:
+
+```python
+import opik
+from typing import Annotated
+
+class MyAgentConfig(opik.AgentConfig):
+    model: str
+    temperature: Annotated[float, "Sampling temperature"]
+    system_prompt: Annotated[str, "The system prompt for the agent"]
+    max_retries: int
+```
+
+Use `Annotated[type, "description"]` to add descriptions that appear in the Opik UI.
+
+### Supported field types
+
+| Python type | Backend type |
+|-------------|-------------|
+| `str` | String |
+| `int` | Integer |
+| `float` | Float |
+| `bool` | Boolean |
+
+## Publishing a configuration version
+
+Use the Opik client to publish a configuration:
+
+```python
+import opik
+
+client = opik.Opik()
+
+config = MyAgentConfig(
+    model="gpt-4",
+    temperature=0.7,
+    system_prompt="You are a helpful assistant.",
+    max_retries=3,
+)
+
+version = client.create_agent_config_version(
+    config,
+    project_name="my-project",
+)
+print(f"Published version: {version}")
+```
+
+If the values match the latest version, no new version is created.
+
+## Retrieving a configuration
+
+Retrieve the configuration inside a `@opik.track`-decorated function:
+
+```python
+@opik.track(entrypoint=True)
+def my_agent(user_message: str) -> str:
+    config = client.get_agent_config(
+        fallback=MyAgentConfig(
+            model="gpt-3.5-turbo",
+            temperature=0.5,
+            system_prompt="You are a helpful assistant.",
+            max_retries=2,
+        ),
+        project_name="my-project",
+        latest=True,
+    )
+
+    # Use config values
+    response = call_llm(
+        model=config.model,
+        temperature=config.temperature,
+        system_prompt=config.system_prompt,
+        message=user_message,
+    )
+    return response
+```
+
+The `fallback` parameter provides default values used when the backend is unreachable. You can check `config.is_fallback` to know whether fallback values are being used.
+
+### Retrieval options
+
+| Parameter | Description |
+|-----------|-------------|
+| `latest=True` | Fetch the most recent version |
+| `env="prod"` | Fetch the version tagged with a specific environment |
+| `version="v3"` | Fetch a specific named version |
+
+## Deploying to an environment
+
+Tag a configuration version with an environment name:
+
+```python
+config = MyAgentConfig(
+    model="gpt-4",
+    temperature=0.7,
+    system_prompt="You are a helpful assistant.",
+    max_retries=3,
+)
+
+client.create_agent_config_version(config, project_name="my-project")
+config.deploy_to("prod")
+```
+
+You can then retrieve the production configuration with:
+
+```python
+config = client.get_agent_config(
+    fallback=default_config,
+    project_name="my-project",
+    env="prod",
+)
+```
+
+## Configuration in the Agent Sandbox
+
+The Agent Sandbox provides a **Configuration** tab where you can:
+
+1. View all configuration versions in a timeline
+2. Select any version to inspect its values
+3. Edit values and create a temporary override (mask) for testing
+4. Run your agent with the modified configuration
+
+Changes made in the sandbox are applied as a mask — they override the published configuration for that specific run without creating a new version. This lets you experiment freely before committing to changes.
+
+## Trace integration
+
+When your agent reads configuration values inside a traced function, the configuration metadata is automatically attached to the trace. This includes:
+
+- The blueprint ID and version
+- The specific values that were read
+- Whether a mask override was applied
+
+This makes it easy to correlate agent behavior with specific configuration versions when debugging or analyzing traces.

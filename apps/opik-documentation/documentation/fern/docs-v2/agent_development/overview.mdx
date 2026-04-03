@@ -1,0 +1,97 @@
+---
+headline: Agent Development Environment | Opik Documentation
+og:description: Build, test, and iterate on your AI agents with Opik's integrated development environment featuring Opik Connect, Agent Sandbox, and Ollie.
+og:site_name: Opik Documentation
+og:title: Agent Development Environment — Opik
+title: Agent Development Environment
+---
+
+The Agent Development Environment brings together the tools you need to build, test, and improve AI agents directly within Opik. Instead of switching between your terminal, your code editor, and your observability dashboard, you can connect your agent to Opik and iterate on it from a single interface.
+
+## Core components
+
+The Agent Development Environment consists of three integrated components:
+
+<CardGroup cols={3}>
+  <Card title="Opik Connect" href="/agent-development/opik-connect" icon="fa-regular fa-link">
+    A CLI command that bridges your locally running agent to the Opik platform via a secure pairing protocol.
+  </Card>
+  <Card title="Agent Sandbox" href="/agent-development/agent-sandbox" icon="fa-regular fa-flask-vial">
+    A web-based playground for running your agent with different inputs and configurations, and inspecting the resulting traces.
+  </Card>
+  <Card title="Ollie" href="/agent-development/ollie" icon="fa-regular fa-wand-magic-sparkles">
+    Opik's built-in AI coding assistant that analyzes your agent traces and suggests improvements to prompts, tools, and configuration.
+  </Card>
+</CardGroup>
+
+## How it works
+
+The development loop follows a straightforward cycle:
+
+1. **Connect** — Run `opik connect` in your terminal to pair your local agent process with Opik
+2. **Configure** — Adjust prompts, tools, model settings, and parameters from the Agent Sandbox UI
+3. **Run** — Execute your agent with test inputs directly from the browser
+4. **Inspect** — View the full trace including response content, agent trajectory, latency, and token usage
+5. **Improve** — Use Ollie to analyze traces and get actionable suggestions for improving your agent
+
+```
+┌─────────────────────────────────────────────────────┐
+│                       Opik                          │
+│                                                     │
+│  ┌─────────────┐   ┌─────────┐   ┌───────────────┐ │
+│  │  Configure   │   │  Input  │   │    Inspect    │ │
+│  │  - Prompts   │   │         │   │  - Response   │ │
+│  │  - Tools     │──▶│  "Run"  │──▶│  - Trajectory │ │
+│  │  - Model     │   │         │   │  - Latency    │ │
+│  │  - Params    │   │         │   │  - Tokens     │ │
+│  └─────────────┘   └─────────┘   └───────┬───────┘ │
+│        ▲                                  │         │
+│        │         ┌──────────────┐         │         │
+│        └─────────│ Improve with │◀────────┘         │
+│                  │    Ollie     │                    │
+│                  └──────────────┘                    │
+│        ▲                                  │         │
+└────────┼──────────────────────────────────┼─────────┘
+         │    Config + Input                │ Response + Trace
+         │                                  ▼
+    ┌────┴──────────────────────────────────────┐
+    │              Your Agent (local)            │
+    └───────────────────────────────────────────┘
+```
+
+## Prerequisites
+
+Before using the Agent Development Environment, you need:
+
+- **Opik account** — Either [Opik Cloud](https://www.comet.com/signup?from=llm&utm_source=opik&utm_medium=docs&utm_content=agent-dev&utm_campaign=opik) or a [self-hosted instance](/self-host/overview)
+- **Opik Python SDK** — Install with `pip install opik`
+- **An agent** — Any Python function that you want to test and improve
+
+## Quick example
+
+Here's a minimal example to get started:
+
+```python
+import opik
+
+@opik.track(entrypoint=True)
+def my_agent(user_message: str) -> str:
+    """A simple agent that responds to user messages."""
+    # Your agent logic here
+    return f"Hello! You said: {user_message}"
+```
+
+Then connect it to Opik:
+
+```bash
+opik connect --pair <PAIR_CODE> -- python my_agent.py
+```
+
+The `--pair` code is generated in the Agent Sandbox UI when you navigate to **Agent sandbox** in your project sidebar.
+
+## Next steps
+
+- [Opik Connect](/agent-development/opik-connect) — Learn how to connect your agent to Opik
+- [Agent Sandbox](/agent-development/agent-sandbox) — Run and test your agent from the browser
+- [Ollie](/agent-development/ollie) — Use Opik's AI assistant to improve your agent
+- [Agent Configuration](/agent-development/agent-configuration) — Version and manage your agent's configuration

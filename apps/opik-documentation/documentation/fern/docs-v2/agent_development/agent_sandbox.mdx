@@ -1,0 +1,75 @@
+---
+headline: Agent Sandbox | Opik Documentation
+og:description: Use the Agent Sandbox to run, test, and debug your AI agents directly from the Opik web interface.
+og:site_name: Opik Documentation
+og:title: Agent Sandbox — Opik
+title: Agent Sandbox
+---
+
+The Agent Sandbox is a web-based playground for running your connected agent with different inputs and configurations, and inspecting the results in real time.
+
+## Accessing the Agent Sandbox
+
+1. Open your project in Opik
+2. Click **Agent sandbox** in the left sidebar (under the Optimization section)
+
+If no agent is connected, you'll see the connection screen with a pairing command. See [Opik Connect](/agent-development/opik-connect) to get started.
+
+## Using the sandbox
+
+Once your agent is connected, the sandbox provides two main panels:
+
+### Input panel
+
+The input panel has two tabs:
+
+**Input tab** — A dynamically generated form based on your agent's parameters. Each parameter from your `@opik.track(entrypoint=True)` function becomes a form field with the appropriate type control (text, number, boolean).
+
+**Configuration tab** — View and edit your agent's [configuration](/agent-development/agent-configuration) values. You can select different configuration versions and modify values to test changes before publishing them.
+
+### Results panel
+
+After running your agent, the results panel shows:
+
+- **Agent output** — The return value of your agent function
+- **Duration** — End-to-end execution time
+- **Tokens** — Total token usage across all LLM calls in the trace
+- **Cost** — Estimated cost of the execution
+
+Click **View trace** to open the full trace detail panel, where you can inspect the complete span tree, individual LLM calls, tool invocations, and more.
+
+## Running your agent
+
+1. Fill in the input fields with your test data
+2. Click **Run** (or press **Shift+Enter**)
+3. Watch the results appear in real time
+
+You can click **Reset** to clear the current results and start fresh, or **Stop** to cancel a running job.
+
+## Testing with configuration overrides
+
+The Configuration tab in the sandbox lets you experiment with different parameter values without modifying your published configuration:
+
+1. Switch to the **Configuration** tab
+2. Select a configuration version from the dropdown
+3. Edit any values you want to test
+4. Switch back to the **Input** tab and run your agent
+
+The modified configuration is applied as a "mask" — a temporary override that only affects sandbox runs. Your published configuration remains unchanged.
+
+## Viewing traces
+
+Every sandbox run creates a trace that you can inspect in detail. The trace includes:
+
+- The full span hierarchy (agent steps, LLM calls, tool calls)
+- Input and output for each span
+- Token usage and latency per span
+- Any errors or exceptions
+
+This is the same trace data available in the Observability section, but accessible directly from the sandbox for a faster development loop.
+
+## Keyboard shortcuts
+
+| Shortcut | Action |
+|----------|--------|
+| Shift+Enter | Run the agent |
