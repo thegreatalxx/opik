@@ -1,0 +1,339 @@
+---
+headline: Agent Configuration | Opik Documentation
+og:description: Learn to utilize Opik's Agent Configuration for versioning, reusing, and
+  managing your prompts and agent parameters in Opik
+og:site_name: Opik Documentation
+og:title: Manage Prompts Effectively with Opik
+title: Getting started with Agent Configuration
+---
+
+When working on Agents there are a lot of different prompts and parameters that you need to track
+and version. Opik allows you to not only track and version these parameters but also improve these
+based on your production data and iterate on these using the [Agent Sandbox].
+
+{/* Add video of Agent Configuration + Agent Sandbox */}
+
+You can track the following items in Agent Configurations:
+1. Prompts
+2. Tool definitions
+3. Models and parameters
+
+## Adding Agent Configuration to your code
+
+<Tabs>
+  <Tab title="AI Integration">
+    You can use the Opik skills to add support for Agent Configuration in your existing agent:
+
+    <Steps>
+      <Step title="Install the Opik skill">
+        ```bash
+        npx skills add comet-ml/opik-skills
+        ```
+
+        This skill is compatible with all coding agents including Claude Code, Codex, Cursor, OpenCode and more.
+      </Step>
+      <Step title="Run the integration">
+        Once the skill is installed, you can integrate with Opik using the following prompt:
+        ```
+        Version my prompts and agent parameters in Opik using the /instrument:agent-configuration command.
+        ```
+      </Step>
+    </Steps>
+  </Tab>
+  <Tab title="Manual integration">
+    If you want to manually update your code to support Agent Configuration, you will need to first define the Agent Configuration
+    schema and then fetch it in your agent.
+
+    First we will create the agent configuration:
+
+    <CodeBlocks>
+
+    ```python title="Python"
+    import opik
+    from typing import Annotated
+
+    client = opik.Opik()
+
+    # Define the schema for my configuration
+    class MyAgentsConfiguration(opik.AgentConfig):
+        model: Annotated[str, "LLM model to use for all LLM calls"]
+        temperature: Annotated[float, "Sampling temperature for LLM calls"]
+        system_prompt: Annotated[opik.Prompt, "System prompt for the agent"]
+
+    # Create the first version of the configuration
+    client.create_agent_config_version(
+      config=MyAgentsConfiguration(
+        model="gpt-4o-mini",
+        temperature=0.75,
+        system_prompt=opik.Prompt(name="system_prompt", prompt="You are an AI assistant.")
+      ),
+      project_name="my-agent-name",
+    )
+    ```
+
+    ```ts title="Typescript"
+    import Opik, { Prompt } from "opik";
+    import { z } from "zod";
+
+    const client = new Opik();
+
+    // Define the schema for my configuration
+    const MyAgentsConfiguration = z
+      .object({
+        model: z.string().describe("LLM model to use for all LLM calls"),
+        temperature: z.number().describe("Sampling temperature for LLM calls"),
+        system_prompt: z.instanceof(Prompt).describe("System prompt for the agent"),
+      })
+      .describe("MyAgentsConfiguration");
+
+    // Create the first version of the configuration
+    const systemPrompt = await client.createPrompt({
+      name: "system_prompt",
+      prompt: "You are an AI assistant.",
+    });
+
+    await client.createAgentConfig(
+      MyAgentsConfiguration,
+      {
+        model: "gpt-4o-mini",
+        temperature: 0.75,
+        system_prompt: systemPrompt,
+      },
+      { projectName: "my-agent-name" }
+    );
+    ```
+    </CodeBlocks>
+
+    Once you have a configuration defined, you can use it in your agent using:
+
+    <CodeBlocks>
+      ```python title="Python"
+      import opik
+      from typing import Annotated
+
+      client = opik.Opik()
+
+      class MyAgentsConfiguration(opik.AgentConfig):
+          model: Annotated[str, "LLM model to use for all LLM calls"]
+          temperature: Annotated[float, "Sampling temperature for LLM calls"]
+          system_prompt: Annotated[opik.Prompt, "System prompt for the agent"]
+
+      cfg = client.get_agent_config(
+        fallback=MyAgentsConfiguration(
+          model="gpt-4o-mini",
+          temperature=0.75,
+          system_prompt=opik.Prompt(name="system_prompt", prompt="You are an AI assistant.")
+        ),
+        project_name="my-agent-name",
+        env="prod",
+      )
+
+      print(cfg.model)
+      print(cfg.temperature)
+      print(cfg.system_prompt)
+      ```
+
+      ```ts title="Typescript"
+      import Opik, { Prompt } from "opik";
+      import { z } from "zod";
+
+      const client = new Opik();
+
+      const MyAgentsConfiguration = z
+        .object({
+          model: z.string(),
+          temperature: z.number(),
+          system_prompt: z.instanceof(Prompt),
+        })
+        .describe("MyAgentsConfiguration");
+
+      const systemPrompt = await client.createPrompt({
+        name: "system_prompt",
+        prompt: "You are an AI assistant.",
+      });
+
+      const cfg = await client.getAgentConfigVersion(MyAgentsConfiguration, {
+        fallback: { model: "gpt-4o-mini", temperature: 0.75, system_prompt: systemPrompt },
+        projectName: "my-agent-name",
+        env: "prod",
+      });
+
+      console.log(cfg.model);
+      console.log(cfg.temperature);
+      console.log(cfg.system_prompt);
+      ```
+    </CodeBlocks>
+
+    <Tip>
+      When `get_agent_config` or `getAgentConfigVersion` is called inside a tracked function (e.g., a function
+      decorated with `@opik.track`), the configuration version is automatically linked to the trace. This
+      lets you see which configuration was used for each request directly in the Opik dashboard.
+    </Tip>
+  </Tab>
+</Tabs>
+
+## Managing Agent Configuration versions
+
+One of the key advantages of using Agent Configurations is that you can update the configuration through the
+Opik platform and deploy this version to production without needing to trigger a new production deployment.
+
+{/* Add video of the agent configuration UI */}
+
+This is achieved through the `env` tag that you can update through the UI and allows you to control which
+version of the configuration is used. By default the SDK will fetch the `prod` version but this can be
+controlled with the `env` parameter in the SDK which supports:
+* `prod`: Production version of the prompt
+* `latest`: The most recent version of the prompt
+* `<custom_label>`: Custom label created in the Opik UI
+* `<v3>`: Specific version
+
+Your code becomes:
+
+<CodeBlocks>
+  ```python title="Python"
+  import opik
+  from typing import Annotated
+
+  client = opik.Opik()
+
+  class MyAgentsConfiguration(opik.AgentConfig):
+      model: Annotated[str, "LLM model to use for all LLM calls"]
+      temperature: Annotated[float, "Sampling temperature for LLM calls"]
+      system_prompt: Annotated[opik.Prompt, "System prompt for the agent"]
+
+  cfg = client.get_agent_config(
+    fallback=MyAgentsConfiguration(
+      model="gpt-4o-mini",
+      temperature=0.75,
+      system_prompt=opik.Prompt(name="system_prompt", prompt="You are an AI assistant.")
+    ),
+    project_name="my-agent-name",
+    env="latest",
+  )
+
+  print(cfg.model)
+  print(cfg.temperature)
+  print(cfg.system_prompt)
+  ```
+
+  ```ts title="Typescript"
+  import Opik, { Prompt } from "opik";
+  import { z } from "zod";
+
+  const client = new Opik();
+
+  const MyAgentsConfiguration = z
+    .object({
+      model: z.string(),
+      temperature: z.number(),
+      system_prompt: z.instanceof(Prompt),
+    })
+    .describe("MyAgentsConfiguration");
+
+  const systemPrompt = await client.createPrompt({
+    name: "system_prompt",
+    prompt: "You are an AI assistant.",
+  });
+
+  const cfg = await client.getAgentConfigVersion(MyAgentsConfiguration, {
+    fallback: { model: "gpt-4o-mini", temperature: 0.75, system_prompt: systemPrompt },
+    projectName: "my-agent-name",
+    env: "latest",
+  });
+
+  console.log(cfg.model);
+  console.log(cfg.temperature);
+  console.log(cfg.system_prompt);
+  ```
+</CodeBlocks>
+
+## Supported configuration parameter types
+
+Agent Configurations support versioning prompts, model settings, tool definitions, and any other parameter
+your agent relies on. Below are the supported types with examples of each.
+
+### Prompts
+
+Use `opik.Prompt` to version text prompts. Prompts support variable substitution using `{{variable_name}}`
+syntax, allowing you to define templates that are filled in at runtime.
+
+<CodeBlocks>
+  ```python title="Python"
+  system_prompt=opik.Prompt(
+    name="system_prompt",
+    prompt="You are a helpful assistant specializing in {{domain}}."
+  )
+  ```
+
+  ```ts title="Typescript"
+  const systemPrompt = await client.createPrompt({
+    name: "system_prompt",
+    prompt: "You are a helpful assistant specializing in {{domain}}.",
+  });
+  ```
+</CodeBlocks>
+
+### Chat Prompts
+
+Use `opik.ChatPrompt` to version a list of chat messages. This is preferred over `opik.Prompt` when your
+agent uses a multi-turn message format with system, user, and assistant roles.
+
+<CodeBlocks>
+  ```python title="Python"
+  chat_prompt=opik.ChatPrompt(
+    name="chat_prompt",
+    messages=[
+      {"role": "system", "content": "You are a helpful assistant."},
+      {"role": "user", "content": "{{user_query}}"},
+    ]
+  )
+  ```
+
+  ```ts title="Typescript"
+  const chatPrompt = await client.createChatPrompt({
+    name: "chat_prompt",
+    messages: [
+      { role: "system", content: "You are a helpful assistant." },
+      { role: "user", content: "{{user_query}}" },
+    ],
+  });
+  ```
+</CodeBlocks>
+
+### Strings
+
+Use strings to version model names, tool definitions, or any other text parameter.
+
+<CodeBlocks>
+  ```python title="Python"
+  class MyAgentsConfiguration(opik.AgentConfig):
+      model: Annotated[str, "LLM model to use"] # e.g. "gpt-4o-mini"
+      tool_definition: Annotated[str, "JSON schema for the search tool"]
+  ```
+
+  ```ts title="Typescript"
+  const MyAgentsConfiguration = z.object({
+    model: z.string().describe("LLM model to use"), // e.g. "gpt-4o-mini"
+    tool_definition: z.string().describe("JSON schema for the search tool"),
+  });
+  ```
+</CodeBlocks>
+
+### Floats
+
+Use floats to version numeric parameters like LLM sampling settings or RAG retrieval thresholds.
+
+<CodeBlocks>
+  ```python title="Python"
+  class MyAgentsConfiguration(opik.AgentConfig):
+      temperature: Annotated[float, "Sampling temperature"] # e.g. 0.75
+      similarity_threshold: Annotated[float, "Minimum similarity score for RAG retrieval"]
+  ```
+
+  ```ts title="Typescript"
+  const MyAgentsConfiguration = z.object({
+    temperature: z.number().describe("Sampling temperature"), // e.g. 0.75
+    similarity_threshold: z.number().describe("Minimum similarity score for RAG retrieval"),
+  });
+  ```
+</CodeBlocks>

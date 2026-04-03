@@ -1,0 +1,140 @@
+---
+headline: Manage Evaluation Suites | Opik Documentation
+og:description: Learn how to update, inspect, and manage Evaluation Suites in Opik
+  including assertions, execution policies, and test items
+og:site_name: Opik Documentation
+og:title: Manage Evaluation Suites — Opik
+title: Manage Evaluation Suites
+---
+
+Once you've created an Evaluation Suite, you can update its assertions and execution policy, inspect its contents, and manage test items.
+
+## Retrieving an existing suite
+
+Use `get_or_create_evaluation_suite` to retrieve an existing suite by name. If the suite doesn't exist, it will be created.
+
+<CodeBlocks>
+  ```python title="Python"
+  import opik
+
+  opik_client = opik.Opik()
+
+  suite = opik_client.get_or_create_evaluation_suite(
+      name="customer-support-qa",
+      project_name="my-agent",
+  )
+  ```
+
+  ```ts title="Typescript"
+  import { Opik, EvaluationSuite } from "opik";
+
+  const client = new Opik();
+
+  const suite = await EvaluationSuite.getOrCreate(client, {
+    name: "customer-support-qa",
+    projectName: "my-agent",
+  });
+  ```
+</CodeBlocks>
+
+## Updating assertions and execution policy
+
+You can update the suite-level assertions and execution policy at any time:
+
+<CodeBlocks>
+  ```python title="Python"
+  suite.update(
+      assertions=[
+          "The response is grounded in the provided context",
+          "The response is concise",
+      ],
+      execution_policy={"runs_per_item": 5, "pass_threshold": 3},
+  )
+  ```
+
+  ```ts title="Typescript"
+  await suite.update({
+    assertions: [
+      "The response is grounded in the provided context",
+      "The response is concise",
+    ],
+    executionPolicy: { runsPerItem: 5, passThreshold: 3 },
+  });
+  ```
+</CodeBlocks>
+
+## Inspecting a suite
+
+Retrieve the current state of a suite — its items, assertions, and execution policy:
+
+<CodeBlocks>
+  ```python title="Python"
+  items = suite.get_items()
+  assertions = suite.get_assertions()
+  policy = suite.get_execution_policy()
+
+  print(f"Items: {len(items)}")
+  print(f"Assertions: {assertions}")
+  print(f"Policy: {policy}")
+  ```
+
+  ```ts title="Typescript"
+  const items = await suite.getItems();
+  const assertions = await suite.getAssertions();
+  const policy = await suite.getExecutionPolicy();
+
+  console.log(`Items: ${items.length}`);
+  console.log(`Assertions: ${assertions}`);
+  console.log(`Policy: ${JSON.stringify(policy)}`);
+  ```
+</CodeBlocks>
+
+## Adding test items
+
+Add individual items or batches of items to a suite:
+
+<CodeBlocks>
+  ```python title="Python"
+  # Add a single item
+  suite.add_item(
+      data={"question": "How do I reset my password?", "context": "Go to Settings > Security > Reset Password."},
+      assertions=["The response mentions the Settings page"],
+  )
+
+  # Add multiple items
+  suite.add_items([
+      {"data": {"question": "What is the free tier limit?", "context": "Free tier: 1GB storage, 100 API calls/day."}},
+      {"data": {"question": "Do you support SSO?", "context": "Enterprise plans include SSO with SAML 2.0."}},
+  ])
+  ```
+
+  ```ts title="Typescript"
+  // Add a single item
+  await suite.addItem(
+    { question: "How do I reset my password?", context: "Go to Settings > Security > Reset Password." },
+    { assertions: ["The response mentions the Settings page"] }
+  );
+
+  // Add multiple items
+  await suite.addItems([
+    { data: { question: "What is the free tier limit?", context: "Free tier: 1GB storage, 100 API calls/day." } },
+    { data: { question: "Do you support SSO?", context: "Enterprise plans include SSO with SAML 2.0." } },
+  ]);
+  ```
+</CodeBlocks>
+
+## Deleting test items
+
+Remove specific items by their ID:
+
+<CodeBlocks>
+  ```python title="Python"
+  items = suite.get_items()
+  suite.delete_items([items[0]["id"]])
+  ```
+
+  ```ts title="Typescript"
+  const items = await suite.getItems();
+  await suite.deleteItems([items[0].id]);
+  ```
+</CodeBlocks>

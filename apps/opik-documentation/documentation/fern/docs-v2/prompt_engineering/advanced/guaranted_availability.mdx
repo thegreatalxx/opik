@@ -1,0 +1,72 @@
+---
+headline: Guaranteed Availability | Opik Documentation
+og:description: Learn how to configure fallback agent configurations in Opik to ensure availability even when the platform is unreachable
+og:site_name: Opik Documentation
+og:title: Guaranteed Availability for Agent Configuration
+title: Guaranteed availability
+---
+
+Opik is a highly reliable platform and we dedicate significant effort to ensure that agent
+configurations are consistently served. However in the event of Opik not being available,
+you can configure a fallback configuration to use if Opik can't be reached:
+
+
+<CodeBlocks>
+  ```python title="Python"
+  import opik
+  from typing import Annotated
+
+  client = opik.Opik()
+
+  # Define the schema for my configuration
+  class MyAgentsConfiguration(opik.AgentConfig):
+      model: Annotated[str, "LLM model to use for all LLM calls"]
+      temperature: Annotated[float, "Sampling temperature for LLM calls"]
+      system_prompt: Annotated[opik.Prompt, "System prompt for the agent"]
+
+  FALLBACK_CONFIGURATION = MyAgentsConfiguration(
+    model="gpt-4o-mini",
+    temperature=0.75,
+    system_prompt=opik.Prompt(name="system_prompt", prompt="You are an AI assistant.")
+  )
+
+  cfg = client.get_agent_config(
+    fallback=FALLBACK_CONFIGURATION,
+    project_name="my-agent-name",
+    env="latest",
+  )
+
+  print(cfg.model)
+  print(cfg.temperature)
+  print(cfg.system_prompt)
+  ```
+
+  ```ts title="Typescript"
+  import Opik, { Prompt } from "opik";
+  import { z } from "zod";
+
+  const client = new Opik();
+
+  const MyAgentsConfiguration = z
+    .object({
+      model: z.string(),
+      temperature: z.number(),
+      system_prompt: z.instanceof(Prompt),
+    })
+    .describe("MyAgentsConfiguration");
+
+  const cfg = await client.getAgentConfigVersion(MyAgentsConfiguration, {
+    projectName: "my-agent-name",
+    env: "latest",
+    fallback: {
+      model: "gpt-4o-mini",
+      temperature: 0.75,
+      system_prompt: systemPrompt,
+    }
+  });
+
+  console.log(cfg.model);
+  console.log(cfg.temperature);
+  console.log(cfg.system_prompt);
+  ```
+</CodeBlocks>

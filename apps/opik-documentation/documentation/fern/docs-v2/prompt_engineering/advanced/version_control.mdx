@@ -1,0 +1,144 @@
+---
+headline: Version Control | Opik Documentation
+og:description: Learn how to create and manage Agent Configuration versions using
+  the Opik UI and SDK
+og:site_name: Opik Documentation
+og:title: Agent Configuration Version Control
+title: Version control
+---
+
+Every change to an Agent Configuration creates a new immutable version. Versions are numbered sequentially (`v1`, `v2`, `v3`, etc.) and cannot be modified after creation, giving you a complete audit trail of your agent's configuration history.
+
+You can create new versions from the Opik UI or programmatically using the SDK.
+
+## Creating a new version
+
+<Tabs>
+  <Tab title="Opik UI">
+    To create a new version from the Opik platform:
+
+    {/* TODO: Add screenshots for each step */}
+
+    1. Navigate to the **Agent Configuration** page for your agent
+    2. Click **Create new version**
+    3. Update the configuration parameters (prompts, model settings, tool definitions, etc.)
+    4. Click **Save** to create the new version
+
+    The new version will be available immediately and can be assigned to an environment label.
+  </Tab>
+  <Tab title="Python SDK">
+    Use `create_agent_config_version` to create a new version programmatically:
+
+    ```python
+    import opik
+    from typing import Annotated
+
+    client = opik.Opik()
+
+    class MyAgentsConfiguration(opik.AgentConfig):
+        model: Annotated[str, "LLM model to use for all LLM calls"]
+        temperature: Annotated[float, "Sampling temperature for LLM calls"]
+        system_prompt: Annotated[opik.Prompt, "System prompt for the agent"]
+
+    client.create_agent_config_version(
+      config=MyAgentsConfiguration(
+        model="gpt-4o",
+        temperature=0.5,
+        system_prompt=opik.Prompt(name="system_prompt", prompt="You are a coding assistant.")
+      ),
+      project_name="my-agent-name",
+    )
+    ```
+
+    Each call to `create_agent_config_version` creates a new version with the provided parameters.
+  </Tab>
+  <Tab title="TypeScript SDK">
+    Use `createAgentConfig` to create a new version programmatically:
+
+    ```ts
+    import Opik, { Prompt } from "opik";
+    import { z } from "zod";
+
+    const client = new Opik();
+
+    const MyAgentsConfiguration = z
+      .object({
+        model: z.string().describe("LLM model to use for all LLM calls"),
+        temperature: z.number().describe("Sampling temperature for LLM calls"),
+        system_prompt: z.instanceof(Prompt).describe("System prompt for the agent"),
+      })
+      .describe("MyAgentsConfiguration");
+
+    const systemPrompt = await client.createPrompt({
+      name: "system_prompt",
+      prompt: "You are a coding assistant.",
+    });
+
+    await client.createAgentConfig(
+      MyAgentsConfiguration,
+      {
+        model: "gpt-4o",
+        temperature: 0.5,
+        system_prompt: systemPrompt,
+      },
+      { projectName: "my-agent-name" }
+    );
+    ```
+
+    Each call to `createAgentConfig` creates a new version with the provided parameters.
+  </Tab>
+</Tabs>
+
+## Assigning environment labels
+
+After creating a version, you can assign an environment label to control which version your agent uses at runtime.
+
+<Tabs>
+  <Tab title="Opik UI">
+    1. Navigate to the **Agent Configuration** page for your agent
+    2. Find the version you want to promote
+    3. Click the **environment label** dropdown and select or create a label (e.g., `prod`, `staging`)
+
+    {/* TODO: Add screenshot of environment label assignment */}
+  </Tab>
+  <Tab title="Python SDK">
+    ```python
+    cfg = client.get_agent_config(
+      fallback=MyAgentsConfiguration(
+        model="gpt-4o-mini",
+        temperature=0.75,
+        system_prompt=opik.Prompt(name="system_prompt", prompt="You are an AI assistant.")
+      ),
+      project_name="my-agent-name",
+      env="prod",
+    )
+    ```
+
+    The `env` parameter controls which version is fetched:
+    - `prod`: The version labeled as production (default)
+    - `latest`: The most recently created version
+    - Custom labels: Any label you create in the UI (e.g., `staging`, `canary`)
+    - Specific version: A pinned version like `v3`
+  </Tab>
+  <Tab title="TypeScript SDK">
+    ```ts
+    const cfg = await client.getAgentConfigVersion(MyAgentsConfiguration, {
+      fallback: { model: "gpt-4o-mini", temperature: 0.75, system_prompt: systemPrompt },
+      projectName: "my-agent-name",
+      env: "prod",
+    });
+    ```
+
+    The `env` parameter controls which version is fetched:
+    - `prod`: The version labeled as production (default)
+    - `latest`: The most recently created version
+    - Custom labels: Any label you create in the UI (e.g., `staging`, `canary`)
+    - Specific version: A pinned version like `v3`
+  </Tab>
+</Tabs>
+
+## Comparing versions
+
+{/* TODO: Add screenshot of version comparison UI */}
+
+You can compare any two versions side-by-side in the Opik UI to see exactly what changed between them. This is useful for reviewing configuration changes before promoting a new version to production.
