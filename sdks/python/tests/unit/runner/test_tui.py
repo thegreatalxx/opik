@@ -179,8 +179,7 @@ class TestRestart:
         tui.child_restarted("file changed: src/agent.py")
         tui.stop()
         output = buf.getvalue()
-        assert "RESTARTING" in output
-        assert "file changed: src/agent.py" in output
+        assert "Restarting..." in output
 
     def test_child_restarted_clears_pending(self):
         tui, buf = _make_tui()

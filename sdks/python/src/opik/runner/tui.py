@@ -117,13 +117,8 @@ class RunnerTUI:
             self._pending_ops.clear()
 
         text = Text()
-        text.append(" \u2503", style="yellow")
-        text.append("")
+        text.append(f" \u2503  Restarting...", style="rgb(80,85,245)")
         self._print(text)
-
-        sep = Text()
-        sep.append(f" \u2503  === RESTARTING ({reason}) ===", style="yellow")
-        self._print(sep)
 
         self._update_live()
 
