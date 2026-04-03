@@ -1,0 +1,46 @@
+---
+headline: Playground | Opik Documentation
+og:description: Use the Opik Playground to interactively test and compare prompt variants across multiple LLM providers
+og:site_name: Opik Documentation
+og:title: Playground
+title: Playground
+---
+
+The Playground is an interactive environment within Opik for testing and iterating on prompts. It lets you create multiple prompt variants, run them side-by-side across different models, and compare outputs — all without writing any code.
+
+You can access the Playground from the left sidebar within any project.
+
+## Multi-variant testing
+
+The Playground supports creating multiple prompt variants in a side-by-side layout. Each variant has its own:
+
+- **Model and provider** — Choose from OpenAI, Anthropic, Gemini, OpenRouter, Vertex AI, or a custom endpoint
+- **Messages** — Add system, user, assistant, and tool messages
+- **Configuration** — Temperature, sampling parameters, and model-specific settings (e.g., thinking effort for reasoning models like Claude or o1/o3)
+
+This makes it easy to compare how different models or prompt phrasings perform on the same input.
+
+## Running prompts
+
+Click **Run** or press **Shift+Enter** to execute all prompt variants simultaneously. Results stream in real-time and include:
+
+- The model's response
+- Token usage (input and output tokens)
+- Latency
+- A link to the full trace for deeper inspection
+
+You can also run individual variants independently.
+
+## Testing on datasets
+
+For more systematic evaluation, you can bind the Playground to a dataset:
+
+1. Click **Test on Dataset** in the header
+2. Select a dataset and configure any variable mappings
+3. Run all prompt variants against every item in the dataset
+
+This generates experiments that you can review in the Experiments tab, with full tracing for each run. You can optionally attach evaluation rules to score the outputs automatically.
+
+## Template variables
+
+Prompt messages can include template variables using `{{variable_name}}` syntax. When you run a prompt, the Playground will ask you to fill in the values — or if you're in dataset mode, variables are automatically mapped to dataset columns.

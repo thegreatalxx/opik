@@ -7,9 +7,28 @@ title: Guaranteed availability
 ---
 
 Opik is a highly reliable platform and we dedicate significant effort to ensure that agent
-configurations are consistently served. However in the event of Opik not being available,
-you can configure a fallback configuration to use if Opik can't be reached:
+configurations are consistently served. The SDK provides two layers of protection against
+unavailability:
 
+## Caching layer
+
+The SDK automatically caches the last successfully fetched configuration in memory with a
+default TTL of **300 seconds (5 minutes)**. A background thread proactively refreshes stale
+cache entries before they expire, so your agent never blocks on a network call in steady state.
+
+If Opik is unreachable during a background refresh, the SDK silently keeps serving the
+last cached value — your agent continues running without interruption.
+
+You can tune the cache TTL by setting the `OPIK_CONFIG_TTL_SECONDS` environment variable:
+
+```bash
+OPIK_CONFIG_TTL_SECONDS=60  # refresh every minute
+```
+
+## Fallback configuration
+
+For the first call (cold start) or if the cache is empty and Opik is unreachable, you can
+provide a hardcoded fallback configuration that the SDK will use instead of raising an error:
 
 <CodeBlocks>
   ```python title="Python"
@@ -55,13 +74,18 @@ you can configure a fallback configuration to use if Opik can't be reached:
     })
     .describe("MyAgentsConfiguration");
 
+  const fallbackPrompt = await client.createPrompt({
+    name: "system_prompt",
+    prompt: "You are an AI assistant.",
+  });
+
   const cfg = await client.getAgentConfigVersion(MyAgentsConfiguration, {
     projectName: "my-agent-name",
     env: "latest",
     fallback: {
       model: "gpt-4o-mini",
       temperature: 0.75,
-      system_prompt: systemPrompt,
+      system_prompt: fallbackPrompt,
     }
   });
 

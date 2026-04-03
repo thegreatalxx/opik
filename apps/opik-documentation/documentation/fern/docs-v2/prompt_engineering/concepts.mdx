@@ -42,6 +42,15 @@ Supported environment values:
 
 This means you can update your agent's behavior in production by simply moving the `prod` label to a new version in the UI — no redeployment required.
 
+## Fallback configuration
+
+Every call to `get_agent_config` / `getAgentConfigVersion` requires a `fallback` value. This is the configuration your agent uses when:
+
+- **Cold start**: The first time your agent runs and no cached value exists yet
+- **Opik unreachable**: If Opik can't be reached and there is no cached value to serve
+
+The SDK caches fetched configurations in memory (default TTL: 5 minutes) and refreshes them in the background, so the fallback is rarely needed in practice. See [Guaranteed availability](/prompt_engineering/advanced/guaranteed-availability) for details.
+
 ## Configuration types
 
 Each field in an Agent Configuration has a type that determines how it is stored and versioned:

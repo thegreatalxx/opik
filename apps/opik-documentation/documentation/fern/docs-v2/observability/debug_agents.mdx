@@ -1,0 +1,84 @@
+---
+headline: Debugging Agents with Ollie | Opik Documentation
+og:description: Debug and improve your agents with Opik traces and Ollie, an AI assistant
+  that has full access to your logged data and agent
+og:site_name: Opik Documentation
+og:title: Debugging Agents with Ollie — Opik
+title: Debugging agents with Ollie
+---
+
+Shipping an agent is just the beginning. In practice, you'll spend significant time investigating why a particular response was wrong, why latency spiked, or why a tool call failed. Opik gives you the traces; **Ollie** gives you an AI assistant that can reason over them alongside you.
+
+## Ollie
+
+Ollie is a conversational AI agent built into Opik. It has simultaneous access to:
+
+- **Your Opik workspace** — every trace, span, thread, dataset, experiment, and prompt you've logged
+- **Your agent** — it can run your agent, call tools on its behalf, create evaluation datasets, and trigger evaluation runs
+
+This means you can have a conversation like: *"Why did this trace fail?"* and Ollie will read the trace, walk through the spans, identify the problematic step, and suggest a fix — all without leaving Opik.
+
+## The debugging loop
+
+The recommended workflow for systematically improving agent quality:
+
+<Steps>
+
+### View the trace
+
+Start in the Opik dashboard. Find the trace you want to investigate — filter by project, date range, error status, or feedback score. Click into a trace to see the full span tree: every LLM call, tool invocation, retrieval step, and their inputs, outputs, latencies, and costs.
+
+### Analyze with Ollie
+
+Open Ollie from the trace view and describe what looks wrong. Ollie reads the trace and all its spans in full, then reasons over the data to identify root causes.
+
+Example prompts:
+- *"Why did the final answer ignore the retrieved context?"*
+- *"Which span caused the latency spike?"*
+- *"Compare this failed trace to a recent successful one"*
+
+Ollie can scan across multiple traces, aggregate patterns, and run arbitrary queries against your workspace data to surface systemic issues, not just one-off failures.
+
+### Add to an evaluation suite
+
+Once you understand the failure, turn it into a test case so the problem can't silently regress. Ask Ollie to add the trace to an evaluation suite with an assertion that captures the expected behavior:
+
+*"Add this trace to my customer-support-qa suite with the assertion: the response must cite a specific step from the provided context"*
+
+Ollie creates the test item directly — no copy-pasting required.
+
+### Make changes to your agent
+
+Fix the root cause. Depending on what you found:
+
+- **Prompt issue** — update via [Agent Configuration](/prompt_engineering/getting-started), which versions your prompts and lets you roll out changes without redeploying
+- **Logic issue** — edit your agent code and redeploy
+- **Tool or retrieval issue** — adjust the tool definition, retrieval parameters, or post-processing
+
+### Test against the evaluation suite
+
+Run the evaluation suite against the updated agent to verify the fix works and nothing else regressed:
+
+```python
+result = suite.run(task=my_agent_task)
+print(f"Pass rate: {result.pass_rate:.0%}")
+```
+
+Ollie can trigger this run for you and summarize the results directly in the chat.
+
+### Repeat
+
+Each cycle tightens the feedback loop: new traces reveal new failure modes, which become new test cases, which drive improvements. Over time your evaluation suite becomes a comprehensive regression guard for your agent.
+
+</Steps>
+
+## What Ollie can do
+
+| Capability | Example |
+|------------|---------|
+| Read and analyze any trace or span | *"What did the retrieval step return for this query?"* |
+| Search across your workspace | *"Find all traces where the tool call timed out this week"* |
+| Add items to evaluation suites | *"Add this to my suite with assertion: response must be under 3 sentences"* |
+| Run evaluation suites | *"Run the customer-support-qa suite against the updated prompt"* |
+| Navigate to any resource | *"Show me the dataset for the last experiment"* |
+| Explain results | *"Why did 3 of the 5 items in this run fail?"* |

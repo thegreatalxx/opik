@@ -1,0 +1,64 @@
+---
+headline: Agent Sandbox | Opik Documentation
+og:description: Run agents locally while connected to Opik for full tracing, debugging, and observability
+og:site_name: Opik Documentation
+og:title: Agent Sandbox
+title: Agent sandbox
+---
+
+The Agent Sandbox lets you run agents on your local machine while connected to Opik. Every agent execution is fully traced — you get LLM calls, latencies, token usage, and the complete execution graph, all visible in the Opik UI.
+
+This is useful during development when you want to iterate on your agent locally but still get the full observability that Opik provides.
+
+## How it works
+
+1. **Generate a pairing code** — In the Opik UI, navigate to your project and open the Agent Sandbox page. Click to generate a pairing code.
+2. **Connect your local runner** — Run your agent script with the `opik connect` CLI command, passing the pairing code.
+3. **Agents are registered** — Opik automatically detects your agent functions and registers them, including their parameter definitions.
+4. **Run from the UI** — Submit jobs from the Opik UI with the inputs you want to test. Results, logs, and traces appear in real-time.
+
+## Getting started
+
+### 1. Mark your agent as an entrypoint
+
+Use the `@opik.track` decorator with `entrypoint=True` on your agent's main function. Opik will automatically detect the function signature and register it as a runnable agent.
+
+```python
+import opik
+
+@opik.track(entrypoint=True, project_name="my-agent")
+def my_agent(query: str, max_results: int = 5) -> str:
+    """Answer user questions using a retrieval pipeline."""
+    # Your agent logic here
+    return result
+```
+
+Parameter types are inferred from Python type hints (`str`, `int`, `float`, `bool`) and displayed as input fields in the UI.
+
+### 2. Connect to Opik
+
+Generate a pairing code from the Agent Sandbox page in the UI, then run:
+
+```bash
+opik connect --pair <PAIRING_CODE> python3 my_agent.py
+```
+
+This starts your script with the runner active. The CLI exchanges the pairing code for credentials, registers your agents, and begins polling for jobs.
+
+You can also provide a custom runner name:
+
+```bash
+opik connect --pair <PAIRING_CODE> --name my-dev-machine python3 my_agent.py
+```
+
+### 3. Submit jobs
+
+Once connected, the UI shows your runner and its registered agents. Select an agent, fill in the input parameters, and click **Run**. The agent executes locally on your machine, and the results — along with the full trace — appear in the UI.
+
+## Features
+
+- **Full tracing** — Every LLM call, tool invocation, and sub-step is captured as spans in a trace
+- **Real-time logs** — Stream logs from your running agent directly to the UI
+- **Job management** — Cancel running jobs from the UI
+- **Heartbeat monitoring** — Opik detects when a runner disconnects and updates the status automatically
+- **Type-safe inputs** — Parameters are validated and cast to the correct types before execution

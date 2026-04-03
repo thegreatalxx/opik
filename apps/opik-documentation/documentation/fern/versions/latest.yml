@@ -19,10 +19,6 @@ tabs:
     display-name: SDK & API reference
     icon: fa-regular fa-square-terminal
     slug: /reference
-  opik-university:
-    display-name: Opik University
-    icon: fa-regular fa-graduation-cap
-    slug: /opik-university
 navigation:
   - tab: documentation
     layout:
@@ -61,6 +57,12 @@ navigation:
           - page: Concepts
             path: ../docs/tracing/concepts.mdx
             slug: concepts
+          - page: Debugging agents with Ollie
+            path: ../docs-v2/observability/debug_agents.mdx
+            slug: debug-agents
+          - page: Agent sandbox
+            path: ../docs-v2/observability/agent_sandbox.mdx
+            slug: agent-sandbox
           - section: Advanced
             slug: /advanced
             contents:
@@ -70,31 +72,24 @@ navigation:
               - page: Log conversations
                 path: ../docs/tracing/log_chat_conversations.mdx
                 slug: log_chat_conversations
-              - page: Log user feedback
-                path: ../docs/tracing/annotate_traces.mdx
-                slug: annotate_traces
               - page: Log media & attachments
                 path: ../docs/tracing/log_multimodal_traces.mdx
                 slug: log_multimodal_traces
-              - page: Cost tracking
-                path: ../docs/tracing/cost_tracking.mdx
-                slug: cost_tracking
-              - section: Manage data
-                skip-slug: true
-                collapsed: true
-                contents:
-                  - page: Export by SDK, REST, and UI
-                    path: ../docs/tracing/export_data.mdx
-                    slug: export_data
-                  - page: Import/Export by command line
-                    path: ../docs/tracing/import_export_commands.mdx
-                    slug: import_export_commands
               - page: Log Agent Graphs
                 path: ../docs/tracing/log_agent_graph.mdx
                 slug: log_agent_graphs
               - page: Log distributed traces
                 path: ../docs/tracing/log_distributed_traces.mdx
                 slug: log_distributed_traces
+              - page: Log user feedback
+                path: ../docs/tracing/annotate_traces.mdx
+                slug: annotate_traces
+              - page: Cost tracking
+                path: ../docs/tracing/cost_tracking.mdx
+                slug: cost_tracking
+              - page: Export data
+                path: ../docs-v2/observability/export_data.mdx
+                slug: export-data
               - page: SDK configuration
                 path: ../docs/tracing/sdk_configuration.mdx
                 slug: sdk_configuration
@@ -113,15 +108,12 @@ navigation:
           - page: Concepts
             path: ../docs-v2/evaluation/concepts.mdx
             slug: concepts
-          - page: Evaluation Suites
-            path: ../docs-v2/evaluation/evaluation_suites.mdx
-            slug: evaluation-suites
-          - page: Manage Evaluation Suites
-            path: ../docs-v2/evaluation/manage_evaluation_suites.mdx
-            slug: manage-evaluation-suites
           - section: Advanced
             slug: /advanced
             contents:
+              - page: Building Evaluation Suites
+                path: ../docs-v2/evaluation/building_evaluation_suites.mdx
+                slug: building-evaluation-suites
               - page: Datasets & Experiments
                 path: ../docs/evaluation/evaluate_your_llm.mdx
                 slug: evaluate_your_llm
@@ -255,6 +247,9 @@ navigation:
               - page: Guaranteed availability
                 path: ../docs-v2/prompt_engineering/advanced/guaranted_availability.mdx
                 slug: guaranteed-availability
+              - page: Playground
+                path: ../docs-v2/prompt_engineering/advanced/playground.mdx
+                slug: playground
       - section: Production
         slug: /production
         contents:
