@@ -79,6 +79,7 @@ public class ExperimentAggregatesSubscriber extends BaseRedisSubscriber<Experime
 
         var action = Mono.defer(() -> experimentAggregatesService.populateAggregations(message.experimentId()))
                 .timeout(config.getAggregationLockTime().toJavaDuration())
+                .then(Mono.defer(() -> resetRetryCounter(message)))
                 .contextWrite(context -> context
                         .put(USER_NAME, message.userName())
                         .put(WORKSPACE_ID, message.workspaceId()));
@@ -91,7 +92,6 @@ public class ExperimentAggregatesSubscriber extends BaseRedisSubscriber<Experime
                         message.experimentId(), message.workspaceId())),
                 config.getAggregationLockTime().toJavaDuration(),
                 config.getLockAcquireWait().toJavaDuration())
-                .then(Mono.defer(() -> resetRetryCounter(message)))
                 .onErrorResume(TimeoutException.class, e -> {
                     log.warn(
                             "Aggregation for experiment '{}' in workspace '{}' was cancelled after exceeding the lock TTL '{}ms'. Re-triggering via debounce.",
@@ -103,8 +103,8 @@ public class ExperimentAggregatesSubscriber extends BaseRedisSubscriber<Experime
                         "Finished processing experiment aggregates for experimentId: '{}'",
                         message.experimentId()))
                 .doOnError(error -> log.error(
-                        "Error processing experiment aggregates for experimentId: '{}'",
-                        message.experimentId(), error));
+                        "Error processing experiment aggregates for experimentId: '{}' in workspace '{}'",
+                        message.experimentId(), message.workspaceId(), error));
     }
 
     private Mono<Void> retriggerIfBelowMaxRetries(ExperimentAggregationMessage message) {
