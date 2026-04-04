@@ -90,7 +90,9 @@ public interface ExperimentAggregatesDAO {
 
     Mono<Void> populateExperimentAggregate(UUID experimentId);
 
-    Mono<BatchResult> populateExperimentItemAggregates(UUID experimentId, UUID cursor, int limit);
+    Mono<UUID> getProjectId(UUID experimentId);
+
+    Mono<BatchResult> populateExperimentItemAggregates(UUID experimentId, UUID projectId, UUID cursor, int limit);
 
     Mono<Experiment> getExperimentFromAggregates(UUID experimentId);
 
@@ -636,18 +638,9 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
             """;
 
     /**
-     * Get trace data for experiment items with cursor
+     * Get trace data for experiment items batch identified by trace_ids
      */
     private static final String GET_TRACES_DATA = """
-            WITH experiment_items AS (
-                SELECT DISTINCT trace_id
-                FROM experiment_items FINAL
-                WHERE workspace_id = :workspace_id
-                AND experiment_id = :experiment_id
-                <if(cursor)>AND id > :cursor<endif>
-                ORDER BY id ASC
-                LIMIT :limit
-            )
             SELECT
                 id as trace_id,
                 project_id,
@@ -661,24 +654,15 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
             FROM traces FINAL
             WHERE workspace_id = :workspace_id
             AND project_id = :project_id
-            AND id IN (SELECT trace_id FROM experiment_items)
+            AND id IN :trace_ids
             SETTINGS log_comment = '<log_comment>'
             ;
             """;
 
     /**
-     * Get span data for experiment items with cursor
+     * Get span data for experiment items batch identified by trace_ids
      */
     private static final String GET_SPANS_DATA = """
-            WITH experiment_items AS (
-                SELECT DISTINCT trace_id
-                FROM experiment_items FINAL
-                WHERE workspace_id = :workspace_id
-                AND experiment_id = :experiment_id
-                <if(cursor)>AND id > :cursor<endif>
-                ORDER BY id ASC
-                LIMIT :limit
-            )
             SELECT
                 trace_id,
                 sumMap(usage) as usage,
@@ -686,25 +670,17 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
             FROM spans FINAL
             WHERE workspace_id = :workspace_id
             AND project_id = :project_id
-            AND trace_id IN (SELECT trace_id FROM experiment_items)
+            AND trace_id IN :trace_ids
             GROUP BY trace_id
             SETTINGS log_comment = '<log_comment>'
             ;
             """;
 
     /**
-     * Get feedback scores for experiment items with cursor
+     * Get feedback scores for experiment items batch identified by trace_ids
      */
     private static final String GET_FEEDBACK_SCORES_DATA = """
-            WITH experiment_items AS (
-                SELECT DISTINCT trace_id
-                FROM experiment_items FINAL
-                WHERE workspace_id = :workspace_id
-                AND experiment_id = :experiment_id
-                <if(cursor)>AND id > :cursor<endif>
-                ORDER BY id ASC
-                LIMIT :limit
-            ), feedback_scores_combined_raw AS (
+            WITH feedback_scores_combined_raw AS (
                 SELECT
                     workspace_id,
                     project_id,
@@ -723,7 +699,7 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
                 WHERE entity_type = 'trace'
                 AND workspace_id = :workspace_id
                 AND project_id = :project_id
-                AND entity_id IN (SELECT trace_id FROM experiment_items)
+                AND entity_id IN :trace_ids
                 UNION ALL
                 SELECT
                     workspace_id,
@@ -743,7 +719,7 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
                 WHERE entity_type = 'trace'
                 AND workspace_id = :workspace_id
                 AND project_id = :project_id
-                AND entity_id IN (SELECT trace_id FROM experiment_items)
+                AND entity_id IN :trace_ids
             ), feedback_scores_with_ranking AS (
                 SELECT workspace_id,
                        project_id,
@@ -846,18 +822,9 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
             """;
 
     /**
-     * Get comments for experiment items with cursor
+     * Get comments for experiment items batch identified by trace_ids
      */
     private static final String GET_COMMENTS_DATA = """
-            WITH experiment_items AS (
-                SELECT DISTINCT trace_id
-                FROM experiment_items FINAL
-                WHERE workspace_id = :workspace_id
-                AND experiment_id = :experiment_id
-                <if(cursor)>AND id > :cursor<endif>
-                ORDER BY id ASC
-                LIMIT :limit
-            )
             SELECT
                 entity_id AS trace_id,
                 toJSONString(groupUniqArray(CAST(tuple(
@@ -889,7 +856,7 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
                 FROM comments
                 WHERE workspace_id = :workspace_id
                 AND project_id = :project_id
-                AND entity_id IN (SELECT trace_id FROM experiment_items)
+                AND entity_id IN :trace_ids
                 ORDER BY (workspace_id, project_id, entity_id, id) DESC, last_updated_at DESC
                 LIMIT 1 BY id
             )
@@ -899,18 +866,9 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
             """;
 
     /**
-     * Get assertions data per trace for experiment items (paginated)
+     * Get assertions data per trace for experiment items batch identified by trace_ids
      */
     private static final String GET_ASSERTIONS_DATA = """
-            WITH experiment_items AS (
-                SELECT DISTINCT trace_id
-                FROM experiment_items FINAL
-                WHERE workspace_id = :workspace_id
-                AND experiment_id = :experiment_id
-                <if(cursor)>AND id > :cursor<endif>
-                ORDER BY id ASC
-                LIMIT :limit
-            )
             SELECT
                 entity_id AS trace_id,
                 toJSONString(
@@ -925,7 +883,7 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
             WHERE entity_type = 'trace'
               AND workspace_id = :workspace_id
               AND project_id = :project_id
-              AND entity_id IN (SELECT trace_id FROM experiment_items)
+              AND entity_id IN :trace_ids
             GROUP BY entity_id
             SETTINGS log_comment = '<log_comment>'
             ;
@@ -1552,7 +1510,8 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
     }
 
     @Override
-    public Mono<BatchResult> populateExperimentItemAggregates(UUID experimentId, UUID cursorId, int limit) {
+    public Mono<BatchResult> populateExperimentItemAggregates(UUID experimentId, UUID projectId, UUID cursorId,
+            int limit) {
 
         return Mono.deferContextual(ctx -> {
             String workspaceId = ctx.get(RequestContext.WORKSPACE_ID);
@@ -1564,38 +1523,32 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
                             return Mono.just(new BatchResult(0L, null));
                         }
 
-                        // Get the last cursor from the batch
                         var lastCursor = items.getLast().id();
+                        var traceIds = items.stream().map(ExperimentItemData::traceId).toList();
 
-                        // Get project_id first, then fetch data using subqueries (no trace IDs list)
-                        return getProjectId(experimentId)
-                                .flatMap(projectId -> Mono.zip(
-                                        getTracesData(workspaceId, experimentId, projectId, cursorId, limit)
-                                                .collectList(),
-                                        getSpansData(workspaceId, experimentId, projectId, cursorId, limit)
-                                                .collectList(),
-                                        getFeedbackScoresData(workspaceId, experimentId, projectId, cursorId, limit)
-                                                .collectList(),
-                                        getCommentsData(workspaceId, experimentId, projectId, cursorId, limit)
-                                                .collectList(),
-                                        getAssertionsData(workspaceId, experimentId, projectId, cursorId, limit)
-                                                .collectList())
-                                        .flatMap(tuple -> {
-                                            var tracesData = tuple.getT1();
-                                            var spansData = tuple.getT2();
-                                            var feedbackData = tuple.getT3();
-                                            var commentsData = tuple.getT4();
-                                            var assertionsData = tuple.getT5();
+                        return Mono.zip(
+                                getTracesData(workspaceId, experimentId, projectId, traceIds).collectList(),
+                                getSpansData(workspaceId, experimentId, projectId, traceIds).collectList(),
+                                getFeedbackScoresData(workspaceId, experimentId, projectId, traceIds).collectList(),
+                                getCommentsData(workspaceId, experimentId, projectId, traceIds).collectList(),
+                                getAssertionsData(workspaceId, experimentId, projectId, traceIds).collectList())
+                                .flatMap(tuple -> {
+                                    var tracesData = tuple.getT1();
+                                    var spansData = tuple.getT2();
+                                    var feedbackData = tuple.getT3();
+                                    var commentsData = tuple.getT4();
+                                    var assertionsData = tuple.getT5();
 
-                                            return insertExperimentItemAggregates(
-                                                    projectId,
-                                                    items,
-                                                    tracesData,
-                                                    spansData,
-                                                    feedbackData,
-                                                    commentsData,
-                                                    assertionsData).map(count -> new BatchResult(count, lastCursor));
-                                        }));
+                                    return insertExperimentItemAggregates(
+                                            projectId,
+                                            items,
+                                            tracesData,
+                                            spansData,
+                                            feedbackData,
+                                            commentsData,
+                                            assertionsData)
+                                            .map(ignored -> new BatchResult(items.size(), lastCursor));
+                                });
                     });
         });
     }
@@ -1614,7 +1567,8 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
         }).singleOrEmpty());
     }
 
-    private Mono<UUID> getProjectId(UUID experimentId) {
+    @Override
+    public Mono<UUID> getProjectId(UUID experimentId) {
         return asyncTemplate.nonTransaction(connection -> makeFluxContextAware((userName, workspaceId) -> {
             var template = getSTWithLogComment(GET_PROJECT_ID,
                     "getProjectId", workspaceId, userName, experimentId.toString());
@@ -1811,44 +1765,22 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
         }));
     }
 
-    /**
-     * Helper method to execute paginated queries with cursor-based pagination.
-     * Eliminates boilerplate for binding workspace_id, experiment_id, project_id, limit, and optional cursor.
-     *
-     * @param sqlTemplate   SQL template constant
-     * @param methodName    Method name for log comment
-     * @param workspaceId   Workspace ID
-     * @param experimentId  Experiment ID
-     * @param projectId     Project ID
-     * @param cursor        Optional cursor for pagination
-     * @param limit         Page size limit
-     * @param rowMapper     Function to map result row to target type
-     * @param <T>           Return type
-     * @return Flux of mapped results
-     */
-    private <T> Flux<T> streamWithExperimentPagination(
+    private <T> Flux<T> streamWithTraceIds(
             String sqlTemplate,
             String methodName,
             String workspaceId,
             UUID experimentId,
             UUID projectId,
-            UUID cursor,
-            int limit,
+            List<UUID> traceIds,
             Function<Row, T> rowMapper) {
 
         return asyncTemplate.stream(connection -> {
-            var template = getSTWithLogComment(sqlTemplate, methodName, workspaceId, "", experimentId.toString())
-                    .add("cursor", cursor != null);
+            var template = getSTWithLogComment(sqlTemplate, methodName, workspaceId, "", experimentId.toString());
 
             var statement = connection.createStatement(template.render())
                     .bind("workspace_id", workspaceId)
-                    .bind("experiment_id", experimentId)
                     .bind("project_id", projectId)
-                    .bind("limit", limit);
-
-            if (cursor != null) {
-                statement.bind("cursor", cursor);
-            }
+                    .bind("trace_ids", traceIds.toArray(UUID[]::new));
 
             return Flux.from(statement.execute())
                     .flatMap(result -> result.map((row, metadata) -> rowMapper.apply(row)));
@@ -1856,68 +1788,33 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
     }
 
     private Flux<TraceData> getTracesData(String workspaceId, UUID experimentId, UUID projectId,
-            UUID cursor, int limit) {
-        return streamWithExperimentPagination(
-                GET_TRACES_DATA,
-                "getTracesData",
-                workspaceId,
-                experimentId,
-                projectId,
-                cursor,
-                limit,
+            List<UUID> traceIds) {
+        return streamWithTraceIds(GET_TRACES_DATA, "getTracesData", workspaceId, experimentId, projectId, traceIds,
                 this::mapTraceData);
     }
 
     private Flux<SpanData> getSpansData(String workspaceId, UUID experimentId, UUID projectId,
-            UUID cursor, int limit) {
-        return streamWithExperimentPagination(
-                GET_SPANS_DATA,
-                "getSpansData",
-                workspaceId,
-                experimentId,
-                projectId,
-                cursor,
-                limit,
+            List<UUID> traceIds) {
+        return streamWithTraceIds(GET_SPANS_DATA, "getSpansData", workspaceId, experimentId, projectId, traceIds,
                 this::mapSpanData);
     }
 
     private Flux<FeedbackScoreData> getFeedbackScoresData(String workspaceId, UUID experimentId, UUID projectId,
-            UUID cursor, int limit) {
-        return streamWithExperimentPagination(
-                GET_FEEDBACK_SCORES_DATA,
-                "getFeedbackScoresData",
-                workspaceId,
-                experimentId,
-                projectId,
-                cursor,
-                limit,
-                this::mapFeedbackScoreData);
+            List<UUID> traceIds) {
+        return streamWithTraceIds(GET_FEEDBACK_SCORES_DATA, "getFeedbackScoresData", workspaceId, experimentId,
+                projectId, traceIds, this::mapFeedbackScoreData);
     }
 
     private Flux<CommentsData> getCommentsData(String workspaceId, UUID experimentId, UUID projectId,
-            UUID cursor, int limit) {
-        return streamWithExperimentPagination(
-                GET_COMMENTS_DATA,
-                "getCommentsData",
-                workspaceId,
-                experimentId,
-                projectId,
-                cursor,
-                limit,
+            List<UUID> traceIds) {
+        return streamWithTraceIds(GET_COMMENTS_DATA, "getCommentsData", workspaceId, experimentId, projectId, traceIds,
                 this::mapCommentsData);
     }
 
     private Flux<AssertionData> getAssertionsData(String workspaceId, UUID experimentId, UUID projectId,
-            UUID cursor, int limit) {
-        return streamWithExperimentPagination(
-                GET_ASSERTIONS_DATA,
-                "getAssertionsData",
-                workspaceId,
-                experimentId,
-                projectId,
-                cursor,
-                limit,
-                this::mapAssertionData);
+            List<UUID> traceIds) {
+        return streamWithTraceIds(GET_ASSERTIONS_DATA, "getAssertionsData", workspaceId, experimentId, projectId,
+                traceIds, this::mapAssertionData);
     }
 
     private Mono<String> getCommentsAggregation(UUID experimentId, UUID projectId) {
