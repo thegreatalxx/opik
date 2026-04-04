@@ -151,6 +151,28 @@ class ExperimentAggregatesSubscriberTest {
 
             verify(publisher, never()).publish(any(), any(), any());
             verify(experimentAggregatesService, never()).populateAggregations(any());
+            verify(atomicLong, never()).delete();
+        }
+
+        @Test
+        void processEventShouldNotResetRetryCounterWhenLockNotAcquired() {
+            var experimentId = UUID.randomUUID();
+            var message = ExperimentAggregationMessage.builder()
+                    .experimentId(experimentId)
+                    .workspaceId(UUID.randomUUID().toString())
+                    .userName("system")
+                    .build();
+
+            // Simulate lock already held by another node: bestEffortLock runs the skip Mono (Mono.empty)
+            when(lockService.bestEffortLock(any(Lock.class), any(), any(), any(), any()))
+                    .thenReturn(Mono.empty());
+
+            StepVerifier.create(subscriber.processEvent(message))
+                    .verifyComplete();
+
+            // resetRetryCounter must NOT run when the lock was not acquired — otherwise
+            // this node would wipe a counter that belongs to the node currently holding the lock
+            verify(atomicLong, never()).delete();
         }
 
         @Test
