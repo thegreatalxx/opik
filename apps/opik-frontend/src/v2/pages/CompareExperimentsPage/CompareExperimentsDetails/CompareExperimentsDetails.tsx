@@ -106,7 +106,7 @@ const CompareExperimentsDetails: React.FunctionComponent<
             resource={RESOURCE_TYPE.experiment}
           />
         )}
-        {experiment?.dataset_name && (
+        {experiment?.dataset_id && (
           <Tag
             size="md"
             variant="transparent"
@@ -117,7 +117,7 @@ const CompareExperimentsDetails: React.FunctionComponent<
               style={{ color: "var(--color-yellow)" }}
             />
             <span className="comet-body-s-accented truncate text-muted-slate">
-              {experiment.dataset_name}
+              {experiment.dataset_name || "Deleted evaluation suite"}
             </span>
           </Tag>
         )}
