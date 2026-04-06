@@ -2050,13 +2050,22 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
         Map<UUID, AssertionData> assertionsMap = assertionsData.stream()
                 .collect(Collectors.toMap(AssertionData::traceId, Function.identity()));
 
+        // Skip items whose traces were deleted to preserve existing aggregate data
+        List<ExperimentItemData> itemsWithTraces = items.stream()
+                .filter(item -> tracesMap.containsKey(item.traceId()))
+                .toList();
+
+        if (itemsWithTraces.isEmpty()) {
+            return Mono.just(0L);
+        }
+
         return asyncTemplate.nonTransaction(connection -> {
             return makeMonoContextAware((userName, workspaceId) -> {
 
-                List<TemplateUtils.QueryItem> queryItems = getQueryItemPlaceHolder(items.size());
+                List<TemplateUtils.QueryItem> queryItems = getQueryItemPlaceHolder(itemsWithTraces.size());
 
                 var template = getSTWithLogComment(INSERT_EXPERIMENT_ITEM_AGGREGATE,
-                        "insertExperimentItemAggregate", workspaceId, userName, items.size())
+                        "insertExperimentItemAggregate", workspaceId, userName, itemsWithTraces.size())
                         .add("items", queryItems);
 
                 var statement = connection.createStatement(template.render())
@@ -2064,7 +2073,8 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
                         .bind("project_id", projectId);
 
                 // Bind item parameters in batch
-                bindItemsParameters(statement, items, tracesMap, spansMap, feedbackMap, commentsMap, assertionsMap);
+                bindItemsParameters(statement, itemsWithTraces, tracesMap, spansMap, feedbackMap, commentsMap,
+                        assertionsMap);
 
                 return Mono.from(statement.execute())
                         .flatMapMany(Result::getRowsUpdated)

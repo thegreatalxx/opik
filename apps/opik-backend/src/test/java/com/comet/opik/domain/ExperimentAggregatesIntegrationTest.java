@@ -2267,6 +2267,73 @@ class ExperimentAggregatesIntegrationTest {
     }
 
     @Test
+    @DisplayName("Experiment item aggregates are preserved when trace is deleted after aggregation")
+    void experimentItemAggregatesPreservedAfterTraceDeletion() {
+        var project = createProject(API_KEY, TEST_WORKSPACE);
+        var dataset = createDataset(API_KEY, TEST_WORKSPACE);
+
+        var experiment = experimentResourceClient.createPartialExperiment()
+                .datasetId(dataset.id())
+                .datasetName(dataset.name())
+                .evaluationMethod(EvaluationMethod.EVALUATION_SUITE)
+                .build();
+        experimentResourceClient.create(experiment, API_KEY, TEST_WORKSPACE);
+
+        List<String> feedbackScoreNames = PodamFactoryUtils.manufacturePojoList(factory, String.class);
+        var experimentItems = createExperimentItemWithData(
+                experiment.id(), dataset.id(), project.name(),
+                feedbackScoreNames, API_KEY, TEST_WORKSPACE);
+
+        var traceId = experimentItems.getFirst().traceId();
+
+        // Populate aggregates (copies trace data to experiment_item_aggregates)
+        experimentAggregatesService.populateAggregations(experiment.id())
+                .contextWrite(ctx -> ctx
+                        .put(RequestContext.USER_NAME, USER)
+                        .put(RequestContext.WORKSPACE_ID, WORKSPACE_ID))
+                .block();
+
+        // Query BEFORE trace deletion to capture expected data
+        var streamRequest = ExperimentItemStreamRequest.builder()
+                .experimentName(experiment.name())
+                .build();
+        var beforeDeletion = experimentResourceClient.streamExperimentItems(streamRequest, API_KEY, TEST_WORKSPACE);
+        assertThat(beforeDeletion).isNotEmpty();
+        var beforeItem = beforeDeletion.stream()
+                .filter(i -> traceId.equals(i.traceId()))
+                .findFirst()
+                .orElseThrow();
+        assertThat(beforeItem.input()).isNotNull();
+        assertThat(beforeItem.output()).isNotNull();
+
+        // Delete the trace
+        traceResourceClient.deleteTrace(traceId, TEST_WORKSPACE, API_KEY);
+
+        // Re-aggregate (this would overwrite good data with empty data before the fix)
+        experimentAggregatesService.populateAggregations(experiment.id())
+                .contextWrite(ctx -> ctx
+                        .put(RequestContext.USER_NAME, USER)
+                        .put(RequestContext.WORKSPACE_ID, WORKSPACE_ID))
+                .block();
+
+        // Query AFTER trace deletion + re-aggregation: data must still be present
+        var afterDeletion = experimentResourceClient.streamExperimentItems(streamRequest, API_KEY, TEST_WORKSPACE);
+        assertThat(afterDeletion).isNotEmpty();
+        var afterItem = afterDeletion.stream()
+                .filter(i -> traceId.equals(i.traceId()))
+                .findFirst()
+                .orElseThrow();
+
+        assertThat(afterItem)
+                .as("experiment item data must be preserved after trace deletion and re-aggregation")
+                .usingRecursiveComparison()
+                .ignoringFields(IGNORED_FIELDS_EXPERIMENT_ITEM)
+                .ignoringCollectionOrderInFields("feedbackScores", "assertionResults")
+                .withComparatorForType(StatsUtils::bigDecimalComparator, BigDecimal.class)
+                .isEqualTo(beforeItem);
+    }
+
+    @Test
     @DisplayName("DatasetItemVersionDAO has_aggregated branch: assertionResults in dataset items view are preserved after aggregation")
     void assertionResultsInDatasetItemsArePreservedAfterAggregation() {
         var project = createProject(API_KEY, TEST_WORKSPACE);
