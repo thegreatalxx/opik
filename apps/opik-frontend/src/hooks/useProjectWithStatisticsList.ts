@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { keepPreviousData, UseQueryOptions } from "@tanstack/react-query";
 import { Sorting } from "@/types/sorting";
-import { Filter } from "@/types/filters";
+import { LOGS_SOURCE } from "@/types/traces";
 import { ProjectStatistic, ProjectWithStatistic } from "@/types/projects";
 import useProjectsList from "@/api/projects/useProjectsList";
 import useProjectStatisticsList from "@/api/projects/useProjectStatisticList";
@@ -12,7 +12,7 @@ type UseProjectWithStatisticsParams = {
   sorting?: Sorting;
   page: number;
   size: number;
-  additionalFilters?: Filter[];
+  logsSource?: LOGS_SOURCE;
 };
 
 type UseProjectWithStatisticsResponse = {
@@ -42,7 +42,6 @@ export default function useProjectWithStatisticsList(
   const { data: projectsStatisticData } = useProjectStatisticsList(
     {
       ...params,
-      additionalFilters: params.additionalFilters,
     },
     {
       ...config,
