@@ -4,6 +4,12 @@ on:
   pull_request:
     paths:
         - 'apps/opik-documentation/documentation/**'
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: 'Branch to generate docs preview for'
+        required: true
+        type: string
 
 
 concurrency:
@@ -17,6 +23,8 @@ jobs:
         steps:
             - name: Checkout repository
               uses: actions/checkout@v6
+              with:
+                ref: ${{ github.event.inputs.branch || github.ref }}
                 
             - name: Install Fern
               run: npm install -g fern-api@0.64.26
@@ -75,7 +83,15 @@ jobs:
                 echo "📌 Results for commit ${{ github.sha }}" >> preview_url.txt
 
             - name: Comment URL in PR
+              if: github.event_name == 'pull_request'
               uses: thollander/actions-comment-pull-request@v3
               with:
                   file-path: apps/opik-documentation/documentation/preview_url.txt
                   comment-tag: docs-preview
+
+            - name: Print preview URL
+              if: github.event_name == 'workflow_dispatch'
+              run: |
+                echo "## Documentation Preview"
+                echo "Preview URL: ${{ steps.generate-docs.outputs.URL }}"
+                cat apps/opik-documentation/documentation/preview_url.txt
