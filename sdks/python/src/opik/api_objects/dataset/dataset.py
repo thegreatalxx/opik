@@ -361,7 +361,7 @@ class Dataset(DatasetExportOperations):
         dataset_ = cls(
             name=dataset_fern.name,
             description=dataset_fern.description,
-            project_name=actual_project_name,
+            project_name=actual_project_name or project_name,
             rest_client=rest_client,
             dataset_items_count=dataset_fern.dataset_items_count,
         )
