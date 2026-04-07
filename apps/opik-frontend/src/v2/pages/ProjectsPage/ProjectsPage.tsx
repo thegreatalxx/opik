@@ -17,7 +17,9 @@ import DataTablePagination from "@/shared/DataTablePagination/DataTablePaginatio
 import IdCell from "@/shared/DataTableCells/IdCell";
 import DurationCell from "@/shared/DataTableCells/DurationCell";
 import CostCell from "@/shared/DataTableCells/CostCell";
+import TextCell from "@/shared/DataTableCells/TextCell";
 import useProjectWithStatisticsList from "@/hooks/useProjectWithStatisticsList";
+import { generateSourceFilters } from "@/lib/filters";
 import useQueryParamAndLocalStorageState from "@/hooks/useQueryParamAndLocalStorageState";
 import { ProjectWithStatistic } from "@/types/projects";
 import Loader from "@/shared/Loader/Loader";
@@ -54,9 +56,7 @@ import { EXPLAINER_ID, EXPLAINERS_MAP } from "@/constants/explainers";
 import ExplainerDescription from "@/shared/ExplainerDescription/ExplainerDescription";
 import ErrorsCountCell from "@/shared/DataTableCells/ErrorsCountCell";
 import { LOGS_TYPE } from "@/constants/traces";
-import { LOGS_SOURCE } from "@/types/traces";
 import { usePermissions } from "@/contexts/PermissionsContext";
-import ProjectNameCell from "@/v2/pages/ProjectsPage/ProjectNameCell";
 
 export const getRowId = (p: ProjectWithStatistic) => p.id;
 
@@ -129,7 +129,7 @@ const ProjectsPage: React.FunctionComponent = () => {
         id: COLUMN_NAME_ID,
         label: "Name",
         type: COLUMN_TYPE.string,
-        cell: ProjectNameCell as never,
+        cell: TextCell as never,
         sortable: true,
       },
       {
@@ -321,6 +321,8 @@ const ProjectsPage: React.FunctionComponent = () => {
     },
   );
 
+  const sourceFilters = useMemo(() => generateSourceFilters(), []);
+
   const { data, isPending, isPlaceholderData, isFetching } =
     useProjectWithStatisticsList(
       {
@@ -337,7 +339,7 @@ const ProjectsPage: React.FunctionComponent = () => {
         }),
         page: page!,
         size: size!,
-        logsSource: LOGS_SOURCE.sdk,
+        additionalFilters: sourceFilters,
       },
       {
         placeholderData: keepPreviousData,
@@ -439,7 +441,7 @@ const ProjectsPage: React.FunctionComponent = () => {
   return (
     <div className="pt-6">
       <div className="mb-1 flex items-center justify-between">
-        <h1 className="comet-title-l truncate break-words">Projects</h1>
+        <h1 className="comet-title-l truncate break-words">Manage projects</h1>
       </div>
       <ExplainerDescription
         className="mb-4"

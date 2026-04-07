@@ -5,10 +5,10 @@ import api, {
   QueryConfig,
 } from "@/api/api";
 import { ProjectStatistic } from "@/types/projects";
-import { generateLogsSourceFilter, processFilters } from "@/lib/filters";
 import { processSorting } from "@/lib/sorting";
+import { processFilters } from "@/lib/filters";
+import { Filter } from "@/types/filters";
 import { Sorting } from "@/types/sorting";
-import { LOGS_SOURCE } from "@/types/traces";
 
 type UseProjectStatisticsListParams = {
   workspaceName: string;
@@ -16,7 +16,7 @@ type UseProjectStatisticsListParams = {
   sorting?: Sorting;
   page: number;
   size: number;
-  logsSource?: LOGS_SOURCE;
+  additionalFilters?: Filter[];
 };
 
 type UseProjectStatisticsListResponse = {
@@ -32,7 +32,7 @@ const getProjectStatisticsList = async (
     sorting,
     size,
     page,
-    logsSource,
+    additionalFilters,
   }: UseProjectStatisticsListParams,
 ) => {
   const { data } = await api.get(`${PROJECTS_REST_ENDPOINT}stats`, {
@@ -41,10 +41,7 @@ const getProjectStatisticsList = async (
       workspace_name: workspaceName,
       ...processSorting(sorting),
       ...(search && { name: search }),
-      ...processFilters(
-        undefined,
-        logsSource ? generateLogsSourceFilter(logsSource) : undefined,
-      ),
+      ...processFilters(undefined, additionalFilters),
       size,
       page,
     },
