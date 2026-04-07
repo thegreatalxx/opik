@@ -1,6 +1,5 @@
 package com.comet.opik.infrastructure.auth;
 
-import com.comet.opik.api.Visibility;
 import com.comet.opik.domain.ProjectService;
 import com.comet.opik.utils.WorkspaceUtils;
 import jakarta.inject.Provider;
