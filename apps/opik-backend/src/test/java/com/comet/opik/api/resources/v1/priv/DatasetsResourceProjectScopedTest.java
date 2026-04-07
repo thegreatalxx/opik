@@ -210,7 +210,7 @@ class DatasetsResourceProjectScopedTest {
     }
 
     @Test
-    @DisplayName("Regression OPIK-5704: put items into workspace-level dataset (no project_name) returns inserted items")
+    @DisplayName("Put items into workspace-level dataset (no project_name) returns inserted items")
     void putDatasetItems__datasetCreatedWithoutProjectName__itemsReturnedOnGet() {
         String apiKey = UUID.randomUUID().toString();
         String workspaceName = UUID.randomUUID().toString();
