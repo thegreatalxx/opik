@@ -46,12 +46,22 @@ Content & Asset Clients
 These clients handle content management: prompt templates and versions, and file attachments
 for traces and spans.
 
+Agent Configuration Clients
+---------------------------
+
+.. toctree::
+   :maxdepth: 1
+
+   agent_configs
+
+These clients handle agent configuration management: versioned configs, environment deployments, and runtime resolution.
+
 System & Configuration Clients
 ------------------------------
 
 .. toctree::
    :maxdepth: 1
-   
+
    check
    workspaces
    llm_provider_key

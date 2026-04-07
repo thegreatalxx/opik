@@ -294,6 +294,12 @@ navigation:
               - page: Cookbook - Evaluate moderation metric
                 path: docs/cookbook/evaluate_moderation_metric.mdx
                 slug: evaluate_moderation_metric
+      - section: Agent Configurations
+        slug: /agent_configurations
+        contents:
+          - page: Overview
+            path: docs/tracing/agent_configurations.mdx
+            slug: overview
       - section: Prompt engineering
         slug: /prompt_engineering
         contents:
@@ -965,6 +971,9 @@ navigation:
           - page: Prompts
             path: docs/reference/typescript-sdk/prompts.mdx
             slug: prompts
+          - page: Agent Configurations
+            path: docs/reference/typescript-sdk/agent-configurations.mdx
+            slug: agent-configurations
           - page: Opik Query Language (OQL)
             path: docs/reference/typescript-sdk/opik-query-language.mdx
             slug: opik-query-language

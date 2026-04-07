@@ -1,0 +1,253 @@
+---
+headline: Agent Configurations | Opik TypeScript SDK
+og:description: Manage versioned agent configurations with the Opik TypeScript SDK using Zod schemas, environment deployments, and runtime resolution.
+og:site_name: Opik Documentation
+og:title: Agent Configurations - TypeScript SDK
+title: Agent Configurations
+---
+
+The Opik TypeScript SDK provides agent configuration management using [Zod](https://zod.dev) schemas for type-safe, versioned configuration objects. You can publish configuration versions, deploy them to environments, and fetch them at runtime with automatic fallback behavior.
+
+## Overview
+
+Agent configurations are defined as Zod object schemas and managed through two main client methods:
+
+- **`createAgentConfig`** — Publishes a new configuration version (or reuses an existing one if values match)
+- **`getAgentConfigVersion`** — Fetches a configuration version at runtime inside a `track()` context
+
+The returned `AgentConfig<T>` object is a typed, read-only object with additional metadata properties.
+
+## Defining a Schema
+
+Define your configuration shape as a Zod object schema. The schema **must** have a `.describe()` name — this is used as the configuration's identifier:
+
+```typescript
+import { z } from "zod";
+
+const MyConfigSchema = z.object({
+    temperature: z.number().describe("Sampling temperature"),
+    model: z.string(),
+    maxTokens: z.number(),
+    useCot: z.boolean().describe("Enable chain-of-thought reasoning"),
+}).describe("MyConfig");
+```
+
+Use `.describe()` on individual fields to attach human-readable descriptions.
+
+## `createAgentConfig`
+
+Publishes a typed agent config version to Opik. If an identical version already exists, it is reused; otherwise a new version is created.
+
+### Signature
+
+```typescript
+async createAgentConfig<S extends z.ZodObject<z.ZodRawShape>>(
+    schema: S,
+    values: z.infer<S>,
+    options?: {
+        projectName?: string;
+        description?: string;
+    }
+): Promise<string>
+```
+
+### Parameters
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `schema` | `z.ZodObject` | Yes | Zod object schema with a `.describe()` name that defines the config shape. |
+| `values` | `z.infer<S>` | Yes | Typed config values that conform to the schema. |
+| `options.projectName` | `string` | No | Project to publish under. Defaults to the client's configured project. |
+| `options.description` | `string` | No | Human-readable description for this version. |
+
+### Returns
+
+`Promise<string>` — The version name (or ID) of the published config.
+
+### Example
+
+```typescript
+import { Opik } from "opik";
+import { z } from "zod";
+
+const client = new Opik();
+
+const MyConfigSchema = z.object({
+    temperature: z.number().describe("Sampling temperature"),
+    model: z.string(),
+    maxTokens: z.number(),
+}).describe("MyConfig");
+
+const version = await client.createAgentConfig(
+    MyConfigSchema,
+    { temperature: 0.7, model: "gpt-4", maxTokens: 1024 },
+    { projectName: "my-project", description: "Production v1" },
+);
+
+console.log(`Published version: ${version}`);
+```
+
+## `getAgentConfigVersion`
+
+Retrieves a typed agent config version and returns it as an `AgentConfig<T>` object. **Must be called inside a `track()` function** — it automatically attaches the resolved config metadata to the active trace.
+
+### Signature
+
+```typescript
+async getAgentConfigVersion<S extends z.ZodObject<z.ZodRawShape>>(
+    schema: S,
+    options: {
+        fallback: z.infer<S>;
+        projectName?: string;
+        env?: string;
+        latest?: boolean;
+        version?: string;
+    }
+): Promise<AgentConfig<z.infer<S>>>
+```
+
+### Parameters
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `schema` | `z.ZodObject` | Yes | Zod object schema with a `.describe()` name. |
+| `options.fallback` | `z.infer<S>` | Yes | Values to use when the backend is unreachable. |
+| `options.projectName` | `string` | No | Project to fetch from. Defaults to the client's configured project. |
+| `options.env` | `string` | No | Environment label to resolve. Defaults to `"prod"` when no other selector is provided. |
+| `options.latest` | `boolean` | No | If `true`, fetch the most recently published version regardless of env. |
+| `options.version` | `string` | No | Fetch a specific named version. |
+
+### Version Selectors
+
+Exactly one of the following selectors can be provided (they are mutually exclusive):
+
+| Selector | Description |
+|---|---|
+| `env` | Fetches the version pinned to that environment label (default: `"prod"`) |
+| `latest: true` | Fetches the most recently published version |
+| `version` | Fetches the named version exactly |
+
+If none is provided, `env: "prod"` is used by default.
+
+### Returns
+
+`Promise<AgentConfig<z.infer<S>>>` — A typed, read-only config object with the resolved values and metadata.
+
+### Example
+
+```typescript
+import { Opik, track } from "opik";
+import { z } from "zod";
+
+const client = new Opik();
+
+const MyConfigSchema = z.object({
+    temperature: z.number(),
+    model: z.string(),
+    maxTokens: z.number(),
+}).describe("MyConfig");
+
+const result = await track({ name: "my-agent" }, async () => {
+    const config = await client.getAgentConfigVersion(MyConfigSchema, {
+        fallback: { temperature: 0.5, model: "gpt-4o-mini", maxTokens: 512 },
+        projectName: "my-project",
+        env: "prod",
+    });
+
+    console.log(`Model: ${config.model}, Temp: ${config.temperature}`);
+    return callLLM(config.model, config.temperature);
+});
+
+await client.flush();
+```
+
+## `AgentConfig<T>` Type
+
+The object returned by `getAgentConfigVersion` is `AgentConfig<T>`, which extends your config values with metadata properties:
+
+```typescript
+type AgentConfig<T> = Readonly<T> & AgentConfigMeta;
+```
+
+### Properties
+
+| Property | Type | Description |
+|---|---|---|
+| `blueprintId` | `string \| undefined` | ID of the resolved blueprint. |
+| `blueprintVersion` | `string \| undefined` | Version name of the resolved blueprint. |
+| `envs` | `string[] \| undefined` | Environment tags associated with the resolved version. |
+| `isFallback` | `boolean` | `true` if local fallback values are being used because the backend was unreachable. |
+
+### Methods
+
+| Method | Signature | Description |
+|---|---|---|
+| `deployTo` | `(env: string) => Promise<void>` | Tags the current version with an environment name (e.g., `"prod"`, `"staging"`). |
+
+### Fallback Behavior
+
+When the backend is unreachable, `getAgentConfigVersion` returns the `fallback` values wrapped as an `AgentConfig<T>` with `isFallback: true`:
+
+```typescript
+const result = await track({ name: "my-agent" }, async () => {
+    const config = await client.getAgentConfigVersion(MyConfigSchema, {
+        fallback: { temperature: 0.0, model: "gpt-3.5-turbo", maxTokens: 512 },
+        env: "prod",
+    });
+
+    if (config.isFallback) {
+        console.log("Using fallback config — backend was unreachable");
+    }
+
+    return process(config);
+});
+```
+
+## Prompts in Configurations
+
+Agent configurations have a direct connection to Opik's prompt management system. **Updating a prompt will automatically update the configuration** — when a prompt referenced by a configuration is updated, the configuration will reflect the updated prompt the next time it is fetched, without needing to publish a new configuration version.
+
+## Trace Metadata
+
+When `getAgentConfigVersion` is called inside a `track()` function, the configuration metadata (blueprint ID, version, field values) is automatically injected into the current trace and span metadata under the `agent_configuration` key.
+
+## Complete Example
+
+```typescript
+import { Opik, track } from "opik";
+import { z } from "zod";
+
+const client = new Opik();
+
+// 1. Define the configuration schema
+const MyConfigSchema = z.object({
+    temperature: z.number().describe("Sampling temperature"),
+    model: z.string(),
+    maxTokens: z.number(),
+}).describe("MyConfig");
+
+// 2. Publish a version
+const version = await client.createAgentConfig(
+    MyConfigSchema,
+    { temperature: 0.7, model: "gpt-4", maxTokens: 1024 },
+    { projectName: "my-project", description: "Production v1" },
+);
+console.log(`Published: ${version}`);
+
+// 3. Fetch at runtime and deploy to an environment
+const result = await track({ name: "run-agent" }, async () => {
+    const cfg = await client.getAgentConfigVersion(MyConfigSchema, {
+        fallback: { temperature: 0.0, model: "gpt-3.5-turbo", maxTokens: 512 },
+        projectName: "my-project",
+        latest: true,
+    });
+
+    // Deploy to prod
+    await cfg.deployTo("prod");
+
+    return `Using ${cfg.model} with temp=${cfg.temperature}`;
+});
+
+console.log(result);
+await client.flush();
+```

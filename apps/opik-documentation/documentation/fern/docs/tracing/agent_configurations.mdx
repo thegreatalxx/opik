@@ -1,0 +1,556 @@
+---
+headline: Agent Configurations | Opik Documentation
+og:description: Learn to manage agent configurations with versioning, environment deployments, and real-time updates using Opik's Python and TypeScript SDKs.
+og:site_name: Opik Documentation
+og:title: Agent Configurations
+title: Agent Configurations
+---
+
+Agent configurations let you manage your agent's runtime parameters (model names, temperatures, prompts, feature flags, etc.) as versioned, typed objects. You can publish new versions, deploy them to environments, and fetch them at runtime — all without redeploying your agent.
+
+## Defining a configuration
+
+<Tabs>
+    <Tab value="Python" title="Python">
+
+        Subclass `opik.AgentConfig` and declare typed fields. Use `typing.Annotated` to attach descriptions:
+
+        ```python
+        from typing import Annotated
+        import opik
+
+        class MyAgentConfig(opik.AgentConfig):
+            temperature: Annotated[float, "Sampling temperature"]
+            model: str
+            max_tokens: int
+            use_cot: Annotated[bool, "Enable chain-of-thought reasoning"]
+        ```
+
+        Supported field types: `str`, `int`, `float`, `bool`, `opik.Prompt`, and `opik.ChatPrompt`.
+
+    </Tab>
+    <Tab value="TypeScript" title="TypeScript">
+
+        Define a [Zod](https://zod.dev) object schema with `.describe()` to name it. Use `.describe()` on individual fields to attach descriptions:
+
+        ```typescript
+        import { z } from "zod";
+
+        const MyConfigSchema = z.object({
+            temperature: z.number().describe("Sampling temperature"),
+            model: z.string(),
+            maxTokens: z.number(),
+            useCot: z.boolean().describe("Enable chain-of-thought reasoning"),
+        }).describe("MyConfig");
+        ```
+
+        Supported field types: `z.string()`, `z.number()`, `z.boolean()`, and Opik prompt types.
+
+    </Tab>
+</Tabs>
+
+<Note>
+  All fields must be provided when creating a configuration instance — default values are not supported.
+</Note>
+
+## Publishing a configuration version
+
+Publish a new version of your configuration. If the values haven't changed since the last version, no new version is created:
+
+<Tabs>
+    <Tab value="Python" title="Python">
+
+        ```python
+        import opik
+
+        client = opik.Opik()
+
+        config = MyAgentConfig(
+            temperature=0.7,
+            model="gpt-4",
+            max_tokens=1024,
+            use_cot=True,
+        )
+
+        version_name = client.create_agent_config_version(
+            config,
+            project_name="my-project",
+            description="Initial production config",
+        )
+        print(f"Published version: {version_name}")
+        ```
+
+        ### Parameters
+
+        | Parameter | Type | Required | Description |
+        |---|---|---|---|
+        | `config` | `AgentConfig` | Yes | An instance of your `AgentConfig` subclass. |
+        | `project_name` | `str` | No | Opik project name. Defaults to the client's default project. |
+        | `description` | `str` | No | Optional description stored with the version. |
+
+    </Tab>
+    <Tab value="TypeScript" title="TypeScript">
+
+        ```typescript
+        import { Opik } from "opik";
+        import { z } from "zod";
+
+        const client = new Opik();
+
+        const MyConfigSchema = z.object({
+            temperature: z.number().describe("Sampling temperature"),
+            model: z.string(),
+            maxTokens: z.number(),
+            useCot: z.boolean().describe("Enable chain-of-thought reasoning"),
+        }).describe("MyConfig");
+
+        const versionName = await client.createAgentConfig(
+            MyConfigSchema,
+            { temperature: 0.7, model: "gpt-4", maxTokens: 1024, useCot: true },
+            {
+                projectName: "my-project",
+                description: "Initial production config",
+            },
+        );
+        console.log(`Published version: ${versionName}`);
+        ```
+
+        ### Parameters
+
+        | Parameter | Type | Required | Description |
+        |---|---|---|---|
+        | `schema` | `z.ZodObject` | Yes | A Zod object schema with a `.describe()` name. |
+        | `values` | `z.infer<S>` | Yes | Typed config values conforming to the schema. |
+        | `options.projectName` | `string` | No | Opik project name. Defaults to the client's configured project. |
+        | `options.description` | `string` | No | Optional description stored with the version. |
+
+    </Tab>
+</Tabs>
+
+### Returns
+
+The version name (e.g., `"v1"`, `"v2"`) — either newly created or the existing version if values already match.
+
+## Deploying to an environment
+
+After publishing a version, tag it with an environment name:
+
+<Tabs>
+    <Tab value="Python" title="Python">
+
+        ```python
+        version_name = client.create_agent_config_version(config, project_name="my-project")
+        config.deploy_to("prod")
+        ```
+
+    </Tab>
+    <Tab value="TypeScript" title="TypeScript">
+
+        In TypeScript, `deployTo` is available on the config object returned by `getAgentConfigVersion`:
+
+        ```typescript
+        const config = await track({ name: "my-agent" }, async () => {
+            const cfg = await client.getAgentConfigVersion(MyConfigSchema, {
+                fallback: { temperature: 0.0, model: "gpt-3.5-turbo", maxTokens: 512, useCot: false },
+                latest: true,
+            });
+            await cfg.deployTo("prod");
+            return cfg;
+        });
+        ```
+
+    </Tab>
+</Tabs>
+
+This allows you to fetch the configuration by environment tag at runtime.
+
+## Fetching a configuration at runtime
+
+Retrieve the configuration from the backend inside a tracked context. Provide a `fallback` that is returned if the backend is unreachable:
+
+<Tabs>
+    <Tab value="Python" title="Python">
+
+        ```python
+        import opik
+
+        client = opik.Opik()
+
+        fallback_config = MyAgentConfig(
+            temperature=0.0,
+            model="gpt-3.5-turbo",
+            max_tokens=512,
+            use_cot=False,
+        )
+
+        @opik.track()
+        def run_agent(user_input: str) -> str:
+            config = client.get_agent_config(
+                fallback=fallback_config,
+                project_name="my-project",
+                env="prod",
+            )
+
+            # Use config fields directly
+            print(f"Using model: {config.model}, temp: {config.temperature}")
+            return f"Processed with {config.model}"
+
+        run_agent("Hello!")
+        ```
+
+        <Warning>
+          `get_agent_config` must be called inside a function decorated with `@opik.track`. Calling it outside a tracked context will raise a `RuntimeError`.
+        </Warning>
+
+    </Tab>
+    <Tab value="TypeScript" title="TypeScript">
+
+        ```typescript
+        import { Opik, track } from "opik";
+        import { z } from "zod";
+
+        const client = new Opik();
+
+        const MyConfigSchema = z.object({
+            temperature: z.number(),
+            model: z.string(),
+            maxTokens: z.number(),
+            useCot: z.boolean(),
+        }).describe("MyConfig");
+
+        const result = await track({ name: "run-agent" }, async () => {
+            const config = await client.getAgentConfigVersion(MyConfigSchema, {
+                fallback: { temperature: 0.0, model: "gpt-3.5-turbo", maxTokens: 512, useCot: false },
+                projectName: "my-project",
+                env: "prod",
+            });
+
+            console.log(`Using model: ${config.model}, temp: ${config.temperature}`);
+            return `Processed with ${config.model}`;
+        });
+        ```
+
+        <Warning>
+          `getAgentConfigVersion` must be called inside a `track()` function. Calling it outside a tracked context will throw an `Error`.
+        </Warning>
+
+    </Tab>
+</Tabs>
+
+### Version selectors
+
+You must use exactly one of the following selectors to specify which version to fetch. If none is provided, it defaults to `env="prod"`:
+
+| Selector | Type | Description |
+|---|---|---|
+| `env` | `string` | Fetch the version deployed to an environment (e.g., `"prod"`, `"staging"`). This is the default when no selector is provided. |
+| `latest` | `boolean` | If `true`, fetch the most recently published version regardless of environment tags. |
+| `version` | `string` | Fetch a specific version by its name (e.g., `"v3"`), as returned by `createAgentConfig` / `create_agent_config_version`. |
+
+<Tabs>
+    <Tab value="by-env" title="By environment">
+        <Tabs>
+            <Tab value="Python" title="Python">
+                ```python
+                @opik.track()
+                def run_agent(user_input: str) -> str:
+                    config = client.get_agent_config(
+                        fallback=fallback_config,
+                        env="prod",
+                    )
+                    return process(config)
+                ```
+            </Tab>
+            <Tab value="TypeScript" title="TypeScript">
+                ```typescript
+                const result = await track({ name: "run-agent" }, async () => {
+                    const config = await client.getAgentConfigVersion(MyConfigSchema, {
+                        fallback: { temperature: 0.0, model: "gpt-3.5-turbo", maxTokens: 512, useCot: false },
+                        env: "prod",
+                    });
+                    return process(config);
+                });
+                ```
+            </Tab>
+        </Tabs>
+    </Tab>
+    <Tab value="latest" title="Latest version">
+        <Tabs>
+            <Tab value="Python" title="Python">
+                ```python
+                @opik.track()
+                def run_agent(user_input: str) -> str:
+                    config = client.get_agent_config(
+                        fallback=fallback_config,
+                        latest=True,
+                    )
+                    return process(config)
+                ```
+            </Tab>
+            <Tab value="TypeScript" title="TypeScript">
+                ```typescript
+                const result = await track({ name: "run-agent" }, async () => {
+                    const config = await client.getAgentConfigVersion(MyConfigSchema, {
+                        fallback: { temperature: 0.0, model: "gpt-3.5-turbo", maxTokens: 512, useCot: false },
+                        latest: true,
+                    });
+                    return process(config);
+                });
+                ```
+            </Tab>
+        </Tabs>
+    </Tab>
+    <Tab value="specific" title="Specific version">
+        <Tabs>
+            <Tab value="Python" title="Python">
+                ```python
+                @opik.track()
+                def run_agent(user_input: str) -> str:
+                    config = client.get_agent_config(
+                        fallback=fallback_config,
+                        version="v3",
+                    )
+                    return process(config)
+                ```
+            </Tab>
+            <Tab value="TypeScript" title="TypeScript">
+                ```typescript
+                const result = await track({ name: "run-agent" }, async () => {
+                    const config = await client.getAgentConfigVersion(MyConfigSchema, {
+                        fallback: { temperature: 0.0, model: "gpt-3.5-turbo", maxTokens: 512, useCot: false },
+                        version: "v3",
+                    });
+                    return process(config);
+                });
+                ```
+            </Tab>
+        </Tabs>
+    </Tab>
+</Tabs>
+
+### Parameters
+
+<Tabs>
+    <Tab value="Python" title="Python">
+
+        | Parameter | Type | Required | Description |
+        |---|---|---|---|
+        | `fallback` | `AgentConfig` | Yes | An instance of your `AgentConfig` subclass. Returned when the backend is unreachable. Its type determines the return type. |
+        | `project_name` | `str` | No | Opik project name. Defaults to the client's default project. |
+        | `env` | `str` | No | Environment tag to fetch. Defaults to `"prod"` when no other selector is provided. |
+        | `latest` | `bool` | No | If `True`, fetch the latest version regardless of environment tags. |
+        | `version` | `str` | No | Fetch a specific version by its name. |
+        | `timeout_in_seconds` | `int` | No | Maximum seconds to wait for the backend response. Defaults to `5`. If the request takes longer, `fallback` is returned. Pass `None` to wait indefinitely. |
+
+    </Tab>
+    <Tab value="TypeScript" title="TypeScript">
+
+        | Parameter | Type | Required | Description |
+        |---|---|---|---|
+        | `schema` | `z.ZodObject` | Yes | A Zod object schema with a `.describe()` name. |
+        | `options.fallback` | `z.infer<S>` | Yes | Fallback values to use when the backend is unreachable. |
+        | `options.projectName` | `string` | No | Opik project name. Defaults to the client's configured project. |
+        | `options.env` | `string` | No | Environment tag to fetch. Defaults to `"prod"` when no other selector is provided. |
+        | `options.latest` | `boolean` | No | If `true`, fetch the latest version regardless of environment tags. |
+        | `options.version` | `string` | No | Fetch a specific version by its name. |
+
+    </Tab>
+</Tabs>
+
+### Fallback behavior
+
+When the backend is unreachable or the request times out, the fallback values are returned instead of raising an exception. You can check whether the fallback was used:
+
+<Tabs>
+    <Tab value="Python" title="Python">
+
+        ```python
+        @opik.track()
+        def run_agent(user_input: str) -> str:
+            config = client.get_agent_config(fallback=fallback_config, env="prod")
+
+            if config.is_fallback:
+                print("Using fallback config — backend was unreachable")
+
+            return process(config)
+        ```
+
+    </Tab>
+    <Tab value="TypeScript" title="TypeScript">
+
+        ```typescript
+        const result = await track({ name: "run-agent" }, async () => {
+            const config = await client.getAgentConfigVersion(MyConfigSchema, {
+                fallback: { temperature: 0.0, model: "gpt-3.5-turbo", maxTokens: 512, useCot: false },
+                env: "prod",
+            });
+
+            if (config.isFallback) {
+                console.log("Using fallback config — backend was unreachable");
+            }
+
+            return process(config);
+        });
+        ```
+
+    </Tab>
+</Tabs>
+
+### Properties
+
+| Property (Python / TypeScript) | Type | Description |
+|---|---|---|
+| `is_fallback` / `isFallback` | `bool` / `boolean` | `true` if local fallback values are being used because the backend was unreachable. |
+| `envs` / `envs` | `list[str]` / `string[]` | Environment tags associated with the resolved configuration version. |
+
+## Using prompts in configurations
+
+Agent configurations have a direct connection to Opik's [prompt management](/docs/opik/prompt_engineering/prompt_management) system. Both the Python and TypeScript SDKs support prompt types as configuration fields, allowing you to version your prompts alongside other configuration parameters.
+
+Importantly, **updating a prompt will automatically update the configuration**. When a prompt referenced by a configuration is updated (e.g., a new version of the prompt is published), the configuration will reflect the updated prompt the next time it is fetched. This means you can manage prompt iterations through the prompt library and have those changes propagate to your agent configuration without needing to publish a new configuration version.
+
+<Tabs>
+    <Tab value="Python" title="Python">
+
+        ```python
+        import opik
+
+        client = opik.Opik()
+
+        text_prompt = client.get_prompt("my-text-prompt")
+        chat_prompt = client.get_chat_prompt("my-chat-prompt")
+
+        class AgentWithPrompts(opik.AgentConfig):
+            system_prompt: opik.ChatPrompt
+            summary_prompt: opik.Prompt
+            temperature: float
+
+        config = AgentWithPrompts(
+            system_prompt=chat_prompt,
+            summary_prompt=text_prompt,
+            temperature=0.7,
+        )
+
+        client.create_agent_config_version(config, project_name="my-project")
+        ```
+
+    </Tab>
+    <Tab value="TypeScript" title="TypeScript">
+
+        ```typescript
+        import { Opik } from "opik";
+        import { z } from "zod";
+
+        const client = new Opik();
+
+        const prompt = await client.getPrompt({ name: "my-text-prompt" });
+
+        const AgentWithPromptsSchema = z.object({
+            summaryPrompt: z.string().describe("Summary prompt template"),
+            temperature: z.number(),
+        }).describe("AgentWithPrompts");
+
+        await client.createAgentConfig(
+            AgentWithPromptsSchema,
+            { summaryPrompt: prompt!.prompt, temperature: 0.7 },
+            { projectName: "my-project" },
+        );
+        ```
+
+    </Tab>
+</Tabs>
+
+<Note>
+  Since prompt updates automatically propagate to configurations, you can use the Opik prompt library as the single source of truth for your prompts while still bundling them with other agent parameters in your configuration.
+</Note>
+
+## Trace metadata
+
+When fetching a configuration inside a tracked context, the configuration metadata (blueprint ID, version, field values) is automatically injected into the current trace and span metadata under the `agent_configuration` key. This gives you full visibility into which configuration version was used for each trace.
+
+## Complete example
+
+<Tabs>
+    <Tab value="Python" title="Python">
+
+        ```python
+        from typing import Annotated
+        import opik
+
+        client = opik.Opik()
+
+        # 1. Define the configuration schema
+        class MyAgentConfig(opik.AgentConfig):
+            temperature: Annotated[float, "Sampling temperature"]
+            model: str
+            max_tokens: int
+
+        # 2. Publish a version
+        config = MyAgentConfig(temperature=0.7, model="gpt-4", max_tokens=1024)
+        version = client.create_agent_config_version(
+            config,
+            project_name="my-project",
+            description="Production v1",
+        )
+        print(f"Published: {version}")
+
+        # 3. Deploy to an environment
+        config.deploy_to("prod")
+
+        # 4. Fetch at runtime
+        fallback = MyAgentConfig(temperature=0.0, model="gpt-3.5-turbo", max_tokens=512)
+
+        @opik.track()
+        def run_agent(user_input: str) -> str:
+            cfg = client.get_agent_config(
+                fallback=fallback,
+                project_name="my-project",
+                env="prod",
+            )
+            return f"Using {cfg.model} with temp={cfg.temperature}"
+
+        result = run_agent("Hello!")
+        print(result)
+        ```
+
+    </Tab>
+    <Tab value="TypeScript" title="TypeScript">
+
+        ```typescript
+        import { Opik, track } from "opik";
+        import { z } from "zod";
+
+        const client = new Opik();
+
+        // 1. Define the configuration schema
+        const MyConfigSchema = z.object({
+            temperature: z.number().describe("Sampling temperature"),
+            model: z.string(),
+            maxTokens: z.number(),
+        }).describe("MyConfig");
+
+        // 2. Publish a version
+        const version = await client.createAgentConfig(
+            MyConfigSchema,
+            { temperature: 0.7, model: "gpt-4", maxTokens: 1024 },
+            { projectName: "my-project", description: "Production v1" },
+        );
+        console.log(`Published: ${version}`);
+
+        // 3. Deploy to an environment (from within a tracked context)
+        // 4. Fetch at runtime
+        const result = await track({ name: "run-agent" }, async () => {
+            const cfg = await client.getAgentConfigVersion(MyConfigSchema, {
+                fallback: { temperature: 0.0, model: "gpt-3.5-turbo", maxTokens: 512 },
+                projectName: "my-project",
+                env: "prod",
+            });
+            return `Using ${cfg.model} with temp=${cfg.temperature}`;
+        });
+
+        console.log(result);
+        await client.flush();
+        ```
+
+    </Tab>
+</Tabs>

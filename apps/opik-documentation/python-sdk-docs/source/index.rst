@@ -259,6 +259,7 @@ You can learn more about the `opik` python SDK in the following sections:
    Objects/TestResult.rst
    Objects/Prompt.rst
    Objects/ChatPrompt.rst
+   Objects/AgentConfig.rst
    Objects/ScoreResult.rst
    Objects/OpikBaseModel.rst
    Objects/LiteLLMChatModel.rst
