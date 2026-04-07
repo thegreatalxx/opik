@@ -210,7 +210,7 @@ class DatasetsResourceProjectScopedTest {
     }
 
     @Test
-    @DisplayName("Put items into workspace-level dataset (no project_name) returns inserted items")
+    @DisplayName("Given workspace-level dataset without project_name, when putting items, then items are returned on get")
     void putDatasetItems__datasetCreatedWithoutProjectName__itemsReturnedOnGet() {
         // Given
         String apiKey = UUID.randomUUID().toString();
