@@ -23,6 +23,7 @@ import ru.vyarus.dropwizard.guice.test.jupiter.ext.TestDropwizardAppExtension;
 import uk.co.jemos.podam.api.PodamFactory;
 
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -36,6 +37,9 @@ class DatasetsResourceProjectScopedTest {
             "lastUpdatedBy", "projectName", "experimentCount", "mostRecentExperimentAt", "lastCreatedExperimentAt",
             "datasetItemsCount", "lastCreatedOptimizationAt", "mostRecentOptimizationAt", "optimizationCount",
             "status", "latestVersion"};
+
+    private static final String[] DATASET_ITEM_IGNORED_FIELDS = {"id", "datasetItemId", "createdAt", "lastUpdatedAt",
+            "createdBy", "lastUpdatedBy", "experimentItems", "runSummariesByExperiment", "datasetId"};
 
     private final TestContainersSetup setup = new TestContainersSetup();
 
@@ -203,6 +207,48 @@ class DatasetsResourceProjectScopedTest {
 
         assertThat(page.content()).hasSize(1);
         assertDataset(page.content().getFirst(), projectDataset);
+    }
+
+    @Test
+    @DisplayName("Regression OPIK-5704: put items into workspace-level dataset (no project_name) returns inserted items")
+    void putDatasetItems__datasetCreatedWithoutProjectName__itemsReturnedOnGet() {
+        String apiKey = UUID.randomUUID().toString();
+        String workspaceName = UUID.randomUUID().toString();
+        String workspaceId = UUID.randomUUID().toString();
+        mockTargetWorkspace(apiKey, workspaceName, workspaceId);
+
+        // Create dataset at workspace level (no project_name / project_id = NULL) — simulates Opik 1.0 UI
+        String datasetName = "dataset-" + UUID.randomUUID();
+        var dataset = buildDataset().toBuilder()
+                .id(null)
+                .projectId(null)
+                .projectName(null)
+                .name(datasetName)
+                .build();
+        var datasetId = datasetResourceClient.createDataset(dataset, apiKey, workspaceName);
+
+        // Insert items via SDK path (datasetName only, no projectName)
+        var item = DatasetResourceClient.buildDatasetItem(factory).toBuilder()
+                .id(null)
+                .tags(Set.of())
+                .build();
+
+        var batch = DatasetItemBatch.builder()
+                .datasetName(datasetName)
+                .items(List.of(item))
+                .build();
+
+        datasetResourceClient.createDatasetItems(batch, workspaceName, apiKey);
+
+        var itemsPage = datasetResourceClient.getDatasetItems(datasetId, 1, 10, null, apiKey, workspaceName);
+
+        assertThat(itemsPage.content())
+                .as("Items inserted into a workspace-level dataset must be retrievable (OPIK-5704)")
+                .hasSize(1);
+        assertThat(itemsPage.content())
+                .usingRecursiveComparison()
+                .ignoringFields(DATASET_ITEM_IGNORED_FIELDS)
+                .isEqualTo(List.of(item));
     }
 
     @Test
