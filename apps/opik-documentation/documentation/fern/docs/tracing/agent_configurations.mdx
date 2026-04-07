@@ -23,6 +23,7 @@ Agent configurations let you manage your agent's runtime parameters (model names
             temperature: Annotated[float, "Sampling temperature"]
             model: str
             max_tokens: int
+            system_prompt: Annotated[opik.ChatPrompt, "System prompt for the agent"]
             use_cot: Annotated[bool, "Enable chain-of-thought reasoning"]
         ```
 
@@ -35,16 +36,18 @@ Agent configurations let you manage your agent's runtime parameters (model names
 
         ```typescript
         import { z } from "zod";
+        import { Prompt, ChatPrompt } from "opik";
 
         const MyConfigSchema = z.object({
             temperature: z.number().describe("Sampling temperature"),
             model: z.string(),
             maxTokens: z.number(),
+            systemPrompt: z.instanceof(ChatPrompt).describe("System prompt for the agent"),
             useCot: z.boolean().describe("Enable chain-of-thought reasoning"),
         }).describe("MyConfig");
         ```
 
-        Supported field types: `z.string()`, `z.number()`, `z.boolean()`, and Opik prompt types.
+        Supported field types: `z.string()`, `z.number()`, `z.boolean()`, `z.instanceof(Prompt)`, and `z.instanceof(ChatPrompt)`.
 
     </Tab>
 </Tabs>
@@ -65,10 +68,13 @@ Publish a new version of your configuration. If the values haven't changed since
 
         client = opik.Opik()
 
+        system_prompt = client.get_chat_prompt("my-system-prompt")
+
         config = MyAgentConfig(
             temperature=0.7,
             model="gpt-4",
             max_tokens=1024,
+            system_prompt=system_prompt,
             use_cot=True,
         )
 
@@ -92,21 +98,24 @@ Publish a new version of your configuration. If the values haven't changed since
     <Tab value="TypeScript" title="TypeScript">
 
         ```typescript
-        import { Opik } from "opik";
+        import { Opik, ChatPrompt } from "opik";
         import { z } from "zod";
 
         const client = new Opik();
+
+        const systemPrompt = await client.getChatPrompt({ name: "my-system-prompt" });
 
         const MyConfigSchema = z.object({
             temperature: z.number().describe("Sampling temperature"),
             model: z.string(),
             maxTokens: z.number(),
+            systemPrompt: z.instanceof(ChatPrompt).describe("System prompt for the agent"),
             useCot: z.boolean().describe("Enable chain-of-thought reasoning"),
         }).describe("MyConfig");
 
         const versionName = await client.createAgentConfig(
             MyConfigSchema,
-            { temperature: 0.7, model: "gpt-4", maxTokens: 1024, useCot: true },
+            { temperature: 0.7, model: "gpt-4", maxTokens: 1024, systemPrompt, useCot: true },
             {
                 projectName: "my-project",
                 description: "Initial production config",
@@ -149,9 +158,11 @@ After publishing a version, tag it with an environment name:
         In TypeScript, `deployTo` is available on the config object returned by `getAgentConfigVersion`:
 
         ```typescript
+        const fallbackPrompt = await client.getChatPrompt({ name: "my-system-prompt" });
+
         const config = await track({ name: "my-agent" }, async () => {
             const cfg = await client.getAgentConfigVersion(MyConfigSchema, {
-                fallback: { temperature: 0.0, model: "gpt-3.5-turbo", maxTokens: 512, useCot: false },
+                fallback: { temperature: 0.0, model: "gpt-3.5-turbo", maxTokens: 512, systemPrompt: fallbackPrompt, useCot: false },
                 latest: true,
             });
             await cfg.deployTo("prod");
@@ -176,10 +187,13 @@ Retrieve the configuration from the backend inside a tracked context. Provide a 
 
         client = opik.Opik()
 
+        fallback_prompt = client.get_chat_prompt("my-system-prompt")
+
         fallback_config = MyAgentConfig(
             temperature=0.0,
             model="gpt-3.5-turbo",
             max_tokens=512,
+            system_prompt=fallback_prompt,
             use_cot=False,
         )
 
@@ -191,8 +205,8 @@ Retrieve the configuration from the backend inside a tracked context. Provide a 
                 env="prod",
             )
 
-            # Use config fields directly
-            print(f"Using model: {config.model}, temp: {config.temperature}")
+            # Use config fields directly — including prompts
+            print(f"Using model: {config.model}, prompt: {config.system_prompt}")
             return f"Processed with {config.model}"
 
         run_agent("Hello!")
@@ -206,26 +220,30 @@ Retrieve the configuration from the backend inside a tracked context. Provide a 
     <Tab value="TypeScript" title="TypeScript">
 
         ```typescript
-        import { Opik, track } from "opik";
+        import { Opik, track, ChatPrompt } from "opik";
         import { z } from "zod";
 
         const client = new Opik();
+
+        const fallbackPrompt = await client.getChatPrompt({ name: "my-system-prompt" });
 
         const MyConfigSchema = z.object({
             temperature: z.number(),
             model: z.string(),
             maxTokens: z.number(),
+            systemPrompt: z.instanceof(ChatPrompt),
             useCot: z.boolean(),
         }).describe("MyConfig");
 
         const result = await track({ name: "run-agent" }, async () => {
             const config = await client.getAgentConfigVersion(MyConfigSchema, {
-                fallback: { temperature: 0.0, model: "gpt-3.5-turbo", maxTokens: 512, useCot: false },
+                fallback: { temperature: 0.0, model: "gpt-3.5-turbo", maxTokens: 512, systemPrompt: fallbackPrompt, useCot: false },
                 projectName: "my-project",
                 env: "prod",
             });
 
-            console.log(`Using model: ${config.model}, temp: ${config.temperature}`);
+            // Use config fields directly — including prompts
+            console.log(`Using model: ${config.model}, prompt: ${config.systemPrompt}`);
             return `Processed with ${config.model}`;
         });
         ```
@@ -265,7 +283,7 @@ You must use exactly one of the following selectors to specify which version to 
                 ```typescript
                 const result = await track({ name: "run-agent" }, async () => {
                     const config = await client.getAgentConfigVersion(MyConfigSchema, {
-                        fallback: { temperature: 0.0, model: "gpt-3.5-turbo", maxTokens: 512, useCot: false },
+                        fallback: { temperature: 0.0, model: "gpt-3.5-turbo", maxTokens: 512, systemPrompt: fallbackPrompt, useCot: false },
                         env: "prod",
                     });
                     return process(config);
@@ -291,7 +309,7 @@ You must use exactly one of the following selectors to specify which version to 
                 ```typescript
                 const result = await track({ name: "run-agent" }, async () => {
                     const config = await client.getAgentConfigVersion(MyConfigSchema, {
-                        fallback: { temperature: 0.0, model: "gpt-3.5-turbo", maxTokens: 512, useCot: false },
+                        fallback: { temperature: 0.0, model: "gpt-3.5-turbo", maxTokens: 512, systemPrompt: fallbackPrompt, useCot: false },
                         latest: true,
                     });
                     return process(config);
@@ -317,7 +335,7 @@ You must use exactly one of the following selectors to specify which version to 
                 ```typescript
                 const result = await track({ name: "run-agent" }, async () => {
                     const config = await client.getAgentConfigVersion(MyConfigSchema, {
-                        fallback: { temperature: 0.0, model: "gpt-3.5-turbo", maxTokens: 512, useCot: false },
+                        fallback: { temperature: 0.0, model: "gpt-3.5-turbo", maxTokens: 512, systemPrompt: fallbackPrompt, useCot: false },
                         version: "v3",
                     });
                     return process(config);
@@ -381,7 +399,7 @@ When the backend is unreachable or the request times out, the fallback values ar
         ```typescript
         const result = await track({ name: "run-agent" }, async () => {
             const config = await client.getAgentConfigVersion(MyConfigSchema, {
-                fallback: { temperature: 0.0, model: "gpt-3.5-turbo", maxTokens: 512, useCot: false },
+                fallback: { temperature: 0.0, model: "gpt-3.5-turbo", maxTokens: 512, systemPrompt: fallbackPrompt, useCot: false },
                 env: "prod",
             });
 
@@ -468,6 +486,95 @@ Importantly, **updating a prompt will automatically update the configuration**. 
 
 When fetching a configuration inside a tracked context, the configuration metadata (blueprint ID, version, field values) is automatically injected into the current trace and span metadata under the `agent_configuration` key. This gives you full visibility into which configuration version was used for each trace.
 
+## Advanced: Configuration masks
+
+<Note>
+  Masks are an advanced feature primarily used by **Opik optimizers** to run experiments with different parameter values. Most users do not need to interact with masks directly — they are managed automatically when you use Opik's optimization and evaluation tools.
+</Note>
+
+A **mask** is a partial override that sits on top of an existing configuration. It lets you substitute a subset of fields without creating a full new version. When a mask is active, `get_agent_config` / `getAgentConfigVersion` transparently merges the mask's values over the base configuration, so your agent code doesn't need to change.
+
+This is how optimizers test different parameter combinations: they create masks with candidate values and run your agent inside a mask context for each trial.
+
+### How masks work
+
+1. **Create a mask** — specify only the fields you want to override
+2. **Activate the mask context** — wrap your agent call so the SDK knows which mask to apply
+3. **Fetch the config as usual** — `get_agent_config` / `getAgentConfigVersion` automatically overlays the mask on the base configuration
+
+<Tabs>
+    <Tab value="Python" title="Python">
+
+        ```python
+        import opik
+        from opik.api_objects.agent_config.config import AgentConfigManager
+
+        client = opik.Opik()
+
+        # Create a mask with overridden values
+        manager = AgentConfigManager(
+            project_name="my-project",
+            rest_client_=client.rest_client,
+        )
+        mask_id = manager.create_mask(
+            parameters={"MyAgentConfig.temperature": 0.9}
+        )
+
+        # Run the agent inside the mask context
+        with opik.agent_config_context(mask_id=mask_id):
+            @opik.track(flush=True)
+            def run_agent(user_input: str) -> str:
+                # get_agent_config automatically applies the mask
+                config = client.get_agent_config(
+                    fallback=fallback_config,
+                    latest=True,
+                )
+                return f"Temperature: {config.temperature}"
+
+            run_agent("Hello!")
+        ```
+
+    </Tab>
+    <Tab value="TypeScript" title="TypeScript">
+
+        ```typescript
+        import { Opik, track } from "opik";
+        import { AgentConfigManager, agentConfigContext } from "opik";
+        import { z } from "zod";
+
+        const client = new Opik();
+
+        // Create a mask with overridden values
+        const manager = new AgentConfigManager("my-project", client);
+        const maskId = await manager.createMask({
+            values: [{ key: "MyConfig.temperature", value: 0.9, type: "float" }],
+        });
+
+        // Run the agent inside the mask context
+        const result = await agentConfigContext(maskId, async () => {
+            return track({ name: "run-agent" }, async () => {
+                // getAgentConfigVersion automatically applies the mask
+                const config = await client.getAgentConfigVersion(MyConfigSchema, {
+                    fallback: { temperature: 0.0, model: "gpt-3.5-turbo", maxTokens: 512 },
+                    latest: true,
+                });
+                return `Temperature: ${config.temperature}`;
+            });
+        });
+        ```
+
+    </Tab>
+</Tabs>
+
+### When are masks used?
+
+Masks are primarily used in two scenarios:
+
+- **Optimization runs** — Opik optimizers automatically create masks to evaluate different parameter combinations (e.g., testing `temperature=0.5` vs `temperature=0.9`) without modifying the base configuration.
+- **A/B testing** — You can manually create masks to run controlled experiments comparing different configuration variants.
+
+The mask ID is recorded in trace metadata (under `_mask_id`), so you can correlate experimental results with the exact parameter overrides that were applied.
+
 ## Complete example
 
 <Tabs>
@@ -484,9 +591,14 @@ When fetching a configuration inside a tracked context, the configuration metada
             temperature: Annotated[float, "Sampling temperature"]
             model: str
             max_tokens: int
+            system_prompt: Annotated[opik.ChatPrompt, "System prompt for the agent"]
 
         # 2. Publish a version
-        config = MyAgentConfig(temperature=0.7, model="gpt-4", max_tokens=1024)
+        system_prompt = client.get_chat_prompt("my-system-prompt")
+        config = MyAgentConfig(
+            temperature=0.7, model="gpt-4", max_tokens=1024,
+            system_prompt=system_prompt,
+        )
         version = client.create_agent_config_version(
             config,
             project_name="my-project",
@@ -498,7 +610,10 @@ When fetching a configuration inside a tracked context, the configuration metada
         config.deploy_to("prod")
 
         # 4. Fetch at runtime
-        fallback = MyAgentConfig(temperature=0.0, model="gpt-3.5-turbo", max_tokens=512)
+        fallback = MyAgentConfig(
+            temperature=0.0, model="gpt-3.5-turbo", max_tokens=512,
+            system_prompt=system_prompt,
+        )
 
         @opik.track()
         def run_agent(user_input: str) -> str:
@@ -507,7 +622,7 @@ When fetching a configuration inside a tracked context, the configuration metada
                 project_name="my-project",
                 env="prod",
             )
-            return f"Using {cfg.model} with temp={cfg.temperature}"
+            return f"Using {cfg.model} with temp={cfg.temperature}, prompt={cfg.system_prompt}"
 
         result = run_agent("Hello!")
         print(result)
@@ -517,7 +632,7 @@ When fetching a configuration inside a tracked context, the configuration metada
     <Tab value="TypeScript" title="TypeScript">
 
         ```typescript
-        import { Opik, track } from "opik";
+        import { Opik, track, ChatPrompt } from "opik";
         import { z } from "zod";
 
         const client = new Opik();
@@ -527,12 +642,14 @@ When fetching a configuration inside a tracked context, the configuration metada
             temperature: z.number().describe("Sampling temperature"),
             model: z.string(),
             maxTokens: z.number(),
+            systemPrompt: z.instanceof(ChatPrompt).describe("System prompt for the agent"),
         }).describe("MyConfig");
 
         // 2. Publish a version
+        const systemPrompt = await client.getChatPrompt({ name: "my-system-prompt" });
         const version = await client.createAgentConfig(
             MyConfigSchema,
-            { temperature: 0.7, model: "gpt-4", maxTokens: 1024 },
+            { temperature: 0.7, model: "gpt-4", maxTokens: 1024, systemPrompt },
             { projectName: "my-project", description: "Production v1" },
         );
         console.log(`Published: ${version}`);
@@ -541,11 +658,11 @@ When fetching a configuration inside a tracked context, the configuration metada
         // 4. Fetch at runtime
         const result = await track({ name: "run-agent" }, async () => {
             const cfg = await client.getAgentConfigVersion(MyConfigSchema, {
-                fallback: { temperature: 0.0, model: "gpt-3.5-turbo", maxTokens: 512 },
+                fallback: { temperature: 0.0, model: "gpt-3.5-turbo", maxTokens: 512, systemPrompt },
                 projectName: "my-project",
                 env: "prod",
             });
-            return `Using ${cfg.model} with temp=${cfg.temperature}`;
+            return `Using ${cfg.model} with temp=${cfg.temperature}, prompt=${cfg.systemPrompt}`;
         });
 
         console.log(result);

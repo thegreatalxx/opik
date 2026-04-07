@@ -23,16 +23,18 @@ Define your configuration shape as a Zod object schema. The schema **must** have
 
 ```typescript
 import { z } from "zod";
+import { Prompt, ChatPrompt } from "opik";
 
 const MyConfigSchema = z.object({
     temperature: z.number().describe("Sampling temperature"),
     model: z.string(),
     maxTokens: z.number(),
+    systemPrompt: z.instanceof(ChatPrompt).describe("System prompt for the agent"),
     useCot: z.boolean().describe("Enable chain-of-thought reasoning"),
 }).describe("MyConfig");
 ```
 
-Use `.describe()` on individual fields to attach human-readable descriptions.
+Use `.describe()` on individual fields to attach human-readable descriptions. Use `z.instanceof(Prompt)` or `z.instanceof(ChatPrompt)` for prompt fields.
 
 ## `createAgentConfig`
 
@@ -67,20 +69,23 @@ async createAgentConfig<S extends z.ZodObject<z.ZodRawShape>>(
 ### Example
 
 ```typescript
-import { Opik } from "opik";
+import { Opik, ChatPrompt } from "opik";
 import { z } from "zod";
 
 const client = new Opik();
+
+const systemPrompt = await client.getChatPrompt({ name: "my-system-prompt" });
 
 const MyConfigSchema = z.object({
     temperature: z.number().describe("Sampling temperature"),
     model: z.string(),
     maxTokens: z.number(),
+    systemPrompt: z.instanceof(ChatPrompt).describe("System prompt for the agent"),
 }).describe("MyConfig");
 
 const version = await client.createAgentConfig(
     MyConfigSchema,
-    { temperature: 0.7, model: "gpt-4", maxTokens: 1024 },
+    { temperature: 0.7, model: "gpt-4", maxTokens: 1024, systemPrompt },
     { projectName: "my-project", description: "Production v1" },
 );
 
@@ -136,25 +141,28 @@ If none is provided, `env: "prod"` is used by default.
 ### Example
 
 ```typescript
-import { Opik, track } from "opik";
+import { Opik, track, ChatPrompt } from "opik";
 import { z } from "zod";
 
 const client = new Opik();
+
+const fallbackPrompt = await client.getChatPrompt({ name: "my-system-prompt" });
 
 const MyConfigSchema = z.object({
     temperature: z.number(),
     model: z.string(),
     maxTokens: z.number(),
+    systemPrompt: z.instanceof(ChatPrompt),
 }).describe("MyConfig");
 
 const result = await track({ name: "my-agent" }, async () => {
     const config = await client.getAgentConfigVersion(MyConfigSchema, {
-        fallback: { temperature: 0.5, model: "gpt-4o-mini", maxTokens: 512 },
+        fallback: { temperature: 0.5, model: "gpt-4o-mini", maxTokens: 512, systemPrompt: fallbackPrompt },
         projectName: "my-project",
         env: "prod",
     });
 
-    console.log(`Model: ${config.model}, Temp: ${config.temperature}`);
+    console.log(`Model: ${config.model}, Temp: ${config.temperature}, Prompt: ${config.systemPrompt}`);
     return callLLM(config.model, config.temperature);
 });
 
@@ -191,7 +199,7 @@ When the backend is unreachable, `getAgentConfigVersion` returns the `fallback` 
 ```typescript
 const result = await track({ name: "my-agent" }, async () => {
     const config = await client.getAgentConfigVersion(MyConfigSchema, {
-        fallback: { temperature: 0.0, model: "gpt-3.5-turbo", maxTokens: 512 },
+        fallback: { temperature: 0.0, model: "gpt-3.5-turbo", maxTokens: 512, systemPrompt: fallbackPrompt },
         env: "prod",
     });
 
@@ -205,16 +213,91 @@ const result = await track({ name: "my-agent" }, async () => {
 
 ## Prompts in Configurations
 
-Agent configurations have a direct connection to Opik's prompt management system. **Updating a prompt will automatically update the configuration** — when a prompt referenced by a configuration is updated, the configuration will reflect the updated prompt the next time it is fetched, without needing to publish a new configuration version.
+Agent configurations have a direct connection to Opik's prompt management system. Use `z.instanceof(Prompt)` or `z.instanceof(ChatPrompt)` to include prompt fields in your schema. **Updating a prompt will automatically update the configuration** — when a prompt referenced by a configuration is updated, the configuration will reflect the updated prompt the next time it is fetched, without needing to publish a new configuration version.
+
+```typescript
+import { Opik, Prompt, ChatPrompt } from "opik";
+import { z } from "zod";
+
+const client = new Opik();
+
+const systemPrompt = await client.getChatPrompt({ name: "my-system-prompt" });
+const summaryPrompt = await client.getPrompt({ name: "my-summary-prompt" });
+
+const AgentWithPromptsSchema = z.object({
+    systemPrompt: z.instanceof(ChatPrompt).describe("System prompt for the agent"),
+    summaryPrompt: z.instanceof(Prompt).describe("Summary prompt template"),
+    temperature: z.number(),
+}).describe("AgentWithPrompts");
+
+await client.createAgentConfig(
+    AgentWithPromptsSchema,
+    { systemPrompt, summaryPrompt: summaryPrompt!, temperature: 0.7 },
+    { projectName: "my-project" },
+);
+```
 
 ## Trace Metadata
 
 When `getAgentConfigVersion` is called inside a `track()` function, the configuration metadata (blueprint ID, version, field values) is automatically injected into the current trace and span metadata under the `agent_configuration` key.
 
-## Complete Example
+## Advanced: Configuration Masks
+
+<Note>
+  Masks are an advanced feature primarily used by **Opik optimizers** to run experiments with different parameter values. Most users do not need to interact with masks directly — they are managed automatically when you use Opik's optimization and evaluation tools.
+</Note>
+
+A **mask** is a partial override that sits on top of an existing configuration. It lets you substitute a subset of fields without creating a full new version. When a mask is active, `getAgentConfigVersion` transparently merges the mask's values over the base configuration, so your agent code doesn't need to change.
+
+### How Masks Work
+
+1. **Create a mask** using `AgentConfigManager.createMask()` — specify only the fields you want to override
+2. **Activate the mask context** using `agentConfigContext()` — wrap your agent call so the SDK knows which mask to apply
+3. **Fetch the config as usual** — `getAgentConfigVersion` automatically overlays the mask
 
 ```typescript
 import { Opik, track } from "opik";
+import { AgentConfigManager, agentConfigContext } from "opik";
+import { z } from "zod";
+
+const client = new Opik();
+
+const MyConfigSchema = z.object({
+    temperature: z.number(),
+    model: z.string(),
+    maxTokens: z.number(),
+}).describe("MyConfig");
+
+// Create a mask with overridden values
+const manager = new AgentConfigManager("my-project", client);
+const maskId = await manager.createMask({
+    values: [{ key: "MyConfig.temperature", value: 0.9, type: "float" }],
+});
+
+// Run the agent inside the mask context
+const result = await agentConfigContext(maskId, async () => {
+    return track({ name: "run-agent" }, async () => {
+        // getAgentConfigVersion automatically applies the mask
+        const config = await client.getAgentConfigVersion(MyConfigSchema, {
+            fallback: { temperature: 0.0, model: "gpt-3.5-turbo", maxTokens: 512 },
+            latest: true,
+        });
+        return `Temperature: ${config.temperature}`; // 0.9 from the mask
+    });
+});
+```
+
+### When Are Masks Used?
+
+- **Optimization runs** — Opik optimizers automatically create masks to evaluate different parameter combinations (e.g., testing `temperature=0.5` vs `temperature=0.9`) without modifying the base configuration.
+- **A/B testing** — You can manually create masks to run controlled experiments comparing different configuration variants.
+
+The mask ID is recorded in trace metadata (under `_mask_id`), so you can correlate experimental results with the exact parameter overrides that were applied.
+
+## Complete Example
+
+```typescript
+import { Opik, track, ChatPrompt } from "opik";
 import { z } from "zod";
 
 const client = new Opik();
@@ -224,12 +307,14 @@ const MyConfigSchema = z.object({
     temperature: z.number().describe("Sampling temperature"),
     model: z.string(),
     maxTokens: z.number(),
+    systemPrompt: z.instanceof(ChatPrompt).describe("System prompt for the agent"),
 }).describe("MyConfig");
 
 // 2. Publish a version
+const systemPrompt = await client.getChatPrompt({ name: "my-system-prompt" });
 const version = await client.createAgentConfig(
     MyConfigSchema,
-    { temperature: 0.7, model: "gpt-4", maxTokens: 1024 },
+    { temperature: 0.7, model: "gpt-4", maxTokens: 1024, systemPrompt },
     { projectName: "my-project", description: "Production v1" },
 );
 console.log(`Published: ${version}`);
@@ -237,7 +322,7 @@ console.log(`Published: ${version}`);
 // 3. Fetch at runtime and deploy to an environment
 const result = await track({ name: "run-agent" }, async () => {
     const cfg = await client.getAgentConfigVersion(MyConfigSchema, {
-        fallback: { temperature: 0.0, model: "gpt-3.5-turbo", maxTokens: 512 },
+        fallback: { temperature: 0.0, model: "gpt-3.5-turbo", maxTokens: 512, systemPrompt },
         projectName: "my-project",
         latest: true,
     });
@@ -245,7 +330,7 @@ const result = await track({ name: "run-agent" }, async () => {
     // Deploy to prod
     await cfg.deployTo("prod");
 
-    return `Using ${cfg.model} with temp=${cfg.temperature}`;
+    return `Using ${cfg.model} with temp=${cfg.temperature}, prompt=${cfg.systemPrompt}`;
 });
 
 console.log(result);
