@@ -378,6 +378,10 @@ class DatasetServiceImpl implements DatasetService {
 
         Dataset dataset = findByName(workspaceId, identifier.datasetName(), projectId, visibility);
 
+        if (projectNameProvided && projectId == null) {
+            requestContext.get().setWorkspaceFallbackFor("Dataset", identifier.datasetName());
+        }
+
         return verifyVisibility(dataset, visibility);
     }
 
