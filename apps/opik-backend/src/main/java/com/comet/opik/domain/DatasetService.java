@@ -367,7 +367,7 @@ class DatasetServiceImpl implements DatasetService {
     }
 
     @Override
-    public Dataset findByName(@NonNull DatasetIdentifier identifier, @NonNull Visibility visibility) {
+    public Dataset findByName(@NonNull DatasetIdentifier identifier, Visibility visibility) {
         var workspaceId = requestContext.get().getWorkspaceId();
         UUID projectId = null;
 
@@ -383,19 +383,7 @@ class DatasetServiceImpl implements DatasetService {
 
     @Override
     public Dataset resolveDatasetByName(@NonNull DatasetIdentifier identifier) {
-        String workspaceId = requestContext.get().getWorkspaceId();
-        Visibility visibility = requestContext.get().getVisibility();
-
-        UUID projectId = null;
-        boolean projectNameProvided = StringUtils.isNotBlank(identifier.projectName());
-
-        if (projectNameProvided) {
-            projectId = projectService.findProjectIdByName(workspaceId, identifier.projectName()).orElse(null);
-        }
-
-        Dataset dataset = findByName(workspaceId, identifier.datasetName(), projectId, visibility);
-
-        return verifyVisibility(dataset, visibility);
+        return findByName(identifier, requestContext.get().getVisibility());
     }
 
     @Override
