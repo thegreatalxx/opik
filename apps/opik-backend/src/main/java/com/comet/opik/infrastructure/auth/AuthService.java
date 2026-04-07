@@ -1,5 +1,6 @@
 package com.comet.opik.infrastructure.auth;
 
+import com.comet.opik.api.Visibility;
 import com.comet.opik.domain.ProjectService;
 import com.comet.opik.utils.WorkspaceUtils;
 import jakarta.inject.Provider;
@@ -32,6 +33,7 @@ class AuthServiceImpl implements AuthService {
             requestContext.get().setUserName(ProjectService.DEFAULT_USER);
             requestContext.get().setWorkspaceId(ProjectService.DEFAULT_WORKSPACE_ID);
             requestContext.get().setWorkspaceName(ProjectService.DEFAULT_WORKSPACE_NAME);
+            requestContext.get().setVisibility(Visibility.PRIVATE);
             requestContext.get().setApiKey("default");
             return;
         }
