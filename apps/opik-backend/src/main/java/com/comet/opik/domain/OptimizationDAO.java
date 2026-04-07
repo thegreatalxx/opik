@@ -7,6 +7,7 @@ import com.comet.opik.api.OptimizationStudioConfig;
 import com.comet.opik.api.OptimizationUpdate;
 import com.comet.opik.domain.filter.FilterQueryBuilder;
 import com.comet.opik.domain.filter.FilterStrategy;
+import com.comet.opik.infrastructure.DatabaseUtils;
 import com.comet.opik.utils.JsonUtils;
 import com.comet.opik.utils.template.TemplateUtils;
 import com.google.common.base.Function;
@@ -29,6 +30,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.SignalType;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -68,6 +70,8 @@ public interface OptimizationDAO {
     Mono<Optimization.OptimizationPage> find(int page, int size, @NonNull OptimizationSearchCriteria searchCriteria);
 
     Flux<OptimizationSummary> findOptimizationSummaryByDatasetIds(Set<UUID> datasetIds);
+
+    Mono<Boolean> hasVersion1Optimizations(String workspaceId);
 }
 
 @Singleton
@@ -75,12 +79,19 @@ public interface OptimizationDAO {
 @Slf4j
 class OptimizationDAOImpl implements OptimizationDAO {
 
+    private static final String HAS_VERSION1_OPTIMIZATIONS = """
+            SELECT 1 FROM optimizations
+            WHERE workspace_id = :workspace_id AND project_id = ''
+            LIMIT 1
+            SETTINGS log_comment = '<log_comment>'""";
+
     private static final String UPSERT = """
             INSERT INTO optimizations (
                 id,
                 dataset_id,
                 name,
                 workspace_id,
+                project_id,
                 objective_name,
                 status,
                 metadata,
@@ -94,6 +105,7 @@ class OptimizationDAOImpl implements OptimizationDAO {
                 :dataset_id,
                 :name,
                 :workspace_id,
+                :project_id,
                 :objective_name,
                 :status,
                 :metadata,
@@ -109,18 +121,30 @@ class OptimizationDAOImpl implements OptimizationDAO {
             WITH optimization_final AS (
                 SELECT
                     *
-                FROM optimizations FINAL
-                WHERE workspace_id = :workspace_id
-                <if(id)>AND id = :id <endif>
+                FROM (
+                    SELECT *
+                    FROM optimizations
+                    WHERE workspace_id = :workspace_id
+                    <if(dataset_id)>AND dataset_id = :dataset_id <endif>
+                    <if(dataset_ids)>AND dataset_id IN :dataset_ids <endif>
+                    <if(id)>AND id = :id <endif>
+                    <if(project_id)>AND project_id = :project_id <endif>
+                    ORDER BY (workspace_id, dataset_id, id) DESC, last_updated_at DESC
+                    LIMIT 1 BY workspace_id, dataset_id, id
+                )
+                WHERE 1=1
                 <if(name)>AND ilike(name, CONCAT('%%', :name ,'%%'))<endif>
-                <if(dataset_id)>AND dataset_id = :dataset_id <endif>
                 <if(dataset_deleted)>AND dataset_deleted = :dataset_deleted<endif>
                 <if(studio_only)>AND studio_config != ''<endif>
                 <if(filters)>AND <filters><endif>
             ), experiments_final AS (
                 SELECT
                     id,
-                    optimization_id
+                    optimization_id,
+                    experiment_scores,
+                    metadata AS experiment_metadata,
+                    created_at AS experiment_created_at,
+                    type AS experiment_type
                 FROM experiments
                 WHERE workspace_id = :workspace_id
                 AND optimization_id IN (SELECT id FROM optimization_final)
@@ -144,7 +168,7 @@ class OptimizationDAOImpl implements OptimizationDAO {
                        value,
                        last_updated_at,
                        last_updated_by AS author
-                FROM feedback_scores FINAL
+                FROM feedback_scores
                 WHERE entity_type = :entity_type
                   AND workspace_id = :workspace_id
                   AND entity_id IN (SELECT trace_id FROM experiment_items_final)
@@ -156,7 +180,7 @@ class OptimizationDAOImpl implements OptimizationDAO {
                        value,
                        last_updated_at,
                        author
-                FROM authored_feedback_scores FINAL
+                FROM authored_feedback_scores
                 WHERE entity_type = :entity_type
                   AND workspace_id = :workspace_id
                   AND entity_id IN (SELECT trace_id FROM experiment_items_final)
@@ -222,15 +246,140 @@ class OptimizationDAOImpl implements OptimizationDAO {
                     HAVING length(fs.name) > 0
                 ) as fs_avg
                 GROUP BY experiment_id
+            ), experiment_scores_parsed AS (
+                SELECT
+                    e.id AS experiment_id,
+                    JSON_VALUE(score, '$.name') AS name,
+                    CAST(JSON_VALUE(score, '$.value') AS Float64) AS value
+                FROM experiments_final AS e
+                ARRAY JOIN JSONExtractArrayRaw(e.experiment_scores) AS score
+                WHERE e.experiment_scores != '' AND e.experiment_scores != '[]'
+                  AND length(JSON_VALUE(score, '$.name')) > 0
+            ), experiment_scores_agg AS (
+                SELECT
+                    experiment_id,
+                    mapFromArrays(
+                        groupArray(name),
+                        groupArray(value)
+                    ) AS experiment_scores
+                FROM experiment_scores_parsed
+                GROUP BY experiment_id
+            ), experiment_durations AS (
+                SELECT
+                    ei.experiment_id,
+                    count(DISTINCT ei.trace_id) AS trace_count,
+                    arrayElement(
+                        quantiles(0.5)(t.duration), 1
+                    ) AS duration_p50,
+                    sum(s.total_estimated_cost) AS total_estimated_cost
+                FROM experiment_items_final ei
+                LEFT JOIN (
+                    SELECT id, duration
+                    FROM traces
+                    WHERE workspace_id = :workspace_id
+                    AND id IN (SELECT trace_id FROM experiment_items_final)
+                    ORDER BY (workspace_id, project_id, id) DESC, last_updated_at DESC
+                    LIMIT 1 BY workspace_id, project_id, id
+                ) AS t ON ei.trace_id = t.id
+                LEFT JOIN (
+                    SELECT trace_id, sum(total_estimated_cost) AS total_estimated_cost
+                    FROM (
+                        SELECT workspace_id, project_id, trace_id, parent_span_id, id, total_estimated_cost, last_updated_at
+                        FROM spans
+                        WHERE workspace_id = :workspace_id
+                        AND trace_id IN (SELECT trace_id FROM experiment_items_final)
+                        ORDER BY (workspace_id, project_id, trace_id, parent_span_id, id) DESC, last_updated_at DESC
+                        LIMIT 1 BY workspace_id, project_id, trace_id, parent_span_id, id
+                    )
+                    GROUP BY trace_id
+                ) AS s ON t.id = s.trace_id
+                GROUP BY ei.experiment_id
+            ), experiment_candidates AS (
+                SELECT
+                    ef.id AS experiment_id,
+                    ef.optimization_id,
+                    ef.experiment_created_at,
+                    if(
+                        JSONHas(ef.experiment_metadata, 'candidate_id') AND JSONExtractString(ef.experiment_metadata, 'candidate_id') != '',
+                        JSONExtractString(ef.experiment_metadata, 'candidate_id'),
+                        toString(ef.id)
+                    ) AS candidate_id
+                FROM experiments_final ef
+                WHERE ef.experiment_type NOT IN ('mini-batch', 'mutation')
+            ), objective_scores_per_experiment AS (
+                SELECT
+                    ef.optimization_id,
+                    esp.experiment_id,
+                    esp.value AS objective_score
+                FROM experiment_scores_parsed esp
+                INNER JOIN experiments_final ef ON esp.experiment_id = ef.id
+                INNER JOIN optimization_final o ON ef.optimization_id = o.id
+                WHERE esp.name = o.objective_name
+            ), candidate_metrics AS (
+                SELECT
+                    ec.optimization_id AS optim_id,
+                    ec.candidate_id,
+                    sum(ospe.objective_score * ed.trace_count)
+                        / nullIf(sumIf(ed.trace_count, isNotNull(ospe.objective_score)), 0)
+                        AS weighted_score,
+                    sum(ed.duration_p50 / 1000.0 * ed.trace_count)
+                        / nullIf(sumIf(ed.trace_count, isNotNull(ed.duration_p50)), 0)
+                        AS weighted_duration,
+                    sum(ed.total_estimated_cost)
+                        / nullIf(sum(ed.trace_count), 0)
+                        AS per_trace_cost,
+                    min(ec.experiment_created_at) AS earliest_created_at
+                FROM experiment_candidates ec
+                LEFT JOIN objective_scores_per_experiment ospe
+                    ON ec.experiment_id = ospe.experiment_id
+                    AND ec.optimization_id = ospe.optimization_id
+                LEFT JOIN experiment_durations ed ON ec.experiment_id = ed.experiment_id
+                GROUP BY ec.optimization_id, ec.candidate_id
+            ), best_candidate AS (
+                SELECT
+                    optim_id AS optimization_id,
+                    max(weighted_score) AS best_score,
+                    argMax(weighted_duration, weighted_score) AS best_duration,
+                    argMax(per_trace_cost, weighted_score) AS best_cost
+                FROM candidate_metrics
+                WHERE isNotNull(weighted_score)
+                GROUP BY optim_id
+            ), baseline_candidate AS (
+                SELECT
+                    optim_id AS optimization_id,
+                    argMin(weighted_score, earliest_created_at) AS baseline_score,
+                    argMin(weighted_duration, earliest_created_at) AS baseline_duration,
+                    argMin(per_trace_cost, earliest_created_at) AS baseline_cost
+                FROM candidate_metrics
+                GROUP BY optim_id
+            ), optimization_costs AS (
+                SELECT
+                    ef2.optimization_id AS optimization_id,
+                    sum(ed2.total_estimated_cost) AS total_optimization_cost
+                FROM experiments_final ef2
+                LEFT JOIN experiment_durations ed2 ON ef2.id = ed2.experiment_id
+                GROUP BY ef2.optimization_id
             )
             SELECT
                 o.*,
                 o.id as id,
                 COUNT(DISTINCT e.id) FILTER (WHERE e.id != '') AS num_trials,
-                maxMap(fs.feedback_scores) AS feedback_scores
+                maxMap(fs.feedback_scores) AS feedback_scores,
+                maxMap(es.experiment_scores) AS experiment_scores,
+                any(bc.best_score) AS best_objective_score,
+                any(blc.baseline_score) AS baseline_objective_score,
+                any(bc.best_duration) AS best_duration,
+                any(bc.best_cost) AS best_cost,
+                any(blc.baseline_duration) AS baseline_duration,
+                any(blc.baseline_cost) AS baseline_cost,
+                any(oc.total_optimization_cost) AS total_optimization_cost
             FROM optimization_final AS o
             LEFT JOIN experiments_final AS e ON o.id = e.optimization_id
             LEFT JOIN feedback_scores_agg AS fs ON e.id = fs.experiment_id
+            LEFT JOIN experiment_scores_agg AS es ON e.id = es.experiment_id
+            LEFT JOIN best_candidate AS bc ON o.id = bc.optimization_id
+            LEFT JOIN baseline_candidate AS blc ON o.id = blc.optimization_id
+            LEFT JOIN optimization_costs AS oc ON o.id = oc.optimization_id
             GROUP BY o.*
             ORDER BY o.id DESC
             <if(limit)> LIMIT :limit <endif> <if(offset)> OFFSET :offset <endif>
@@ -243,11 +392,19 @@ class OptimizationDAOImpl implements OptimizationDAO {
             FROM (
                 SELECT
                     id
-                FROM optimizations FINAL
-                WHERE workspace_id = :workspace_id
-                <if(id)>AND id = :id <endif>
+                FROM (
+                    SELECT *
+                    FROM optimizations
+                    WHERE workspace_id = :workspace_id
+                    <if(dataset_id)>AND dataset_id = :dataset_id <endif>
+                    <if(dataset_ids)>AND dataset_id IN :dataset_ids <endif>
+                    <if(id)>AND id = :id <endif>
+                    <if(project_id)>AND project_id = :project_id <endif>
+                    ORDER BY (workspace_id, dataset_id, id) DESC, last_updated_at DESC
+                    LIMIT 1 BY workspace_id, dataset_id, id
+                )
+                WHERE 1=1
                 <if(name)>AND ilike(name, CONCAT('%%', :name ,'%%'))<endif>
-                <if(dataset_id)>AND dataset_id = :dataset_id <endif>
                 <if(dataset_deleted)>AND dataset_deleted = :dataset_deleted<endif>
                 <if(studio_only)>AND studio_config != ''<endif>
                 <if(filters)>AND <filters><endif>
@@ -275,13 +432,14 @@ class OptimizationDAOImpl implements OptimizationDAO {
 
     private static final String UPDATE_BY_ID = """
             INSERT INTO optimizations (
-            	id, dataset_id, name, workspace_id, objective_name, status, metadata, created_at, created_by, last_updated_by, studio_config
+            	id, dataset_id, name, workspace_id, project_id, objective_name, status, metadata, created_at, created_by, last_updated_by, studio_config
             )
             SELECT
                 id,
                 dataset_id,
                 <if(name)> :name <else> name <endif> as name,
                 workspace_id,
+                project_id,
                 objective_name,
                 <if(status)> :status <else> status <endif> as status,
                 metadata,
@@ -299,13 +457,14 @@ class OptimizationDAOImpl implements OptimizationDAO {
 
     private static final String SET_DATASET_DELETED_TO_TRUE_BY_DATASET_ID = """
             INSERT INTO optimizations (
-            	id, dataset_id, name, workspace_id, objective_name, status, metadata, created_at, created_by, last_updated_at, last_updated_by, dataset_deleted, studio_config
+            	id, dataset_id, name, workspace_id, project_id, objective_name, status, metadata, created_at, created_by, last_updated_at, last_updated_by, dataset_deleted, studio_config
             )
             SELECT
                 id,
                 dataset_id,
                 name as name,
                 workspace_id,
+                project_id,
                 objective_name,
                 status as status,
                 metadata,
@@ -542,12 +701,19 @@ class OptimizationDAOImpl implements OptimizationDAO {
         Optional.ofNullable(searchCriteria.datasetId())
                 .ifPresent(datasetId -> template.add("dataset_id", datasetId));
 
+        Optional.ofNullable(searchCriteria.datasetIds())
+                .filter(ids -> !ids.isEmpty())
+                .ifPresent(datasetIds -> template.add("dataset_ids", datasetIds));
+
         Optional.ofNullable(searchCriteria.name())
                 .ifPresent(name -> template.add("name", name));
 
         Optional.ofNullable(searchCriteria.studioOnly())
                 .filter(Boolean.TRUE::equals)
                 .ifPresent(studioOnly -> template.add("studio_only", "true"));
+
+        Optional.ofNullable(searchCriteria.projectId())
+                .ifPresent(projectId -> template.add("project_id", projectId));
 
         Optional.ofNullable(searchCriteria.filters())
                 .flatMap(filters -> filterQueryBuilder.toAnalyticsDbFilters(filters, FilterStrategy.OPTIMIZATION))
@@ -565,8 +731,15 @@ class OptimizationDAOImpl implements OptimizationDAO {
         Optional.ofNullable(searchCriteria.datasetId())
                 .ifPresent(datasetId -> statement.bind("dataset_id", datasetId));
 
+        Optional.ofNullable(searchCriteria.datasetIds())
+                .filter(ids -> !ids.isEmpty())
+                .ifPresent(datasetIds -> statement.bind("dataset_ids", datasetIds));
+
         Optional.ofNullable(searchCriteria.name())
                 .ifPresent(name -> statement.bind("name", name));
+
+        Optional.ofNullable(searchCriteria.projectId())
+                .ifPresent(projectId -> statement.bind("project_id", projectId.toString()));
 
         Optional.ofNullable(searchCriteria.filters())
                 .ifPresent(filters -> filterQueryBuilder.bind(statement, filters, FilterStrategy.OPTIMIZATION));
@@ -583,6 +756,7 @@ class OptimizationDAOImpl implements OptimizationDAO {
                 .bind("id", optimization.id())
                 .bind("dataset_id", optimization.datasetId())
                 .bind("name", optimization.name())
+                .bind("project_id", optimization.projectId() != null ? optimization.projectId().toString() : "")
                 .bind("objective_name", optimization.objectiveName())
                 .bind("status", optimization.status().getValue())
                 .bind("metadata", getStringOrDefault(optimization.metadata()));
@@ -634,10 +808,14 @@ class OptimizationDAOImpl implements OptimizationDAO {
                 }
             }
 
+            String projectIdStr = row.get("project_id", String.class);
+            UUID projectId = StringUtils.isNotBlank(projectIdStr) ? UUID.fromString(projectIdStr) : null;
+
             return Optimization.builder()
                     .id(row.get("id", UUID.class))
                     .name(row.get("name", String.class))
                     .datasetId(row.get("dataset_id", UUID.class))
+                    .projectId(projectId)
                     .objectiveName(row.get("objective_name", String.class))
                     .status(OptimizationStatus.fromString(row.get("status", String.class)))
                     .metadata(getJsonNodeOrDefault(row.get("metadata", String.class)))
@@ -647,7 +825,15 @@ class OptimizationDAOImpl implements OptimizationDAO {
                     .createdBy(row.get("created_by", String.class))
                     .lastUpdatedBy(row.get("last_updated_by", String.class))
                     .feedbackScores(getFeedbackScores(row, "feedback_scores"))
+                    .experimentScores(getFeedbackScores(row, "experiment_scores"))
                     .numTrials(row.get("num_trials", Long.class))
+                    .baselineObjectiveScore(row.get("baseline_objective_score", BigDecimal.class))
+                    .bestObjectiveScore(row.get("best_objective_score", BigDecimal.class))
+                    .baselineDuration(row.get("baseline_duration", BigDecimal.class))
+                    .bestDuration(row.get("best_duration", BigDecimal.class))
+                    .baselineCost(row.get("baseline_cost", BigDecimal.class))
+                    .bestCost(row.get("best_cost", BigDecimal.class))
+                    .totalOptimizationCost(row.get("total_optimization_cost", BigDecimal.class))
                     .build();
         });
     }
@@ -703,5 +889,17 @@ class OptimizationDAOImpl implements OptimizationDAO {
         statement.bind("id", id);
 
         return statement;
+    }
+
+    @Override
+    public Mono<Boolean> hasVersion1Optimizations(@NonNull String workspaceId) {
+        var template = DatabaseUtils.getSTWithLogComment(HAS_VERSION1_OPTIMIZATIONS,
+                "has_version1_optimizations", workspaceId, "", "");
+        return Mono.from(connectionFactory.create())
+                .flatMapMany(connection -> Flux.from(connection.createStatement(template.render())
+                        .bind("workspace_id", workspaceId)
+                        .execute())
+                        .flatMap(result -> Flux.from(result.map((row, metadata) -> true))))
+                .hasElements();
     }
 }

@@ -6,16 +6,27 @@ import com.comet.opik.api.Prompt;
 import com.comet.opik.api.PromptVersion;
 import com.comet.opik.api.PromptVersionCommitsRequest;
 import com.comet.opik.api.PromptVersionLink;
+import com.comet.opik.api.PromptVersionRetrieve;
+import com.comet.opik.api.filter.PromptFilter;
 import com.comet.opik.api.resources.utils.TestUtils;
+import com.comet.opik.api.sorting.SortingField;
 import com.comet.opik.infrastructure.auth.RequestContext;
+import com.comet.opik.podam.PodamFactoryUtils;
+import com.comet.opik.utils.JsonUtils;
 import jakarta.ws.rs.client.Entity;
+import jakarta.ws.rs.client.WebTarget;
 import jakarta.ws.rs.core.GenericType;
 import jakarta.ws.rs.core.HttpHeaders;
+import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.Response;
 import lombok.RequiredArgsConstructor;
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.hc.core5.http.HttpStatus;
 import ru.vyarus.dropwizard.guice.test.ClientSupport;
 import uk.co.jemos.podam.api.PodamFactory;
 
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -31,6 +42,16 @@ public class PromptResourceClient {
     private final String baseURI;
     private final PodamFactory podamFactory;
 
+    public static Prompt buildPrompt(PodamFactory factory) {
+        return factory.manufacturePojo(Prompt.class).toBuilder().projectId(null).projectName(null).build();
+    }
+
+    public static List<Prompt> buildPromptList(PodamFactory factory) {
+        return PodamFactoryUtils.manufacturePojoList(factory, Prompt.class).stream()
+                .map(prompt -> prompt.toBuilder().projectId(null).projectName(null).build())
+                .toList();
+    }
+
     public UUID createPrompt(Prompt prompt, String apiKey, String workspaceName) {
 
         try (var response = client.target(PROMPT_PATH.formatted(baseURI))
@@ -42,6 +63,56 @@ public class PromptResourceClient {
             assertThat(response.getStatus()).isEqualTo(HttpStatus.SC_CREATED);
 
             return TestUtils.getIdFromLocation(response.getLocation());
+        }
+    }
+
+    public Prompt.PromptPage getProjectPrompts(UUID projectId, int page, String name, List<SortingField> sortingFields,
+            List<PromptFilter> filters, String apiKey, String workspaceName) {
+
+        WebTarget target = client.target("%s/v1/private/projects/%s/prompts".formatted(baseURI, projectId));
+
+        if (name != null) {
+            target = target.queryParam("name", name);
+        }
+
+        if (page > 1) {
+            target = target.queryParam("page", page);
+        }
+
+        if (CollectionUtils.isNotEmpty(sortingFields)) {
+            target = target.queryParam("sorting",
+                    URLEncoder.encode(JsonUtils.writeValueAsString(sortingFields), StandardCharsets.UTF_8));
+        }
+
+        if (CollectionUtils.isNotEmpty(filters)) {
+            target = target.queryParam("filters", TestUtils.toURLEncodedQueryParam(filters));
+        }
+
+        try (var response = target
+                .request()
+                .header(HttpHeaders.AUTHORIZATION, apiKey)
+                .header(RequestContext.WORKSPACE_HEADER, workspaceName)
+                .get()) {
+
+            assertThat(response.getStatus()).isEqualTo(HttpStatus.SC_OK);
+            return response.readEntity(Prompt.PromptPage.class);
+        }
+    }
+
+    public Prompt.PromptPage getPromptsByProjectId(UUID projectId, String apiKey, String workspaceName) {
+
+        try (var response = client.target(PROMPT_PATH.formatted(baseURI))
+                .queryParam("page", 1)
+                .queryParam("size", 100)
+                .queryParam("project_id", projectId)
+                .request()
+                .accept(MediaType.APPLICATION_JSON_TYPE)
+                .header(HttpHeaders.AUTHORIZATION, apiKey)
+                .header(RequestContext.WORKSPACE_HEADER, workspaceName)
+                .get()) {
+
+            assertThat(response.getStatus()).isEqualTo(HttpStatus.SC_OK);
+            return response.readEntity(Prompt.PromptPage.class);
         }
     }
 
@@ -125,6 +196,14 @@ public class PromptResourceClient {
             return response.readEntity(new GenericType<>() {
             });
         }
+    }
+
+    public Response callRetrievePromptVersion(PromptVersionRetrieve request, String apiKey, String workspaceName) {
+        return client.target(PROMPT_PATH.formatted(baseURI) + "/versions/retrieve")
+                .request()
+                .header(HttpHeaders.AUTHORIZATION, apiKey)
+                .header(RequestContext.WORKSPACE_HEADER, workspaceName)
+                .post(Entity.json(request));
     }
 
     public PromptVersion createPromptVersion(Prompt prompt, String apiKey, String workspaceName) {

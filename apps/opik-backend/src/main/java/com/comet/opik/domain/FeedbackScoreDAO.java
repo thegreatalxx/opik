@@ -52,13 +52,12 @@ public interface FeedbackScoreDAO {
 
     Mono<Long> scoreBatchOfThreads(List<FeedbackScoreBatchItemThread> scores, @Nullable String author);
 
-    Mono<List<String>> getTraceFeedbackScoreNames(UUID projectId, Set<String> excludeCategoryNames);
+    Mono<List<String>> getTraceFeedbackScoreNames(UUID projectId);
 
-    Mono<List<String>> getSpanFeedbackScoreNames(UUID projectId, SpanType type,
-            Set<String> excludeCategoryNames);
+    Mono<List<String>> getSpanFeedbackScoreNames(UUID projectId, SpanType type);
 
     Mono<List<FeedbackScoreNames.ScoreName>> getExperimentsFeedbackScoreNames(Set<UUID> experimentIds,
-            Set<String> excludeCategoryNames);
+            @Nullable UUID projectId);
 
     Mono<List<String>> getProjectsFeedbackScoreNames(Set<UUID> projectIds);
 
@@ -69,6 +68,8 @@ public interface FeedbackScoreDAO {
 @RequiredArgsConstructor(onConstructor_ = @Inject)
 @Slf4j
 class FeedbackScoreDAOImpl implements FeedbackScoreDAO {
+
+    static final String SUITE_ASSERTION_CATEGORY = "suite_assertion";
 
     private static final String BULK_INSERT_FEEDBACK_SCORE = """
             INSERT INTO <if(author)>authored_feedback_scores<else>feedback_scores<endif>(
@@ -157,6 +158,9 @@ class FeedbackScoreDAOImpl implements FeedbackScoreDAO {
                 FROM experiment_items
                 WHERE workspace_id = :workspace_id
                 AND experiment_id IN :experiment_ids
+                <if(project_ids)>
+                AND project_id IN :project_ids
+                <endif>
             )
             <endif>
             SELECT DISTINCT
@@ -171,9 +175,6 @@ class FeedbackScoreDAOImpl implements FeedbackScoreDAO {
             <if(experiment_ids)>
             AND entity_id IN (SELECT trace_id FROM experiment_trace_ids)
             <endif>
-            <if(exclude_category_names)>
-            AND category_name NOT IN :exclude_category_names
-            <endif>
             UNION DISTINCT
             SELECT DISTINCT
                 name,
@@ -187,9 +188,6 @@ class FeedbackScoreDAOImpl implements FeedbackScoreDAO {
             <if(experiment_ids)>
             AND entity_id IN (SELECT trace_id FROM experiment_trace_ids)
             <endif>
-            <if(exclude_category_names)>
-            AND category_name NOT IN :exclude_category_names
-            <endif>
             <if(experiment_ids)>
             UNION DISTINCT
             SELECT DISTINCT
@@ -200,6 +198,9 @@ class FeedbackScoreDAOImpl implements FeedbackScoreDAO {
                 FROM experiments
                 WHERE workspace_id = :workspace_id
                 AND id IN :experiment_ids
+                <if(project_ids)>
+                AND project_id IN :project_ids
+                <endif>
                 ORDER BY (workspace_id, dataset_id, id) DESC, last_updated_at DESC
                 LIMIT 1 BY id
             ) AS e
@@ -261,9 +262,6 @@ class FeedbackScoreDAOImpl implements FeedbackScoreDAO {
                 )
                 <endif>
                 AND entity_type = 'span'
-                <if(exclude_category_names)>
-                AND category_name NOT IN :exclude_category_names
-                <endif>
                 ORDER BY (workspace_id, project_id, entity_type, entity_id, name) DESC, last_updated_at DESC
                 LIMIT 1 BY entity_id, name
                 UNION ALL
@@ -285,9 +283,6 @@ class FeedbackScoreDAOImpl implements FeedbackScoreDAO {
                 )
                 <endif>
                 AND entity_type = 'span'
-                <if(exclude_category_names)>
-                AND category_name NOT IN :exclude_category_names
-                <endif>
                 ORDER BY (workspace_id, project_id, entity_type, entity_id, author, name) DESC, last_updated_at DESC
                 LIMIT 1 BY entity_id, author, name
             ) AS names
@@ -324,9 +319,14 @@ class FeedbackScoreDAOImpl implements FeedbackScoreDAO {
 
         Preconditions.checkArgument(CollectionUtils.isNotEmpty(scores), "Argument 'scores' must not be empty");
 
+        return insertFeedbackScores(entityType, scores, author);
+    }
+
+    private Mono<Long> insertFeedbackScores(@NonNull EntityType entityType,
+            @NonNull List<? extends FeedbackScoreItem> scores, @Nullable String author) {
         return asyncTemplate.nonTransaction(connection -> makeMonoContextAware((userName, workspaceId) -> {
 
-            var logComment = getLogComment("bulk_insert_feedback_score", workspaceId, scores.size());
+            var logComment = getLogComment("bulk_insert_feedback_score", workspaceId, userName, scores.size());
             var template = TemplateUtils.getBatchSql(BULK_INSERT_FEEDBACK_SCORE, scores.size());
             template.add("author", author);
             template.add("log_comment", logComment);
@@ -376,7 +376,7 @@ class FeedbackScoreDAOImpl implements FeedbackScoreDAO {
 
             // Delete from feedback_scores table
             var deleteFeedbackScore = getSTWithLogComment(DELETE_FEEDBACK_SCORE, "delete_feedback_score", workspaceId,
-                    "")
+                    userName, "")
                     .add("table_name", "feedback_scores");
 
             if (StringUtils.isNotBlank(score.author())) {
@@ -399,7 +399,7 @@ class FeedbackScoreDAOImpl implements FeedbackScoreDAO {
 
             // Delete from authored_feedback_scores table
             var deleteAuthoredFeedbackScore = getSTWithLogComment(DELETE_FEEDBACK_SCORE,
-                    "delete_authored_feedback_score", workspaceId, "")
+                    "delete_authored_feedback_score", workspaceId, userName, "")
                     .add("table_name", "authored_feedback_scores");
             Optional.ofNullable(score.author())
                     .filter(StringUtils::isNotBlank)
@@ -446,7 +446,7 @@ class FeedbackScoreDAOImpl implements FeedbackScoreDAO {
 
             // Delete from feedback_scores table
             var template1 = getSTWithLogComment(DELETE_FEEDBACK_SCORE_BY_ENTITY_IDS,
-                    "delete_feedback_scores_by_entity_ids", workspaceId, names.size());
+                    "delete_feedback_scores_by_entity_ids", workspaceId, userName, names.size());
             template1.add("names", names);
             template1.add("table_name", "feedback_scores");
 
@@ -469,7 +469,7 @@ class FeedbackScoreDAOImpl implements FeedbackScoreDAO {
 
             // Delete from authored_feedback_scores table
             var template2 = getSTWithLogComment(DELETE_FEEDBACK_SCORE_BY_ENTITY_IDS,
-                    "delete_authored_feedback_scores_by_entity_ids", workspaceId, names.size());
+                    "delete_authored_feedback_scores_by_entity_ids", workspaceId, userName, names.size());
             template2.add("names", names);
             template2.add("table_name", "authored_feedback_scores");
             Optional.ofNullable(author)
@@ -493,22 +493,20 @@ class FeedbackScoreDAOImpl implements FeedbackScoreDAO {
 
     @Override
     @WithSpan
-    public Mono<List<String>> getTraceFeedbackScoreNames(UUID projectId, @NonNull Set<String> excludeCategoryNames) {
+    public Mono<List<String>> getTraceFeedbackScoreNames(UUID projectId) {
         return asyncTemplate.nonTransaction(connection -> makeMonoContextAware((userName, workspaceId) -> {
 
             var template = getSTWithLogComment(SELECT_FEEDBACK_SCORE_NAMES, "get_trace_feedback_score_names",
-                    workspaceId, "");
+                    workspaceId, userName, "");
 
             List<UUID> projectIds = projectId == null ? List.of() : List.of(projectId);
 
             bindTemplateParam(projectIds, null, template);
-            bindExcludeCategoryNames(template, excludeCategoryNames);
 
             var statement = connection.createStatement(template.render())
                     .bind("workspace_id", workspaceId);
 
             bindStatementParam(projectIds, null, statement, EntityType.TRACE);
-            bindExcludeCategoryNames(statement, excludeCategoryNames);
 
             return Flux.from(statement.execute())
                     .flatMap(result -> result.map((row, rowMetadata) -> row.get("name", String.class)))
@@ -519,17 +517,17 @@ class FeedbackScoreDAOImpl implements FeedbackScoreDAO {
     @Override
     @WithSpan
     public Mono<List<FeedbackScoreNames.ScoreName>> getExperimentsFeedbackScoreNames(Set<UUID> experimentIds,
-            @NonNull Set<String> excludeCategoryNames) {
+            @Nullable UUID projectId) {
         return asyncTemplate.nonTransaction(connection -> makeMonoContextAware((userName, workspaceId) -> {
             var template = getSTWithLogComment(SELECT_FEEDBACK_SCORE_NAMES, "get_experiments_feedback_score_names",
-                    workspaceId, experimentIds.size());
-            bindTemplateParam(null, experimentIds, template);
-            bindExcludeCategoryNames(template, excludeCategoryNames);
+                    workspaceId, userName, experimentIds != null ? experimentIds.size() : 0);
+
+            List<UUID> projectIds = projectId == null ? null : List.of(projectId);
+            bindTemplateParam(projectIds, experimentIds, template);
 
             var statement = connection.createStatement(template.render())
                     .bind("workspace_id", workspaceId);
-            bindStatementParam(null, experimentIds, statement, EntityType.TRACE);
-            bindExcludeCategoryNames(statement, excludeCategoryNames);
+            bindStatementParam(projectIds, experimentIds, statement, EntityType.TRACE);
 
             return Flux.from(statement.execute())
                     .flatMap(result -> result.map((row, rowMetadata) -> FeedbackScoreNames.ScoreName.builder()
@@ -546,7 +544,8 @@ class FeedbackScoreDAOImpl implements FeedbackScoreDAO {
         return asyncTemplate.nonTransaction(connection -> makeMonoContextAware((userName, workspaceId) -> {
 
             var template = getSTWithLogComment(SELECT_PROJECTS_FEEDBACK_SCORE_NAMES,
-                    "get_projects_feedback_score_names", workspaceId, projectIds != null ? projectIds.size() : 0);
+                    "get_projects_feedback_score_names", workspaceId, userName,
+                    projectIds != null ? projectIds.size() : 0);
 
             if (CollectionUtils.isNotEmpty(projectIds)) {
                 template.add("project_ids", projectIds);
@@ -571,7 +570,7 @@ class FeedbackScoreDAOImpl implements FeedbackScoreDAO {
         return asyncTemplate.nonTransaction(connection -> makeMonoContextAware((userName, workspaceId) -> {
 
             var template = getSTWithLogComment(SELECT_FEEDBACK_SCORE_NAMES,
-                    "get_projects_trace_threads_feedback_score_names", workspaceId, projectIds.size());
+                    "get_projects_trace_threads_feedback_score_names", workspaceId, userName, projectIds.size());
 
             bindTemplateParam(projectIds, null, template);
 
@@ -588,17 +587,15 @@ class FeedbackScoreDAOImpl implements FeedbackScoreDAO {
 
     @Override
     @WithSpan
-    public Mono<List<String>> getSpanFeedbackScoreNames(@NonNull UUID projectId, SpanType type,
-            @NonNull Set<String> excludeCategoryNames) {
+    public Mono<List<String>> getSpanFeedbackScoreNames(@NonNull UUID projectId, SpanType type) {
         return asyncTemplate.nonTransaction(connection -> makeMonoContextAware((userName, workspaceId) -> {
 
             var template = getSTWithLogComment(SELECT_SPAN_FEEDBACK_SCORE_NAMES, "get_span_feedback_score_names",
-                    workspaceId, type != null ? type.name() : "");
+                    workspaceId, userName, type != null ? type.name() : "");
 
             if (type != null) {
                 template.add("type", type.name());
             }
-            bindExcludeCategoryNames(template, excludeCategoryNames);
 
             var statement = connection.createStatement(template.render())
                     .bind("project_id", projectId)
@@ -607,7 +604,6 @@ class FeedbackScoreDAOImpl implements FeedbackScoreDAO {
             if (type != null) {
                 statement.bind("type", type.name());
             }
-            bindExcludeCategoryNames(statement, excludeCategoryNames);
 
             return Flux.from(statement.execute())
                     .flatMap(result -> result.map((row, rowMetadata) -> row.get("name", String.class)))
@@ -638,25 +634,13 @@ class FeedbackScoreDAOImpl implements FeedbackScoreDAO {
         }
     }
 
-    private void bindExcludeCategoryNames(ST template, @NonNull Set<String> excludeCategoryNames) {
-        if (CollectionUtils.isNotEmpty(excludeCategoryNames)) {
-            template.add("exclude_category_names", excludeCategoryNames);
-        }
-    }
-
-    private void bindExcludeCategoryNames(Statement statement, @NonNull Set<String> excludeCategoryNames) {
-        if (CollectionUtils.isNotEmpty(excludeCategoryNames)) {
-            statement.bind("exclude_category_names", excludeCategoryNames);
-        }
-    }
-
     private Mono<? extends Result> cascadeSpanDelete(Set<UUID> traceIds, UUID projectId, Connection connection) {
         log.info("Deleting feedback scores by span entityId, traceIds count '{}'", traceIds.size());
 
         return makeMonoContextAware((userName, workspaceId) -> {
             // Delete from feedback_scores table
             var template1 = getSTWithLogComment(DELETE_SPANS_CASCADE_FEEDBACK_SCORE, "cascade_span_delete", workspaceId,
-                    traceIds.size());
+                    userName, traceIds.size());
             Optional.ofNullable(projectId)
                     .ifPresent(id -> template1.add("project_id", id));
             template1.add("table_name", "feedback_scores");
@@ -671,7 +655,7 @@ class FeedbackScoreDAOImpl implements FeedbackScoreDAO {
 
             // Delete from authored_feedback_scores table
             var template2 = getSTWithLogComment(DELETE_SPANS_CASCADE_FEEDBACK_SCORE, "cascade_span_delete_authored",
-                    workspaceId, traceIds.size());
+                    workspaceId, userName, traceIds.size());
             Optional.ofNullable(projectId)
                     .ifPresent(id -> template2.add("project_id", id));
             template2.add("table_name", "authored_feedback_scores");
@@ -696,7 +680,7 @@ class FeedbackScoreDAOImpl implements FeedbackScoreDAO {
         return makeMonoContextAware((userName, workspaceId) -> {
             // Delete from feedback_scores table
             var template1 = getSTWithLogComment(DELETE_FEEDBACK_SCORE_BY_ENTITY_IDS, "delete_scores_by_entity_ids",
-                    workspaceId, entityIds.size());
+                    workspaceId, userName, entityIds.size());
             Optional.ofNullable(projectId)
                     .ifPresent(id -> template1.add("project_id", id));
             template1.add("table_name", "feedback_scores");
@@ -712,7 +696,7 @@ class FeedbackScoreDAOImpl implements FeedbackScoreDAO {
 
             // Delete from authored_feedback_scores table
             var template2 = getSTWithLogComment(DELETE_FEEDBACK_SCORE_BY_ENTITY_IDS,
-                    "delete_scores_by_entity_ids_authored", workspaceId, entityIds.size());
+                    "delete_scores_by_entity_ids_authored", workspaceId, userName, entityIds.size());
             Optional.ofNullable(projectId)
                     .ifPresent(id -> template2.add("project_id", id));
             template2.add("table_name", "authored_feedback_scores");

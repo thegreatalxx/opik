@@ -45,6 +45,7 @@ module.exports = {
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
         "foreground-secondary": "hsl(var(--foreground-secondary))",
+        "new-foreground-secondary": "hsl(var(--new-foreground-secondary))",
         warning: "hsl(var(--warning))",
         success: "hsl(var(--success))",
         "light-slate": "hsl(var(--light-slate))",
@@ -103,6 +104,8 @@ module.exports = {
         "breadcrumb-last": "hsl(var(--breadcrumb-last))",
         "special-button": "var(--special-button)",
         "thread-active": "var(--thread-active)",
+        "selection-bar": "hsl(var(--selection-bar))",
+        "row-selected": "hsl(var(--row-selected))",
 
         /* Info box colors */
         "info-box-bg": "hsl(var(--info-box-bg))",
@@ -116,11 +119,20 @@ module.exports = {
         "warning-box-icon-bg": "hsl(var(--warning-box-icon-bg))",
         "warning-box-icon-text": "hsl(var(--warning-box-icon-text))",
 
+        /* Chart colors (Figma Design System) */
+        "chart-blue": "var(--chart-blue)",
+        "chart-yellow": "var(--chart-yellow)",
+        "chart-green": "var(--chart-green)",
+        "chart-red": "var(--chart-red)",
+        "chart-burgundy": "var(--chart-burgundy)",
+        "chart-purple": "var(--chart-purple)",
+        "chart-pink": "var(--chart-pink)",
+        "chart-orange": "var(--chart-orange)",
+
         /* Template icon colors */
         "template-icon-metrics": "var(--template-icon-metrics)",
         "template-icon-performance": "var(--template-icon-performance)",
         "template-icon-scratch": "var(--template-icon-scratch)",
-        "template-icon-experiments": "var(--template-icon-experiments)",
       },
       borderRadius: {
         xxl: "calc(var(--radius) + 4px)",

@@ -1,16 +1,19 @@
 package com.comet.opik.api.resources.utils;
 
+import com.comet.opik.api.OpikVersion;
 import com.comet.opik.infrastructure.usagelimit.Quota;
 import com.comet.opik.utils.JsonUtils;
 import com.github.tomakehurst.wiremock.WireMockServer;
 import jakarta.ws.rs.core.HttpHeaders;
 import lombok.experimental.UtilityClass;
 
+import java.util.LinkedHashMap;
 import java.util.List;
 
 import static com.comet.opik.infrastructure.auth.RequestContext.SESSION_COOKIE;
 import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
 import static com.github.tomakehurst.wiremock.client.WireMock.equalTo;
+import static com.github.tomakehurst.wiremock.client.WireMock.forbidden;
 import static com.github.tomakehurst.wiremock.client.WireMock.get;
 import static com.github.tomakehurst.wiremock.client.WireMock.matching;
 import static com.github.tomakehurst.wiremock.client.WireMock.matchingJsonPath;
@@ -21,23 +24,26 @@ import static com.github.tomakehurst.wiremock.client.WireMock.urlPathEqualTo;
 @UtilityClass
 public class AuthTestUtils {
 
-    private static final String AUTH_RESPONSE = """
-            {
-                "user": "%s",
-                "workspaceId": "%s",
-                "workspaceName": "%s",
-                "quotas": %s
-            }
-            """;
-
     public static String newWorkspaceAuthResponse(String user, String workspaceId) {
         return newWorkspaceAuthResponse(user, workspaceId, "", null);
     }
 
     public static String newWorkspaceAuthResponse(
             String user, String workspaceId, String workspaceName, List<Quota> quotas) {
-        return AUTH_RESPONSE.formatted(user, workspaceId, workspaceName,
-                quotas == null ? null : JsonUtils.writeValueAsString(quotas));
+        return newWorkspaceAuthResponse(user, workspaceId, workspaceName, quotas, null);
+    }
+
+    public static String newWorkspaceAuthResponse(
+            String user, String workspaceId, String workspaceName, List<Quota> quotas, OpikVersion opikVersion) {
+        var response = new LinkedHashMap<String, Object>();
+        response.put("user", user);
+        response.put("workspaceId", workspaceId);
+        response.put("workspaceName", workspaceName);
+        response.put("quotas", quotas);
+        if (opikVersion != null) {
+            response.put("opikVersion", opikVersion.getValue());
+        }
+        return JsonUtils.writeValueAsString(response);
     }
 
     public static void mockTargetWorkspace(WireMockServer server, String apiKey, String workspaceName,
@@ -48,13 +54,19 @@ public class AuthTestUtils {
     public static void mockTargetWorkspace(
             WireMockServer server, String apiKey, String workspaceName, String workspaceId, String user,
             List<Quota> quotas) {
+        mockTargetWorkspace(server, apiKey, workspaceName, workspaceId, user, quotas, null);
+    }
+
+    public static void mockTargetWorkspace(
+            WireMockServer server, String apiKey, String workspaceName, String workspaceId, String user,
+            List<Quota> quotas, OpikVersion opikVersion) {
         server.stubFor(
                 post(urlPathEqualTo("/opik/auth"))
                         .withHeader(HttpHeaders.AUTHORIZATION, equalTo(apiKey))
                         .withRequestBody(matchingJsonPath("$.workspaceName", equalTo(workspaceName)))
                         .withRequestBody(matchingJsonPath("$.path", matching("/v1/private/.*")))
                         .willReturn(okJson(AuthTestUtils.newWorkspaceAuthResponse(user, workspaceId, workspaceName,
-                                quotas))));
+                                quotas, opikVersion))));
     }
 
     public static void mockGetWorkspaceIdByName(
@@ -65,6 +77,17 @@ public class AuthTestUtils {
                         .willReturn(aResponse()
                                 .withStatus(200)
                                 .withBody(workspaceId)));
+    }
+
+    public static void mockTargetWorkspaceDenyPermission(
+            WireMockServer server, String apiKey, String workspaceName, String requiredPermission) {
+        server.stubFor(
+                post(urlPathEqualTo("/opik/auth"))
+                        .withHeader(HttpHeaders.AUTHORIZATION, equalTo(apiKey))
+                        .withRequestBody(matchingJsonPath("$.workspaceName", equalTo(workspaceName)))
+                        .withRequestBody(
+                                matchingJsonPath("$.requiredPermissions[0]", equalTo(requiredPermission)))
+                        .willReturn(forbidden()));
     }
 
     public static void mockSessionCookieTargetWorkspace(WireMockServer server, String sessionToken,

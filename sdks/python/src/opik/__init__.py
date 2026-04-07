@@ -12,8 +12,8 @@ from .api_objects.experiment.experiment_item import (
     ExperimentItemReferences,
 )
 from .api_objects.agent_config import AgentConfig, Blueprint
-from .api_objects.agent_config.decorator import agent_config_decorator as agent_config
 from .api_objects.agent_config.context import agent_config_context
+from .exceptions import AgentConfigNotFound
 from .api_objects.opik_client import Opik
 from .api_objects.prompt import Prompt, ChatPrompt
 from .api_objects.prompt.types import PromptType
@@ -26,6 +26,7 @@ from .evaluation import (
     evaluate_experiment,
     evaluate_on_dict_items,
     evaluate_prompt,
+    LocalRunnerTask,
 )
 from .integrations.sagemaker import auth as sagemaker_auth
 from .plugins.pytest.decorator import llm_unit
@@ -40,6 +41,7 @@ from .decorator.context_manager.span_context_manager import start_as_current_spa
 from .decorator.context_manager.trace_context_manager import start_as_current_trace
 from .simulation import SimulatedUser, run_simulation
 from .api_objects.local_recording import record_traces_locally
+from .opik_context import update_current_trace, update_current_span
 
 
 _logging.setup()
@@ -79,10 +81,13 @@ __all__ = [
     "SimulatedUser",
     "run_simulation",
     "record_traces_locally",
+    "LocalRunnerTask",
     "AgentConfig",
+    "AgentConfigNotFound",
     "Blueprint",
-    "agent_config",
     "agent_config_context",
+    "update_current_trace",
+    "update_current_span",
 ]
 
 sagemaker_auth.setup_aws_sagemaker_session_hook()

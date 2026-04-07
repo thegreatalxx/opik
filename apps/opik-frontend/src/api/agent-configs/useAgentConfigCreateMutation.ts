@@ -3,7 +3,7 @@ import get from "lodash/get";
 import api, { AGENT_CONFIGS_KEY, AGENT_CONFIGS_REST_ENDPOINT } from "@/api/api";
 import { AgentConfigCreate } from "@/types/agent-configs";
 import { AxiosError } from "axios";
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@/ui/use-toast";
 import { extractIdFromLocation } from "@/lib/utils";
 
 type UseAgentConfigCreateMutationParams = {
@@ -16,7 +16,7 @@ const useAgentConfigCreateMutation = () => {
 
   return useMutation({
     mutationFn: async ({ agentConfig }: UseAgentConfigCreateMutationParams) => {
-      const { headers } = await api.post(
+      const { headers } = await api.patch(
         `${AGENT_CONFIGS_REST_ENDPOINT}blueprints/`,
         agentConfig,
       );

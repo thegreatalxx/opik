@@ -1,4 +1,5 @@
 import logging
+import warnings
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 import anthropic
@@ -14,7 +15,7 @@ from . import stream_patchers
 
 LOGGER = logging.getLogger(__name__)
 
-KWARGS_KEYS_TO_LOG_AS_INPUTS = ["messages", "system", "tools"]
+KWARGS_KEYS_TO_LOG_AS_INPUTS = ["messages", "system", "tools", "output_format"]
 RESPONSE_KEYS_TO_LOG_AS_OUTPUT = ["content"]
 
 
@@ -73,18 +74,30 @@ class AnthropicMessagesCreateDecorator(base_track_decorator.BaseTrackDecorator):
 
             return result
 
+        usage_dict = output.usage.model_dump()
         opik_usage = llm_usage.try_build_opik_usage_or_log_error(
             provider=self.provider,
-            usage=output.usage.model_dump(),
+            usage=usage_dict,
             logger=LOGGER,
             error_message="Failed to log token usage from anthropic call",
         )
-
-        output_dict = output.model_dump()
+        # Anthropic's messages.parse() returns ParsedMessage with ParsedTextBlock
+        # in content, but ParsedTextBlock isn't in Message.content's discriminated
+        # union — Pydantic warns for every union variant it can't match during
+        # serialization. The data serializes correctly; the warnings are noise.
+        with warnings.catch_warnings():
+            warnings.filterwarnings(
+                "ignore",
+                message="Pydantic serializer warnings",
+            )
+            output_dict = output.model_dump()
         span_output, metadata = dict_utils.split_dict_by_keys(
             output_dict, RESPONSE_KEYS_TO_LOG_AS_OUTPUT
         )
         model = metadata.get("model")
+
+        if usage_dict.get("iterations"):
+            metadata["usage.iterations"] = usage_dict["iterations"]
 
         result = arguments_helpers.EndSpanParameters(
             output=span_output, usage=opik_usage, metadata=metadata, model=model
@@ -136,6 +149,32 @@ class AnthropicMessagesCreateDecorator(base_track_decorator.BaseTrackDecorator):
                 trace_to_end=trace_to_end,
                 finally_callback=self._after_call,
             )
+
+        try:
+            from anthropic.lib.streaming._beta_messages import (
+                BetaAsyncMessageStreamManager,
+                BetaMessageStreamManager,
+            )
+
+            if isinstance(output, BetaMessageStreamManager):
+                span_to_end, trace_to_end = base_track_decorator.pop_end_candidates()
+                return stream_patchers.patch_sync_beta_message_stream_manager(
+                    output,
+                    span_to_end=span_to_end,
+                    trace_to_end=trace_to_end,
+                    finally_callback=self._after_call,
+                )
+
+            if isinstance(output, BetaAsyncMessageStreamManager):
+                span_to_end, trace_to_end = base_track_decorator.pop_end_candidates()
+                return stream_patchers.patch_async_beta_message_stream_manager(
+                    output,
+                    span_to_end=span_to_end,
+                    trace_to_end=trace_to_end,
+                    finally_callback=self._after_call,
+                )
+        except ImportError:
+            pass
 
         NOT_A_STREAM = None
 

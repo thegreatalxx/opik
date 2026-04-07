@@ -2,6 +2,7 @@ package com.comet.opik.domain;
 
 import com.comet.opik.api.BiInformationResponse;
 import com.comet.opik.api.ProjectStats;
+import com.comet.opik.api.Source;
 import com.comet.opik.api.Span;
 import com.comet.opik.api.SpanUpdate;
 import com.comet.opik.api.SpansCountResponse;
@@ -59,6 +60,7 @@ import static com.comet.opik.api.Span.SpanField;
 import static com.comet.opik.api.Span.SpanPage;
 import static com.comet.opik.domain.AsyncContextUtils.bindUserNameAndWorkspace;
 import static com.comet.opik.domain.AsyncContextUtils.bindWorkspaceIdToMono;
+import static com.comet.opik.infrastructure.DatabaseUtils.getLogComment;
 import static com.comet.opik.infrastructure.DatabaseUtils.getSTWithLogComment;
 import static com.comet.opik.infrastructure.instrumentation.InstrumentAsyncUtils.Segment;
 import static com.comet.opik.infrastructure.instrumentation.InstrumentAsyncUtils.endSegment;
@@ -71,7 +73,7 @@ import static java.util.function.Predicate.not;
 @Singleton
 @RequiredArgsConstructor(onConstructor_ = @Inject)
 @Slf4j
-class SpanDAO {
+public class SpanDAO {
 
     private static final String SPAN_SEARCH_CLAUSE = """
             (ilike(id, :search_text)
@@ -112,7 +114,8 @@ class SpanDAO {
                 truncation_threshold,
                 input_slim,
                 output_slim,
-                ttft
+                ttft,
+                source
             )
             SETTINGS log_comment = '<log_comment>'
             FORMAT Values
@@ -143,7 +146,8 @@ class SpanDAO {
                         :truncation_threshold<item.index>,
                         :input_slim<item.index>,
                         :output_slim<item.index>,
-                        :ttft<item.index>
+                        :ttft<item.index>,
+                        :source<item.index>
                     )
                     <if(item.hasNext)>,<endif>
                 }>
@@ -182,7 +186,8 @@ class SpanDAO {
                 truncation_threshold,
                 input_slim,
                 output_slim,
-                ttft
+                ttft,
+                source
             )
             SELECT
                 new_span.id as id,
@@ -279,7 +284,11 @@ class SpanDAO {
                 multiIf(
                     isNotNull(old_span.ttft), old_span.ttft,
                     new_span.ttft
-                ) as ttft
+                ) as ttft,
+                multiIf(
+                    notEquals(old_span.source, 'unknown'), old_span.source,
+                    new_span.source
+                ) as source
             FROM (
                 SELECT
                     :id as id,
@@ -307,7 +316,8 @@ class SpanDAO {
                     :truncation_threshold as truncation_threshold,
                     :input_slim as input_slim,
                     :output_slim as output_slim,
-                    :ttft as ttft
+                    :ttft as ttft,
+                    :source as source
             ) as new_span
             LEFT JOIN (
                 SELECT
@@ -354,7 +364,8 @@ class SpanDAO {
             	truncation_threshold,
             	input_slim,
             	output_slim,
-            	ttft
+            	ttft,
+            	source
             )
             SELECT
             	id,
@@ -382,7 +393,8 @@ class SpanDAO {
                 :truncation_threshold,
                 <if(input)> :input_slim <else> input_slim <endif> as input_slim,
                 <if(output)> :output_slim <else> output_slim <endif> as output_slim,
-                <if(ttft)> :ttft <else> ttft <endif> as ttft
+                <if(ttft)> :ttft <else> ttft <endif> as ttft,
+                <if(source)> :source <else> source <endif> as source
             FROM spans
             WHERE id = :id
             AND workspace_id = :workspace_id
@@ -406,7 +418,7 @@ class SpanDAO {
             INSERT INTO spans (
                 id, project_id, workspace_id, trace_id, parent_span_id, name, type,
                 start_time, end_time, input, output, metadata, model, provider, total_estimated_cost, total_estimated_cost_version, tags, usage, error_info, created_at,
-                created_by, last_updated_by, truncation_threshold, input_slim, output_slim, ttft
+                created_by, last_updated_by, truncation_threshold, input_slim, output_slim, ttft, source
             )
             SELECT
                 new_span.id as id,
@@ -519,7 +531,11 @@ class SpanDAO {
                     isNotNull(new_span.ttft), new_span.ttft,
                     isNotNull(old_span.ttft), old_span.ttft,
                     new_span.ttft
-                ) as ttft
+                ) as ttft,
+                multiIf(
+                    notEquals(old_span.source, 'unknown'), old_span.source,
+                    new_span.source
+                ) as source
             FROM (
                 SELECT
                     :id as id,
@@ -547,7 +563,8 @@ class SpanDAO {
                     :truncation_threshold as truncation_threshold,
                     <if(input)> :input_slim <else> '' <endif> as input_slim,
                     <if(output)> :output_slim <else> '' <endif> as output_slim,
-                    <if(ttft)> :ttft <else> null <endif> as ttft
+                    <if(ttft)> :ttft <else> null <endif> as ttft,
+                    :source as source
             ) as new_span
             LEFT JOIN (
                 SELECT
@@ -986,7 +1003,7 @@ class SpanDAO {
                  HAVING <feedback_scores_empty_filters>
             )
             <endif>
-            , spans_final AS (
+            , spans_deduped AS (
                 SELECT
                       s.* <if(exclude_fields)>EXCEPT (<exclude_fields>) <endif>,
                       truncated_input,
@@ -995,9 +1012,6 @@ class SpanDAO {
                       output_length,
                       duration
                 FROM spans s
-                <if(sort_has_feedback_scores)>
-                LEFT JOIN feedback_scores_agg fsagg ON fsagg.entity_id = s.id
-                <endif>
                 WHERE project_id = :project_id
                 AND workspace_id = :workspace_id
                 <if(last_received_span_id)> AND id \\< :last_received_span_id <endif>
@@ -1022,9 +1036,20 @@ class SpanDAO {
                 <if(stream)>
                 ORDER BY (workspace_id, project_id, id) DESC, last_updated_at DESC
                 <else>
-                ORDER BY <if(sort_fields)> <sort_fields>, id DESC <else>(workspace_id, project_id, trace_id, parent_span_id, id) DESC, last_updated_at DESC <endif>
+                ORDER BY (workspace_id, project_id, trace_id, parent_span_id, id) DESC, last_updated_at DESC
                 <endif>
                 LIMIT 1 BY id
+            ), spans_final AS (
+                SELECT sd.*
+                FROM spans_deduped sd
+                <if(sort_has_feedback_scores)>
+                LEFT JOIN feedback_scores_agg fsagg ON fsagg.entity_id = sd.id
+                <endif>
+                <if(stream)>
+                ORDER BY (workspace_id, project_id, id) DESC, last_updated_at DESC
+                <else>
+                ORDER BY <if(sort_fields)> <sort_fields>, <endif>(workspace_id, project_id, trace_id, parent_span_id, id) DESC, last_updated_at DESC
+                <endif>
                 LIMIT :limit <if(offset)>OFFSET :offset <endif>
             )
             SELECT
@@ -1045,7 +1070,7 @@ class SpanDAO {
             <if(stream)>
             ORDER BY (workspace_id, project_id, id) DESC, last_updated_at DESC
             <else>
-            ORDER BY <if(sort_fields)> <sort_fields>, id DESC <else>(workspace_id, project_id, trace_id, parent_span_id, id) DESC, last_updated_at DESC <endif>
+            ORDER BY <if(sort_fields)> <sort_fields>, <endif>(workspace_id, project_id, trace_id, parent_span_id, id) DESC, last_updated_at DESC
             <endif>
             SETTINGS log_comment = '<log_comment>'
             ;
@@ -1165,6 +1190,46 @@ class SpanDAO {
             WHERE id IN :ids
             AND workspace_id = :workspace_id
             <if(project_id)>AND project_id = :project_id<endif>
+            SETTINGS log_comment = '<log_comment>'
+            ;
+            """;
+
+    private static final String DELETE_FOR_RETENTION = """
+            DELETE FROM spans
+            WHERE workspace_id IN :workspace_ids
+            AND trace_id >= :lower_bound
+            AND trace_id \\< :cutoff_id
+            AND trace_id NOT IN (
+                SELECT trace_id FROM experiment_items
+                WHERE workspace_id IN :workspace_ids
+                AND trace_id >= :lower_bound
+                AND trace_id \\< :cutoff_id
+            )
+            SETTINGS log_comment = '<log_comment>', lightweight_deletes_sync = 1, allow_nondeterministic_mutations = 1
+            ;
+            """;
+
+    // Lightweight pre-delete count for observability. Omits the experiment_items exclusion subquery
+    // to avoid the join cost; this makes it an upper-bound ceiling with >99% precision in practice
+    // (very few traces are linked to experiments).
+    private static final String COUNT_FOR_RETENTION = """
+            SELECT count() FROM spans
+            WHERE workspace_id IN :workspace_ids
+            AND trace_id >= :lower_bound
+            AND trace_id \\< :cutoff_id
+            SETTINGS log_comment = '<log_comment>'
+            ;
+            """;
+
+    private static final String ESTIMATE_VELOCITY_FOR_RETENTION = """
+            SELECT
+                toUInt64(if(count() = 0, 0,
+                    uniq(id) / greatest(dateDiff('week', UUIDv7ToDateTime(toUUID(min(id))), now()), 1)
+                )) AS spans_per_week,
+                UUIDv7ToDateTime(toUUID(min(id))) AS oldest_span_time
+            FROM spans
+            WHERE workspace_id = :workspace_id
+            AND trace_id \\< :cutoff_id
             SETTINGS log_comment = '<log_comment>'
             ;
             """;
@@ -1463,7 +1528,8 @@ class SpanDAO {
                 truncation_threshold,
                 input_slim,
                 output_slim,
-                ttft
+                ttft,
+                source
             )
             SELECT
                 s.id,
@@ -1494,7 +1560,8 @@ class SpanDAO {
                         :truncation_threshold,
                         <if(input)> :input_slim <else> s.input_slim <endif> as input_slim,
                         <if(output)> :output_slim <else> s.output_slim <endif> as output_slim,
-                        <if(ttft)> :ttft <else> s.ttft <endif> as ttft
+                        <if(ttft)> :ttft <else> s.ttft <endif> as ttft,
+                        s.source
                     FROM spans s
                     WHERE s.id IN :ids AND s.workspace_id = :workspace_id
                     ORDER BY (s.workspace_id, s.project_id, s.trace_id, s.parent_span_id, s.id) DESC, s.last_updated_at DESC
@@ -1536,7 +1603,7 @@ class SpanDAO {
         return makeMonoContextAware((userName, workspaceId) -> {
             List<TemplateUtils.QueryItem> queryItems = getQueryItemPlaceHolder(spans.size());
 
-            var template = getSTWithLogComment(BULK_INSERT, "batch_insert_spans", workspaceId, spans.size())
+            var template = getSTWithLogComment(BULK_INSERT, "batch_insert_spans", workspaceId, userName, spans.size())
                     .add("items", queryItems);
 
             Statement statement = connection.createStatement(template.render());
@@ -1606,6 +1673,12 @@ class SpanDAO {
                     statement.bindNull("ttft" + i, Double.class);
                 }
 
+                if (span.source() != null) {
+                    statement.bind("source" + i, span.source().getValue());
+                } else {
+                    statement.bindNull("source" + i, String.class);
+                }
+
                 i++;
             }
 
@@ -1620,7 +1693,7 @@ class SpanDAO {
 
     private Publisher<? extends Result> insert(Span span, Connection connection) {
         return makeFluxContextAware((userName, workspaceId) -> {
-            var template = newInsertTemplate(span, workspaceId);
+            var template = newInsertTemplate(span, workspaceId, userName);
             String inputValue = TruncationUtils.toJsonString(span.input());
             String outputValue = TruncationUtils.toJsonString(span.output());
             var statement = connection.createStatement(template.render())
@@ -1686,6 +1759,12 @@ class SpanDAO {
                 statement.bindNull("ttft", Double.class);
             }
 
+            if (span.source() != null) {
+                statement.bind("source", span.source().getValue());
+            } else {
+                statement.bindNull("source", String.class);
+            }
+
             bindUserNameAndWorkspace(statement, userName, workspaceId);
 
             Segment segment = startSegment("spans", "Clickhouse", "insert");
@@ -1695,8 +1774,8 @@ class SpanDAO {
         });
     }
 
-    private ST newInsertTemplate(Span span, String workspaceId) {
-        var template = getSTWithLogComment(INSERT, "insert_span", workspaceId, "");
+    private ST newInsertTemplate(Span span, String workspaceId, String userName) {
+        var template = getSTWithLogComment(INSERT, "insert_span", workspaceId, userName, "");
         Optional.ofNullable(span.endTime())
                 .ifPresent(endTime -> template.add("end_time", endTime));
         Optional.ofNullable(span.ttft())
@@ -1718,7 +1797,7 @@ class SpanDAO {
         return Mono.from(connectionFactory.create())
                 .flatMapMany(connection -> makeFluxContextAware((userName, workspaceId) -> {
                     var template = newUpdateTemplate(spanUpdate, PARTIAL_INSERT, false, "partial_insert_span",
-                            workspaceId);
+                            workspaceId, userName);
 
                     var statement = connection.createStatement(template.render());
 
@@ -1733,6 +1812,12 @@ class SpanDAO {
                     }
 
                     bindUpdateParams(spanUpdate, statement, false);
+
+                    if (spanUpdate.source() != null) {
+                        statement.bind("source", spanUpdate.source().getValue());
+                    } else {
+                        statement.bindNull("source", String.class);
+                    }
 
                     bindUserNameAndWorkspace(statement, userName, workspaceId);
 
@@ -1757,7 +1842,7 @@ class SpanDAO {
 
         return makeFluxContextAware((userName, workspaceId) -> {
             var template = newUpdateTemplate(finalUpdate, UPDATE, isManualCost(existingSpan), "update_span",
-                    workspaceId);
+                    workspaceId, userName);
             var statement = connection.createStatement(template.render());
             statement.bind("id", id);
 
@@ -1834,11 +1919,14 @@ class SpanDAO {
 
         Optional.ofNullable(spanUpdate.ttft())
                 .ifPresent(ttft -> statement.bind("ttft", ttft));
+
+        Optional.ofNullable(spanUpdate.source())
+                .ifPresent(source -> statement.bind("source", source.getValue()));
     }
 
     private ST newUpdateTemplate(SpanUpdate spanUpdate, String sql, boolean isManualCostExist, String queryName,
-            String workspaceId) {
-        var template = getSTWithLogComment(sql, queryName, workspaceId, "");
+            String workspaceId, String userName) {
+        var template = getSTWithLogComment(sql, queryName, workspaceId, userName, "");
         if (StringUtils.isNotBlank(spanUpdate.name())) {
             template.add("name", spanUpdate.name());
         }
@@ -1873,6 +1961,8 @@ class SpanDAO {
         }
         Optional.ofNullable(spanUpdate.ttft())
                 .ifPresent(ttft -> template.add("ttft", ttft));
+        Optional.ofNullable(spanUpdate.source())
+                .ifPresent(source -> template.add("source", source.getValue()));
         return template;
     }
 
@@ -1888,7 +1978,8 @@ class SpanDAO {
         log.info("Getting span by id '{}'", id);
         return Mono.from(connectionFactory.create())
                 .flatMapMany(connection -> makeFluxContextAware((userName, workspaceId) -> {
-                    var template = getSTWithLogComment(SELECT_ONLY_SPAN_BY_ID, "get_only_span_by_id", workspaceId, "");
+                    var template = getSTWithLogComment(SELECT_ONLY_SPAN_BY_ID, "get_only_span_by_id", workspaceId,
+                            userName, "");
                     var statement = connection.createStatement(template.render())
                             .bind("id", id)
                             .bind("project_id", projectId)
@@ -1914,7 +2005,8 @@ class SpanDAO {
 
     private Publisher<? extends Result> getPartialById(UUID id, Connection connection) {
         return makeFluxContextAware((userName, workspaceId) -> {
-            var template = getSTWithLogComment(SELECT_PARTIAL_BY_ID, "get_partial_span_by_id", workspaceId, "");
+            var template = getSTWithLogComment(SELECT_PARTIAL_BY_ID, "get_partial_span_by_id", workspaceId, userName,
+                    "");
             var statement = connection.createStatement(template.render())
                     .bind("id", id)
                     .bind("workspace_id", workspaceId);
@@ -1935,6 +2027,7 @@ class SpanDAO {
         return Mono.from(connectionFactory.create())
                 .flatMapMany(connection -> makeFluxContextAware((userName, workspaceId) -> {
                     var template = getSTWithLogComment(SELECT_BY_TRACE_IDS, "get_spans_by_trace_ids", workspaceId,
+                            userName,
                             traceIds.size());
                     var statement = connection.createStatement(template.render())
                             .bind("trace_ids", traceIds.toArray(new UUID[0]))
@@ -1955,11 +2048,12 @@ class SpanDAO {
     private Mono<List<UUID>> getTargetProjectIdsForSpans(Set<UUID> ids) {
         return Mono.deferContextual(ctx -> {
             String workspaceId = ctx.get(RequestContext.WORKSPACE_ID);
+            String userName = ctx.get(RequestContext.USER_NAME);
 
             return Mono.from(connectionFactory.create())
                     .flatMap(connection -> {
                         var template = getSTWithLogComment(SELECT_TARGET_PROJECTS_FOR_SPANS,
-                                "get_target_project_ids_for_spans", workspaceId, ids.size());
+                                "get_target_project_ids_for_spans", workspaceId, userName, ids.size());
 
                         var statement = connection.createStatement(template.render())
                                 .bind("ids", ids.toArray(UUID[]::new));
@@ -1982,10 +2076,12 @@ class SpanDAO {
         return getTargetProjectIdsForSpans(ids)
                 .flatMapMany(targetProjectIds -> Mono.deferContextual(ctx -> {
                     String workspaceId = ctx.get(RequestContext.WORKSPACE_ID);
+                    String userName = ctx.get(RequestContext.USER_NAME);
 
                     return Mono.from(connectionFactory.create())
                             .flatMap(connection -> {
                                 var template = getSTWithLogComment(SELECT_BY_IDS, "get_spans_by_ids", workspaceId,
+                                        userName,
                                         ids.size());
 
                                 if (CollectionUtils.isNotEmpty(targetProjectIds)) {
@@ -2016,7 +2112,7 @@ class SpanDAO {
 
         return Mono.from(connectionFactory.create())
                 .flatMapMany(connection -> makeFluxContextAware((userName, workspaceId) -> {
-                    var template = getSTWithLogComment(DELETE_BY_IDS, "delete_spans_by_ids", workspaceId,
+                    var template = getSTWithLogComment(DELETE_BY_IDS, "delete_spans_by_ids", workspaceId, userName,
                             spanIds.size());
 
                     Optional.ofNullable(projectId)
@@ -2126,6 +2222,10 @@ class SpanDAO {
                         getValue(exclude, SpanField.LAST_UPDATED_BY, row, "last_updated_by", String.class))
                 .duration(getValue(exclude, SpanField.DURATION, row, "duration", Double.class))
                 .ttft(getValue(exclude, SpanField.TTFT, row, "ttft", Double.class))
+                .source(Optional.ofNullable(
+                        getValue(exclude, SpanField.SOURCE, row, "source", String.class))
+                        .flatMap(Source::fromString)
+                        .orElse(null))
                 .build();
     }
 
@@ -2174,7 +2274,7 @@ class SpanDAO {
     private Flux<? extends Result> findSpanStream(int limit, SpanSearchCriteria criteria, Connection connection) {
         log.info("Searching spans by '{}'", criteria);
         return makeFluxContextAware((userName, workspaceId) -> {
-            var template = newFindTemplate(SELECT_BY_PROJECT_ID, criteria, "find_span_stream", workspaceId);
+            var template = newFindTemplate(SELECT_BY_PROJECT_ID, criteria, "find_span_stream", workspaceId, userName);
 
             if (shouldUseSpanIdPrefilter(criteria, template)) {
                 template.add("span_id_prefilter", true);
@@ -2206,7 +2306,7 @@ class SpanDAO {
 
         return makeFluxContextAware((userName, workspaceId) -> {
             var template = newFindTemplate(SELECT_BY_PROJECT_ID, spanSearchCriteria, "find_spans_by_project_id",
-                    workspaceId);
+                    workspaceId, userName);
             template.add("offset", (page - 1) * size);
 
             template = ImageUtils.addTruncateToTemplate(template, spanSearchCriteria.truncate());
@@ -2302,7 +2402,7 @@ class SpanDAO {
     private Publisher<? extends Result> countTotal(SpanSearchCriteria spanSearchCriteria, Connection connection) {
         return makeFluxContextAware((userName, workspaceId) -> {
             var template = newFindTemplate(COUNT_BY_PROJECT_ID, spanSearchCriteria, "count_spans_by_project_id",
-                    workspaceId);
+                    workspaceId, userName);
 
             var statement = connection.createStatement(template.render())
                     .bind("project_id", spanSearchCriteria.projectId())
@@ -2318,8 +2418,8 @@ class SpanDAO {
     }
 
     private ST newFindTemplate(String query, SpanSearchCriteria spanSearchCriteria, String queryName,
-            String workspaceId) {
-        var template = getSTWithLogComment(query, queryName, workspaceId, "");
+            String workspaceId, String userName) {
+        var template = getSTWithLogComment(query, queryName, workspaceId, userName, "");
         Optional.ofNullable(spanSearchCriteria.traceId())
                 .ifPresent(traceId -> template.add("trace_id", traceId));
         Optional.ofNullable(spanSearchCriteria.type())
@@ -2398,7 +2498,7 @@ class SpanDAO {
             return Mono.just(List.of());
         }
 
-        var template = getSTWithLogComment(SELECT_SPAN_ID_AND_WORKSPACE, "get_span_workspace", "", spanIds.size());
+        var template = getSTWithLogComment(SELECT_SPAN_ID_AND_WORKSPACE, "get_span_workspace", "", "", spanIds.size());
 
         return Mono.from(connectionFactory.create())
                 .flatMap(connection -> {
@@ -2421,7 +2521,7 @@ class SpanDAO {
                 .flatMapMany(connection -> makeFluxContextAware((userName, workspaceId) -> {
 
                     var template = getSTWithLogComment(SELECT_PROJECT_ID_FROM_SPAN, "get_project_id_from_span",
-                            workspaceId, "");
+                            workspaceId, userName, "");
 
                     var statement = connection.createStatement(template.render())
                             .bind("id", spanId)
@@ -2438,7 +2538,8 @@ class SpanDAO {
 
         return Mono.from(connectionFactory.create())
                 .flatMapMany(connection -> makeFluxContextAware((userName, workspaceId) -> {
-                    var template = newFindTemplate(SELECT_SPANS_STATS, searchCriteria, "get_span_stats", workspaceId);
+                    var template = newFindTemplate(SELECT_SPANS_STATS, searchCriteria, "get_span_stats", workspaceId,
+                            userName);
 
                     var statement = connection.createStatement(template.render())
                             .bind("project_id", searchCriteria.projectId())
@@ -2464,7 +2565,7 @@ class SpanDAO {
         return Mono.from(connectionFactory.create())
                 .flatMapMany(connection -> makeFluxContextAware((userName, workspaceId) -> {
                     var template = getSTWithLogComment(SELECT_SPAN_IDS_BY_TRACE_ID, "get_span_ids_by_trace_ids",
-                            workspaceId, traceIds.size());
+                            workspaceId, userName, traceIds.size());
 
                     Optional.ofNullable(projectId)
                             .ifPresent(id -> template.add("project_id", id));
@@ -2488,7 +2589,7 @@ class SpanDAO {
 
         Optional<Instant> demoDataCreatedAt = DemoDataExclusionUtils.calculateDemoDataCreatedAt(excludedProjectIds);
 
-        var template = getSTWithLogComment(SPAN_COUNT_BY_WORKSPACE_ID, "count_spans_per_workspace", "", "");
+        var template = getSTWithLogComment(SPAN_COUNT_BY_WORKSPACE_ID, "count_spans_per_workspace", "", "", "");
 
         if (!excludedProjectIds.isEmpty()) {
             template.add("excluded_project_ids", excludedProjectIds.keySet().toArray(UUID[]::new));
@@ -2524,7 +2625,7 @@ class SpanDAO {
 
         Optional<Instant> demoDataCreatedAt = DemoDataExclusionUtils.calculateDemoDataCreatedAt(excludedProjectIds);
 
-        var template = getSTWithLogComment(SPAN_DAILY_BI_INFORMATION, "get_span_bi_information", "", "");
+        var template = getSTWithLogComment(SPAN_DAILY_BI_INFORMATION, "get_span_bi_information", "", "", "");
 
         if (!excludedProjectIds.isEmpty()) {
             template.add("excluded_project_ids", excludedProjectIds.keySet().toArray(UUID[]::new));
@@ -2585,7 +2686,7 @@ class SpanDAO {
 
         return Mono.from(connectionFactory.create())
                 .flatMapMany(connection -> makeFluxContextAware((userName, workspaceId) -> {
-                    var template = newBulkUpdateTemplate(update, BULK_UPDATE, mergeTags, workspaceId);
+                    var template = newBulkUpdateTemplate(update, BULK_UPDATE, mergeTags, workspaceId, userName);
                     var query = template.render();
 
                     var statement = connection.createStatement(query)
@@ -2604,8 +2705,9 @@ class SpanDAO {
                 .doOnSuccess(__ -> log.info("Completed bulk update for '{}' spans", ids.size()));
     }
 
-    private ST newBulkUpdateTemplate(SpanUpdate spanUpdate, String sql, boolean mergeTags, String workspaceId) {
-        var template = getSTWithLogComment(sql, "bulk_update_spans", workspaceId, "");
+    private ST newBulkUpdateTemplate(SpanUpdate spanUpdate, String sql, boolean mergeTags, String workspaceId,
+            String userName) {
+        var template = getSTWithLogComment(sql, "bulk_update_spans", workspaceId, userName, "");
 
         if (StringUtils.isNotBlank(spanUpdate.name())) {
             template.add("name", spanUpdate.name());
@@ -2707,6 +2809,139 @@ class SpanDAO {
         // Inject provider as first field in metadata
         return JsonUtils.prependField(
                 baseMetadata, SpanField.PROVIDER.getValue(), provider);
+    }
+
+    /**
+     * Bulk delete spans for data retention enforcement (applyToPast=true).
+     * Deletes spans whose trace_id is in [lowerBound, cutoffId) and not linked to experiments.
+     */
+    public Mono<Long> deleteForRetention(@NonNull List<String> workspaceIds, @NonNull UUID cutoffId,
+            @NonNull UUID lowerBound) {
+        Preconditions.checkArgument(
+                CollectionUtils.isNotEmpty(workspaceIds), "Argument 'workspaceIds' must not be empty");
+
+        log.info("Retention delete spans: workspaces='{}', cutoffId='{}', lowerBound='{}'",
+                workspaceIds.size(), cutoffId, lowerBound);
+
+        var template = getSTWithLogComment(DELETE_FOR_RETENTION, "retention_delete_spans", null, "",
+                workspaceIds.size());
+
+        return Mono.from(connectionFactory.create())
+                .flatMap(connection -> {
+                    var statement = connection.createStatement(template.render())
+                            .bind("workspace_ids", workspaceIds.toArray(String[]::new))
+                            .bind("cutoff_id", cutoffId)
+                            .bind("lower_bound", lowerBound);
+
+                    return Mono.from(statement.execute())
+                            .flatMap(result -> Mono.from(result.getRowsUpdated()));
+                });
+    }
+
+    /**
+     * Lightweight pre-delete count for observability.
+     * Counts spans in [lowerBound, cutoffId) without the experiment_items exclusion subquery
+     * to avoid join cost. This is an upper-bound ceiling with >99% precision (very few traces
+     * are linked to experiments in practice).
+     */
+    public Mono<Long> countForRetention(@NonNull List<String> workspaceIds, @NonNull UUID cutoffId,
+            @NonNull UUID lowerBound) {
+        if (workspaceIds.isEmpty()) {
+            return Mono.just(0L);
+        }
+
+        var template = getSTWithLogComment(COUNT_FOR_RETENTION, "retention_count_spans", null, "",
+                workspaceIds.size());
+
+        return Mono.from(connectionFactory.create())
+                .flatMap(connection -> {
+                    var statement = connection.createStatement(template.render())
+                            .bind("workspace_ids", workspaceIds.toArray(String[]::new))
+                            .bind("cutoff_id", cutoffId)
+                            .bind("lower_bound", lowerBound);
+
+                    return Mono.from(statement.execute())
+                            .flatMap(result -> Mono.from(result.map((row, meta) -> row.get(0, Long.class))));
+                });
+    }
+
+    /**
+     * Bulk delete spans for data retention enforcement (applyToPast=false).
+     * Each workspace has its own lower bound.
+     */
+    public Mono<Long> deleteForRetentionBounded(@NonNull Map<String, UUID> workspaceMinIds,
+            @NonNull UUID cutoffId, @NonNull UUID lowerBound) {
+        Preconditions.checkArgument(!workspaceMinIds.isEmpty(), "Argument 'workspaceMinIds' must not be empty");
+
+        log.info("Retention delete spans (bounded): workspaces='{}', cutoffId='{}'", workspaceMinIds.size(), cutoffId);
+
+        var logComment = getLogComment("retention_delete_spans_bounded", null, "", workspaceMinIds.size());
+        var entries = List.copyOf(workspaceMinIds.entrySet());
+
+        var sb = new StringBuilder("DELETE FROM spans WHERE (");
+        for (int i = 0; i < entries.size(); i++) {
+            if (i > 0) sb.append(" OR ");
+            sb.append("(workspace_id = :ws_").append(i)
+                    .append(" AND trace_id >= :lb_").append(i)
+                    .append(" AND trace_id < :cutoff_id)");
+        }
+        sb.append(") AND trace_id NOT IN (")
+                .append("SELECT trace_id FROM experiment_items")
+                .append(" WHERE workspace_id IN :workspace_ids_flat")
+                .append(" AND trace_id >= :min_lower_bound")
+                .append(" AND trace_id < :cutoff_id")
+                .append(") SETTINGS log_comment = '").append(logComment)
+                .append("', lightweight_deletes_sync = 1, allow_nondeterministic_mutations = 1");
+
+        var sql = sb.toString();
+
+        return Mono.from(connectionFactory.create())
+                .flatMap(connection -> {
+                    var statement = connection.createStatement(sql)
+                            .bind("cutoff_id", cutoffId)
+                            .bind("workspace_ids_flat", workspaceMinIds.keySet().toArray(String[]::new))
+                            .bind("min_lower_bound", lowerBound);
+
+                    for (int i = 0; i < entries.size(); i++) {
+                        statement.bind("ws_" + i, entries.get(i).getKey());
+                        statement.bind("lb_" + i, entries.get(i).getValue());
+                    }
+
+                    return Mono.from(statement.execute())
+                            .flatMap(result -> Mono.from(result.getRowsUpdated()));
+                });
+    }
+
+    /**
+     * Result of the velocity estimation query: spans/week and the oldest span timestamp.
+     */
+    public record VelocityEstimate(long spansPerWeek, Instant oldestSpanTime) {
+    }
+
+    /**
+     * Estimate the span velocity (spans/week) for a workspace in the catch-up range.
+     * Also returns the oldest span timestamp to use as the catch-up cursor start.
+     *
+     * @return velocity estimate with oldest span time, or empty Mono if no data exists
+     * @throws io.r2dbc.spi.R2dbcException with code 158 (TOO_MANY_ROWS) for huge workspaces
+     */
+    public Mono<VelocityEstimate> estimateVelocityForRetention(@NonNull String workspaceId, @NonNull UUID cutoffId) {
+        log.debug("Estimating retention velocity for workspace '{}'", workspaceId);
+
+        var template = getSTWithLogComment(ESTIMATE_VELOCITY_FOR_RETENTION,
+                "retention_estimate_velocity", workspaceId, "", "");
+
+        return Mono.from(connectionFactory.create())
+                .flatMap(connection -> {
+                    var statement = connection.createStatement(template.render())
+                            .bind("workspace_id", workspaceId)
+                            .bind("cutoff_id", cutoffId);
+
+                    return Mono.from(statement.execute())
+                            .flatMap(result -> Mono.from(result.map((row, metadata) -> new VelocityEstimate(
+                                    row.get("spans_per_week", Long.class),
+                                    row.get("oldest_span_time", Instant.class)))));
+                });
     }
 
 }

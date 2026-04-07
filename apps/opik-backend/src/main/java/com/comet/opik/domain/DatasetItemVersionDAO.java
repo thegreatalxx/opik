@@ -1,5 +1,6 @@
 package com.comet.opik.domain;
 
+import com.clickhouse.client.ClickHouseException;
 import com.comet.opik.api.Column;
 import com.comet.opik.api.DatasetItem;
 import com.comet.opik.api.DatasetItem.DatasetItemPage;
@@ -12,6 +13,9 @@ import com.comet.opik.api.filter.DatasetItemFilter;
 import com.comet.opik.api.filter.ExperimentsComparisonFilter;
 import com.comet.opik.api.filter.Filter;
 import com.comet.opik.api.sorting.SortingFactoryDatasets;
+import com.comet.opik.domain.experiments.aggregations.AggregatedExperimentCounts;
+import com.comet.opik.domain.experiments.aggregations.AggregationBranchCountsCriteria;
+import com.comet.opik.domain.experiments.aggregations.ExperimentAggregatesDAO;
 import com.comet.opik.domain.filter.FilterQueryBuilder;
 import com.comet.opik.domain.filter.FilterStrategy;
 import com.comet.opik.domain.sorting.SortingQueryBuilder;
@@ -47,6 +51,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 import static com.comet.opik.domain.AsyncContextUtils.bindWorkspaceIdToFlux;
+import static com.comet.opik.infrastructure.DatabaseUtils.getSTWithLogComment;
 import static com.comet.opik.infrastructure.instrumentation.InstrumentAsyncUtils.Segment;
 import static com.comet.opik.infrastructure.instrumentation.InstrumentAsyncUtils.endSegment;
 import static com.comet.opik.infrastructure.instrumentation.InstrumentAsyncUtils.startSegment;
@@ -69,7 +74,7 @@ public interface DatasetItemVersionDAO {
      * @return a Mono containing the page of dataset items with experiment items
      */
     Mono<DatasetItemPage> getItemsWithExperimentItems(DatasetItemSearchCriteria searchCriteria, int page, int size,
-            UUID versionId);
+            String versionId);
 
     Mono<List<Column>> getExperimentItemsOutputColumns(UUID datasetId, Set<UUID> experimentIds);
 
@@ -101,29 +106,6 @@ public interface DatasetItemVersionDAO {
             List<DatasetItemFilter> excludeFilters, List<UUID> uuids);
 
     /**
-     * Applies delta changes (add, edit, delete) from a base version to create a new version.
-     * <p>
-     * This operation:
-     * <ul>
-     *   <li>Copies items from baseVersion that are NOT in deletedIds and NOT in editedItems</li>
-     *   <li>Inserts editedItems (with updated data but same stable ID)</li>
-     *   <li>Inserts addedItems (with new stable IDs)</li>
-     * </ul>
-     * <p>
-     * For items passed to this method:
-     * - Use {@code datasetItemId} field as the stable ID (maintained across versions)
-     * - The {@code id} field is ignored (row IDs are generated internally)
-     *
-     * @param datasetId the dataset ID
-     * @param baseVersionId the base version to apply changes from
-     * @param newVersionId the new version ID to create
-     * @param addedItems new items to add
-     * @param editedItems existing items with updated data
-     * @param deletedIds stable item IDs to exclude from the new version
-     * @param baseVersionItemCount the item count in the base version (for UUID pool sizing)
-     * @return the total number of items in the new version
-     */
-    /**
      * Apply delta changes to create a new dataset version.
      * Added and edited items should already have their row IDs (id field) set.
      * Unchanged items will be copied with UUIDs from unchangedUuids.
@@ -142,7 +124,7 @@ public interface DatasetItemVersionDAO {
             List<UUID> unchangedUuids, Set<UUID> additionalExcludeIds);
 
     Mono<Long> editItemsViaSelectInsert(UUID datasetId, UUID baseVersionId, UUID newVersionId,
-            List<DatasetItemEdit> editedItems, Map<UUID, UUID> rowIdToDatasetItemId, List<UUID> newRowIds);
+            List<DatasetItemEdit> editedItems, List<UUID> newRowIds);
 
     /**
      * Applies batch updates to items from a base version, creating updated copies in a new version.
@@ -172,7 +154,7 @@ public interface DatasetItemVersionDAO {
      * @param versionId the version ID to insert into
      * @param items the items to insert
      * @param workspaceId the workspace ID
-     * @param userName the user name
+     * @param userName the username
      * @return the number of items inserted
      */
     Mono<Long> insertItems(UUID datasetId, UUID versionId, List<DatasetItem> items,
@@ -207,7 +189,6 @@ public interface DatasetItemVersionDAO {
     /**
      * Resolves which dataset contains the given item by looking across all versions.
      * This is used for initial lookup when only the item ID is known.
-     *
      * Note: This method queries across versions to find which dataset contains the item.
      * It's only used for dataset resolution - actual data retrieval should use version-specific methods.
      *
@@ -222,9 +203,9 @@ public interface DatasetItemVersionDAO {
      * This is more efficient than calling resolveDatasetIdFromItemId multiple times.
      *
      * @param datasetItemIds the set of stable item IDs (dataset_item_ids)
-     * @return Mono emitting the first resolved dataset ID, or empty if none of the IDs exist
+     * @return Mono emitting the list of distinct dataset IDs found, or empty list if none exist
      */
-    Mono<UUID> resolveDatasetIdFromItemIds(Set<UUID> datasetItemIds);
+    Mono<List<UUID>> resolveDatasetIdsFromItemIds(Set<UUID> datasetItemIds);
 
     /**
      * Gets an item by its dataset_item_id from a specific version.
@@ -237,26 +218,6 @@ public interface DatasetItemVersionDAO {
     Mono<DatasetItem> getItemByDatasetItemId(UUID datasetId, UUID versionId, UUID datasetItemId);
 
     /**
-     * Gets multiple items by their dataset_item_ids from a specific version in a single query.
-     * This is the batch version of getItemByDatasetItemId to avoid N+1 queries.
-     *
-     * @param datasetId the dataset ID
-     * @param versionId the version ID to retrieve items from
-     * @param datasetItemIds the stable item IDs (dataset_item_id values)
-     * @return Flux emitting DatasetItems for all found items
-     */
-    Flux<DatasetItem> getItemsByDatasetItemIds(UUID datasetId, UUID versionId, Set<UUID> datasetItemIds);
-
-    /**
-     * Maps row IDs (id field) to their corresponding stable item IDs (dataset_item_id).
-     * This is used when the frontend sends row IDs but we need stable IDs for operations.
-     *
-     * @param rowIds the row IDs (id field values)
-     * @return Flux emitting mappings of row ID to dataset_item_id
-     */
-    Flux<DatasetItemIdMapping> mapRowIdsToDatasetItemIds(Set<UUID> rowIds);
-
-    /**
      * Gets an item by its ID (id field).
      * This is used when the frontend sends the ID from the API response.
      *
@@ -266,25 +227,20 @@ public interface DatasetItemVersionDAO {
     Mono<DatasetItem> getItemById(UUID id);
 
     /**
-     * Gets workspace IDs for dataset item row IDs (id field from dataset_item_versions).
+     * Gets workspace IDs for stable dataset item IDs (dataset_item_id field from dataset_item_versions).
      * Used for validating that dataset items belong to the correct workspace.
+     * Intentionally unscoped by workspace so cross-workspace items return their true workspace_id.
      *
-     * @param datasetItemRowIds the row IDs (id field values from dataset_item_versions)
+     * @param datasetItemIds the stable dataset_item_id values
      * @return Mono emitting a list of workspace and resource ID pairs
      */
-    Mono<List<WorkspaceAndResourceId>> getDatasetItemWorkspace(Set<UUID> datasetItemRowIds);
+    Mono<List<WorkspaceAndResourceId>> getDatasetItemWorkspace(Set<UUID> datasetItemIds);
 
     record DatasetItemPolicyEntry(UUID datasetVersionId, UUID datasetItemId, ExecutionPolicy policy) {
     }
 
     Flux<DatasetItemPolicyEntry> getExecutionPoliciesByDatasetItemIds(Set<UUID> datasetItemIds,
             Set<UUID> datasetVersionIds);
-
-    /**
-     * Mapping from row ID to dataset_item_id.
-     */
-    record DatasetItemIdMapping(UUID rowId, UUID datasetItemId, UUID datasetId) {
-    }
 
     /**
      * Soft deletes all items from a specific dataset version.
@@ -343,13 +299,19 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
             new FilterQueryBuilder.FilterStrategyParam(FilterStrategy.EXPERIMENT_ITEM, "experiment_item_filters"),
             new FilterQueryBuilder.FilterStrategyParam(FilterStrategy.FEEDBACK_SCORES, "feedback_scores_filters"),
             new FilterQueryBuilder.FilterStrategyParam(FilterStrategy.FEEDBACK_SCORES_IS_EMPTY,
-                    "feedback_scores_empty_filters"));
+                    "feedback_scores_empty_filters"),
+            new FilterQueryBuilder.FilterStrategyParam(FilterStrategy.FEEDBACK_SCORES_AGGREGATED,
+                    "feedback_scores_filters_agg"),
+            new FilterQueryBuilder.FilterStrategyParam(FilterStrategy.FEEDBACK_SCORES_AGGREGATED_IS_EMPTY,
+                    "feedback_scores_empty_filters_agg"));
 
     private static final List<FilterStrategy> BIND_STRATEGIES = List.of(
             FilterStrategy.DATASET_ITEM,
             FilterStrategy.EXPERIMENT_ITEM,
             FilterStrategy.FEEDBACK_SCORES,
-            FilterStrategy.FEEDBACK_SCORES_IS_EMPTY);
+            FilterStrategy.FEEDBACK_SCORES_IS_EMPTY,
+            FilterStrategy.FEEDBACK_SCORES_AGGREGATED,
+            FilterStrategy.FEEDBACK_SCORES_AGGREGATED_IS_EMPTY);
 
     private static final String SELECT_ITEM_IDS_AND_HASHES = """
             SELECT
@@ -363,14 +325,13 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
             WHERE dataset_id = :datasetId
             AND dataset_version_id = :versionId
             AND workspace_id = :workspace_id
-            ORDER BY (workspace_id, dataset_id, dataset_version_id, id) DESC, last_updated_at DESC
-            LIMIT 1 BY id
+            ORDER BY dataset_item_id DESC, last_updated_at DESC
+            LIMIT 1 BY dataset_item_id
             """;
 
     private static final String SELECT_DATASET_ITEM_VERSIONS = """
             SELECT
-                id,
-                dataset_item_id,
+                dataset_item_id AS id,
                 dataset_id,
                 <if(truncate)> mapApply((k, v) -> (k, substring(replaceRegexpAll(v, '<truncate>', '"[image]"'), 1, <truncationSize>)), data) as data <else> data <endif>,
                 description,
@@ -389,10 +350,10 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
             WHERE dataset_id = :datasetId
             AND dataset_version_id = :versionId
             AND workspace_id = :workspace_id
-            <if(lastRetrievedId)>AND id \\< :lastRetrievedId<endif>
+            <if(lastRetrievedId)>AND dataset_item_id \\< :lastRetrievedId<endif>
             <if(dataset_item_filters)>AND (<dataset_item_filters>)<endif>
-            ORDER BY (workspace_id, dataset_id, dataset_version_id, id) DESC, last_updated_at DESC
-            LIMIT 1 BY id
+            ORDER BY dataset_item_id DESC, last_updated_at DESC
+            LIMIT 1 BY dataset_item_id
             <if(lastRetrievedId)>
             LIMIT :limit
             <else>
@@ -401,7 +362,7 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
             """;
 
     private static final String SELECT_DATASET_ITEM_VERSIONS_COUNT = """
-            SELECT count(DISTINCT id) as count
+            SELECT count(DISTINCT dataset_item_id) as count
             FROM dataset_item_versions
             WHERE dataset_id = :datasetId
             AND dataset_version_id = :versionId
@@ -431,13 +392,21 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
     /**
      * Counts dataset items with experiment items, applying all filters from search criteria.
      * This ensures pagination totals match the filtered results.
-     *
      * Note: Uses simplified feedback scores processing (only aggregated values, not full details)
      * since we only need values for filtering in HAVING clauses, not for display.
      * This keeps the count query closer to the legacy pattern while supporting all required filters.
      */
     private static final String SELECT_DATASET_ITEM_VERSIONS_WITH_EXPERIMENT_ITEMS_COUNT = """
-            WITH experiments_resolved AS (
+            WITH experiment_aggregated_scope_ids AS (
+                SELECT
+                    id,
+                    COALESCE(nullIf(dataset_version_id, ''), :versionId) AS resolved_dataset_version_id
+                FROM experiment_aggregates FINAL
+                WHERE workspace_id = :workspace_id
+                AND dataset_id = :datasetId
+                <if(experiment_ids)>AND id IN :experiment_ids<endif>
+            ),
+            experiments_resolved AS (
                 SELECT
                     id,
                     COALESCE(nullIf(dataset_version_id, ''), :versionId) AS resolved_dataset_version_id
@@ -445,14 +414,16 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
                 WHERE workspace_id = :workspace_id
                 AND dataset_id = :datasetId
                 <if(experiment_ids)>AND id IN :experiment_ids<endif>
+                AND id NOT IN (SELECT id FROM experiment_aggregated_scope_ids)
                 ORDER BY (workspace_id, dataset_id, id) DESC, last_updated_at DESC
                 LIMIT 1 BY id
             ),
             experiment_items_scope AS (
-            	SELECT ei.*
+            	SELECT ei.*, e.resolved_dataset_version_id
             	FROM experiment_items ei
             	INNER JOIN experiments_resolved e ON e.id = ei.experiment_id
             	WHERE ei.workspace_id = :workspace_id
+            	<if(experiment_ids)>AND experiment_id IN :experiment_ids<endif>
             	ORDER BY (ei.workspace_id, ei.experiment_id, ei.dataset_item_id, ei.trace_id, ei.id) DESC, ei.last_updated_at DESC
             	LIMIT 1 BY ei.id
             ),
@@ -544,8 +515,9 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
             <endif>
             , dataset_items_resolved AS (
                 SELECT
-                    div_dedup.id AS id,
-                    div_dedup.dataset_item_id AS dataset_item_id,
+                    div_dedup.dataset_item_id AS id,
+                    div_dedup.id AS row_id,
+                    div_dedup.dataset_version_id AS dataset_version_id,
                     div_dedup.data AS data,
                     div_dedup.source AS source,
                     div_dedup.trace_id AS trace_id,
@@ -613,59 +585,105 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
                 )
                 <endif>
                 <if(dataset_item_filters)>
-                AND ei.dataset_item_id IN (
-                    SELECT id FROM dataset_items_resolved WHERE <dataset_item_filters>
-                )
+                AND ei.dataset_item_id IN (SELECT arrayJoin([id, row_id]) FROM dataset_items_resolved WHERE <dataset_item_filters>)
                 <endif>
             	ORDER BY id DESC, last_updated_at DESC
-            )
-            SELECT COUNT(DISTINCT ei.dataset_item_id) AS count
-            FROM experiment_items_final AS ei
-            LEFT JOIN dataset_items_resolved AS di ON di.id = ei.dataset_item_id
-            <if(search)>
-            LEFT JOIN (
+            ), dataset_items_agg_resolved AS (
                 SELECT
-                    id,
-                    input,
-                    output
-                FROM traces
-                WHERE workspace_id = :workspace_id
-                <if(has_target_projects)>AND project_id IN :target_project_ids<endif>
-                AND id IN (SELECT trace_id FROM experiment_items_final)
-                ORDER BY (workspace_id, project_id, id) DESC, last_updated_at DESC
-                LIMIT 1 BY id
-            ) AS tfs ON ei.trace_id = tfs.id
-            WHERE multiSearchAnyCaseInsensitive(toString(COALESCE(di.data, map())), :searchTerms) OR multiSearchAnyCaseInsensitive(toString(tfs.input), :searchTerms) OR multiSearchAnyCaseInsensitive(toString(tfs.output), :searchTerms)
-            <endif>
+                    div_dedup.dataset_item_id AS id,
+                    div_dedup.id AS row_id,
+                    div_dedup.dataset_version_id AS dataset_version_id,
+                    div_dedup.data AS data,
+                    div_dedup.source AS source,
+                    div_dedup.trace_id AS trace_id,
+                    div_dedup.span_id AS span_id,
+                    div_dedup.tags AS tags,
+                    div_dedup.created_at AS created_at,
+                    div_dedup.last_updated_at AS last_updated_at,
+                    div_dedup.created_by AS created_by,
+                    div_dedup.last_updated_by AS last_updated_by
+                FROM (
+                    SELECT *
+                    FROM dataset_item_versions
+                    WHERE workspace_id = :workspace_id
+                    AND dataset_id = :datasetId
+                    AND dataset_version_id IN (SELECT resolved_dataset_version_id FROM experiment_aggregated_scope_ids)
+                    ORDER BY (workspace_id, dataset_id, dataset_version_id, id) DESC, last_updated_at DESC
+                    LIMIT 1 BY id
+                ) AS div_dedup
+            ), item_agg_count AS (
+                SELECT
+                    eia.id,
+                    eia.experiment_id,
+                    eia.dataset_item_id,
+                    eia.trace_id,
+                    eia.input,
+                    eia.output
+                FROM experiment_item_aggregates AS eia FINAL
+                WHERE eia.workspace_id = :workspace_id
+                AND eia.experiment_id IN (SELECT id FROM experiment_aggregated_scope_ids)
+                <if(experiment_item_filters)> AND <experiment_item_filters> <endif>
+                <if(feedback_scores_filters_agg)> AND <feedback_scores_filters_agg> <endif>
+                <if(feedback_scores_empty_filters_agg)> AND <feedback_scores_empty_filters_agg> <endif>
+                <if(dataset_item_filters)>
+                AND eia.dataset_item_id IN (SELECT arrayJoin([id, row_id]) FROM dataset_items_agg_resolved WHERE <dataset_item_filters>)
+                <endif>
+            )
+            SELECT COUNT(DISTINCT di_id) AS count
+            FROM (
+                <if(has_aggregated)>
+                SELECT eia.dataset_item_id AS di_id
+                FROM item_agg_count AS eia
+                <if(search)>
+                INNER JOIN experiment_aggregated_scope_ids eas ON eas.id = eia.experiment_id
+                LEFT JOIN dataset_items_agg_resolved di ON (di.id = eia.dataset_item_id OR di.row_id = eia.dataset_item_id)
+                    AND di.dataset_version_id = eas.resolved_dataset_version_id
+                WHERE multiSearchAnyCaseInsensitive(toString(COALESCE(di.data, map())), :searchTerms) OR multiSearchAnyCaseInsensitive(toString(eia.input), :searchTerms) OR multiSearchAnyCaseInsensitive(toString(eia.output), :searchTerms)
+                <endif>
+                <endif>
+
+                <if(has_aggregated)><if(has_raw)>UNION ALL<endif><endif>
+
+                <if(has_raw)>
+                SELECT ei.dataset_item_id AS di_id
+                FROM experiment_items_final AS ei
+                LEFT JOIN dataset_items_resolved AS di ON (di.id = ei.dataset_item_id OR di.row_id = ei.dataset_item_id)
+                    AND di.dataset_version_id = ei.resolved_dataset_version_id
+                <if(search)>
+                LEFT JOIN (
+                    SELECT
+                        id,
+                        input,
+                        output
+                    FROM traces
+                    WHERE workspace_id = :workspace_id
+                    <if(has_target_projects)>AND project_id IN :target_project_ids<endif>
+                    AND id IN (SELECT trace_id FROM experiment_items_final)
+                    ORDER BY (workspace_id, project_id, id) DESC, last_updated_at DESC
+                    LIMIT 1 BY id
+                ) AS tfs ON ei.trace_id = tfs.id
+                WHERE multiSearchAnyCaseInsensitive(toString(COALESCE(di.data, map())), :searchTerms) OR multiSearchAnyCaseInsensitive(toString(tfs.input), :searchTerms) OR multiSearchAnyCaseInsensitive(toString(tfs.output), :searchTerms)
+                <endif>
+                <endif>
+            )
             """;
 
     // Query to extract columns from trace output for experiment items view
     private static final String SELECT_EXPERIMENT_ITEMS_OUTPUT_COLUMNS = """
-            WITH dataset_items_scope AS (
+            WITH experiments_resolved AS (
                 SELECT DISTINCT
-                    div.id AS row_id,
-                    div.dataset_item_id AS stable_id,
-                    div.dataset_version_id
-                FROM experiments e
-                INNER JOIN dataset_item_versions div
-                    ON div.dataset_id = :datasetId
-                    AND div.workspace_id = :workspace_id
-                    AND div.dataset_version_id = e.dataset_version_id
-                WHERE e.workspace_id = :workspace_id
-                <if(experiment_ids)>AND e.id IN :experiment_ids<endif>
-                ORDER BY (div.workspace_id, div.dataset_id, div.dataset_version_id, div.id) DESC, div.last_updated_at DESC
-                LIMIT 1 BY div.id
+                    id
+                FROM experiments
+                WHERE workspace_id = :workspace_id
+                AND dataset_id = :datasetId
+                <if(experiment_ids)>AND id IN :experiment_ids<endif>
             ),
             experiment_items_scope AS (
-                SELECT
-                    trace_id,
-                    dataset_item_id
-                FROM experiment_items
-                WHERE workspace_id = :workspace_id
-                AND dataset_item_id IN (SELECT row_id FROM dataset_items_scope)
-                <if(experiment_ids)>AND experiment_id IN :experiment_ids<endif>
-                ORDER BY id DESC, last_updated_at DESC
-                LIMIT 1 BY id
+                SELECT DISTINCT
+                    ei.trace_id
+                FROM experiment_items ei
+                WHERE ei.workspace_id = :workspace_id
+                <if(experiment_ids)>AND ei.experiment_id IN (SELECT id FROM experiments_resolved)<endif>
             )
             SELECT
                 mapFromArrays(
@@ -716,7 +734,15 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
 
     // Query to fetch versioned dataset items with their associated experiment items
     private static final String SELECT_DATASET_ITEM_VERSIONS_WITH_EXPERIMENT_ITEMS = """
-            WITH experiments_resolved AS (
+            WITH experiment_aggregated_scope_ids AS (
+                SELECT
+                    id,
+                    COALESCE(nullIf(dataset_version_id, ''), :versionId) AS resolved_dataset_version_id
+                FROM experiment_aggregates FINAL
+                WHERE workspace_id = :workspace_id
+                AND dataset_id = :datasetId
+                <if(experiment_ids)>AND id IN :experiment_ids<endif>
+            ), experiments_resolved AS (
                 SELECT
                     *,
                     COALESCE(nullIf(dataset_version_id, ''), :versionId) AS resolved_dataset_version_id
@@ -724,25 +750,30 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
                 WHERE workspace_id = :workspace_id
                 AND dataset_id = :datasetId
                 <if(experiment_ids)>AND id IN :experiment_ids<endif>
+                AND id NOT IN (SELECT id FROM experiment_aggregated_scope_ids)
                 ORDER BY (workspace_id, dataset_id, id) DESC, last_updated_at DESC
                 LIMIT 1 BY id
-            ),
-            experiment_items_scope AS (
-            	SELECT ei.*
+            ), experiment_items_scope AS (
+            	SELECT ei.*, e.resolved_dataset_version_id
             	FROM experiment_items ei
             	INNER JOIN experiments_resolved e ON e.id = ei.experiment_id
             	WHERE ei.workspace_id = :workspace_id
+            	<if(experiment_ids)>AND experiment_id IN :experiment_ids<endif>
             	ORDER BY (ei.workspace_id, ei.experiment_id, ei.dataset_item_id, ei.trace_id, ei.id) DESC, ei.last_updated_at DESC
             	LIMIT 1 BY ei.id
-            ),
-            experiment_items_trace_scope AS (
+            ), experiment_items_trace_scope AS (
                 SELECT DISTINCT ei.trace_id
                 FROM experiment_items ei
                 INNER JOIN experiments_resolved e ON e.id = ei.experiment_id
                 WHERE ei.workspace_id = :workspace_id
                 <if(experiment_ids)>AND ei.experiment_id IN :experiment_ids<endif>
-            ),
-            trace_data AS (
+            ), experiment_item_aggr_trace_scope AS (
+                SELECT DISTINCT trace_id
+                FROM experiment_item_aggregates ei
+                WHERE workspace_id = :workspace_id
+                AND experiment_id IN (SELECT id FROM experiment_aggregated_scope_ids)
+                <if(experiment_ids)>AND experiment_id IN :experiment_ids<endif>
+            ), trace_data AS (
                 SELECT
                     id,
                     duration,
@@ -761,8 +792,9 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
             ),
             dataset_items_resolved AS (
                 SELECT
-                    div_dedup.id AS id,
-                    div_dedup.dataset_item_id AS dataset_item_id,
+                    div_dedup.dataset_item_id AS id,
+                    div_dedup.id AS row_id,
+                    div_dedup.dataset_version_id AS dataset_version_id,
                     div_dedup.data AS data,
                     div_dedup.description AS description,
                     div_dedup.source AS source,
@@ -894,14 +926,14 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
                     mapFromArrays(
                         authors,
                         arrayMap(
-                            i -> tuple(values[i], reasons[i], categories[i], sources[i], last_updated_ats[i]),
+                            i -> tuple(values[i], reasons[i], categories[i], sources[i], CAST(last_updated_ats[i] AS DateTime64(9, 'UTC'))),
                             arrayEnumerate(values)
                         )
                     ) AS value_by_author,
                     arrayStringConcat(created_bies, ', ') AS created_by,
                     arrayStringConcat(updated_bies, ', ') AS last_updated_by,
-                    arrayMin(created_ats) AS created_at,
-                    arrayMax(last_updated_ats) AS last_updated_at
+                    CAST(arrayMin(created_ats) AS DateTime64(9, 'UTC')) AS created_at,
+                    CAST(arrayMax(last_updated_ats) AS DateTime64(9, 'UTC')) AS last_updated_at
                 FROM feedback_scores_combined_grouped
             )
             <if(feedback_scores_empty_filters)>
@@ -956,9 +988,7 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
                 )
                 <endif>
                 <if(dataset_item_filters)>
-                AND ei.dataset_item_id IN (
-                    SELECT id FROM dataset_items_resolved WHERE <dataset_item_filters>
-                )
+                AND ei.dataset_item_id IN (SELECT arrayJoin([id, row_id]) FROM dataset_items_resolved WHERE <dataset_item_filters>)
                 <endif>
             )
             , comments_final AS (
@@ -977,137 +1007,411 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
                 ORDER BY (workspace_id, project_id, entity_id, id) DESC, last_updated_at DESC
                 LIMIT 1 BY id
             )
-            SELECT
-                ei.dataset_item_id AS id,
-                :datasetId AS dataset_id,
-                <if(truncate)> mapApply((k, v) -> (k, substring(replaceRegexpAll(v, '<truncate>', '"[image]"'), 1, <truncationSize>)), COALESCE(di.data, map())) <else> COALESCE(di.data, map()) <endif> AS data_final,
-                COALESCE(di.data, map()) AS data,
-                di.description AS description,
-                di.trace_id AS trace_id,
-                di.span_id AS span_id,
-                di.source AS source,
-                di.tags AS tags,
-                di.evaluators AS evaluators,
-                di.execution_policy AS execution_policy,
-                di.item_created_at AS created_at,
-                di.item_last_updated_at AS last_updated_at,
-                di.item_created_by AS created_by,
-                di.item_last_updated_by AS last_updated_by,
-                avg(tfs.duration) AS duration,
-                avg(tfs.total_estimated_cost) AS total_estimated_cost,
-                avgMap(tfs.usage) AS usage,
-                avgMap(tfs.feedback_scores) AS feedback_scores,
-                argMax(tfs.input, ei.id) AS input,
-                argMax(tfs.output, ei.id) AS output,
-                argMax(tfs.metadata, ei.id) AS metadata,
-                argMax(tfs.visibility_mode, ei.id) AS visibility_mode,
-                argMax(tfs.comments_array_agg, ei.id) AS comments,
-                groupArray(tuple(
-                    ei.id,
-                    ei.experiment_id,
-                    ei.dataset_item_id,
-                    ei.trace_id,
-                    tfs.input,
-                    tfs.output,
-                    tfs.feedback_scores_array,
-                    ei.created_at,
-                    ei.last_updated_at,
-                    ei.created_by,
-                    ei.last_updated_by,
-                    tfs.comments_array_agg,
-                    tfs.duration,
-                    tfs.total_estimated_cost,
-                    tfs.usage,
-                    tfs.visibility_mode,
-                    tfs.metadata,
-                    di.description
-                )) AS experiment_items_array
-            FROM experiment_items_final AS ei
-            LEFT JOIN dataset_items_resolved AS di ON di.id = ei.dataset_item_id
-            LEFT JOIN (
+            , assertion_results_per_trace AS (
                 SELECT
-                    t.id,
-                    t.input,
-                    t.output,
-                    t.full_input,
-                    t.full_output,
-                    t.metadata,
-                    t.duration,
-                    t.visibility_mode,
-                    s.total_estimated_cost,
-                    s.usage,
-                    groupUniqArray(tuple(
-                        fs.entity_id,
-                        fs.name,
-                        fs.category_name,
-                        fs.value,
-                        fs.reason,
-                        fs.source,
-                        fs.created_at,
-                        fs.last_updated_at,
-                        fs.created_by,
-                        fs.last_updated_by,
-                        fs.value_by_author
-                    )) AS feedback_scores_array,
-                    mapFromArrays(
-                        groupArray(fs.name),
-                        groupArray(fs.value)
-                    ) AS feedback_scores,
-                    groupUniqArray(tuple(c.*)) AS comments_array_agg
-                FROM trace_data AS t
-                LEFT JOIN feedback_scores_final AS fs ON t.id = fs.entity_id
-                LEFT JOIN comments_final AS c ON t.id = c.entity_id
+                    entity_id,
+                    toJSONString(
+                        groupArray(
+                            CAST(
+                                (name, toString(passed), reason),
+                                'Tuple(value String, passed String, reason String)'
+                            )
+                        )
+                    ) AS assertions_array
+                FROM assertion_results FINAL
+                WHERE entity_type = 'trace'
+                  AND workspace_id = :workspace_id
+                  <if(has_target_projects)>AND project_id IN :target_project_ids<endif>
+                  AND entity_id IN (SELECT trace_id FROM experiment_items_final)
+                GROUP BY entity_id
+            )
+            , dataset_items_aggr_resolved AS (
+                SELECT
+                    div_dedup.dataset_item_id AS id,
+                    div_dedup.id AS row_id,
+                    div_dedup.dataset_version_id AS dataset_version_id,
+                    div_dedup.data AS data,
+                    div_dedup.description AS description,
+                    div_dedup.source AS source,
+                    div_dedup.trace_id AS trace_id,
+                    div_dedup.span_id AS span_id,
+                    div_dedup.tags AS tags,
+                    div_dedup.evaluators AS evaluators,
+                    div_dedup.execution_policy AS execution_policy,
+                    div_dedup.created_at AS item_created_at,
+                    div_dedup.last_updated_at AS item_last_updated_at,
+                    div_dedup.created_by AS item_created_by,
+                    div_dedup.last_updated_by AS item_last_updated_by
+                FROM (
+                    SELECT *
+                    FROM dataset_item_versions
+                    WHERE workspace_id = :workspace_id
+                    AND dataset_id  = :datasetId
+                    AND dataset_version_id IN (SELECT resolved_dataset_version_id FROM experiment_aggregated_scope_ids)
+                    ORDER BY (workspace_id, dataset_id, dataset_version_id, id) DESC, last_updated_at DESC
+                    LIMIT 1 BY id
+                ) AS div_dedup
+            )
+            <if(push_top_limit)>
+            , top_dataset_items AS (
+                SELECT eia_t.dataset_item_id
+                FROM experiment_item_aggregates AS eia_t FINAL
+                <if(push_top_needs_div)>
+                INNER JOIN experiment_aggregated_scope_ids eas_t ON eas_t.id = eia_t.experiment_id
+                LEFT JOIN dataset_items_aggr_resolved AS di_t ON (di_t.id = eia_t.dataset_item_id OR di_t.row_id = eia_t.dataset_item_id)
+                    AND di_t.dataset_version_id = eas_t.resolved_dataset_version_id
+                <endif>
+                WHERE eia_t.workspace_id = :workspace_id
+                AND eia_t.experiment_id IN (SELECT id FROM experiment_aggregated_scope_ids)
+                GROUP BY eia_t.dataset_item_id
+                ORDER BY <top_sorting>
+                LIMIT :top_limit OFFSET :top_offset
+            )
+            <endif>
+            SELECT
+                *
+            FROM (
+                <if(has_aggregated)>
+                SELECT
+                    ei.dataset_item_id AS id,
+                    :datasetId AS dataset_id,
+                    <if(truncate)> mapApply((k, v) -> (k, substring(replaceRegexpAll(v, '<truncate>', '"[image]"'), 1, <truncationSize>)), COALESCE(di.data, map())) <else> COALESCE(di.data, map()) <endif> AS data_final,
+                    COALESCE(di.data, map()) AS data,
+                    di.description AS description,
+                    di.trace_id AS trace_id,
+                    di.span_id AS span_id,
+                    di.source AS source,
+                    di.tags AS tags,
+                    di.evaluators AS evaluators,
+                    di.execution_policy AS execution_policy,
+                    di.item_created_at AS created_at,
+                    di.item_last_updated_at AS last_updated_at,
+                    di.item_created_by AS created_by,
+                    di.item_last_updated_by AS last_updated_by,
+                    avg(ei.duration) AS duration,
+                    avg(ei.total_estimated_cost) AS total_estimated_cost,
+                    avgMap(ei.usage) AS usage,
+                    avgMap(ei.feedback_scores) AS feedback_scores,
+                    <if(truncate)>replaceRegexpAll(if(notEmpty(argMax(ei.input_slim, ei.id)), argMax(ei.input_slim, ei.id), argMax(ei.input, ei.id)), '<truncate>', '"[image]"')<else>argMax(ei.input, ei.id)<endif> AS input,
+                    <if(truncate)>replaceRegexpAll(if(notEmpty(argMax(ei.output_slim, ei.id)), argMax(ei.output_slim, ei.id), argMax(ei.output, ei.id)), '<truncate>', '"[image]"')<else>argMax(ei.output, ei.id)<endif> AS output,
+                    argMax(ei.metadata, ei.id) AS metadata,
+                    argMax(ei.visibility_mode, ei.id) AS visibility_mode,
+                    argMax(ei.comments_array_agg, ei.id) AS comments,
+                    groupArray(tuple(
+                        ei.id,
+                        ei.experiment_id,
+                        ei.dataset_item_id,
+                        ei.trace_id,
+                        <if(truncate)>replaceRegexpAll(if(notEmpty(ei.input_slim), ei.input_slim, ei.input), '<truncate>', '"[image]"')<else>ei.input<endif>,
+                        <if(truncate)>replaceRegexpAll(if(notEmpty(ei.output_slim), ei.output_slim, ei.output), '<truncate>', '"[image]"')<else>ei.output<endif>,
+                        ei.feedback_scores_array,
+                        ei.created_at,
+                        ei.last_updated_at,
+                        ei.created_by,
+                        ei.last_updated_by,
+                        ei.comments_array_agg,
+                        ei.duration,
+                        ei.total_estimated_cost,
+                        ei.usage,
+                        ei.visibility_mode,
+                        ei.metadata,
+                        di.description,
+                        ei.execution_policy,
+                        ei.assertions_array
+                    )) AS experiment_items_array
+                FROM (
+                    SELECT
+                        eia.id,
+                        eia.trace_id,
+                        eia.dataset_item_id,
+                        eia.experiment_id,
+                        eia.project_id,
+                        eia.input,
+                        eia.output,
+                        eia.input_slim,
+                        eia.output_slim,
+                        eia.feedback_scores_array,
+                        eia.duration AS duration,
+                        eia.total_estimated_cost,
+                        eia.usage,
+                        eia.visibility_mode,
+                        eia.created_at,
+                        eia.last_updated_at,
+                        eia.created_by,
+                        eia.last_updated_by,
+                        eia.metadata,
+                        eia.feedback_scores,
+                        eia.comments_array_agg,
+                        eia.execution_policy,
+                        eia.assertions_array
+                    FROM experiment_item_aggregates AS eia FINAL
+                    WHERE eia.workspace_id = :workspace_id
+                    AND eia.experiment_id IN (SELECT id FROM experiment_aggregated_scope_ids)
+                    <if(push_top_limit)>AND eia.dataset_item_id IN (SELECT dataset_item_id FROM top_dataset_items)<endif>
+                    <if(experiment_item_filters)> AND <experiment_item_filters> <endif>
+                    <if(feedback_scores_filters_agg)> AND <feedback_scores_filters_agg> <endif>
+                    <if(feedback_scores_empty_filters_agg)> AND <feedback_scores_empty_filters_agg> <endif>
+                    <if(dataset_item_filters)>
+                    AND eia.dataset_item_id IN (SELECT arrayJoin([id, row_id]) FROM dataset_items_aggr_resolved WHERE <dataset_item_filters>)
+                    <endif>
+                ) ei
+                INNER JOIN experiment_aggregated_scope_ids eas ON eas.id = ei.experiment_id
+                LEFT JOIN dataset_items_aggr_resolved AS di ON (di.id = ei.dataset_item_id OR di.row_id = ei.dataset_item_id)
+                    AND di.dataset_version_id = eas.resolved_dataset_version_id
+                GROUP BY
+                    ei.dataset_item_id,
+                    :datasetId,
+                    COALESCE(di.data, map()),
+                    di.trace_id,
+                    di.description,
+                    di.span_id,
+                    di.source,
+                    di.tags,
+                    di.evaluators,
+                    di.execution_policy,
+                    di.item_created_at,
+                    di.item_last_updated_at,
+                    di.item_created_by,
+                    di.item_last_updated_by
+                <if(search || filters)>
+                  HAVING 1=1
+
+                  <if(search)>
+                  AND (multiSearchAnyCaseInsensitive(toString(data_final), :searchTerms) OR multiSearchAnyCaseInsensitive(toString(argMax(ei.input, ei.id)), :searchTerms) OR multiSearchAnyCaseInsensitive(toString(argMax(ei.output, ei.id)), :searchTerms))
+                  <endif>
+
+                  <if(filters)>
+                  AND (<filters>)
+                  <endif>
+
+                <endif>
+                <endif>
+
+            <if(has_aggregated)><if(has_raw)>UNION ALL<endif><endif>
+
+                <if(has_raw)>
+                SELECT
+                    ei.dataset_item_id AS id,
+                    :datasetId AS dataset_id,
+                    <if(truncate)> mapApply((k, v) -> (k, substring(replaceRegexpAll(v, '<truncate>', '"[image]"'), 1, <truncationSize>)), COALESCE(di.data, map())) <else> COALESCE(di.data, map()) <endif> AS data_final,
+                    COALESCE(di.data, map()) AS data,
+                    di.description AS description,
+                    di.trace_id AS trace_id,
+                    di.span_id AS span_id,
+                    di.source AS source,
+                    di.tags AS tags,
+                    di.evaluators AS evaluators,
+                    di.execution_policy AS execution_policy,
+                    di.item_created_at AS created_at,
+                    di.item_last_updated_at AS last_updated_at,
+                    di.item_created_by AS created_by,
+                    di.item_last_updated_by AS last_updated_by,
+                    avg(tfs.duration) AS duration,
+                    avg(tfs.total_estimated_cost) AS total_estimated_cost,
+                    avgMap(tfs.usage) AS usage,
+                    avgMap(tfs.feedback_scores) AS feedback_scores,
+                    argMax(tfs.input, ei.id) AS input,
+                    argMax(tfs.output, ei.id) AS output,
+                    argMax(tfs.metadata, ei.id) AS metadata,
+                    argMax(tfs.visibility_mode, ei.id) AS visibility_mode,
+                    argMax(tfs.comments_array_agg, ei.id) AS comments,
+                    groupArray(tuple(
+                        ei.id,
+                        ei.experiment_id,
+                        ei.dataset_item_id,
+                        ei.trace_id,
+                        tfs.input,
+                        tfs.output,
+                        toString(tfs.feedback_scores_array),
+                        ei.created_at,
+                        ei.last_updated_at,
+                        ei.created_by,
+                        ei.last_updated_by,
+                        tfs.comments_array_agg,
+                        tfs.duration,
+                        tfs.total_estimated_cost,
+                        tfs.usage,
+                        tfs.visibility_mode,
+                        tfs.metadata,
+                        di.description,
+                        ei.execution_policy,
+                        arp.assertions_array
+                    )) AS experiment_items_array
+                FROM experiment_items_final AS ei
+                LEFT JOIN dataset_items_resolved AS di ON (di.id = ei.dataset_item_id OR di.row_id = ei.dataset_item_id)
+                    AND di.dataset_version_id = ei.resolved_dataset_version_id
                 LEFT JOIN (
                     SELECT
-                        trace_id,
-                        SUM(total_estimated_cost) AS total_estimated_cost,
-                        sumMap(usage) AS usage
-                    FROM spans final
-                    WHERE workspace_id = :workspace_id
-                    <if(has_target_projects)>AND project_id IN :target_project_ids<endif>
-                    AND trace_id IN (SELECT trace_id FROM experiment_items_trace_scope)
-                    GROUP BY workspace_id, project_id, trace_id
-                ) s ON t.id = s.trace_id
+                        ei2.id AS item_id,
+                        t.input,
+                        t.output,
+                        t.full_input,
+                        t.full_output,
+                        t.metadata,
+                        t.duration,
+                        t.visibility_mode,
+                        s.total_estimated_cost,
+                        s.usage,
+                        any(fsa.feedback_scores_array) AS feedback_scores_array,
+                        any(fsa.feedback_scores) AS feedback_scores,
+                        any(co.comments_array_agg) AS comments_array_agg
+                    FROM experiment_items_final ei2
+                    INNER JOIN trace_data AS t ON ei2.trace_id = t.id
+                    LEFT JOIN (
+                        SELECT
+                            entity_id,
+                            toJSONString(
+                                groupUniqArray(
+                                    CAST(
+                                        (
+                                            name,
+                                            category_name,
+                                            value,
+                                            reason,
+                                            toString(source),
+                                            concat(replaceOne(toString(created_at), ' ', 'T'), 'Z'),
+                                            concat(replaceOne(toString(last_updated_at), ' ', 'T'), 'Z'),
+                                            created_by,
+                                            last_updated_by,
+                                            mapFromArrays(
+                                                mapKeys(value_by_author),
+                                                arrayMap(
+                                                    v -> CAST(
+                                                        (
+                                                            v.1,
+                                                            v.2,
+                                                            v.3,
+                                                            toString(v.4),
+                                                            concat(replaceOne(toString(v.5), ' ', 'T'), 'Z')
+                                                        ),
+                                                        'Tuple(
+                                                            value Decimal(18,9),
+                                                            reason String,
+                                                            category_name String,
+                                                            source String,
+                                                            last_updated_at String
+                                                        )'
+                                                    ),
+                                                    mapValues(value_by_author)
+                                                )
+                                            )
+                                        ),
+                                        'Tuple(
+                                            name String,
+                                            category_name String,
+                                            value Decimal(18,9),
+                                            reason String,
+                                            source String,
+                                            created_at String,
+                                            last_updated_at String,
+                                            created_by String,
+                                            last_updated_by String,
+                                            value_by_author Map(
+                                                String,
+                                                Tuple(
+                                                    value Decimal(18,9),
+                                                    reason String,
+                                                    category_name String,
+                                                    source String,
+                                                    last_updated_at String
+                                                )
+                                            )
+                                        )'
+                                    )
+                                )
+                            ) AS feedback_scores_array,
+                            mapFromArrays(
+                                groupArray(name),
+                                groupArray(value)
+                            ) AS feedback_scores
+                        FROM feedback_scores_final
+                        GROUP BY entity_id
+                    ) AS fsa ON t.id = fsa.entity_id
+                    LEFT JOIN (
+                        SELECT
+                            entity_id,
+                            toJSONString(groupUniqArray(CAST(tuple(
+                                c.comment_id,
+                                c.text,
+                                concat(replaceOne(toString(c.comment_created_at), ' ', 'T'), 'Z'),
+                                concat(replaceOne(toString(c.comment_last_updated_at), ' ', 'T'), 'Z'),
+                                c.comment_created_by,
+                                c.comment_last_updated_by,
+                                c.entity_id
+                            ), 'Tuple(
+                                id FixedString(36),
+                                text String,
+                                created_at String,
+                                last_updated_at String,
+                                created_by String,
+                                last_updated_by String,
+                                entity_id FixedString(36)
+                            )'))) AS comments_array_agg
+                        FROM comments_final AS c
+                        GROUP BY entity_id
+                    ) AS co ON t.id = co.entity_id
+                    LEFT JOIN (
+                        SELECT
+                            trace_id,
+                            SUM(total_estimated_cost) AS total_estimated_cost,
+                            sumMap(usage) AS usage
+                        FROM spans final
+                        WHERE workspace_id = :workspace_id
+                        <if(has_target_projects)>AND project_id IN :target_project_ids<endif>
+                        AND trace_id IN (SELECT trace_id FROM experiment_items_trace_scope)
+                        GROUP BY workspace_id, project_id, trace_id
+                    ) s ON t.id = s.trace_id
+                    GROUP BY
+                        ei2.id,
+                        t.input,
+                        t.output,
+                        t.metadata,
+                        t.duration,
+                        t.visibility_mode,
+                        t.full_input,
+                        t.full_output,
+                        s.total_estimated_cost,
+                        s.usage
+                ) AS tfs ON ei.id = tfs.item_id
+                LEFT JOIN assertion_results_per_trace AS arp ON ei.trace_id = arp.entity_id
                 GROUP BY
-                    t.id,
-                    t.input,
-                    t.output,
-                    t.metadata,
-                    t.duration,
-                    t.visibility_mode,
-                    t.full_input,
-                    t.full_output,
-                    s.total_estimated_cost,
-                    s.usage
-            ) AS tfs ON ei.trace_id = tfs.id
-            GROUP BY
-                ei.dataset_item_id,
-                :datasetId,
-                COALESCE(di.data, map()),
-                di.trace_id,
-                di.description,
-                di.span_id,
-                di.source,
-                di.tags,
-                di.evaluators,
-                di.execution_policy,
-                di.item_created_at,
-                di.item_last_updated_at,
-                di.item_created_by,
-                di.item_last_updated_by
-            <if(search)>
-            HAVING multiSearchAnyCaseInsensitive(toString(data_final), :searchTerms) OR multiSearchAnyCaseInsensitive(toString(argMax(tfs.full_input, ei.id)), :searchTerms) OR multiSearchAnyCaseInsensitive(toString(argMax(tfs.full_output, ei.id)), :searchTerms)
-            <endif>
-            <if(filters)>
-            HAVING <filters>
-            <endif>
+                    ei.dataset_item_id,
+                    :datasetId,
+                    COALESCE(di.data, map()),
+                    di.trace_id,
+                    di.description,
+                    di.span_id,
+                    di.source,
+                    di.tags,
+                    di.evaluators,
+                    di.execution_policy,
+                    di.item_created_at,
+                    di.item_last_updated_at,
+                    di.item_created_by,
+                    di.item_last_updated_by
+                <if(search || filters)>
+                  HAVING 1=1
+
+                  <if(search)>
+                  AND (multiSearchAnyCaseInsensitive(toString(data_final), :searchTerms) OR multiSearchAnyCaseInsensitive(toString(argMax(tfs.full_input, ei.id)), :searchTerms) OR multiSearchAnyCaseInsensitive(toString(argMax(tfs.full_output, ei.id)), :searchTerms))
+                  <endif>
+
+                  <if(filters)>
+                  AND (<filters>)
+                  <endif>
+
+                <endif>
+                <endif>
+            )
             <if(sorting)>
-            ORDER BY <sorting>
+            ORDER BY <sorting>, id DESC
             <else>
             ORDER BY id DESC
             <endif>
             LIMIT :limit
-            OFFSET :offset
+            <if(!push_top_limit)>OFFSET :offset<endif>
+            SETTINGS output_format_json_named_tuples_as_objects = 1
+            ;
             """;
 
     // Batch insert items
@@ -1203,7 +1507,7 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
                 src.source,
                 src.trace_id,
                 src.span_id,
-                """
+            """
             + TagOperations.tagUpdateFragment("src.tags")
             + """
                         as tags,
@@ -1371,7 +1675,7 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
             FROM dataset_item_versions
             WHERE dataset_item_id = :datasetItemId
             AND workspace_id = :workspace_id
-            ORDER BY (workspace_id, dataset_id, dataset_version_id, id) DESC, last_updated_at DESC
+            ORDER BY last_updated_at DESC
             LIMIT 1
             """;
 
@@ -1382,7 +1686,6 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
             WHERE dataset_item_id IN :datasetItemIds
             AND workspace_id = :workspace_id
             GROUP BY dataset_id
-            LIMIT 1
             """;
 
     private static final String SELECT_COLUMNS_BY_VERSION = """
@@ -1410,22 +1713,9 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
             )
             """;
 
-    private static final String SELECT_ITEM_ID_MAPPING_BY_ROW_IDS = """
-            SELECT
-                id,
-                dataset_item_id,
-                dataset_id
-            FROM dataset_item_versions
-            WHERE id IN :rowIds
-            AND workspace_id = :workspace_id
-            ORDER BY (workspace_id, dataset_id, dataset_version_id, id) DESC, last_updated_at DESC
-            LIMIT 1 BY id
-            """;
-
     private static final String SELECT_ITEM_BY_ID = """
             SELECT
-                id,
-                dataset_item_id,
+                dataset_item_id AS id,
                 dataset_id,
                 data,
                 description,
@@ -1441,36 +1731,35 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
                 item_last_updated_by as last_updated_by
             FROM dataset_item_versions
             WHERE workspace_id = :workspace_id
-            AND id = :id
-            ORDER BY (workspace_id, dataset_id, dataset_version_id, id) DESC, last_updated_at DESC
+            AND dataset_item_id = :id
+            ORDER BY last_updated_at DESC
             LIMIT 1
             """;
 
     private static final String SELECT_DATASET_WORKSPACE_ITEMS_BY_ROW_IDS = """
             SELECT DISTINCT
-                id,
+                dataset_item_id AS id,
                 workspace_id
             FROM dataset_item_versions
-            WHERE id IN :datasetItemRowIds
-            ORDER BY (workspace_id, dataset_id, dataset_version_id, id) DESC, last_updated_at DESC
-            LIMIT 1 BY id
+            WHERE dataset_item_id IN :datasetItemRowIds OR id IN :datasetItemRowIds
+            ORDER BY last_updated_at DESC
+            LIMIT 1 BY dataset_item_id
             """;
 
     private static final String SELECT_EXECUTION_POLICIES_BY_DATASET_ITEM_IDS = """
             SELECT DISTINCT
-                dataset_item_id,
+                dataset_item_id AS id,
                 dataset_version_id,
                 execution_policy
             FROM dataset_item_versions
-            WHERE dataset_item_id IN :datasetItemIds
+            WHERE (id IN :datasetItemIds OR dataset_item_id IN :datasetItemIds)
             AND dataset_version_id IN :datasetVersionIds
             AND workspace_id = :workspace_id
             """;
 
     private static final String SELECT_ITEMS_BY_DATASET_ITEM_IDS = """
             SELECT
-                id,
-                dataset_item_id,
+                dataset_item_id AS id,
                 dataset_id,
                 data,
                 description,
@@ -1489,12 +1778,20 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
             AND dataset_id = :datasetId
             AND dataset_version_id = :versionId
             AND dataset_item_id IN :datasetItemIds
-            ORDER BY (workspace_id, dataset_id, dataset_version_id, id) DESC, last_updated_at DESC
+            ORDER BY dataset_item_id DESC, last_updated_at DESC
             LIMIT 1 BY dataset_item_id
             """;
 
     private static final String SELECT_DATASET_ITEM_VERSIONS_WITH_EXPERIMENT_ITEMS_STATS = """
-            WITH experiments_resolved AS (
+            WITH experiment_aggregated_scope_ids AS (
+                SELECT
+                    id,
+                    COALESCE(nullIf(dataset_version_id, ''), :versionId) AS resolved_dataset_version_id
+                FROM experiment_aggregates FINAL
+                WHERE workspace_id = :workspace_id
+                AND dataset_id = :datasetId
+                <if(experiment_ids)>AND id IN :experiment_ids<endif>
+            ), experiments_resolved AS (
                 SELECT
                     id,
                     COALESCE(nullIf(dataset_version_id, ''), :versionId) AS resolved_version_id
@@ -1502,13 +1799,15 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
                 WHERE workspace_id = :workspace_id
                 AND dataset_id = :datasetId
                 <if(experiment_ids)>AND id IN :experiment_ids<endif>
+                AND id NOT IN (SELECT id FROM experiment_aggregated_scope_ids)
                 ORDER BY (workspace_id, dataset_id, id) DESC, last_updated_at DESC
                 LIMIT 1 BY id
             ), experiment_items_scope AS (
-                SELECT ei.*
+                SELECT ei.*, e.resolved_version_id AS resolved_dataset_version_id
                 FROM experiment_items ei
                 INNER JOIN experiments_resolved e ON e.id = ei.experiment_id
                 WHERE ei.workspace_id = :workspace_id
+                <if(experiment_ids)>AND ei.experiment_id IN :experiment_ids<endif>
                 ORDER BY (ei.workspace_id, ei.experiment_id, ei.dataset_item_id, ei.trace_id, ei.id) DESC, ei.last_updated_at DESC
                 LIMIT 1 BY ei.id
             ), experiment_items_trace_scope AS (
@@ -1516,6 +1815,12 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
                 FROM experiment_items ei
                 INNER JOIN experiments_resolved e ON e.id = ei.experiment_id
                 WHERE ei.workspace_id = :workspace_id
+                <if(experiment_ids)>AND ei.experiment_id IN :experiment_ids<endif>
+            ), experiment_items_aggr_trace_scope AS (
+                SELECT DISTINCT ei.trace_id
+                FROM experiment_item_aggregates ei
+                WHERE ei.workspace_id = :workspace_id
+                AND experiment_id IN (SELECT id FROM experiment_aggregated_scope_ids)
                 <if(experiment_ids)>AND ei.experiment_id IN :experiment_ids<endif>
             ), trace_data AS (
                 SELECT
@@ -1545,7 +1850,9 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
                 FROM feedback_scores FINAL
                 WHERE entity_type = 'trace'
                 AND workspace_id = :workspace_id
-                <if(has_target_projects)>AND project_id IN :target_project_ids<endif>
+                <if(has_target_projects)>
+                AND project_id IN :target_project_ids
+                <endif>
                 AND entity_id IN (SELECT trace_id FROM experiment_items_trace_scope)
                 UNION ALL
                 SELECT
@@ -1559,7 +1866,9 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
                 FROM authored_feedback_scores FINAL
                 WHERE entity_type = 'trace'
                 AND workspace_id = :workspace_id
-                <if(has_target_projects)>AND project_id IN :target_project_ids<endif>
+                <if(has_target_projects)>
+                AND project_id IN :target_project_ids
+                <endif>
                 AND entity_id IN (SELECT trace_id FROM experiment_items_trace_scope)
             ), feedback_scores_with_ranking AS (
                 SELECT workspace_id,
@@ -1614,16 +1923,18 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
                     ei.trace_id
                 FROM experiment_items_scope ei
                 INNER JOIN (
-                    SELECT
-                        div.id,
-                        div.dataset_item_id
-                    FROM dataset_item_versions div
-                    WHERE div.workspace_id = :workspace_id
-                    AND div.dataset_id = :datasetId
-                    AND div.dataset_version_id IN (SELECT resolved_version_id FROM experiments_resolved)
-                    ORDER BY (div.workspace_id, div.dataset_id, div.dataset_version_id, div.id) DESC, div.last_updated_at DESC
-                    LIMIT 1 BY div.id
-                ) dibv ON dibv.id = ei.dataset_item_id
+                    SELECT div_dedup.dataset_item_id, div_dedup.id AS row_id, div_dedup.dataset_version_id
+                    FROM (
+                        SELECT *
+                        FROM dataset_item_versions div
+                        WHERE div.workspace_id = :workspace_id
+                        AND div.dataset_id = :datasetId
+                        AND div.dataset_version_id IN (SELECT resolved_version_id FROM experiments_resolved)
+                        ORDER BY (div.workspace_id, div.dataset_id, div.dataset_version_id, div.id) DESC, div.last_updated_at DESC
+                        LIMIT 1 BY div.id
+                    ) div_dedup
+                ) dibv ON (dibv.dataset_item_id = ei.dataset_item_id OR dibv.row_id = ei.dataset_item_id)
+                    AND dibv.dataset_version_id = ei.resolved_dataset_version_id
                 <if(experiment_item_filters)>
                 AND ei.trace_id IN (
                     SELECT
@@ -1663,10 +1974,11 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
                 <endif>
                 <if(dataset_item_filters)>
                 AND ei.dataset_item_id IN (
-                    SELECT id
+                    SELECT arrayJoin([id, row_id])
                     FROM (
                         SELECT
-                            div_dedup.id AS id,
+                            div_dedup.dataset_item_id AS id,
+                            div_dedup.id AS row_id,
                             div_dedup.data AS data,
                             div_dedup.source AS source,
                             div_dedup.trace_id AS trace_id,
@@ -1683,6 +1995,47 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
                             WHERE workspace_id = :workspace_id
                             AND dataset_id = :datasetId
                             AND dataset_version_id IN (SELECT resolved_version_id FROM experiments_resolved)
+                            ORDER BY (workspace_id, dataset_id, dataset_version_id, id) DESC, last_updated_at DESC
+                            LIMIT 1 BY id
+                        ) AS div_dedup
+                    ) AS versioned
+                    WHERE <dataset_item_filters>
+                )
+                <endif>
+            ), item_agg AS (
+                SELECT
+                    eia.id,
+                    eia.experiment_id,
+                    eia.dataset_item_id,
+                    eia.trace_id,
+                    toFloat64(eia.duration) AS duration,
+                    eia.total_estimated_cost,
+                    eia.usage,
+                    eia.feedback_scores
+                FROM experiment_item_aggregates AS eia FINAL
+                WHERE eia.workspace_id = :workspace_id
+                AND eia.experiment_id IN (SELECT id FROM experiment_aggregated_scope_ids)
+                <if(experiment_item_filters)> AND <experiment_item_filters> <endif>
+                <if(feedback_scores_filters_agg)> AND <feedback_scores_filters_agg> <endif>
+                <if(feedback_scores_empty_filters_agg)> AND <feedback_scores_empty_filters_agg> <endif>
+                <if(dataset_item_filters)>
+                AND eia.dataset_item_id IN (
+                    SELECT arrayJoin([id, row_id])
+                    FROM (
+                        SELECT
+                            div_dedup.dataset_item_id AS id,
+                            div_dedup.id AS row_id,
+                            div_dedup.data AS data,
+                            div_dedup.source AS source,
+                            div_dedup.trace_id AS trace_id,
+                            div_dedup.span_id AS span_id,
+                            div_dedup.tags AS tags
+                        FROM (
+                            SELECT *
+                            FROM dataset_item_versions
+                            WHERE workspace_id = :workspace_id
+                            AND dataset_id = :datasetId
+                            AND dataset_version_id IN (SELECT resolved_dataset_version_id FROM experiment_aggregated_scope_ids)
                             ORDER BY (workspace_id, dataset_id, dataset_version_id, id) DESC, last_updated_at DESC
                             LIMIT 1 BY id
                         ) AS div_dedup
@@ -1709,7 +2062,7 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
                     AND trace_id IN (SELECT trace_id FROM experiment_items_trace_scope)
                     GROUP BY workspace_id, project_id, trace_id
                 ) AS s ON eif.trace_id = s.trace_id
-            ), feedback_scores_agg AS (
+            ), feedback_scores_raw_agg AS (
                 SELECT
                     entity_id,
                     mapFromArrays(
@@ -1717,23 +2070,32 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
                         groupArray(value)
                     ) AS feedback_scores
                 FROM feedback_scores_final
-                GROUP BY workspace_id, project_id, entity_id
+                GROUP BY entity_id
             ), feedback_scores_percentiles AS (
                 SELECT
                     name,
                     quantiles(0.5, 0.9, 0.99)(toFloat64(value)) AS percentiles
-                FROM feedback_scores_final
-                WHERE entity_id IN (SELECT trace_id FROM experiment_items_filtered)
+                FROM (
+                    <if(has_aggregated)>
+                    SELECT
+                        name,
+                        toDecimal64(value, 9) AS value
+                    FROM item_agg
+                    ARRAY JOIN mapKeys(feedback_scores) AS name, mapValues(feedback_scores) AS value
+                    WHERE notEmpty(feedback_scores)
+                    <endif>
+                    <if(has_aggregated)><if(has_raw)>UNION ALL<endif><endif>
+                    <if(has_raw)>
+                    SELECT name, value
+                    FROM feedback_scores_final
+                    WHERE entity_id IN (SELECT trace_id FROM experiment_items_filtered)
+                    <endif>
+                )
                 GROUP BY name
-            ), usage_total_tokens_data AS (
-                SELECT
-                    toFloat64(tc.usage['total_tokens']) AS total_tokens
-                FROM traces_with_cost_and_duration tc
-                WHERE tc.usage['total_tokens'] IS NOT NULL AND tc.usage['total_tokens'] > 0
             )
             SELECT
                 count(DISTINCT ei.id) as experiment_items_count,
-                count(DISTINCT tc.trace_id) as trace_count,
+                count(DISTINCT ei.trace_id) as trace_count,
                 mapFromArrays(
                     ['p50', 'p90', 'p99'],
                     arrayMap(
@@ -1744,10 +2106,10 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
                              ),
                              9
                            ),
-                      quantiles(0.5, 0.9, 0.99)(tc.duration)
+                      quantiles(0.5, 0.9, 0.99)(ei.duration)
                     )
                 ) AS duration,
-                avgMap(f.feedback_scores) AS feedback_scores,
+                avgMap(ei.feedback_scores) AS feedback_scores,
                 (SELECT mapFromArrays(
                     groupArray(name),
                     groupArray(mapFromArrays(
@@ -1755,9 +2117,9 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
                         arrayMap(v -> toDecimal64(if(isFinite(v), v, 0), 9), percentiles)
                     ))
                 ) FROM feedback_scores_percentiles) AS feedback_scores_percentiles,
-                avgIf(tc.total_estimated_cost, tc.total_estimated_cost > 0) AS total_estimated_cost_,
+                avgIf(ei.total_estimated_cost, ei.total_estimated_cost > 0) AS total_estimated_cost_,
                 toDecimal128(if(isNaN(total_estimated_cost_), 0, total_estimated_cost_), 12) AS total_estimated_cost_avg,
-                sumIf(tc.total_estimated_cost, tc.total_estimated_cost > 0) AS total_estimated_cost_sum_,
+                sumIf(ei.total_estimated_cost, ei.total_estimated_cost > 0) AS total_estimated_cost_sum_,
                 toDecimal128(total_estimated_cost_sum_, 12) AS total_estimated_cost_sum,
                 mapFromArrays(
                     ['p50', 'p90', 'p99'],
@@ -1769,20 +2131,45 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
                              ),
                              12
                            ),
-                      quantilesIf(0.5, 0.9, 0.99)(tc.total_estimated_cost, tc.total_estimated_cost > 0)
+                      quantilesIf(0.5, 0.9, 0.99)(ei.total_estimated_cost, ei.total_estimated_cost > 0)
                     )
                 ) AS total_estimated_cost_percentiles,
-                avgMap(tc.usage) AS usage,
+                avgMap(ei.usage) AS usage,
                 mapFromArrays(
                     ['p50', 'p90', 'p99'],
                     arrayMap(
                       v -> toInt64(greatest(least(if(isFinite(v), v, 0), 999999999.999999999), -999999999.999999999)),
-                      (SELECT quantiles(0.5, 0.9, 0.99)(total_tokens) FROM usage_total_tokens_data)
+                      quantilesIf(0.5, 0.9, 0.99)(
+                          toFloat64(ei.usage['total_tokens']),
+                          ei.usage['total_tokens'] IS NOT NULL AND ei.usage['total_tokens'] > 0
+                      )
                     )
                 ) AS usage_total_tokens_percentiles
-            FROM experiment_items_filtered ei
-            LEFT JOIN traces_with_cost_and_duration AS tc ON ei.trace_id = tc.trace_id
-            LEFT JOIN feedback_scores_agg AS f ON ei.trace_id = f.entity_id
+            FROM (
+                <if(has_aggregated)>
+                SELECT
+                    ia.id AS id,
+                    ia.trace_id AS trace_id,
+                    ia.duration AS duration,
+                    ia.total_estimated_cost AS total_estimated_cost,
+                    ia.usage AS usage,
+                    ia.feedback_scores AS feedback_scores
+                FROM item_agg ia
+                <endif>
+                <if(has_aggregated)><if(has_raw)>UNION ALL<endif><endif>
+                <if(has_raw)>
+                SELECT
+                    eif.id AS id,
+                    eif.trace_id AS trace_id,
+                    tc.duration AS duration,
+                    tc.total_estimated_cost AS total_estimated_cost,
+                    tc.usage AS usage,
+                    fr.feedback_scores AS feedback_scores
+                FROM experiment_items_filtered eif
+                LEFT JOIN traces_with_cost_and_duration tc ON tc.trace_id = eif.trace_id
+                LEFT JOIN feedback_scores_raw_agg fr ON fr.entity_id = eif.trace_id
+                <endif>
+            ) ei
             ;
             """;
 
@@ -1824,7 +2211,7 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
             """;
 
     private static final String COUNT_ITEMS_IN_VERSION = """
-            SELECT count(DISTINCT id) as count
+            SELECT count(DISTINCT dataset_item_id) as count
             FROM dataset_item_versions
             WHERE workspace_id = :workspaceId
               AND dataset_id = :datasetId
@@ -1840,7 +2227,7 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
     private static final String COUNT_ITEMS_IN_VERSIONS_BATCH = """
             SELECT
                 dataset_version_id,
-                count(DISTINCT id) as count
+                count(DISTINCT dataset_item_id) as count
             FROM dataset_item_versions
             WHERE (workspace_id, dataset_id, dataset_version_id) IN (<version_tuples>)
             GROUP BY dataset_version_id
@@ -1851,6 +2238,7 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
     private final @NonNull SortingQueryBuilder sortingQueryBuilder;
     private final @NonNull SortingFactoryDatasets sortingFactory;
     private final @NonNull OpikConfiguration config;
+    private final @NonNull ExperimentAggregatesDAO experimentAggregatesDAO;
 
     @Override
     @WithSpan
@@ -1991,7 +2379,7 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
             @NonNull UUID versionId) {
         return Mono.zip(
                 getCount(criteria, versionId),
-                getColumns(criteria.datasetId(), versionId)).flatMap(tuple -> {
+                getColumns(criteria.datasetId(), versionId.toString())).flatMap(tuple -> {
                     Long total = tuple.getT1();
                     Set<Column> columns = tuple.getT2();
 
@@ -2018,6 +2406,7 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
                                 .doFinally(signalType -> endSegment(segment))
                                 .flatMap(DatasetItemResultMapper::mapItem)
                                 .collectList()
+                                .onErrorResume(e -> handleSqlError(e, List.of()))
                                 .map(items -> new DatasetItemPage(items, page, items.size(), total, columns,
                                         sortingFactory.getSortableFields()));
                     });
@@ -2026,7 +2415,7 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
 
     @Override
     public Mono<DatasetItemPage> getItemsWithExperimentItems(@NonNull DatasetItemSearchCriteria criteria, int page,
-            int size, @NonNull UUID versionId) {
+            int size, @NonNull String versionId) {
         log.info(
                 "Getting versioned dataset items with experiment items for dataset '{}', version '{}', experiments '{}'",
                 criteria.datasetId(), versionId, criteria.experimentIds());
@@ -2034,88 +2423,148 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
         return Mono.deferContextual(ctx -> {
             String workspaceId = ctx.get(RequestContext.WORKSPACE_ID);
 
-            // First, get the target project IDs to reduce traces table scans in the main query
-            return getTargetProjectIds(workspaceId, criteria.datasetId(), criteria.experimentIds())
-                    .flatMap(targetProjectIds -> asyncTemplate.nonTransaction(connection -> {
-                        // Build the query using StringTemplate
-                        ST template = TemplateUtils.newST(SELECT_DATASET_ITEM_VERSIONS_WITH_EXPERIMENT_ITEMS);
+            var aggregationCriteria = AggregationBranchCountsCriteria.builder()
+                    .datasetId(criteria.datasetId())
+                    .experimentIds(criteria.experimentIds())
+                    .build();
 
-                        template = ImageUtils.addTruncateToTemplate(template, criteria.truncate());
-                        template.add("truncationSize", config.getResponseFormatting().getTruncationSize());
+            // Run pre-queries in parallel: target project IDs and aggregated experiment IDs
+            var targetProjectIdsMono = getTargetProjectIds(workspaceId, criteria.datasetId(), criteria.experimentIds());
+            var branchCountsMono = getAggregationBranchCounts(aggregationCriteria);
 
-                        // Add experiment IDs to template
-                        if (CollectionUtils.isNotEmpty(criteria.experimentIds())) {
-                            template.add("experiment_ids", criteria.experimentIds());
-                        }
+            return Mono.zip(targetProjectIdsMono, branchCountsMono)
+                    .flatMap(preQueryResults -> {
+                        var targetProjectIds = preQueryResults.getT1();
+                        var counts = preQueryResults.getT2();
 
-                        // Add filters and search criteria using helper method
-                        addFiltersToTemplate(template, criteria);
+                        boolean hasAggregated = counts.hasAggregated();
+                        boolean hasRaw = counts.hasRaw();
 
-                        // Add sorting if present
-                        var hasDynamicKeys = criteria.sortingFields() != null
-                                && sortingQueryBuilder.hasDynamicKeys(criteria.sortingFields());
+                        return asyncTemplate.nonTransaction(connection -> {
+                            // Build the query using StringTemplate
+                            ST template = TemplateUtils
+                                    .newST(SELECT_DATASET_ITEM_VERSIONS_WITH_EXPERIMENT_ITEMS);
 
-                        if (criteria.sortingFields() != null && !criteria.sortingFields().isEmpty()) {
-                            String sortingQuery = sortingQueryBuilder.toOrderBySql(
-                                    criteria.sortingFields(),
-                                    filterQueryBuilder.buildDatasetItemFieldMapping(criteria.sortingFields()));
-                            if (sortingQuery != null) {
-                                template.add("sorting", sortingQuery);
+                            template = ImageUtils.addTruncateToTemplate(template, criteria.truncate());
+                            template.add("truncationSize",
+                                    config.getResponseFormatting().getTruncationSize());
+
+                            // Add experiment IDs to template
+                            if (CollectionUtils.isNotEmpty(criteria.experimentIds())) {
+                                template.add("experiment_ids", criteria.experimentIds());
                             }
-                        }
 
-                        // Add target project IDs flag to template (from separate query to reduce traces table scans)
-                        if (CollectionUtils.isNotEmpty(targetProjectIds)) {
-                            template.add("has_target_projects", true);
-                        }
+                            // Add branch flags to conditionally include/exclude UNION ALL branches
+                            template.add("has_aggregated", hasAggregated);
+                            template.add("has_raw", hasRaw);
 
-                        String query = template.render();
+                            // Push-top-limit: only when all experiments are aggregated (single branch)
+                            boolean pushTopLimit = hasAggregated && !hasRaw
+                                    && CollectionUtils.isNotEmpty(criteria.sortingFields())
+                                    && sortingFactory.supportsPushTopLimit(criteria.sortingFields());
 
-                        var statement = connection.createStatement(query)
-                                .bind("workspace_id", workspaceId)
-                                .bind("datasetId", criteria.datasetId())
-                                .bind("versionId", versionId)
-                                .bind("limit", size)
-                                .bind("offset", (page - 1) * size);
+                            if (pushTopLimit) {
+                                template.add("push_top_limit", true);
+                                template.add("top_sorting", buildTopItemsSorting(criteria.sortingFields()));
+                                if (sortingFactory.pushTopLimitNeedsDivJoin(criteria.sortingFields())) {
+                                    template.add("push_top_needs_div", true);
+                                }
+                            }
 
-                        // Bind target project IDs (from separate query to reduce traces table scans)
-                        if (CollectionUtils.isNotEmpty(targetProjectIds)) {
-                            statement.bind("target_project_ids", targetProjectIds.toArray(UUID[]::new));
-                        }
+                            // Add filters and search criteria using helper method
+                            addFiltersToTemplate(template, criteria);
 
-                        // Bind experiment IDs as array
-                        if (CollectionUtils.isNotEmpty(criteria.experimentIds())) {
-                            statement.bind("experiment_ids", criteria.experimentIds().toArray(UUID[]::new));
-                        }
+                            // Add sorting if present
+                            var fieldMapping = criteria.sortingFields() != null
+                                    ? filterQueryBuilder
+                                            .buildDatasetItemFieldMapping(criteria.sortingFields())
+                                    : null;
 
-                        // Bind dynamic sorting keys if present
-                        if (hasDynamicKeys) {
-                            statement = sortingQueryBuilder.bindDynamicKeys(statement, criteria.sortingFields());
-                        }
+                            var hasDynamicKeys = criteria.sortingFields() != null
+                                    && sortingQueryBuilder.hasDynamicKeys(criteria.sortingFields());
 
-                        // Bind search and filter parameters using helper method
-                        statement = bindSearchAndFilters(statement, criteria);
+                            if (criteria.sortingFields() != null && !criteria.sortingFields().isEmpty()) {
+                                String sortingQuery = sortingQueryBuilder.toOrderBySql(
+                                        criteria.sortingFields(), fieldMapping);
+                                if (sortingQuery != null) {
+                                    template.add("sorting", sortingQuery);
+                                }
+                            }
 
-                        Segment segment = startSegment(DATASET_ITEM_VERSIONS, CLICKHOUSE,
-                                "select_dataset_item_versions_with_experiment_items");
+                            // Add target project IDs flag to template (from separate query to reduce traces table scans)
+                            if (CollectionUtils.isNotEmpty(targetProjectIds)) {
+                                template.add("has_target_projects", true);
+                            }
 
-                        return makeFluxContextAware(bindWorkspaceIdToFlux(statement))
-                                .doFinally(signalType -> endSegment(segment))
-                                .flatMap(DatasetItemResultMapper::mapItem)
-                                .collectList()
-                                .zipWith(getCountWithExperimentFilters(criteria, versionId, targetProjectIds))
-                                .zipWith(getColumns(criteria.datasetId(), versionId))
-                                .map(tuple -> {
-                                    var itemsAndCount = tuple.getT1();
-                                    List<DatasetItem> items = itemsAndCount.getT1();
-                                    Long count = itemsAndCount.getT2();
-                                    Set<Column> columns = tuple.getT2();
+                            String query = template.render();
 
-                                    return new DatasetItemPage(items, page, items.size(), count, columns,
-                                            sortingFactory.getSortableFields());
-                                });
-                    }));
+                            var statement = connection.createStatement(query)
+                                    .bind("workspace_id", workspaceId)
+                                    .bind("datasetId", criteria.datasetId())
+                                    .bind("versionId", versionId)
+                                    .bind("limit", size);
+
+                            if (pushTopLimit) {
+                                statement.bind("top_limit", size);
+                                statement.bind("top_offset", (page - 1) * size);
+                            } else {
+                                statement.bind("offset", (page - 1) * size);
+                            }
+
+                            // Bind target project IDs (from separate query to reduce traces table scans)
+                            if (CollectionUtils.isNotEmpty(targetProjectIds)) {
+                                statement.bind("target_project_ids",
+                                        targetProjectIds.toArray(UUID[]::new));
+                            }
+
+                            // Bind experiment IDs as array
+                            if (CollectionUtils.isNotEmpty(criteria.experimentIds())) {
+                                statement.bind("experiment_ids",
+                                        criteria.experimentIds().toArray(UUID[]::new));
+                            }
+
+                            // Bind dynamic sorting keys if present.
+                            // Pass without fieldMapping so ALL dynamic keys are bound,
+                            // including those used in the top_sorting SELECT expression.
+                            if (hasDynamicKeys) {
+                                statement = sortingQueryBuilder.bindDynamicKeys(statement,
+                                        criteria.sortingFields());
+                            }
+
+                            // Bind search and filter parameters using helper method
+                            statement = bindSearchAndFilters(statement, criteria);
+
+                            Segment segment = startSegment(DATASET_ITEM_VERSIONS, CLICKHOUSE,
+                                    "select_dataset_item_versions_with_experiment_items");
+
+                            return makeFluxContextAware(bindWorkspaceIdToFlux(statement))
+                                    .doFinally(signalType -> endSegment(segment))
+                                    .flatMap(DatasetItemResultMapper::mapItem)
+                                    .collectList()
+                                    .onErrorResume(e -> handleSqlError(e, List.of()))
+                                    .zipWith(getCountWithExperimentFilters(criteria, versionId,
+                                            targetProjectIds, hasAggregated, hasRaw))
+                                    .zipWith(getColumns(criteria.datasetId(), versionId))
+
+                                    .map(tuple -> {
+                                        var itemsAndCount = tuple.getT1();
+                                        List<DatasetItem> items = itemsAndCount.getT1();
+                                        Long count = itemsAndCount.getT2();
+                                        Set<Column> columns = tuple.getT2();
+
+                                        return new DatasetItemPage(items, page, items.size(), count,
+                                                columns, sortingFactory.getSortableFields());
+                                    });
+                        });
+                    });
         });
+    }
+
+    private <T> Mono<T> handleSqlError(Throwable e, T defaultValue) {
+        if (e instanceof ClickHouseException && e.getMessage().contains("Unable to parse JSONPath. (BAD_ARGUMENTS)")) {
+            return Mono.just(defaultValue);
+        }
+        return Mono.error(e);
     }
 
     /**
@@ -2124,13 +2573,12 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
      */
     private Mono<List<UUID>> getTargetProjectIds(String workspaceId, UUID datasetId, Set<UUID> experimentIds) {
         return asyncTemplate.nonTransaction(connection -> {
-            ST template = TemplateUtils.newST(SELECT_TARGET_PROJECTS);
+            ST template = getSTWithLogComment(SELECT_TARGET_PROJECTS, "get_target_project_ids", workspaceId, "",
+                    datasetId);
 
             if (CollectionUtils.isNotEmpty(experimentIds)) {
                 template.add("experiment_ids", true);
             }
-
-            template.add("log_comment", "get_target_project_ids:workspace_id:" + workspaceId);
 
             String query = template.render();
 
@@ -2146,6 +2594,11 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
                     .flatMap(result -> result.map((row, metadata) -> row.get("project_id", UUID.class)))
                     .collectList();
         });
+    }
+
+    private Mono<AggregatedExperimentCounts> getAggregationBranchCounts(
+            @NonNull AggregationBranchCountsCriteria criteria) {
+        return experimentAggregatesDAO.getAggregationBranchCounts(criteria);
     }
 
     @Override
@@ -2184,7 +2637,8 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
     }
 
     private Mono<Long> getCountWithExperimentFilters(@NonNull DatasetItemSearchCriteria criteria,
-            @NonNull UUID versionId, List<UUID> targetProjectIds) {
+            @NonNull String versionId, List<UUID> targetProjectIds,
+            boolean hasAggregated, boolean hasRaw) {
         log.debug("Getting filtered count for dataset '{}' version '{}' with experiment filters", criteria.datasetId(),
                 versionId);
 
@@ -2199,6 +2653,10 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
                 template.add("experiment_ids", true);
             }
 
+            // Add branch flags to conditionally include/exclude UNION ALL branches
+            template.add("has_aggregated", hasAggregated);
+            template.add("has_raw", hasRaw);
+
             // Add filters and search criteria using helper method
             addFiltersToTemplate(template, criteria);
 
@@ -2209,7 +2667,7 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
 
             var statement = connection.createStatement(template.render())
                     .bind("datasetId", criteria.datasetId())
-                    .bind("versionId", versionId.toString());
+                    .bind("versionId", versionId);
 
             // Bind target project IDs (from separate query to reduce traces table scans)
             if (CollectionUtils.isNotEmpty(targetProjectIds)) {
@@ -2229,7 +2687,8 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
             return makeFluxContextAware(bindWorkspaceIdToFlux(statement))
                     .doFinally(signalType -> endSegment(segment))
                     .flatMap(result -> result.map((row, meta) -> row.get("count", Long.class)))
-                    .reduce(0L, Long::sum);
+                    .reduce(0L, Long::sum)
+                    .onErrorResume(e -> handleSqlError(e, 0L));
         });
     }
 
@@ -2251,7 +2710,8 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
             return makeFluxContextAware(bindWorkspaceIdToFlux(statement))
                     .doFinally(signalType -> endSegment(segment))
                     .flatMap(result -> result.map((row, meta) -> row.get("count", Long.class)))
-                    .reduce(0L, Long::sum);
+                    .reduce(0L, Long::sum)
+                    .onErrorResume(e -> handleSqlError(e, 0L));
         });
     }
 
@@ -2361,7 +2821,7 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
     @WithSpan
     public Mono<Long> editItemsViaSelectInsert(@NonNull UUID datasetId, @NonNull UUID baseVersionId,
             @NonNull UUID newVersionId, @NonNull List<DatasetItemEdit> editedItems,
-            @NonNull Map<UUID, UUID> rowIdToDatasetItemId, @NonNull List<UUID> newRowIds) {
+            @NonNull List<UUID> newRowIds) {
 
         if (editedItems.isEmpty()) {
             return Mono.just(0L);
@@ -2380,7 +2840,6 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
 
                 for (int i = 0; i < editedItems.size(); i++) {
                     DatasetItemEdit edit = editedItems.get(i);
-                    UUID datasetItemId = rowIdToDatasetItemId.get(edit.id());
                     UUID newRowId = newRowIds.get(i);
 
                     ST template = new ST(EDIT_ITEM_VIA_SELECT_INSERT);
@@ -2407,7 +2866,7 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
                             .bind("datasetId", datasetId.toString())
                             .bind("baseVersionId", baseVersionId.toString())
                             .bind("newVersionId", newVersionId.toString())
-                            .bind("datasetItemId", datasetItemId.toString())
+                            .bind("datasetItemId", edit.id().toString())
                             .bind("newId", newRowId.toString())
                             .bind("userName", userName);
 
@@ -2897,13 +3356,13 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
 
     @Override
     @WithSpan
-    public Mono<UUID> resolveDatasetIdFromItemIds(@NonNull Set<UUID> datasetItemIds) {
+    public Mono<List<UUID>> resolveDatasetIdsFromItemIds(@NonNull Set<UUID> datasetItemIds) {
         if (datasetItemIds.isEmpty()) {
-            log.debug("Empty dataset_item_ids set provided, returning empty");
-            return Mono.empty();
+            log.debug("Empty dataset_item_ids set provided, returning empty list");
+            return Mono.just(List.of());
         }
 
-        log.debug("Resolving dataset ID from '{}' item IDs", datasetItemIds.size());
+        log.debug("Resolving dataset IDs from '{}' item IDs", datasetItemIds.size());
 
         return asyncTemplate.nonTransaction(connection -> {
             var statement = connection.createStatement(RESOLVE_DATASET_ID_FROM_ITEM_IDS)
@@ -2919,14 +3378,9 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
                 return Flux.from(statement.execute())
                         .flatMap(result -> result
                                 .map((row, rowMetadata) -> UUID.fromString(row.get("dataset_id", String.class))))
-                        .next()
-                        .doOnSuccess(datasetId -> {
-                            if (datasetId != null) {
-                                log.debug("Resolved dataset '{}' from '{}' item IDs", datasetId, datasetItemIds.size());
-                            } else {
-                                log.debug("No dataset found for '{}' item IDs", datasetItemIds.size());
-                            }
-                        })
+                        .collectList()
+                        .doOnSuccess(datasetIds -> log.debug("Resolved '{}' dataset(s) from '{}' item IDs",
+                                datasetIds.size(), datasetItemIds.size()))
                         .doFinally(signalType -> endSegment(segment));
             });
         });
@@ -2943,9 +3397,8 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
         return getItemsByDatasetItemIds(datasetId, versionId, Set.of(datasetItemId)).next();
     }
 
-    @Override
     @WithSpan
-    public Flux<DatasetItem> getItemsByDatasetItemIds(@NonNull UUID datasetId, @NonNull UUID versionId,
+    private Flux<DatasetItem> getItemsByDatasetItemIds(@NonNull UUID datasetId, @NonNull UUID versionId,
             @NonNull Set<UUID> datasetItemIds) {
         if (datasetItemIds.isEmpty()) {
             return Flux.empty();
@@ -2965,7 +3418,7 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
             return makeFluxContextAware(bindWorkspaceIdToFlux(statement))
                     .doFinally(signalType -> endSegment(segment))
                     .flatMap(result -> result
-                            .map((row, rowMetadata) -> mapVersionedItemToDatasetItem(row, rowMetadata)));
+                            .map(this::mapVersionedItemToDatasetItem));
         });
     }
 
@@ -2981,9 +3434,10 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
                         Map.Entry::getKey,
                         entry -> com.comet.opik.utils.JsonUtils.getJsonNodeFromStringWithFallback(entry.getValue())));
 
+        UUID id = UUID.fromString(row.get("id", String.class));
         return DatasetItem.builder()
-                .id(UUID.fromString(row.get("id", String.class)))
-                .datasetItemId(UUID.fromString(row.get("dataset_item_id", String.class)))
+                .id(id)
+                .datasetItemId(id)
                 .datasetId(UUID.fromString(row.get("dataset_id", String.class)))
                 .data(data.isEmpty() ? null : data)
                 .description(DatasetItemResultMapper.getDescription(row, rowMetadata))
@@ -3004,20 +3458,20 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
                         .orElse(null))
                 .evaluators(DatasetItemResultMapper.getEvaluators(row, rowMetadata))
                 .executionPolicy(DatasetItemResultMapper.getExecutionPolicy(row, rowMetadata))
-                .createdAt(row.get("created_at", Instant.class))
-                .lastUpdatedAt(row.get("last_updated_at", Instant.class))
+                .createdAt(DatasetItemResultMapper.nullIfEpoch(row.get("created_at", Instant.class)))
+                .lastUpdatedAt(DatasetItemResultMapper.nullIfEpoch(row.get("last_updated_at", Instant.class)))
                 .createdBy(row.get("created_by", String.class))
                 .lastUpdatedBy(row.get("last_updated_by", String.class))
                 .build();
     }
 
-    private Mono<Set<Column>> getColumns(UUID datasetId, UUID versionId) {
+    private Mono<Set<Column>> getColumns(UUID datasetId, String versionId) {
         log.debug("Getting columns for dataset '{}', version '{}'", datasetId, versionId);
 
         return asyncTemplate.nonTransaction(connection -> {
             var statement = connection.createStatement(SELECT_COLUMNS_BY_VERSION)
                     .bind("datasetId", datasetId.toString())
-                    .bind("versionId", versionId.toString());
+                    .bind("versionId", versionId);
 
             Segment segment = startSegment(DATASET_ITEM_VERSIONS, CLICKHOUSE, "get_columns_by_version");
 
@@ -3030,30 +3484,6 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
                         .defaultIfEmpty(Set.of())
                         .doFinally(signalType -> endSegment(segment));
             });
-        });
-    }
-
-    @Override
-    @WithSpan
-    public Flux<DatasetItemIdMapping> mapRowIdsToDatasetItemIds(@NonNull Set<UUID> rowIds) {
-        if (rowIds.isEmpty()) {
-            return Flux.empty();
-        }
-
-        log.debug("Mapping '{}' row IDs to dataset_item_ids", rowIds.size());
-
-        return asyncTemplate.stream(connection -> {
-            var statement = connection.createStatement(SELECT_ITEM_ID_MAPPING_BY_ROW_IDS)
-                    .bind("rowIds", rowIds.toArray(UUID[]::new));
-
-            Segment segment = startSegment(DATASET_ITEM_VERSIONS, CLICKHOUSE, "map_row_ids_to_dataset_item_ids");
-
-            return makeFluxContextAware(bindWorkspaceIdToFlux(statement))
-                    .doFinally(signalType -> endSegment(segment))
-                    .flatMap(result -> result.map((row, rowMetadata) -> new DatasetItemIdMapping(
-                            UUID.fromString(row.get("id", String.class)),
-                            UUID.fromString(row.get("dataset_item_id", String.class)),
-                            UUID.fromString(row.get("dataset_id", String.class)))));
         });
     }
 
@@ -3073,7 +3503,7 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
 
                 return Flux.from(statement.execute())
                         .flatMap(result -> result
-                                .map((row, rowMetadata) -> mapVersionedItemToDatasetItem(row, rowMetadata)))
+                                .map(this::mapVersionedItemToDatasetItem))
                         .next()
                         .doOnSuccess(item -> {
                             if (item != null) {
@@ -3131,7 +3561,7 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
             return makeFluxContextAware(bindWorkspaceIdToFlux(statement))
                     .doFinally(signalType -> endSegment(segment))
                     .flatMap(result -> result.map((row, rowMetadata) -> {
-                        var datasetItemId = UUID.fromString(row.get("dataset_item_id", String.class));
+                        var datasetItemId = UUID.fromString(row.get("id", String.class));
                         var versionId = UUID.fromString(row.get("dataset_version_id", String.class));
                         var policy = ExecutionPolicyMapper.fromJson(row.get("execution_policy", String.class));
                         return new DatasetItemPolicyEntry(versionId, datasetItemId, policy);
@@ -3153,18 +3583,32 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
         return Mono.deferContextual(ctx -> {
             String workspaceId = ctx.get(RequestContext.WORKSPACE_ID);
 
-            // First, get the target project IDs to reduce traces table scans in the main query
-            return getTargetProjectIds(workspaceId, datasetId, experimentIds)
-                    .flatMap(targetProjectIds -> {
+            var aggregationCriteria = AggregationBranchCountsCriteria.builder()
+                    .datasetId(datasetId)
+                    .experimentIds(experimentIds)
+                    .build();
+            var targetProjectIdsMono = getTargetProjectIds(workspaceId, datasetId, experimentIds);
+            var branchCountsMono = getAggregationBranchCounts(aggregationCriteria);
+
+            return Mono.zip(targetProjectIdsMono, branchCountsMono)
+                    .flatMap(preQueryResults -> {
+                        var targetProjectIds = preQueryResults.getT1();
+                        var counts = preQueryResults.getT2();
+
+                        boolean hasAggregated = counts.hasAggregated();
+                        boolean hasRaw = counts.hasRaw();
+
                         var template = TemplateUtils.newST(SELECT_DATASET_ITEM_VERSIONS_WITH_EXPERIMENT_ITEMS_STATS);
 
                         if (CollectionUtils.isNotEmpty(experimentIds)) {
                             template.add("experiment_ids", true);
                         }
 
+                        template.add("has_aggregated", hasAggregated);
+                        template.add("has_raw", hasRaw);
+
                         applyFiltersToTemplate(template, filters);
 
-                        // Add target project IDs flag to template (from separate query to reduce traces table scans)
                         if (CollectionUtils.isNotEmpty(targetProjectIds)) {
                             template.add("has_target_projects", true);
                         }
@@ -3175,7 +3619,6 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
                             Statement statement = connection.createStatement(sql);
                             bindStatementParameters(statement, datasetId, versionId, experimentIds, filters);
 
-                            // Bind target project IDs (from separate query to reduce traces table scans)
                             if (CollectionUtils.isNotEmpty(targetProjectIds)) {
                                 statement.bind("target_project_ids", targetProjectIds.toArray(UUID[]::new));
                             }
@@ -3213,6 +3656,16 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
                             com.comet.opik.domain.filter.FilterStrategy.DATASET_ITEM)
                             .ifPresent(datasetItemFilters -> template.add("dataset_item_filters",
                                     datasetItemFilters));
+
+                    FilterQueryBuilder.toAnalyticsDbFilters(filtersParam,
+                            com.comet.opik.domain.filter.FilterStrategy.FEEDBACK_SCORES_AGGREGATED)
+                            .ifPresent(feedbackScoresAggFilters -> template.add("feedback_scores_filters_agg",
+                                    feedbackScoresAggFilters));
+
+                    FilterQueryBuilder.toAnalyticsDbFilters(filtersParam,
+                            com.comet.opik.domain.filter.FilterStrategy.FEEDBACK_SCORES_AGGREGATED_IS_EMPTY)
+                            .ifPresent(feedbackScoresAggEmptyFilters -> template.add(
+                                    "feedback_scores_empty_filters_agg", feedbackScoresAggEmptyFilters));
                 });
     }
 
@@ -3226,7 +3679,6 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
 
         Optional.ofNullable(filters)
                 .ifPresent(filtersParam -> {
-                    // Bind all filters - the builder will handle both regular and aggregated filters
                     FilterQueryBuilder.bind(statement, filtersParam,
                             com.comet.opik.domain.filter.FilterStrategy.EXPERIMENT_ITEM);
                     FilterQueryBuilder.bind(statement, filtersParam,
@@ -3235,6 +3687,10 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
                             com.comet.opik.domain.filter.FilterStrategy.FEEDBACK_SCORES_IS_EMPTY);
                     FilterQueryBuilder.bind(statement, filtersParam,
                             com.comet.opik.domain.filter.FilterStrategy.DATASET_ITEM);
+                    FilterQueryBuilder.bind(statement, filtersParam,
+                            com.comet.opik.domain.filter.FilterStrategy.FEEDBACK_SCORES_AGGREGATED);
+                    FilterQueryBuilder.bind(statement, filtersParam,
+                            com.comet.opik.domain.filter.FilterStrategy.FEEDBACK_SCORES_AGGREGATED_IS_EMPTY);
                 });
     }
 
@@ -3346,6 +3802,75 @@ class DatasetItemVersionDAOImpl implements DatasetItemVersionDAO {
                 .collectList()
                 .doOnSuccess(itemCounts -> log.debug("Completed counting items for '{}' versions", itemCounts.size()))
                 .flatMapMany(Flux::fromIterable);
+    }
+
+    /**
+     * Builds the ORDER BY expression for the top_dataset_items CTE.
+     * Maps outer query field names to CTE-context expressions using experiment_item_aggregates (eia_t)
+     * and optionally dataset_items_aggr_resolved (di_t).
+     */
+    private String buildTopItemsSorting(List<com.comet.opik.api.sorting.SortingField> sortingFields) {
+        String primarySort = sortingFields.stream()
+                .map(sf -> {
+                    String expr = getTopSortExpression(sf);
+                    String dir = sf.direction() != null ? sf.direction().name() : "ASC";
+                    return expr + " " + dir;
+                })
+                .collect(Collectors.joining(", "));
+        return primarySort + ", eia_t.dataset_item_id DESC";
+    }
+
+    private String getTopSortExpression(com.comet.opik.api.sorting.SortingField sf) {
+        String field = sf.field();
+
+        if ("id".equals(field)) {
+            return "eia_t.dataset_item_id";
+        }
+        if ("description".equals(field)) {
+            return "any(di_t.description)";
+        }
+        if ("tags".equals(field)) {
+            return "any(di_t.tags)";
+        }
+        if ("created_at".equals(field)) {
+            return "any(di_t.item_created_at)";
+        }
+        if ("last_updated_at".equals(field)) {
+            return "any(di_t.item_last_updated_at)";
+        }
+        if ("created_by".equals(field)) {
+            return "any(di_t.item_created_by)";
+        }
+        if ("last_updated_by".equals(field)) {
+            return "any(di_t.item_last_updated_by)";
+        }
+        if ("duration".equals(field)) {
+            return "avg(eia_t.duration)";
+        }
+        if ("total_estimated_cost".equals(field)) {
+            return "avg(eia_t.total_estimated_cost)";
+        }
+        if (field.startsWith("data.")) {
+            return "any(di_t.data)[:%s]".formatted(sf.bindKey());
+        }
+        if (field.startsWith("usage.")) {
+            return "avgMap(eia_t.usage)[:%s]".formatted(sf.bindKey());
+        }
+        if (field.startsWith("feedback_scores.")) {
+            return "avgMap(eia_t.feedback_scores)[:%s]".formatted(sf.bindKey());
+        }
+        if (field.startsWith("input.")) {
+            return "JSONExtractRaw(argMax(eia_t.input, eia_t.id), :%s)".formatted(sf.bindKey());
+        }
+        if (field.startsWith("output.")) {
+            return "JSONExtractRaw(argMax(eia_t.output, eia_t.id), :%s)".formatted(sf.bindKey());
+        }
+        if (field.startsWith("metadata.")) {
+            return "JSONExtractRaw(argMax(eia_t.metadata, eia_t.id), :%s)".formatted(sf.bindKey());
+        }
+
+        // Fallback — should not happen if supportsPushTopLimit is checked first
+        return "eia_t.dataset_item_id";
     }
 
 }

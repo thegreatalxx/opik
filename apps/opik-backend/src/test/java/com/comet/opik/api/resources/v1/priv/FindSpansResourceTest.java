@@ -6,6 +6,7 @@ import com.comet.opik.api.FeedbackScore;
 import com.comet.opik.api.FeedbackScoreItem;
 import com.comet.opik.api.Span;
 import com.comet.opik.api.SpanSearchStreamRequest;
+import com.comet.opik.api.SpanUpdate;
 import com.comet.opik.api.filter.Field;
 import com.comet.opik.api.filter.FieldType;
 import com.comet.opik.api.filter.Operator;
@@ -15,6 +16,7 @@ import com.comet.opik.api.resources.utils.AuthTestUtils;
 import com.comet.opik.api.resources.utils.ClickHouseContainerUtils;
 import com.comet.opik.api.resources.utils.ClientSupportUtils;
 import com.comet.opik.api.resources.utils.DurationUtils;
+import com.comet.opik.api.resources.utils.FilterTestUtils;
 import com.comet.opik.api.resources.utils.MigrationUtils;
 import com.comet.opik.api.resources.utils.MinIOContainerUtils;
 import com.comet.opik.api.resources.utils.MySQLContainerUtils;
@@ -464,36 +466,6 @@ class FindSpansResourceTest {
                     arguments("/spans/search", spanStreamTestAssertion, arg.get()[0], arg.get()[1])));
         }
 
-        private String getValidValue(Field field) {
-            return switch (field.getType()) {
-                case STRING, LIST, DICTIONARY, DICTIONARY_STATE_DB, MAP, ENUM, ERROR_CONTAINER, STRING_STATE_DB,
-                        CUSTOM ->
-                    RandomStringUtils.secure().nextAlphanumeric(10);
-                case NUMBER, DURATION, FEEDBACK_SCORES_NUMBER -> String.valueOf(randomNumber(1, 10));
-                case DATE_TIME, DATE_TIME_STATE_DB -> Instant.now().toString();
-            };
-        }
-
-        private String getKey(Field field) {
-            return switch (field.getType()) {
-                case STRING, NUMBER, DURATION, DATE_TIME, LIST, ENUM, ERROR_CONTAINER, STRING_STATE_DB,
-                        DATE_TIME_STATE_DB ->
-                    null;
-                case FEEDBACK_SCORES_NUMBER, CUSTOM -> RandomStringUtils.secure().nextAlphanumeric(10);
-                case DICTIONARY, DICTIONARY_STATE_DB, MAP -> "";
-            };
-        }
-
-        private String getInvalidValue(Field field) {
-            return switch (field.getType()) {
-                case STRING, DICTIONARY, DICTIONARY_STATE_DB, MAP, CUSTOM, LIST, ENUM, ERROR_CONTAINER, STRING_STATE_DB,
-                        DATE_TIME_STATE_DB ->
-                    " ";
-                case NUMBER, DURATION, DATE_TIME, FEEDBACK_SCORES_NUMBER ->
-                    RandomStringUtils.secure().nextAlphanumeric(10);
-            };
-        }
-
         private Stream<Arguments> getFilterInvalidOperatorForFieldTypeArgs() {
             return filterQueryBuilder.getUnSupportedOperators(SpanField.values())
                     .entrySet()
@@ -504,20 +476,20 @@ class FindSpansResourceTest {
                                     Arguments.of("/stats", SpanFilter.builder()
                                             .field(filter.getKey())
                                             .operator(operator)
-                                            .key(getKey(filter.getKey()))
-                                            .value(getValidValue(filter.getKey()))
+                                            .key(FilterTestUtils.getKey(filter.getKey()))
+                                            .value(FilterTestUtils.getValidValue(filter.getKey()))
                                             .build()),
                                     Arguments.of("", SpanFilter.builder()
                                             .field(filter.getKey())
                                             .operator(operator)
-                                            .key(getKey(filter.getKey()))
-                                            .value(getValidValue(filter.getKey()))
+                                            .key(FilterTestUtils.getKey(filter.getKey()))
+                                            .value(FilterTestUtils.getValidValue(filter.getKey()))
                                             .build()),
                                     Arguments.of("/search", SpanFilter.builder()
                                             .field(filter.getKey())
                                             .operator(operator)
-                                            .key(getKey(filter.getKey()))
-                                            .value(getValidValue(filter.getKey()))
+                                            .key(FilterTestUtils.getKey(filter.getKey()))
+                                            .value(FilterTestUtils.getValidValue(filter.getKey()))
                                             .build()))));
         }
 
@@ -535,7 +507,7 @@ class FindSpansResourceTest {
                                                 .field(filter.getKey())
                                                 .operator(operator)
                                                 .key(null)
-                                                .value(getValidValue(filter.getKey()))
+                                                .value(FilterTestUtils.getValidValue(filter.getKey()))
                                                 .build(),
                                         SpanFilter.builder()
                                                 .field(filter.getKey())
@@ -543,8 +515,8 @@ class FindSpansResourceTest {
                                                 // if no value is expected, create an invalid filter by an empty key
                                                 .key(Operator.NO_VALUE_OPERATORS.contains(operator)
                                                         ? ""
-                                                        : getKey(filter.getKey()))
-                                                .value(getInvalidValue(filter.getKey()))
+                                                        : FilterTestUtils.getKey(filter.getKey()))
+                                                .value(FilterTestUtils.getInvalidValue(filter.getKey()))
                                                 .build());
                                 case ERROR_CONTAINER -> Stream.of();
                                 case LIST -> {
@@ -556,13 +528,13 @@ class FindSpansResourceTest {
                                     yield Stream.of(SpanFilter.builder()
                                             .field(filter.getKey())
                                             .operator(operator)
-                                            .value(getInvalidValue(filter.getKey()))
+                                            .value(FilterTestUtils.getInvalidValue(filter.getKey()))
                                             .build());
                                 }
                                 default -> Stream.of(SpanFilter.builder()
                                         .field(filter.getKey())
                                         .operator(operator)
-                                        .value(getInvalidValue(filter.getKey()))
+                                        .value(FilterTestUtils.getInvalidValue(filter.getKey()))
                                         .build());
                             }));
 
@@ -3959,6 +3931,72 @@ class FindSpansResourceTest {
 
             var actualEntity = actualResponse.readEntity(Span.SpanPage.class);
             assertThat(actualEntity).isNotNull();
+        }
+
+        @Test
+        void whenSortingByUsageTotalTokens__afterUpdate__thenReturnLatestVersion() {
+            var workspaceName = RandomStringUtils.secure().nextAlphanumeric(10);
+            var workspaceId = UUID.randomUUID().toString();
+            var apiKey = UUID.randomUUID().toString();
+
+            mockTargetWorkspace(apiKey, workspaceName, workspaceId);
+
+            var projectName = RandomStringUtils.secure().nextAlphanumeric(10);
+            var traceId = generator.generate();
+            var spanId = generator.generate();
+
+            var originalInput = JsonUtils.getJsonNodeFromString("{\"message\": \"original input\"}");
+            var updatedInput = JsonUtils.getJsonNodeFromString("{\"message\": \"updated input\"}");
+
+            var span = Span.builder()
+                    .id(spanId)
+                    .traceId(traceId)
+                    .projectName(projectName)
+                    .name("dedup-test-span")
+                    .type(SpanType.llm)
+                    .startTime(Instant.now().truncatedTo(ChronoUnit.MILLIS))
+                    .endTime(Instant.now().plus(1, ChronoUnit.SECONDS).truncatedTo(ChronoUnit.MILLIS))
+                    .input(originalInput)
+                    .output(JsonUtils.getJsonNodeFromString("{\"message\": \"original output\"}"))
+                    .usage(Map.of("total_tokens", 9999, "prompt_tokens", 5000, "completion_tokens", 4999))
+                    .build();
+
+            spanResourceClient.createSpan(span, apiKey, workspaceName);
+
+            var spanUpdate = SpanUpdate.builder()
+                    .traceId(traceId)
+                    .projectName(projectName)
+                    .input(updatedInput)
+                    .output(JsonUtils.getJsonNodeFromString("{\"message\": \"updated output\"}"))
+                    .usage(Map.of("total_tokens", 5, "prompt_tokens", 3, "completion_tokens", 2))
+                    .build();
+
+            spanResourceClient.updateSpan(span.id(), spanUpdate, apiKey, workspaceName);
+
+            var sorting = List.of(
+                    SortingField.builder()
+                            .field("usage.total_tokens")
+                            .direction(Direction.DESC)
+                            .build());
+
+            var actualPage = spanResourceClient.findSpans(
+                    workspaceName,
+                    apiKey,
+                    projectName,
+                    null,
+                    1,
+                    10,
+                    null,
+                    null,
+                    List.of(),
+                    sorting,
+                    List.of());
+
+            assertThat(actualPage.content()).hasSize(1);
+
+            var returnedSpan = actualPage.content().getFirst();
+            assertThat(returnedSpan.usage().get("total_tokens")).isEqualTo(5);
+            assertThat(returnedSpan.input()).isEqualTo(updatedInput);
         }
 
         @ParameterizedTest

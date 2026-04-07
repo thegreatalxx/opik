@@ -12,6 +12,8 @@ import com.comet.opik.domain.IdGenerator;
 import com.comet.opik.domain.OptimizationSearchCriteria;
 import com.comet.opik.domain.OptimizationService;
 import com.comet.opik.infrastructure.auth.RequestContext;
+import com.comet.opik.infrastructure.auth.RequiredPermissions;
+import com.comet.opik.infrastructure.auth.WorkspaceUserPermission;
 import com.comet.opik.infrastructure.ratelimit.RateLimited;
 import com.fasterxml.jackson.annotation.JsonView;
 import io.dropwizard.jersey.errors.ErrorMessage;
@@ -95,7 +97,9 @@ public class OptimizationsResource {
             @QueryParam("size") @Min(1) @DefaultValue("10") int size,
             @QueryParam("dataset_id") UUID datasetId,
             @QueryParam("name") @Schema(description = "Filter optimizations by name (partial match, case insensitive)") String name,
+            @QueryParam("dataset_name") @Schema(description = "Filter optimizations by dataset name (partial match)") String datasetName,
             @QueryParam("dataset_deleted") Boolean datasetDeleted,
+            @QueryParam("project_id") UUID projectId,
             @QueryParam("filters") String filters) {
 
         List<OptimizationFilter> parsedFilters = (List<OptimizationFilter>) filtersFactory.newFilters(filters,
@@ -104,9 +108,11 @@ public class OptimizationsResource {
         var searchCriteria = OptimizationSearchCriteria.builder()
                 .datasetId(datasetId)
                 .name(name)
+                .datasetName(datasetName)
                 .datasetDeleted(datasetDeleted)
                 .filters(parsedFilters)
                 .entityType(EntityType.TRACE)
+                .projectId(projectId)
                 .build();
 
         log.info("Finding optimizations by '{}', page '{}', size '{}'", searchCriteria, page, size);
@@ -172,6 +178,7 @@ public class OptimizationsResource {
     @Path("/delete")
     @Operation(operationId = "deleteOptimizationsById", summary = "Delete optimizations by id", description = "Delete optimizations by id", responses = {
             @ApiResponse(responseCode = "204", description = "No content")})
+    @RequiredPermissions(WorkspaceUserPermission.OPTIMIZATION_RUN_DELETE)
     public Response deleteOptimizationsById(
             @RequestBody(content = @Content(schema = @Schema(implementation = DeleteIdsHolder.class))) @NotNull @Valid DeleteIdsHolder request) {
         log.info("Deleting optimizations, count '{}'", request.ids().size());

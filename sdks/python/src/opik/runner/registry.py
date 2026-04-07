@@ -5,14 +5,17 @@ import inspect
 import threading
 from typing import Any, Callable, Dict, List
 
+from opik.api_objects import type_helpers
+
 _lock = threading.Lock()
 REGISTRY: Dict[str, Dict[str, Any]] = {}
+_listeners: List[Callable[[str], None]] = []
 
 
 @dataclasses.dataclass
 class Param:
     name: str
-    type: str = "str"
+    type: str = "string"
 
 
 def register(
@@ -30,6 +33,15 @@ def register(
             "params": params,
             "docstring": docstring,
         }
+        listeners = list(_listeners)
+
+    for listener in listeners:
+        listener(name)
+
+
+def on_register(listener: Callable[[str], None]) -> None:
+    with _lock:
+        _listeners.append(listener)
 
 
 def get_all() -> Dict[str, Dict[str, Any]]:
@@ -42,9 +54,15 @@ def extract_params(fn: Callable) -> List[Param]:
     params: List[Param] = []
     for param_name, param in sig.parameters.items():
         if param.annotation is inspect.Parameter.empty:
-            type_name = "str"
+            type_name = "string"
         else:
             ann = param.annotation
-            type_name = ann.__name__ if hasattr(ann, "__name__") else str(ann)
+            inner = type_helpers.unwrap_optional(ann)
+            if inner is not None:
+                ann = inner
+            try:
+                type_name = type_helpers.python_type_to_backend_type(ann)
+            except TypeError:
+                type_name = "string"
         params.append(Param(name=param_name, type=type_name))
     return params

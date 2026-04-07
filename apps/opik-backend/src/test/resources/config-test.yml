@@ -69,7 +69,7 @@ databaseAnalytics:
   #   - failover=3
   #   - custom_http_params=max_query_size=100000000
   #  Description: query parameters that will be added to the connection string
-  queryParameters: health_check_interval=2000&compress=1&auto_discovery=true&failover=3&custom_http_params=max_query_size=100000000,async_insert_busy_timeout_max_ms=60,async_insert_busy_timeout_min_ms=50,async_insert=1,wait_for_async_insert=1,async_insert_use_adaptive_busy_timeout=1,async_insert_deduplicate=1
+  queryParameters: health_check_interval=2000&compress=1&auto_discovery=true&failover=3&custom_http_params=max_query_size=100000000,async_insert_busy_timeout_max_ms=60,async_insert_busy_timeout_min_ms=50,async_insert=1,wait_for_async_insert=1,async_insert_use_adaptive_busy_timeout=1,async_insert_deduplicate=1,use_skip_indexes_if_final=1
 
 # https://www.dropwizard.io/en/stable/manual/configuration.html#health
 health:
@@ -430,7 +430,7 @@ experimentDenormalization:
   consumerBatchSize: 100
   poolingInterval: 500ms
   longPollingDuration: 5s
-  debounceDelay: 1s
+  debounceDelay: 120s
   jobLockTime: 4s
   jobLockWaitTime: 300ms
   aggregationLockTime: 120s
@@ -530,6 +530,14 @@ serviceToggles:
   # Default: false
   # Description: Whether or not Collaborators tab feature is enabled
   collaboratorsTabEnabled: "false"
+  # Default: version_1
+  # Description: Forces ALL workspaces to a specific navigation version. Highest priority override.
+  # Valid values: "disabled" (use version 1 entity check), "version_1" (force legacy), "version_2" (force project-first).
+  # Scope: Global — applies to all workspaces regardless of their entity state.
+  # Overrides: When not "disabled", overrides the version entity check and auth gate entirely.
+  # Operational impact: Set to "version_1" until V2 is ready, then change to "disabled" to enable entity-based determination.
+  # For tests, changed to "disabled" as it will be the final state
+  forceWorkspaceVersion: "disabled"
 
 # Local Runner configuration
 localRunner:
@@ -570,15 +578,14 @@ traceThreadConfig:
   # Default: 1s
   # Description: The interval at which the close trace thread job will run to inactive threads
   closeTraceThreadJobInterval: 1500ms
-  # Default: 4s
-  # Description: The time to wait for the close trace threads job to finish before releasing the lock
-  closeTraceThreadJobLockTime: 3s
   # Default: 300ms
   # Description: The time to wait for the close trace threads job to acquire the lock before giving up
   closeTraceThreadJobLockWaitTime: 300ms
   # Default: 2000
   # Description: The maximum number of item to process in a single close trace thread run
   closeTraceThreadMaxItemPerRun: 2000
+  coldStartLookback: 7d
+  maxBackoffExponent: 5
   # Default: 10
   # Description: Claim pending messages every N polling intervals
   claimIntervalRatio: 10

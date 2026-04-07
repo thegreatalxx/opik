@@ -57,16 +57,19 @@ public class TraceThreadConfig implements StreamConfiguration {
     private Duration closeTraceThreadJobInterval;
 
     @Valid @JsonProperty
-    @MinDuration(value = 1, unit = TimeUnit.SECONDS)
-    private Duration closeTraceThreadJobLockTime;
-
-    @Valid @JsonProperty
     @MaxDuration(value = 1, unit = TimeUnit.SECONDS)
     @MinDuration(value = 100, unit = TimeUnit.MILLISECONDS)
     private Duration closeTraceThreadJobLockWaitTime;
 
     @Valid @JsonProperty
     @Min(1) @Max(10_000) private int closeTraceThreadMaxItemPerRun;
+
+    @Valid @JsonProperty
+    @NotNull @MinDuration(value = 1, unit = TimeUnit.HOURS)
+    private Duration coldStartLookback;
+
+    @JsonProperty
+    @Min(1) @Max(10) private int maxBackoffExponent;
 
     @JsonProperty
     @Min(1000) @Max(10_000_000) private int streamMaxLen;

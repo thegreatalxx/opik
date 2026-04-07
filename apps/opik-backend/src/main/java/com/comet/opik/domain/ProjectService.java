@@ -21,6 +21,7 @@ import com.comet.opik.utils.BinaryOperatorUtils;
 import com.comet.opik.utils.ErrorUtils;
 import com.comet.opik.utils.PaginationUtils;
 import com.google.inject.ImplementedBy;
+import jakarta.annotation.Nullable;
 import jakarta.inject.Inject;
 import jakarta.inject.Provider;
 import jakarta.inject.Singleton;
@@ -30,6 +31,7 @@ import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.jdbi.v3.core.statement.UnableToExecuteStatementException;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
@@ -85,17 +87,25 @@ public interface ProjectService {
 
     List<Project> findByNames(String workspaceId, List<String> names);
 
+    Optional<UUID> findProjectIdByName(String workspaceId, String projectName);
+
+    Mono<Optional<UUID>> resolveProjectId(String projectName);
+
     Map<UUID, String> findIdToNameByIds(String workspaceId, Set<UUID> ids);
 
     Mono<Map<UUID, Instant>> getDemoProjectIdsWithTimestamps();
 
     Mono<Project> getOrCreate(String projectName);
 
+    Project getOrCreate(String workspaceId, String projectName, String userName);
+
     Project retrieveByName(String projectName);
 
     Mono<List<Project>> retrieveByNamesOrCreate(Set<String> projectNames);
 
     void recordLastUpdatedTrace(String workspaceId, Collection<ProjectIdLastUpdated> lastUpdatedTraces);
+
+    Mono<Optional<UUID>> resolveProjectIdOrCreate(@Nullable UUID projectId, @Nullable String projectName);
 
     Mono<UUID> resolveProjectIdAndVerifyVisibility(UUID projectId, String projectName);
 
@@ -105,6 +115,8 @@ public interface ProjectService {
             @NonNull List<SortingField> sortingFields);
 
     Mono<Project> getOrFail(@NonNull UUID id);
+
+    void validateProjectIdExists(UUID projectId, String workspaceId);
 
     static Map<String, Project> groupByName(List<Project> projects) {
         return projects.stream().collect(Collectors.toMap(
@@ -238,6 +250,13 @@ class ProjectServiceImpl implements ProjectService {
     }
 
     @Override
+    public void validateProjectIdExists(UUID projectId, String workspaceId) {
+        if (projectId != null && findByIds(workspaceId, Set.of(projectId)).isEmpty()) {
+            throw ErrorUtils.failWithNotFound("Project", projectId);
+        }
+    }
+
+    @Override
     public Project get(@NonNull UUID id, @NonNull String workspaceId) {
         Project project = template.inTransaction(READ_ONLY, handle -> {
 
@@ -268,7 +287,7 @@ class ProjectServiceImpl implements ProjectService {
                 .map(Project::id)
                 .toList();
 
-        Map<UUID, Map<String, Object>> projectStats = getProjectStats(projectIds, workspaceId);
+        Map<UUID, Map<String, Object>> projectStats = getProjectStats(projectIds, workspaceId, criteria);
 
         return ProjectStatsSummary.builder()
                 .content(
@@ -378,8 +397,9 @@ class ProjectServiceImpl implements ProjectService {
                 sortingFactory.getSortableFields());
     }
 
-    private Map<UUID, Map<String, Object>> getProjectStats(List<UUID> projectIds, String workspaceId) {
-        return traceDAO.getStatsByProjectIds(projectIds, workspaceId)
+    private Map<UUID, Map<String, Object>> getProjectStats(List<UUID> projectIds, String workspaceId,
+            ProjectCriteria criteria) {
+        return traceDAO.getStatsByProjectIds(projectIds, workspaceId, criteria.filters())
                 .map(stats -> stats.entrySet().stream()
                         .map(entry -> {
                             Map<String, Object> statsMap = entry.getValue().stats()
@@ -494,6 +514,45 @@ class ProjectServiceImpl implements ProjectService {
     }
 
     @Override
+    public Optional<UUID> findProjectIdByName(@NonNull String workspaceId, String projectName) {
+        if (StringUtils.isBlank(projectName)) {
+            return Optional.empty();
+        }
+
+        return findByNames(workspaceId, List.of(projectName)).stream()
+                .findFirst()
+                .map(Project::id);
+    }
+
+    @Override
+    public Mono<Optional<UUID>> resolveProjectId(String projectName) {
+        return Mono.deferContextual(ctx -> {
+            String workspaceId = ctx.get(RequestContext.WORKSPACE_ID);
+            return Mono.fromCallable(() -> findProjectIdByName(workspaceId, projectName))
+                    .subscribeOn(Schedulers.boundedElastic());
+        });
+    }
+
+    @Override
+    public Mono<Optional<UUID>> resolveProjectIdOrCreate(@Nullable UUID projectId, @Nullable String projectName) {
+        if (projectId != null) {
+            return Mono.deferContextual(ctx -> Mono.fromCallable(() -> {
+                validateProjectIdExists(projectId, ctx.get(RequestContext.WORKSPACE_ID));
+                return Optional.of(projectId);
+            }).subscribeOn(Schedulers.boundedElastic()));
+        }
+
+        if (StringUtils.isBlank(projectName)) {
+            return Mono.just(Optional.empty());
+        }
+
+        return Mono.deferContextual(ctx -> Mono.fromCallable(
+                () -> Optional.of(getOrCreate(ctx.get(RequestContext.WORKSPACE_ID),
+                        projectName, ctx.get(RequestContext.USER_NAME)).id()))
+                .subscribeOn(Schedulers.boundedElastic()));
+    }
+
+    @Override
     public Map<UUID, String> findIdToNameByIds(String workspaceId, Set<UUID> ids) {
         return findByIds(workspaceId, ids)
                 .stream()
@@ -528,7 +587,8 @@ class ProjectServiceImpl implements ProjectService {
                 .subscribeOn(Schedulers.boundedElastic()));
     }
 
-    private Project getOrCreate(String workspaceId, String projectName, String userName) {
+    @Override
+    public Project getOrCreate(String workspaceId, String projectName, String userName) {
 
         return findByNames(workspaceId, List.of(projectName))
                 .stream()
@@ -561,6 +621,7 @@ class ProjectServiceImpl implements ProjectService {
         });
 
         return projects
+                .flatMap(project -> verifyVisibility(project, requestContext.get().getVisibility()))
                 .map(project -> {
                     Map<UUID, Instant> projectLastUpdatedTraceAtMap = transactionTemplateAsync
                             .nonTransaction(connection -> {
@@ -569,7 +630,7 @@ class ProjectServiceImpl implements ProjectService {
                             }).block();
 
                     Map<UUID, Map<String, Object>> projectStats = getProjectStats(List.of(project.id()),
-                            workspaceId);
+                            workspaceId, ProjectCriteria.builder().build());
 
                     return project.toBuilder()
                             .lastUpdatedTraceAt(projectLastUpdatedTraceAtMap.get(project.id()))

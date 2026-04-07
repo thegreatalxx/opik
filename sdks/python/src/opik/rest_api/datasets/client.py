@@ -156,6 +156,7 @@ class DatasetsClient:
         with_experiments_only: typing.Optional[bool] = None,
         with_optimizations_only: typing.Optional[bool] = None,
         prompt_id: typing.Optional[str] = None,
+        project_id: typing.Optional[str] = None,
         name: typing.Optional[str] = None,
         sorting: typing.Optional[str] = None,
         filters: typing.Optional[str] = None,
@@ -175,6 +176,8 @@ class DatasetsClient:
         with_optimizations_only : typing.Optional[bool]
 
         prompt_id : typing.Optional[str]
+
+        project_id : typing.Optional[str]
 
         name : typing.Optional[str]
 
@@ -202,6 +205,7 @@ class DatasetsClient:
             with_experiments_only=with_experiments_only,
             with_optimizations_only=with_optimizations_only,
             prompt_id=prompt_id,
+            project_id=project_id,
             name=name,
             sorting=sorting,
             filters=filters,
@@ -214,6 +218,8 @@ class DatasetsClient:
         *,
         name: str,
         id: typing.Optional[str] = OMIT,
+        project_id: typing.Optional[str] = OMIT,
+        project_name: typing.Optional[str] = OMIT,
         type: typing.Optional[DatasetWriteType] = OMIT,
         visibility: typing.Optional[DatasetWriteVisibility] = OMIT,
         tags: typing.Optional[typing.Sequence[str]] = OMIT,
@@ -228,6 +234,12 @@ class DatasetsClient:
         name : str
 
         id : typing.Optional[str]
+
+        project_id : typing.Optional[str]
+            Project ID. Takes precedence over project_name when both are provided.
+
+        project_name : typing.Optional[str]
+            For project scope, specify either project_id or project_name. If project_name is provided and the project does not exist, it will be created. Ignored when project_id is provided. If neither is provided, the dataset is created at workspace level.
 
         type : typing.Optional[DatasetWriteType]
 
@@ -253,6 +265,8 @@ class DatasetsClient:
         _response = self._raw_client.create_dataset(
             name=name,
             id=id,
+            project_id=project_id,
+            project_name=project_name,
             type=type,
             visibility=visibility,
             tags=tags,
@@ -267,11 +281,15 @@ class DatasetsClient:
         items: typing.Sequence[DatasetItemWrite],
         dataset_name: typing.Optional[str] = OMIT,
         dataset_id: typing.Optional[str] = OMIT,
+        project_name: typing.Optional[str] = OMIT,
+        project_id: typing.Optional[str] = OMIT,
         batch_group_id: typing.Optional[str] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> None:
         """
-        Create/update dataset items based on dataset item id
+        Create/update dataset items based on dataset item id.
+        Each item's 'id' field is the stable identifier and upsert key.
+        Provide it to update an existing item, or omit it to create a new one.
 
         Parameters
         ----------
@@ -282,6 +300,12 @@ class DatasetsClient:
 
         dataset_id : typing.Optional[str]
             If null, dataset_name must be provided
+
+        project_name : typing.Optional[str]
+            Optional. Associates the batch with a project by name. Ignored if project_id is provided.
+
+        project_id : typing.Optional[str]
+            Optional. Associates the batch with a project by ID. Takes precedence over project_name.
 
         batch_group_id : typing.Optional[str]
             Optional batch group ID to group multiple batches into a single dataset version. If null, mutates the latest version instead of creating a new one.
@@ -305,6 +329,8 @@ class DatasetsClient:
             items=items,
             dataset_name=dataset_name,
             dataset_id=dataset_id,
+            project_name=project_name,
+            project_id=project_id,
             batch_group_id=batch_group_id,
             request_options=request_options,
         )
@@ -516,7 +542,11 @@ class DatasetsClient:
         return _response.data
 
     def delete_dataset_by_name(
-        self, *, dataset_name: str, request_options: typing.Optional[RequestOptions] = None
+        self,
+        *,
+        dataset_name: str,
+        project_name: typing.Optional[str] = OMIT,
+        request_options: typing.Optional[RequestOptions] = None,
     ) -> None:
         """
         Delete dataset by name
@@ -524,6 +554,8 @@ class DatasetsClient:
         Parameters
         ----------
         dataset_name : str
+
+        project_name : typing.Optional[str]
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -538,7 +570,9 @@ class DatasetsClient:
         client = OpikApi(api_key="YOUR_API_KEY", workspace_name="YOUR_WORKSPACE_NAME", )
         client.datasets.delete_dataset_by_name(dataset_name='dataset_name', )
         """
-        _response = self._raw_client.delete_dataset_by_name(dataset_name=dataset_name, request_options=request_options)
+        _response = self._raw_client.delete_dataset_by_name(
+            dataset_name=dataset_name, project_name=project_name, request_options=request_options
+        )
         return _response.data
 
     def delete_dataset_items(
@@ -766,7 +800,11 @@ class DatasetsClient:
         return _response.data
 
     def get_dataset_by_identifier(
-        self, *, dataset_name: str, request_options: typing.Optional[RequestOptions] = None
+        self,
+        *,
+        dataset_name: str,
+        project_name: typing.Optional[str] = OMIT,
+        request_options: typing.Optional[RequestOptions] = None,
     ) -> DatasetPublic:
         """
         Get dataset by name
@@ -774,6 +812,8 @@ class DatasetsClient:
         Parameters
         ----------
         dataset_name : str
+
+        project_name : typing.Optional[str]
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -790,7 +830,7 @@ class DatasetsClient:
         client.datasets.get_dataset_by_identifier(dataset_name='dataset_name', )
         """
         _response = self._raw_client.get_dataset_by_identifier(
-            dataset_name=dataset_name, request_options=request_options
+            dataset_name=dataset_name, project_name=project_name, request_options=request_options
         )
         return _response.data
 
@@ -938,6 +978,10 @@ class DatasetsClient:
         data : JsonNode
 
         id : typing.Optional[str]
+            Stable item identifier.
+            On write, used as the upsert key.
+            If omitted, a new ID is generated.
+            Remains the same across dataset versions
 
         trace_id : typing.Optional[str]
 
@@ -1128,6 +1172,7 @@ class DatasetsClient:
         last_retrieved_id: typing.Optional[str] = OMIT,
         steam_limit: typing.Optional[int] = OMIT,
         dataset_version: typing.Optional[str] = OMIT,
+        project_name: typing.Optional[str] = OMIT,
         filters: typing.Optional[str] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> typing.Iterator[bytes]:
@@ -1144,6 +1189,8 @@ class DatasetsClient:
 
         dataset_version : typing.Optional[str]
 
+        project_name : typing.Optional[str]
+
         filters : typing.Optional[str]
 
         request_options : typing.Optional[RequestOptions]
@@ -1159,6 +1206,7 @@ class DatasetsClient:
             last_retrieved_id=last_retrieved_id,
             steam_limit=steam_limit,
             dataset_version=dataset_version,
+            project_name=project_name,
             filters=filters,
             request_options=request_options,
         ) as r:
@@ -1526,6 +1574,7 @@ class AsyncDatasetsClient:
         with_experiments_only: typing.Optional[bool] = None,
         with_optimizations_only: typing.Optional[bool] = None,
         prompt_id: typing.Optional[str] = None,
+        project_id: typing.Optional[str] = None,
         name: typing.Optional[str] = None,
         sorting: typing.Optional[str] = None,
         filters: typing.Optional[str] = None,
@@ -1545,6 +1594,8 @@ class AsyncDatasetsClient:
         with_optimizations_only : typing.Optional[bool]
 
         prompt_id : typing.Optional[str]
+
+        project_id : typing.Optional[str]
 
         name : typing.Optional[str]
 
@@ -1575,6 +1626,7 @@ class AsyncDatasetsClient:
             with_experiments_only=with_experiments_only,
             with_optimizations_only=with_optimizations_only,
             prompt_id=prompt_id,
+            project_id=project_id,
             name=name,
             sorting=sorting,
             filters=filters,
@@ -1587,6 +1639,8 @@ class AsyncDatasetsClient:
         *,
         name: str,
         id: typing.Optional[str] = OMIT,
+        project_id: typing.Optional[str] = OMIT,
+        project_name: typing.Optional[str] = OMIT,
         type: typing.Optional[DatasetWriteType] = OMIT,
         visibility: typing.Optional[DatasetWriteVisibility] = OMIT,
         tags: typing.Optional[typing.Sequence[str]] = OMIT,
@@ -1601,6 +1655,12 @@ class AsyncDatasetsClient:
         name : str
 
         id : typing.Optional[str]
+
+        project_id : typing.Optional[str]
+            Project ID. Takes precedence over project_name when both are provided.
+
+        project_name : typing.Optional[str]
+            For project scope, specify either project_id or project_name. If project_name is provided and the project does not exist, it will be created. Ignored when project_id is provided. If neither is provided, the dataset is created at workspace level.
 
         type : typing.Optional[DatasetWriteType]
 
@@ -1629,6 +1689,8 @@ class AsyncDatasetsClient:
         _response = await self._raw_client.create_dataset(
             name=name,
             id=id,
+            project_id=project_id,
+            project_name=project_name,
             type=type,
             visibility=visibility,
             tags=tags,
@@ -1643,11 +1705,15 @@ class AsyncDatasetsClient:
         items: typing.Sequence[DatasetItemWrite],
         dataset_name: typing.Optional[str] = OMIT,
         dataset_id: typing.Optional[str] = OMIT,
+        project_name: typing.Optional[str] = OMIT,
+        project_id: typing.Optional[str] = OMIT,
         batch_group_id: typing.Optional[str] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> None:
         """
-        Create/update dataset items based on dataset item id
+        Create/update dataset items based on dataset item id.
+        Each item's 'id' field is the stable identifier and upsert key.
+        Provide it to update an existing item, or omit it to create a new one.
 
         Parameters
         ----------
@@ -1658,6 +1724,12 @@ class AsyncDatasetsClient:
 
         dataset_id : typing.Optional[str]
             If null, dataset_name must be provided
+
+        project_name : typing.Optional[str]
+            Optional. Associates the batch with a project by name. Ignored if project_id is provided.
+
+        project_id : typing.Optional[str]
+            Optional. Associates the batch with a project by ID. Takes precedence over project_name.
 
         batch_group_id : typing.Optional[str]
             Optional batch group ID to group multiple batches into a single dataset version. If null, mutates the latest version instead of creating a new one.
@@ -1684,6 +1756,8 @@ class AsyncDatasetsClient:
             items=items,
             dataset_name=dataset_name,
             dataset_id=dataset_id,
+            project_name=project_name,
+            project_id=project_id,
             batch_group_id=batch_group_id,
             request_options=request_options,
         )
@@ -1915,7 +1989,11 @@ class AsyncDatasetsClient:
         return _response.data
 
     async def delete_dataset_by_name(
-        self, *, dataset_name: str, request_options: typing.Optional[RequestOptions] = None
+        self,
+        *,
+        dataset_name: str,
+        project_name: typing.Optional[str] = OMIT,
+        request_options: typing.Optional[RequestOptions] = None,
     ) -> None:
         """
         Delete dataset by name
@@ -1923,6 +2001,8 @@ class AsyncDatasetsClient:
         Parameters
         ----------
         dataset_name : str
+
+        project_name : typing.Optional[str]
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -1941,7 +2021,7 @@ class AsyncDatasetsClient:
         asyncio.run(main())
         """
         _response = await self._raw_client.delete_dataset_by_name(
-            dataset_name=dataset_name, request_options=request_options
+            dataset_name=dataset_name, project_name=project_name, request_options=request_options
         )
         return _response.data
 
@@ -2186,7 +2266,11 @@ class AsyncDatasetsClient:
         return _response.data
 
     async def get_dataset_by_identifier(
-        self, *, dataset_name: str, request_options: typing.Optional[RequestOptions] = None
+        self,
+        *,
+        dataset_name: str,
+        project_name: typing.Optional[str] = OMIT,
+        request_options: typing.Optional[RequestOptions] = None,
     ) -> DatasetPublic:
         """
         Get dataset by name
@@ -2194,6 +2278,8 @@ class AsyncDatasetsClient:
         Parameters
         ----------
         dataset_name : str
+
+        project_name : typing.Optional[str]
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -2213,7 +2299,7 @@ class AsyncDatasetsClient:
         asyncio.run(main())
         """
         _response = await self._raw_client.get_dataset_by_identifier(
-            dataset_name=dataset_name, request_options=request_options
+            dataset_name=dataset_name, project_name=project_name, request_options=request_options
         )
         return _response.data
 
@@ -2373,6 +2459,10 @@ class AsyncDatasetsClient:
         data : JsonNode
 
         id : typing.Optional[str]
+            Stable item identifier.
+            On write, used as the upsert key.
+            If omitted, a new ID is generated.
+            Remains the same across dataset versions
 
         trace_id : typing.Optional[str]
 
@@ -2578,6 +2668,7 @@ class AsyncDatasetsClient:
         last_retrieved_id: typing.Optional[str] = OMIT,
         steam_limit: typing.Optional[int] = OMIT,
         dataset_version: typing.Optional[str] = OMIT,
+        project_name: typing.Optional[str] = OMIT,
         filters: typing.Optional[str] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> typing.AsyncIterator[bytes]:
@@ -2594,6 +2685,8 @@ class AsyncDatasetsClient:
 
         dataset_version : typing.Optional[str]
 
+        project_name : typing.Optional[str]
+
         filters : typing.Optional[str]
 
         request_options : typing.Optional[RequestOptions]
@@ -2609,6 +2702,7 @@ class AsyncDatasetsClient:
             last_retrieved_id=last_retrieved_id,
             steam_limit=steam_limit,
             dataset_version=dataset_version,
+            project_name=project_name,
             filters=filters,
             request_options=request_options,
         ) as r:

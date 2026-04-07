@@ -663,7 +663,6 @@ public class TraceResourceClient extends BaseCommentResourceClient {
     }
 
     public FeedbackScoreNames getTraceThreadsFeedbackScoreNames(UUID projectId, String apiKey, String workspaceName) {
-
         WebTarget webTarget = client.target(RESOURCE_PATH.formatted(baseURI))
                 .path("threads")
                 .path("feedback-scores")
@@ -677,7 +676,6 @@ public class TraceResourceClient extends BaseCommentResourceClient {
                 .header(WORKSPACE_HEADER, workspaceName)
                 .get()) {
 
-            // then
             assertThat(actualResponse.getStatusInfo().getStatusCode()).isEqualTo(HttpStatus.SC_OK);
             return actualResponse.readEntity(FeedbackScoreNames.class);
         }

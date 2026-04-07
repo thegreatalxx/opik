@@ -10,7 +10,6 @@ import com.comet.opik.api.VisibilityMode;
 import com.comet.opik.utils.JsonUtils;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.google.common.collect.Sets;
 import io.r2dbc.spi.Result;
 import io.r2dbc.spi.Row;
 import io.r2dbc.spi.RowMetadata;
@@ -41,6 +40,9 @@ import static java.util.stream.Collectors.toMap;
 public class DatasetItemResultMapper {
 
     private static final int COMMENT_INDEX = 11;
+    /** Tuple index for execution_policy, added after description (index 17) in the experiment_items_array */
+    private static final int EXECUTION_POLICY_INDEX = 18;
+    private static final int ASSERTIONS_INDEX = 19;
 
     private DatasetItemResultMapper() {
     }
@@ -53,32 +55,46 @@ public class DatasetItemResultMapper {
         var experimentItems = Arrays.stream(experimentItemsArrays)
                 .filter(experimentItem -> CollectionUtils.isNotEmpty(experimentItem) &&
                         !CLICKHOUSE_FIXED_STRING_UUID_FIELD_NULL_VALUE.equals(experimentItem.get(2).toString()))
-                .map(experimentItem -> ExperimentItem.builder()
-                        .id(UUID.fromString(experimentItem.get(0).toString()))
-                        .experimentId(UUID.fromString(experimentItem.get(1).toString()))
-                        .datasetItemId(UUID.fromString(experimentItem.get(2).toString()))
-                        .traceId(UUID.fromString(experimentItem.get(3).toString()))
-                        .input(getJsonNodeOrNull(experimentItem.get(4)))
-                        .output(getJsonNodeOrNull(experimentItem.get(5)))
-                        .feedbackScores(getFeedbackScores(experimentItem.get(6)))
-                        .createdAt(Instant.parse(experimentItem.get(7).toString()))
-                        .lastUpdatedAt(Instant.parse(experimentItem.get(8).toString()))
-                        .createdBy(experimentItem.get(9).toString())
-                        .lastUpdatedBy(experimentItem.get(10).toString())
-                        .comments(experimentItem.size() > COMMENT_INDEX ? getComments(experimentItem.get(11)) : null)
-                        .duration((Double) experimentItem.get(12))
-                        .totalEstimatedCost(getTotalEstimatedCost(experimentItem))
-                        .usage(getUsage(experimentItem))
-                        .traceVisibilityMode(Optional.ofNullable(experimentItem.get(15))
-                                .map(Object::toString)
-                                .filter(StringUtils::isNotBlank)
-                                .flatMap(VisibilityMode::fromString)
-                                .orElse(null))
-                        .description(Optional.ofNullable(experimentItem.get(17))
-                                .map(Object::toString)
-                                .filter(StringUtils::isNotBlank)
-                                .orElse(null))
-                        .build())
+                .map(experimentItem -> {
+                    var item = ExperimentItem.builder()
+                            .id(UUID.fromString(experimentItem.get(0).toString()))
+                            .experimentId(UUID.fromString(experimentItem.get(1).toString()))
+                            .datasetItemId(UUID.fromString(experimentItem.get(2).toString()))
+                            .traceId(UUID.fromString(experimentItem.get(3).toString()))
+                            .input(getJsonNodeOrNull(experimentItem.get(4)))
+                            .output(getJsonNodeOrNull(experimentItem.get(5)))
+                            .feedbackScores(getFeedbackScores(experimentItem.get(6)))
+                            .createdAt(Instant.parse(experimentItem.get(7).toString()))
+                            .lastUpdatedAt(Instant.parse(experimentItem.get(8).toString()))
+                            .createdBy(experimentItem.get(9).toString())
+                            .lastUpdatedBy(experimentItem.get(10).toString())
+                            .comments(
+                                    experimentItem.size() > COMMENT_INDEX ? getComments(experimentItem.get(11)) : null)
+                            .duration((Double) experimentItem.get(12))
+                            .totalEstimatedCost(getTotalEstimatedCost(experimentItem))
+                            .usage(getUsage(experimentItem))
+                            .traceVisibilityMode(Optional.ofNullable(experimentItem.get(15))
+                                    .map(Object::toString)
+                                    .filter(StringUtils::isNotBlank)
+                                    .flatMap(VisibilityMode::fromString)
+                                    .orElse(null))
+                            .description(Optional.ofNullable(experimentItem.get(17))
+                                    .map(Object::toString)
+                                    .filter(StringUtils::isNotBlank)
+                                    .orElse(null))
+                            .executionPolicy(experimentItem.size() > EXECUTION_POLICY_INDEX
+                                    ? ExecutionPolicyMapper.fromJson(
+                                            Optional.ofNullable(experimentItem.get(EXECUTION_POLICY_INDEX))
+                                                    .map(Object::toString)
+                                                    .orElse(null))
+                                    : null)
+                            .build();
+                    var assertionsJson = experimentItem.size() > ASSERTIONS_INDEX
+                            ? Optional.ofNullable(experimentItem.get(ASSERTIONS_INDEX)).map(Object::toString)
+                                    .orElse(null)
+                            : null;
+                    return AssertionResultMapper.enrichWithAssertions(item, assertionsJson);
+                })
                 .toList();
 
         return experimentItems.isEmpty() ? null : experimentItems;
@@ -106,12 +122,6 @@ public class DatasetItemResultMapper {
         return JsonUtils.getJsonNodeFromStringWithFallback(field.toString());
     }
 
-    static Map.Entry<Long, Set<Column>> groupResults(Map.Entry<Long, Set<Column>> result1,
-            Map.Entry<Long, Set<Column>> result2) {
-
-        return Map.entry(result1.getKey() + result2.getKey(), Sets.union(result1.getValue(), result2.getValue()));
-    }
-
     private static Set<Column> mapColumnsField(Map<String, String[]> row, String filterField) {
         return Optional.ofNullable(row).orElse(Map.of())
                 .entrySet()
@@ -131,7 +141,6 @@ public class DatasetItemResultMapper {
                     case "Object" -> ColumnType.OBJECT;
                     case "Array" -> ColumnType.ARRAY;
                     case "Bool" -> ColumnType.BOOLEAN;
-                    case "Null" -> ColumnType.NULL;
                     default -> ColumnType.NULL;
                 })
                 .toArray(ColumnType[]::new);
@@ -145,17 +154,21 @@ public class DatasetItemResultMapper {
 
         Map<String, JsonNode> data = getData(row);
 
+        var id = row.get("id", UUID.class);
         // Check if dataset_item_id column exists in the result (only present for versioned items)
-        UUID datasetItemId = null;
+        // Fallback to the id if missing
+        UUID datasetItemId = id;
         if (rowMetadata.contains("dataset_item_id")) {
             datasetItemId = Optional.ofNullable(row.get("dataset_item_id", String.class))
                     .filter(s -> !s.isBlank())
                     .map(UUID::fromString)
-                    .orElse(null);
+                    .orElse(id);
         }
 
+        var experimentItems = getExperimentItems(row.get("experiment_items_array", List[].class));
+
         return DatasetItem.builder()
-                .id(row.get("id", UUID.class))
+                .id(id)
                 .data(data)
                 .description(getDescription(row, rowMetadata))
                 .source(Optional.ofNullable(row.get("source", String.class))
@@ -180,12 +193,17 @@ public class DatasetItemResultMapper {
                 .evaluators(getEvaluators(row, rowMetadata))
                 .executionPolicy(getExecutionPolicy(row, rowMetadata))
                 .datasetItemId(datasetItemId)
-                .experimentItems(getExperimentItems(row.get("experiment_items_array", List[].class)))
-                .lastUpdatedAt(row.get("last_updated_at", Instant.class))
-                .createdAt(row.get("created_at", Instant.class))
+                .experimentItems(experimentItems)
+                .runSummariesByExperiment(AssertionResultMapper.computeRunSummaries(experimentItems))
+                .lastUpdatedAt(nullIfEpoch(row.get("last_updated_at", Instant.class)))
+                .createdAt(nullIfEpoch(row.get("created_at", Instant.class)))
                 .createdBy(row.get("created_by", String.class))
                 .lastUpdatedBy(row.get("last_updated_by", String.class))
                 .build();
+    }
+
+    static Instant nullIfEpoch(Instant instant) {
+        return instant == null || instant.equals(Instant.EPOCH) ? null : instant;
     }
 
     private static final TypeReference<List<EvaluatorItem>> EVALUATOR_LIST_TYPE = new TypeReference<>() {
@@ -250,14 +268,6 @@ public class DatasetItemResultMapper {
 
     static String getOrDefault(UUID value) {
         return Optional.ofNullable(value).map(UUID::toString).orElse("");
-    }
-
-    static Publisher<Map.Entry<Long, Set<Column>>> mapCountAndColumns(Result result, String filterFieldPrefix) {
-        return result.map((row, rowMetadata) -> {
-            Long count = extractCountFromResult(row);
-            Map<String, String[]> columnsMap = extractColumnsField(row);
-            return Map.entry(count, mapColumnsField(columnsMap, filterFieldPrefix));
-        });
     }
 
     private static Long extractCountFromResult(Row row) {

@@ -13,6 +13,7 @@ import com.comet.opik.api.runner.LocalRunnerJobStatus;
 import com.comet.opik.api.runner.LocalRunnerLogEntry;
 import com.comet.opik.api.runner.LocalRunnerPairResponse;
 import com.comet.opik.infrastructure.LocalRunnerConfig;
+import com.comet.opik.infrastructure.redis.StringRedisClient;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.redis.testcontainers.RedisContainer;
@@ -33,7 +34,6 @@ import org.redisson.api.RMap;
 import org.redisson.api.RScoredSortedSet;
 import org.redisson.api.RSet;
 import org.redisson.api.RedissonClient;
-import org.redisson.client.codec.StringCodec;
 import org.redisson.config.Config;
 
 import java.time.Instant;
@@ -61,6 +61,7 @@ class LocalRunnerServiceImplTest {
 
     private final RedisContainer redis = RedisContainerUtils.newRedisContainer();
     private RedissonClient redisClient;
+    private StringRedisClient stringRedis;
     private LocalRunnerConfig runnerConfig;
     private IdGenerator idGenerator;
     private ProjectService projectService;
@@ -78,13 +79,14 @@ class LocalRunnerServiceImplTest {
                 .setDatabase(0);
 
         redisClient = Redisson.create(config);
+        stringRedis = new StringRedisClient(redisClient);
 
         runnerConfig = new LocalRunnerConfig();
         runnerConfig.setEnabled(true);
         runnerConfig.setHeartbeatTtl(Duration.seconds(2));
         runnerConfig.setNextJobPollTimeout(Duration.seconds(1));
         runnerConfig.setMaxPendingJobsPerRunner(3);
-        runnerConfig.setDeadRunnerPurgeTime(Duration.seconds(0));
+        runnerConfig.setDeadRunnerPurgeTime(Duration.hours(24));
         runnerConfig.setCompletedJobTtl(Duration.days(7));
         runnerConfig.setJobTimeout(Duration.seconds(1800));
         runnerConfig.setReaperLockDuration(Duration.seconds(55));
@@ -96,7 +98,8 @@ class LocalRunnerServiceImplTest {
         when(projectService.get(eq(PROJECT_ID), any())).thenReturn(
                 Project.builder().id(PROJECT_ID).name(PROJECT_NAME).build());
 
-        runnerService = new LocalRunnerServiceImpl(redisClient, runnerConfig, idGenerator, projectService);
+        runnerService = new LocalRunnerServiceImpl(stringRedis, redisClient.reactive(), runnerConfig, idGenerator,
+                projectService);
     }
 
     @BeforeEach
@@ -156,8 +159,8 @@ class LocalRunnerServiceImplTest {
             stubNextId();
             LocalRunnerPairResponse resp = runnerService.generatePairingCode(WORKSPACE_ID, USER_NAME, PROJECT_ID);
 
-            RBucket<String> pairBucket = redisClient.getBucket(
-                    "opik:runners:pair:" + resp.pairingCode(), StringCodec.INSTANCE);
+            RBucket<String> pairBucket = stringRedis.getBucket(
+                    "opik:runners:pair:" + resp.pairingCode());
             assertThat(pairBucket.isExists()).isTrue();
             String value = pairBucket.get();
             assertThat(value).contains(resp.runnerId().toString());
@@ -171,8 +174,8 @@ class LocalRunnerServiceImplTest {
             stubNextId();
             LocalRunnerPairResponse resp = runnerService.generatePairingCode(WORKSPACE_ID, USER_NAME, PROJECT_ID);
 
-            RMap<String, String> runnerMap = redisClient.getMap(
-                    "opik:runners:runner:" + resp.runnerId(), StringCodec.INSTANCE);
+            RMap<String, String> runnerMap = stringRedis.getMap(
+                    "opik:runners:runner:" + resp.runnerId());
             assertThat(runnerMap.get("status")).isEqualTo("pairing");
             assertThat(runnerMap.get("workspace_id")).isEqualTo(WORKSPACE_ID);
             assertThat(runnerMap.get("user_name")).isEqualTo(USER_NAME);
@@ -185,12 +188,12 @@ class LocalRunnerServiceImplTest {
             stubNextId();
             LocalRunnerPairResponse resp = runnerService.generatePairingCode(WORKSPACE_ID, USER_NAME, PROJECT_ID);
 
-            RScoredSortedSet<String> wsRunners = redisClient.getScoredSortedSet(
-                    "opik:runners:workspace:" + WORKSPACE_ID + ":runners", StringCodec.INSTANCE);
+            RScoredSortedSet<String> wsRunners = stringRedis.getScoredSortedSet(
+                    "opik:runners:workspace:" + WORKSPACE_ID + ":runners");
             assertThat(wsRunners.contains(resp.runnerId().toString())).isTrue();
 
-            RSet<String> workspaces = redisClient.getSet(
-                    "opik:runners:workspaces:with_runners", StringCodec.INSTANCE);
+            RSet<String> workspaces = stringRedis.getSet(
+                    "opik:runners:workspaces:with_runners");
             assertThat(workspaces.contains(WORKSPACE_ID)).isTrue();
         }
 
@@ -199,10 +202,9 @@ class LocalRunnerServiceImplTest {
             stubNextId();
             runnerService.generatePairingCode(WORKSPACE_ID, USER_NAME, PROJECT_ID);
 
-            RBucket<String> userRunner = redisClient.getBucket(
+            RBucket<String> userRunner = stringRedis.getBucket(
                     "opik:runners:workspace:" + WORKSPACE_ID + ":project:" + PROJECT_ID + ":user:" + USER_NAME
-                            + ":runner",
-                    StringCodec.INSTANCE);
+                            + ":runner");
             assertThat(userRunner.isExists()).isFalse();
         }
 
@@ -211,9 +213,8 @@ class LocalRunnerServiceImplTest {
             stubNextId();
             LocalRunnerPairResponse resp = runnerService.generatePairingCode(WORKSPACE_ID, USER_NAME, PROJECT_ID);
 
-            RSet<String> projectRunners = redisClient.getSet(
-                    "opik:runners:workspace:" + WORKSPACE_ID + ":project:" + PROJECT_ID + ":runners",
-                    StringCodec.INSTANCE);
+            RSet<String> projectRunners = stringRedis.getSet(
+                    "opik:runners:workspace:" + WORKSPACE_ID + ":project:" + PROJECT_ID + ":runners");
             assertThat(projectRunners.contains(resp.runnerId().toString())).isTrue();
         }
     }
@@ -236,12 +237,12 @@ class LocalRunnerServiceImplTest {
             assertThat(resp.projectId()).isEqualTo(PROJECT_ID);
             assertThat(resp.projectName()).isEqualTo(PROJECT_NAME);
 
-            RBucket<String> pairBucket = redisClient.getBucket(
-                    "opik:runners:pair:" + pair.pairingCode(), StringCodec.INSTANCE);
+            RBucket<String> pairBucket = stringRedis.getBucket(
+                    "opik:runners:pair:" + pair.pairingCode());
             assertThat(pairBucket.isExists()).isFalse();
 
-            RMap<String, String> runnerMap = redisClient.getMap(
-                    "opik:runners:runner:" + resp.runnerId(), StringCodec.INSTANCE);
+            RMap<String, String> runnerMap = stringRedis.getMap(
+                    "opik:runners:runner:" + resp.runnerId());
             assertThat(runnerMap.get("status")).isEqualTo("connected");
             assertThat(runnerMap.get("name")).isEqualTo(RUNNER_NAME);
             assertThat(runnerMap.get("connected_at")).isNotBlank();
@@ -259,8 +260,8 @@ class LocalRunnerServiceImplTest {
                     .build();
             runnerService.connect(WORKSPACE_ID, USER_NAME, req);
 
-            RMap<String, String> runnerMap = redisClient.getMap(
-                    "opik:runners:runner:" + pair.runnerId(), StringCodec.INSTANCE);
+            RMap<String, String> runnerMap = stringRedis.getMap(
+                    "opik:runners:runner:" + pair.runnerId());
             assertThat(runnerMap.remainTimeToLive()).isEqualTo(-1);
         }
 
@@ -275,8 +276,8 @@ class LocalRunnerServiceImplTest {
                     .build();
             LocalRunnerConnectResponse resp = runnerService.connect(WORKSPACE_ID, USER_NAME, req);
 
-            RBucket<String> hb = redisClient.getBucket(
-                    "opik:runners:runner:" + resp.runnerId() + ":heartbeat", StringCodec.INSTANCE);
+            RBucket<String> hb = stringRedis.getBucket(
+                    "opik:runners:runner:" + resp.runnerId() + ":heartbeat");
             assertThat(hb.isExists()).isTrue();
             assertThat(hb.remainTimeToLive()).isPositive();
         }
@@ -288,14 +289,13 @@ class LocalRunnerServiceImplTest {
 
             assertThat(newRunnerId).isNotEqualTo(oldRunnerId);
 
-            RBucket<String> oldHb = redisClient.getBucket(
-                    "opik:runners:runner:" + oldRunnerId + ":heartbeat", StringCodec.INSTANCE);
+            RBucket<String> oldHb = stringRedis.getBucket(
+                    "opik:runners:runner:" + oldRunnerId + ":heartbeat");
             assertThat(oldHb.isExists()).isFalse();
 
-            RBucket<String> userRunner = redisClient.getBucket(
+            RBucket<String> userRunner = stringRedis.getBucket(
                     "opik:runners:workspace:" + WORKSPACE_ID + ":project:" + PROJECT_ID + ":user:" + USER_NAME
-                            + ":runner",
-                    StringCodec.INSTANCE);
+                            + ":runner");
             assertThat(userRunner.get()).isEqualTo(newRunnerId.toString());
         }
     }
@@ -310,8 +310,8 @@ class LocalRunnerServiceImplTest {
             LocalRunnerHeartbeatResponse resp = runnerService.heartbeat(runnerId, WORKSPACE_ID, USER_NAME);
             assertThat(resp).isNotNull();
 
-            RBucket<String> hb = redisClient.getBucket(
-                    "opik:runners:runner:" + runnerId + ":heartbeat", StringCodec.INSTANCE);
+            RBucket<String> hb = stringRedis.getBucket(
+                    "opik:runners:runner:" + runnerId + ":heartbeat");
             assertThat(hb.isExists()).isTrue();
             assertThat(hb.remainTimeToLive()).isPositive();
         }
@@ -322,14 +322,13 @@ class LocalRunnerServiceImplTest {
             UUID jobId = createTestJob(WORKSPACE_ID, USER_NAME, AGENT_NAME);
 
             stubNextId();
-            LocalRunnerJob claimed = runnerService.nextJob(runnerId, WORKSPACE_ID, USER_NAME).toCompletableFuture()
-                    .join();
+            LocalRunnerJob claimed = runnerService.nextJob(runnerId, WORKSPACE_ID, USER_NAME).block();
             assertThat(claimed).isNotNull();
 
             runnerService.heartbeat(runnerId, WORKSPACE_ID, USER_NAME);
 
-            RMap<String, String> jobMap = redisClient.getMap(
-                    "opik:runners:job:" + claimed.id(), StringCodec.INSTANCE);
+            RMap<String, String> jobMap = stringRedis.getMap(
+                    "opik:runners:job:" + claimed.id());
             assertThat(jobMap.get("last_heartbeat")).isNotBlank();
         }
     }
@@ -355,12 +354,12 @@ class LocalRunnerServiceImplTest {
             assertThat(job.status().getValue()).isEqualTo("pending");
             assertThat(job.projectId()).isEqualTo(PROJECT_ID);
 
-            RList<String> pending = redisClient.getList(
-                    "opik:runners:jobs:" + runnerId + ":pending", StringCodec.INSTANCE);
+            RList<String> pending = stringRedis.getList(
+                    "opik:runners:jobs:" + runnerId + ":pending");
             assertThat(pending.readAll()).contains(jobId.toString());
 
-            RScoredSortedSet<String> runnerJobs = redisClient.getScoredSortedSet(
-                    "opik:runners:runner:" + runnerId + ":jobs", StringCodec.INSTANCE);
+            RScoredSortedSet<String> runnerJobs = stringRedis.getScoredSortedSet(
+                    "opik:runners:runner:" + runnerId + ":jobs");
             assertThat(runnerJobs.contains(jobId.toString())).isTrue();
         }
     }
@@ -373,14 +372,14 @@ class LocalRunnerServiceImplTest {
             UUID runnerId = pairAndConnect(WORKSPACE_ID, USER_NAME, RUNNER_NAME);
             UUID jobId = createTestJob(WORKSPACE_ID, USER_NAME, AGENT_NAME);
 
-            runnerService.nextJob(runnerId, WORKSPACE_ID, USER_NAME).toCompletableFuture().join();
+            runnerService.nextJob(runnerId, WORKSPACE_ID, USER_NAME).block();
 
-            RList<String> pending = redisClient.getList(
-                    "opik:runners:jobs:" + runnerId + ":pending", StringCodec.INSTANCE);
+            RList<String> pending = stringRedis.getList(
+                    "opik:runners:jobs:" + runnerId + ":pending");
             assertThat(pending.size()).isZero();
 
-            RList<String> active = redisClient.getList(
-                    "opik:runners:jobs:" + runnerId + ":active", StringCodec.INSTANCE);
+            RList<String> active = stringRedis.getList(
+                    "opik:runners:jobs:" + runnerId + ":active");
             assertThat(active.readAll()).contains(jobId.toString());
         }
     }
@@ -394,7 +393,7 @@ class LocalRunnerServiceImplTest {
             UUID jobId = createTestJob(WORKSPACE_ID, USER_NAME, AGENT_NAME);
 
             String fakeJobId = UUID.randomUUID().toString();
-            RMap<String, String> fakeJob = redisClient.getMap("opik:runners:job:" + fakeJobId, StringCodec.INSTANCE);
+            RMap<String, String> fakeJob = stringRedis.getMap("opik:runners:job:" + fakeJobId);
             fakeJob.putAll(Map.of(
                     "id", fakeJobId,
                     "runner_id", runnerId.toString(),
@@ -402,8 +401,8 @@ class LocalRunnerServiceImplTest {
                     "status", "pending",
                     "workspace_id", OTHER_WORKSPACE_ID,
                     "created_at", Instant.now().toString()));
-            RScoredSortedSet<String> runnerJobs = redisClient.getScoredSortedSet(
-                    "opik:runners:runner:" + runnerId + ":jobs", StringCodec.INSTANCE);
+            RScoredSortedSet<String> runnerJobs = stringRedis.getScoredSortedSet(
+                    "opik:runners:runner:" + runnerId + ":jobs");
             runnerJobs.add(Instant.now().toEpochMilli(), fakeJobId);
 
             LocalRunnerJob.LocalRunnerJobPage page = runnerService.listJobs(runnerId, null, WORKSPACE_ID, USER_NAME, 0,
@@ -416,7 +415,7 @@ class LocalRunnerServiceImplTest {
             UUID runnerId = pairAndConnect(WORKSPACE_ID, USER_NAME, RUNNER_NAME);
             UUID jobId = createTestJob(WORKSPACE_ID, USER_NAME, AGENT_NAME);
 
-            redisClient.getMap("opik:runners:job:" + jobId, StringCodec.INSTANCE).delete();
+            stringRedis.getMap("opik:runners:job:" + jobId).delete();
 
             LocalRunnerJob.LocalRunnerJobPage page = runnerService.listJobs(runnerId, null, WORKSPACE_ID, USER_NAME, 0,
                     10);
@@ -435,8 +434,8 @@ class LocalRunnerServiceImplTest {
             runnerService.appendLogs(jobId, WORKSPACE_ID, USER_NAME,
                     List.of(LocalRunnerLogEntry.builder().stream("stdout").text("hello").build()));
 
-            RList<String> logsList = redisClient.getList(
-                    "opik:runners:job:" + jobId + ":logs", StringCodec.INSTANCE);
+            RList<String> logsList = stringRedis.getList(
+                    "opik:runners:job:" + jobId + ":logs");
             assertThat(logsList.size()).isEqualTo(1);
         }
 
@@ -450,8 +449,8 @@ class LocalRunnerServiceImplTest {
             runnerService.appendLogs(jobId, WORKSPACE_ID, USER_NAME,
                     List.of(LocalRunnerLogEntry.builder().stream("stdout").text("batch2").build()));
 
-            RList<String> logsList = redisClient.getList(
-                    "opik:runners:job:" + jobId + ":logs", StringCodec.INSTANCE);
+            RList<String> logsList = stringRedis.getList(
+                    "opik:runners:job:" + jobId + ":logs");
             assertThat(logsList.size()).isEqualTo(2);
         }
     }
@@ -463,7 +462,7 @@ class LocalRunnerServiceImplTest {
         void completedJob() {
             UUID runnerId = pairAndConnect(WORKSPACE_ID, USER_NAME, RUNNER_NAME);
             UUID jobId = createTestJob(WORKSPACE_ID, USER_NAME, AGENT_NAME);
-            runnerService.nextJob(runnerId, WORKSPACE_ID, USER_NAME).toCompletableFuture().join();
+            runnerService.nextJob(runnerId, WORKSPACE_ID, USER_NAME).block();
 
             ObjectNode resultNode = MAPPER.createObjectNode();
             resultNode.put("output", "success");
@@ -472,14 +471,14 @@ class LocalRunnerServiceImplTest {
                     LocalRunnerJobResultRequest.builder().status(LocalRunnerJobStatus.COMPLETED).result(resultNode)
                             .build());
 
-            RMap<String, String> jobMap = redisClient.getMap(
-                    "opik:runners:job:" + jobId, StringCodec.INSTANCE);
+            RMap<String, String> jobMap = stringRedis.getMap(
+                    "opik:runners:job:" + jobId);
             assertThat(jobMap.get("status")).isEqualTo("completed");
             assertThat(jobMap.get("completed_at")).isNotBlank();
             assertThat(jobMap.get("result")).contains("success");
 
-            RList<String> active = redisClient.getList(
-                    "opik:runners:jobs:" + runnerId + ":active", StringCodec.INSTANCE);
+            RList<String> active = stringRedis.getList(
+                    "opik:runners:jobs:" + runnerId + ":active");
             assertThat(active.readAll()).doesNotContain(jobId.toString());
         }
 
@@ -487,14 +486,14 @@ class LocalRunnerServiceImplTest {
         void failedJob() {
             UUID runnerId = pairAndConnect(WORKSPACE_ID, USER_NAME, RUNNER_NAME);
             UUID jobId = createTestJob(WORKSPACE_ID, USER_NAME, AGENT_NAME);
-            runnerService.nextJob(runnerId, WORKSPACE_ID, USER_NAME).toCompletableFuture().join();
+            runnerService.nextJob(runnerId, WORKSPACE_ID, USER_NAME).block();
 
             runnerService.reportResult(jobId, WORKSPACE_ID, USER_NAME,
                     LocalRunnerJobResultRequest.builder().status(LocalRunnerJobStatus.FAILED).error("something broke")
                             .build());
 
-            RMap<String, String> jobMap = redisClient.getMap(
-                    "opik:runners:job:" + jobId, StringCodec.INSTANCE);
+            RMap<String, String> jobMap = stringRedis.getMap(
+                    "opik:runners:job:" + jobId);
             assertThat(jobMap.get("status")).isEqualTo("failed");
             assertThat(jobMap.get("error")).isEqualTo("something broke");
             assertThat(jobMap.get("completed_at")).isNotBlank();
@@ -504,15 +503,15 @@ class LocalRunnerServiceImplTest {
         void setsTraceId() {
             UUID runnerId = pairAndConnect(WORKSPACE_ID, USER_NAME, RUNNER_NAME);
             UUID jobId = createTestJob(WORKSPACE_ID, USER_NAME, AGENT_NAME);
-            runnerService.nextJob(runnerId, WORKSPACE_ID, USER_NAME).toCompletableFuture().join();
+            runnerService.nextJob(runnerId, WORKSPACE_ID, USER_NAME).block();
 
             UUID traceId = UUID.randomUUID();
             runnerService.reportResult(jobId, WORKSPACE_ID, USER_NAME,
                     LocalRunnerJobResultRequest.builder().status(LocalRunnerJobStatus.COMPLETED).traceId(traceId)
                             .build());
 
-            RMap<String, String> jobMap = redisClient.getMap(
-                    "opik:runners:job:" + jobId, StringCodec.INSTANCE);
+            RMap<String, String> jobMap = stringRedis.getMap(
+                    "opik:runners:job:" + jobId);
             assertThat(jobMap.get("trace_id")).isEqualTo(traceId.toString());
         }
 
@@ -520,7 +519,7 @@ class LocalRunnerServiceImplTest {
         void setsTTLOnJobAndLogs() {
             UUID runnerId = pairAndConnect(WORKSPACE_ID, USER_NAME, RUNNER_NAME);
             UUID jobId = createTestJob(WORKSPACE_ID, USER_NAME, AGENT_NAME);
-            runnerService.nextJob(runnerId, WORKSPACE_ID, USER_NAME).toCompletableFuture().join();
+            runnerService.nextJob(runnerId, WORKSPACE_ID, USER_NAME).block();
 
             runnerService.appendLogs(jobId, WORKSPACE_ID, USER_NAME,
                     List.of(LocalRunnerLogEntry.builder().stream("stdout").text("log").build()));
@@ -528,13 +527,77 @@ class LocalRunnerServiceImplTest {
             runnerService.reportResult(jobId, WORKSPACE_ID, USER_NAME,
                     LocalRunnerJobResultRequest.builder().status(LocalRunnerJobStatus.COMPLETED).build());
 
-            RMap<String, String> jobMap = redisClient.getMap(
-                    "opik:runners:job:" + jobId, StringCodec.INSTANCE);
+            RMap<String, String> jobMap = stringRedis.getMap(
+                    "opik:runners:job:" + jobId);
             assertThat(jobMap.remainTimeToLive()).isPositive();
 
-            RList<String> logsList = redisClient.getList(
-                    "opik:runners:job:" + jobId + ":logs", StringCodec.INSTANCE);
+            RList<String> logsList = stringRedis.getList(
+                    "opik:runners:job:" + jobId + ":logs");
             assertThat(logsList.remainTimeToLive()).isPositive();
+        }
+
+        @Test
+        void inFlightRunningSetsTraceIdWithoutCompletingJob() {
+            UUID runnerId = pairAndConnect(WORKSPACE_ID, USER_NAME, RUNNER_NAME);
+            UUID jobId = createTestJob(WORKSPACE_ID, USER_NAME, AGENT_NAME);
+            runnerService.nextJob(runnerId, WORKSPACE_ID, USER_NAME).block();
+
+            UUID traceId = UUID.randomUUID();
+            runnerService.reportResult(jobId, WORKSPACE_ID, USER_NAME,
+                    LocalRunnerJobResultRequest.builder().status(LocalRunnerJobStatus.RUNNING).traceId(traceId)
+                            .build());
+
+            RMap<String, String> jobMap = stringRedis.getMap(
+                    "opik:runners:job:" + jobId);
+            assertThat(jobMap.get("status")).isEqualTo("running");
+            assertThat(jobMap.get("trace_id")).isEqualTo(traceId.toString());
+            assertThat(jobMap.get("completed_at")).isNull();
+
+            RList<String> active = stringRedis.getList(
+                    "opik:runners:jobs:" + runnerId + ":active");
+            assertThat(active.readAll()).contains(jobId.toString());
+
+            assertThat(jobMap.remainTimeToLive()).isEqualTo(-1L);
+        }
+
+        @Test
+        void inFlightRunningThenTerminalCompletes() {
+            UUID runnerId = pairAndConnect(WORKSPACE_ID, USER_NAME, RUNNER_NAME);
+            UUID jobId = createTestJob(WORKSPACE_ID, USER_NAME, AGENT_NAME);
+            runnerService.nextJob(runnerId, WORKSPACE_ID, USER_NAME).block();
+
+            UUID traceId = UUID.randomUUID();
+            runnerService.reportResult(jobId, WORKSPACE_ID, USER_NAME,
+                    LocalRunnerJobResultRequest.builder().status(LocalRunnerJobStatus.RUNNING).traceId(traceId)
+                            .build());
+
+            ObjectNode resultNode = MAPPER.createObjectNode();
+            resultNode.put("output", "done");
+            runnerService.reportResult(jobId, WORKSPACE_ID, USER_NAME,
+                    LocalRunnerJobResultRequest.builder().status(LocalRunnerJobStatus.COMPLETED).result(resultNode)
+                            .build());
+
+            RMap<String, String> jobMap = stringRedis.getMap(
+                    "opik:runners:job:" + jobId);
+            assertThat(jobMap.get("status")).isEqualTo("completed");
+            assertThat(jobMap.get("trace_id")).isEqualTo(traceId.toString());
+            assertThat(jobMap.get("completed_at")).isNotBlank();
+            assertThat(jobMap.get("result")).contains("done");
+
+            RList<String> active = stringRedis.getList(
+                    "opik:runners:jobs:" + runnerId + ":active");
+            assertThat(active.readAll()).doesNotContain(jobId.toString());
+        }
+
+        @Test
+        void rejectsPendingStatus() {
+            UUID runnerId = pairAndConnect(WORKSPACE_ID, USER_NAME, RUNNER_NAME);
+            UUID jobId = createTestJob(WORKSPACE_ID, USER_NAME, AGENT_NAME);
+            runnerService.nextJob(runnerId, WORKSPACE_ID, USER_NAME).block();
+
+            assertThatThrownBy(() -> runnerService.reportResult(jobId, WORKSPACE_ID, USER_NAME,
+                    LocalRunnerJobResultRequest.builder().status(LocalRunnerJobStatus.PENDING).build()))
+                    .isInstanceOf(ClientErrorException.class);
         }
     }
 
@@ -545,17 +608,17 @@ class LocalRunnerServiceImplTest {
         void cancelActiveJob_addsToCancellationSet() {
             UUID runnerId = pairAndConnect(WORKSPACE_ID, USER_NAME, RUNNER_NAME);
             UUID jobId = createTestJob(WORKSPACE_ID, USER_NAME, AGENT_NAME);
-            runnerService.nextJob(runnerId, WORKSPACE_ID, USER_NAME).toCompletableFuture().join();
+            runnerService.nextJob(runnerId, WORKSPACE_ID, USER_NAME).block();
 
             runnerService.cancelJob(jobId, WORKSPACE_ID, USER_NAME);
 
-            RMap<String, String> jobMap = redisClient.getMap(
-                    "opik:runners:job:" + jobId, StringCodec.INSTANCE);
+            RMap<String, String> jobMap = stringRedis.getMap(
+                    "opik:runners:job:" + jobId);
             assertThat(jobMap.get("status")).isEqualTo("cancelled");
             assertThat(jobMap.get("completed_at")).isNotBlank();
 
-            RSet<String> cancellations = redisClient.getSet(
-                    "opik:runners:runner:" + runnerId + ":cancellations", StringCodec.INSTANCE);
+            RSet<String> cancellations = stringRedis.getSet(
+                    "opik:runners:runner:" + runnerId + ":cancellations");
             assertThat(cancellations.contains(jobId.toString())).isTrue();
         }
 
@@ -566,16 +629,16 @@ class LocalRunnerServiceImplTest {
 
             runnerService.cancelJob(jobId, WORKSPACE_ID, USER_NAME);
 
-            RList<String> pending = redisClient.getList(
-                    "opik:runners:jobs:" + runnerId + ":pending", StringCodec.INSTANCE);
+            RList<String> pending = stringRedis.getList(
+                    "opik:runners:jobs:" + runnerId + ":pending");
             assertThat(pending.readAll()).doesNotContain(jobId.toString());
 
-            RSet<String> cancellations = redisClient.getSet(
-                    "opik:runners:runner:" + runnerId + ":cancellations", StringCodec.INSTANCE);
+            RSet<String> cancellations = stringRedis.getSet(
+                    "opik:runners:runner:" + runnerId + ":cancellations");
             assertThat(cancellations.contains(jobId.toString())).isFalse();
 
-            RMap<String, String> jobMap = redisClient.getMap(
-                    "opik:runners:job:" + jobId, StringCodec.INSTANCE);
+            RMap<String, String> jobMap = stringRedis.getMap(
+                    "opik:runners:job:" + jobId);
             assertThat(jobMap.get("status")).isEqualTo("cancelled");
             assertThat(jobMap.remainTimeToLive()).isPositive();
         }
@@ -600,7 +663,8 @@ class LocalRunnerServiceImplTest {
         LocalRunner.Agent agentMeta = LocalRunner.Agent.builder().build();
         runnerService.registerAgents(runnerId, WORKSPACE_ID, USER_NAME, Map.of(AGENT_NAME, agentMeta));
 
-        LocalRunner.LocalRunnerPage runnerPage = runnerService.listRunners(WORKSPACE_ID, USER_NAME, PROJECT_ID, 0, 25);
+        LocalRunner.LocalRunnerPage runnerPage = runnerService.listRunners(WORKSPACE_ID, USER_NAME, PROJECT_ID, null, 0,
+                25);
         assertThat(runnerPage.content()).hasSize(1);
         assertThat(runnerPage.content().get(0).agents()).hasSize(1);
 
@@ -617,7 +681,7 @@ class LocalRunnerServiceImplTest {
         LocalRunnerJob created = runnerService.getJob(jobId, WORKSPACE_ID, USER_NAME);
         assertThat(created.status().getValue()).isEqualTo("pending");
 
-        LocalRunnerJob claimed = runnerService.nextJob(runnerId, WORKSPACE_ID, USER_NAME).toCompletableFuture().join();
+        LocalRunnerJob claimed = runnerService.nextJob(runnerId, WORKSPACE_ID, USER_NAME).block();
         assertThat(claimed).isNotNull();
         assertThat(claimed.id()).isEqualTo(jobId);
         assertThat(claimed.status().getValue()).isEqualTo("running");
@@ -657,7 +721,8 @@ class LocalRunnerServiceImplTest {
         void listRunners_excludesOtherUsersRunners() {
             pairAndConnect(WORKSPACE_ID, USER_NAME, RUNNER_NAME);
 
-            LocalRunner.LocalRunnerPage page = runnerService.listRunners(WORKSPACE_ID, OTHER_USER, PROJECT_ID, 0, 25);
+            LocalRunner.LocalRunnerPage page = runnerService.listRunners(WORKSPACE_ID, OTHER_USER, PROJECT_ID, null, 0,
+                    25);
             assertThat(page.content()).isEmpty();
             assertThat(page.total()).isZero();
         }
@@ -756,7 +821,7 @@ class LocalRunnerServiceImplTest {
         void reportResult_rejectsOtherUser() {
             UUID runnerId = pairAndConnect(WORKSPACE_ID, USER_NAME, RUNNER_NAME);
             UUID jobId = createTestJob(WORKSPACE_ID, USER_NAME, AGENT_NAME);
-            runnerService.nextJob(runnerId, WORKSPACE_ID, USER_NAME).toCompletableFuture().join();
+            runnerService.nextJob(runnerId, WORKSPACE_ID, USER_NAME).block();
 
             assertThatThrownBy(() -> runnerService.reportResult(jobId, WORKSPACE_ID, OTHER_USER,
                     LocalRunnerJobResultRequest.builder().status(LocalRunnerJobStatus.COMPLETED).build()))

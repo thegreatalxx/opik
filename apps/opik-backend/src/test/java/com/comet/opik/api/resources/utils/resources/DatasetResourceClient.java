@@ -17,9 +17,11 @@ import com.comet.opik.api.DatasetVersionTag;
 import com.comet.opik.api.DatasetVersionUpdate;
 import com.comet.opik.api.ProjectStats;
 import com.comet.opik.api.PromptVersion;
+import com.comet.opik.api.filter.DatasetFilter;
 import com.comet.opik.api.filter.ExperimentsComparisonFilter;
 import com.comet.opik.api.filter.Filter;
 import com.comet.opik.api.sorting.SortingField;
+import com.comet.opik.podam.PodamFactoryUtils;
 import com.comet.opik.utils.JsonUtils;
 import com.google.common.net.HttpHeaders;
 import jakarta.ws.rs.client.Entity;
@@ -31,7 +33,10 @@ import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.http.HttpStatus;
 import ru.vyarus.dropwizard.guice.test.ClientSupport;
+import uk.co.jemos.podam.api.PodamFactory;
 
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -48,9 +53,44 @@ import static org.assertj.core.api.Assertions.assertThat;
 @RequiredArgsConstructor
 public class DatasetResourceClient {
     private static final String RESOURCE_PATH = "%s/v1/private/datasets";
+    private static final String PROJECT_DATASETS_PATH = "%s/v1/private/projects/%s/datasets";
 
     private final ClientSupport client;
     private final String baseURI;
+
+    public static Dataset buildDataset(PodamFactory factory) {
+        return factory.manufacturePojo(Dataset.class).toBuilder().projectId(null).projectName(null).build();
+    }
+
+    public static List<Dataset> buildDatasetList(PodamFactory factory) {
+        return PodamFactoryUtils.manufacturePojoList(factory, Dataset.class).stream()
+                .map(dataset -> dataset.toBuilder().projectId(null).projectName(null).build())
+                .toList();
+    }
+
+    public static DatasetItem buildDatasetItem(PodamFactory factory) {
+        return factory.manufacturePojo(DatasetItem.class).toBuilder()
+                .experimentItems(null)
+                .runSummariesByExperiment(null)
+                .datasetId(null)
+                .build();
+    }
+
+    public static DatasetItemBatch buildDatasetItemBatch(PodamFactory factory) {
+        return factory.manufacturePojo(DatasetItemBatch.class).toBuilder()
+                .projectId(null)
+                .projectName(null)
+                .build();
+    }
+
+    public Response callCreateDataset(Dataset dataset, String apiKey, String workspaceName) {
+        return client.target(RESOURCE_PATH.formatted(baseURI))
+                .request()
+                .accept(MediaType.APPLICATION_JSON_TYPE)
+                .header(HttpHeaders.AUTHORIZATION, apiKey)
+                .header(WORKSPACE_HEADER, workspaceName)
+                .post(Entity.json(dataset));
+    }
 
     public UUID createDataset(Dataset dataset, String apiKey, String workspaceName) {
         try (var actualResponse = client.target(RESOURCE_PATH.formatted(baseURI))
@@ -102,6 +142,79 @@ public class DatasetResourceClient {
             assertThat(actualResponse.getStatusInfo().getStatusCode()).isEqualTo(200);
             return actualResponse.readEntity(DatasetPage.class);
         }
+    }
+
+    public DatasetPage getDatasetsByProjectId(UUID projectId, String workspaceName, String apiKey) {
+        try (var actualResponse = client.target(RESOURCE_PATH.formatted(baseURI))
+                .queryParam("page", 1)
+                .queryParam("size", 100)
+                .queryParam("project_id", projectId)
+                .request()
+                .accept(MediaType.APPLICATION_JSON_TYPE)
+                .header(HttpHeaders.AUTHORIZATION, apiKey)
+                .header(WORKSPACE_HEADER, workspaceName)
+                .get()) {
+
+            assertThat(actualResponse.getStatusInfo().getStatusCode()).isEqualTo(200);
+            return actualResponse.readEntity(DatasetPage.class);
+        }
+    }
+
+    public DatasetPage getProjectDatasets(UUID projectId, int page, int size, String workspaceName, String apiKey) {
+        return getProjectDatasets(projectId, page, size, null, null, null, workspaceName, apiKey);
+    }
+
+    public DatasetPage getProjectDatasets(UUID projectId, int page, int size, String name, String sorting,
+            List<DatasetFilter> filters, String workspaceName, String apiKey) {
+        try (var actualResponse = buildProjectDatasetsTarget(projectId, page, size, name, sorting, filters)
+                .request()
+                .accept(MediaType.APPLICATION_JSON_TYPE)
+                .header(HttpHeaders.AUTHORIZATION, apiKey)
+                .header(WORKSPACE_HEADER, workspaceName)
+                .get()) {
+
+            assertThat(actualResponse.getStatusInfo().getStatusCode()).isEqualTo(200);
+            return actualResponse.readEntity(DatasetPage.class);
+        }
+    }
+
+    public Response callGetProjectDatasets(UUID projectId, int page, int size, String name, String sorting,
+            List<DatasetFilter> filters, String workspaceName, String apiKey) {
+        return buildProjectDatasetsTarget(projectId, page, size, name, sorting, filters)
+                .request()
+                .accept(MediaType.APPLICATION_JSON_TYPE)
+                .header(HttpHeaders.AUTHORIZATION, apiKey)
+                .header(WORKSPACE_HEADER, workspaceName)
+                .get();
+    }
+
+    private WebTarget buildProjectDatasetsTarget(UUID projectId, int page, int size, String name, String sorting,
+            List<DatasetFilter> filters) {
+        WebTarget target = client.target(PROJECT_DATASETS_PATH.formatted(baseURI, projectId))
+                .queryParam("page", page)
+                .queryParam("size", size);
+
+        if (StringUtils.isNotBlank(name)) {
+            target = target.queryParam("name", name);
+        }
+
+        if (StringUtils.isNotBlank(sorting)) {
+            target = target.queryParam("sorting", sorting);
+        }
+
+        if (CollectionUtils.isNotEmpty(filters)) {
+            target = target.queryParam("filters", toURLEncodedQueryParam(filters));
+        }
+
+        return target;
+    }
+
+    public DatasetPage getProjectDatasetsWithSortingField(UUID projectId, int size, List<SortingField> sortingFields,
+            List<DatasetFilter> filters, String workspaceName, String apiKey) {
+        String sorting = CollectionUtils.isNotEmpty(sortingFields)
+                ? URLEncoder.encode(JsonUtils.writeValueAsString(sortingFields), StandardCharsets.UTF_8)
+                : null;
+        return getProjectDatasets(projectId, 1, size, null, sorting, filters, workspaceName, apiKey);
     }
 
     public void createDatasetItems(DatasetItemBatch batch, String workspaceName, String apiKey) {
@@ -319,6 +432,23 @@ public class DatasetResourceClient {
                 .delete();
     }
 
+    public Dataset getDatasetByIdentifier(DatasetIdentifier identifier, String apiKey, String workspaceName) {
+        try (var actualResponse = callGetDatasetByIdentifier(identifier, apiKey, workspaceName)) {
+            assertThat(actualResponse.getStatusInfo().getStatusCode()).isEqualTo(200);
+            return actualResponse.readEntity(Dataset.class);
+        }
+    }
+
+    public Response callGetDatasetByIdentifier(DatasetIdentifier identifier, String apiKey, String workspaceName) {
+        return client.target(RESOURCE_PATH.formatted(baseURI))
+                .path("retrieve")
+                .request()
+                .accept(MediaType.APPLICATION_JSON_TYPE)
+                .header(HttpHeaders.AUTHORIZATION, apiKey)
+                .header(WORKSPACE_HEADER, workspaceName)
+                .post(Entity.json(identifier));
+    }
+
     public void deleteDatasetByName(String name, String apiKey, String workspaceName) {
         try (var actualResponse = client.target(RESOURCE_PATH.formatted(baseURI))
                 .path("delete")
@@ -326,7 +456,7 @@ public class DatasetResourceClient {
                 .accept(MediaType.APPLICATION_JSON_TYPE)
                 .header(HttpHeaders.AUTHORIZATION, apiKey)
                 .header(WORKSPACE_HEADER, workspaceName)
-                .post(Entity.json(new DatasetIdentifier(name)))) {
+                .post(Entity.json(DatasetIdentifier.builder().datasetName(name).build()))) {
 
             assertThat(actualResponse.getStatusInfo().getStatusCode()).isEqualTo(HttpStatus.SC_NO_CONTENT);
             assertThat(actualResponse.hasEntity()).isFalse();
@@ -397,12 +527,20 @@ public class DatasetResourceClient {
 
     public DatasetItemPage getDatasetItemsWithExperimentItems(UUID datasetId, List<UUID> experimentIds, String search,
             List<? extends Filter> filters, String apiKey, String workspaceName) {
-        return getDatasetItemsWithExperimentItems(datasetId, experimentIds, search, filters, null, apiKey,
+        return getDatasetItemsWithExperimentItems(datasetId, experimentIds, search, filters, null, null, null, apiKey,
                 workspaceName);
     }
 
     public DatasetItemPage getDatasetItemsWithExperimentItems(UUID datasetId, List<UUID> experimentIds, String search,
-            List<? extends Filter> filters, List<SortingField> sorting, String apiKey, String workspaceName) {
+            List<? extends Filter> filters, List<?> sorting, String apiKey, String workspaceName) {
+        return getDatasetItemsWithExperimentItems(datasetId, experimentIds, search, filters, sorting, null, null,
+                apiKey,
+                workspaceName);
+    }
+
+    public DatasetItemPage getDatasetItemsWithExperimentItems(UUID datasetId, List<UUID> experimentIds, String search,
+            List<? extends Filter> filters, List<?> sorting, Integer page, Integer size,
+            String apiKey, String workspaceName) {
         var experimentIdsQueryParam = JsonUtils.writeValueAsString(experimentIds);
 
         var webTarget = client.target(RESOURCE_PATH.formatted(baseURI))
@@ -420,8 +558,16 @@ public class DatasetResourceClient {
             webTarget = webTarget.queryParam("filters", toURLEncodedQueryParam(filters));
         }
 
-        if (CollectionUtils.isNotEmpty(sorting)) {
+        if (sorting != null && !sorting.isEmpty()) {
             webTarget = webTarget.queryParam("sorting", toURLEncodedQueryParam(sorting));
+        }
+
+        if (page != null) {
+            webTarget = webTarget.queryParam("page", page);
+        }
+
+        if (size != null) {
+            webTarget = webTarget.queryParam("size", size);
         }
 
         try (var response = webTarget
@@ -736,14 +882,7 @@ public class DatasetResourceClient {
 
     public List<DatasetItem> streamDatasetItems(DatasetItemStreamRequest request, String apiKey,
             String workspaceName) {
-        try (var response = client.target(RESOURCE_PATH.formatted(baseURI))
-                .path("items")
-                .path("stream")
-                .request()
-                .header(HttpHeaders.AUTHORIZATION, apiKey)
-                .header(WORKSPACE_HEADER, workspaceName)
-                .post(Entity.json(request))) {
-
+        try (var response = callStreamDatasetItems(request, apiKey, workspaceName)) {
             assertThat(response.getStatusInfo().getStatusCode()).isEqualTo(HttpStatus.SC_OK);
 
             // Read the chunked output as a string and parse each line as a DatasetItem
@@ -757,5 +896,15 @@ public class DatasetResourceClient {
                     .map(line -> JsonUtils.readValue(line, DatasetItem.class))
                     .toList();
         }
+    }
+
+    public Response callStreamDatasetItems(DatasetItemStreamRequest request, String apiKey, String workspaceName) {
+        return client.target(RESOURCE_PATH.formatted(baseURI))
+                .path("items")
+                .path("stream")
+                .request()
+                .header(HttpHeaders.AUTHORIZATION, apiKey)
+                .header(WORKSPACE_HEADER, workspaceName)
+                .post(Entity.json(request));
     }
 }

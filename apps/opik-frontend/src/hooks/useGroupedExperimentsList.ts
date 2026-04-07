@@ -12,6 +12,7 @@ import md5 from "md5";
 
 import {
   Experiment,
+  EXPERIMENT_TYPE,
   ExperimentsGroupNode,
   ExperimentsAggregations,
   ExperimentsGroupNodeWithAggregations,
@@ -75,10 +76,12 @@ const buildOrderMap = <T extends { id: string }>(
 
 type UseGroupedExperimentsListParams = {
   workspaceName: string;
+  projectId?: string;
   filters?: Filters;
   sorting?: Sorting;
   groups?: Groups;
   promptId?: string;
+  types?: EXPERIMENT_TYPE[];
   search?: string;
   page: number;
   size: number;
@@ -358,11 +361,13 @@ export default function useGroupedExperimentsList(
     const isOrphanProjectFilter = projectFilter && projectIdValue === "";
 
     return {
-      projectId: isOrphanProjectFilter ? undefined : projectIdValue,
+      projectId:
+        params.projectId ??
+        (isOrphanProjectFilter ? undefined : projectIdValue),
       projectDeleted: isOrphanProjectFilter ? true : undefined,
       filtersWithoutProjectId: otherFilters,
     };
-  }, [params.filters]);
+  }, [params.filters, params.projectId]);
 
   const {
     data: groupsData,
@@ -378,6 +383,7 @@ export default function useGroupedExperimentsList(
       search: params.search,
       promptId: params.promptId,
       projectId,
+      types: params.types,
     },
     {
       placeholderData: keepPreviousData,
@@ -395,6 +401,7 @@ export default function useGroupedExperimentsList(
         search: params.search,
         promptId: params.promptId,
         projectId,
+        types: params.types,
       },
       {
         placeholderData: keepPreviousData,
@@ -410,6 +417,7 @@ export default function useGroupedExperimentsList(
   } = useDatasetsList(
     {
       workspaceName: params.workspaceName,
+      ...(projectId && { projectId }),
       page: 1,
       size: MAX_ENTITIES_FOR_SORTING,
       withExperimentsOnly: true,
@@ -448,6 +456,7 @@ export default function useGroupedExperimentsList(
         sorting: params.sorting,
         search: params.search,
         promptId: params.promptId,
+        types: params.types,
         projectId,
         projectDeleted,
         page: params.page,
@@ -536,8 +545,12 @@ export default function useGroupedExperimentsList(
         sorting: params.sorting,
         search: params.search,
         promptId: params.promptId,
+        types: params.types,
         // Don't send projectId if it's an orphan project, use projectDeleted flag instead
-        projectId: isOrphanProject ? undefined : projectIdValue,
+        // Fall back to params.projectId (page context) when no project filter or group metadata
+        projectId: isOrphanProject
+          ? undefined
+          : projectIdValue ?? params.projectId,
         projectDeleted: isOrphanProject || undefined,
         page: 1,
         size: extractPageSize(id, params.groupLimit),

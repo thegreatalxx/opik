@@ -5,6 +5,7 @@ import com.comet.opik.domain.threads.TraceThreadService;
 import com.comet.opik.infrastructure.JobTimeoutConfig;
 import com.comet.opik.infrastructure.TraceThreadConfig;
 import com.comet.opik.infrastructure.lock.LockService;
+import com.comet.opik.infrastructure.redis.RedisStreamUtils;
 import io.dropwizard.jobs.Job;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
@@ -14,7 +15,6 @@ import org.quartz.DisallowConcurrentExecution;
 import org.quartz.InterruptableJob;
 import org.quartz.JobExecutionContext;
 import org.redisson.api.RedissonReactiveClient;
-import org.redisson.api.stream.StreamAddArgs;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import ru.vyarus.dropwizard.guice.module.yaml.bind.Config;
@@ -22,6 +22,8 @@ import ru.vyarus.dropwizard.guice.module.yaml.bind.Config;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 import static com.comet.opik.infrastructure.lock.LockService.Lock;
 
@@ -30,6 +32,10 @@ import static com.comet.opik.infrastructure.lock.LockService.Lock;
 @DisallowConcurrentExecution
 public class TraceThreadsClosingJob extends Job implements InterruptableJob {
 
+    // On first run after startup (or after an outage), look back further to catch any threads that
+    // became stale during downtime. This is deliberately conservative — the minmax skip index keeps
+    // the cost proportional to matching granules, so the wider window is still very cheap.
+
     private final TraceThreadService traceThreadService;
     private final LockService lockService;
     private final TraceThreadConfig traceThreadConfig;
@@ -37,6 +43,9 @@ public class TraceThreadsClosingJob extends Job implements InterruptableJob {
     private final JobTimeoutConfig jobTimeoutConfig;
 
     private final AtomicBoolean interrupted = new AtomicBoolean(false);
+    private final AtomicBoolean completedFirstRun = new AtomicBoolean(false);
+    private final AtomicInteger consecutiveFailures = new AtomicInteger(0);
+    private final AtomicLong backoffUntilMillis = new AtomicLong(0);
 
     @Inject
     public TraceThreadsClosingJob(@NonNull TraceThreadService traceThreadService,
@@ -59,6 +68,14 @@ public class TraceThreadsClosingJob extends Job implements InterruptableJob {
             return;
         }
 
+        // Skip execution if still in backoff period
+        long backoffUntil = backoffUntilMillis.get();
+        if (backoffUntil > 0 && System.currentTimeMillis() < backoffUntil) {
+            log.info("Trace threads closing job in backoff period (consecutive failures: '{}'), skipping execution",
+                    consecutiveFailures.get());
+            return;
+        }
+
         var lock = new Lock("job", TraceThreadsClosingJob.class.getSimpleName());
         var defaultTimeoutToMarkThreadAsInactive = traceThreadConfig
                 .getTimeoutToMarkThreadAsInactive().toJavaDuration(); // This is the default timeout to mark threads as inactive when workspace config is not set
@@ -68,18 +85,26 @@ public class TraceThreadsClosingJob extends Job implements InterruptableJob {
                 .timeout(Duration.ofSeconds(jobTimeoutConfig.getTraceThreadsClosingJobTimeout())) // Add timeout to prevent hanging
                 .subscribe(
                         __ -> {
-                            if (!interrupted.get()) {
-                                log.info("Successfully started closing trace threads process");
-                            } else {
-                                log.info(
-                                        "Closing trace threads process completed but was interrupted during execution");
-                            }
+                            // Note: Mono<Void> never emits onNext, success is handled in onComplete below
                         },
                         error -> {
                             if (interrupted.get()) {
                                 log.warn("Closing of trace threads was interrupted", error);
                             } else {
-                                log.error("Error processing closing of trace threads", error);
+                                applyBackoff();
+                                log.error("Error processing closing of trace threads (consecutive failures: '{}')",
+                                        consecutiveFailures.get(), error);
+                            }
+                        },
+                        () -> {
+                            if (!interrupted.get()) {
+                                completedFirstRun.set(true);
+                                consecutiveFailures.set(0);
+                                backoffUntilMillis.set(0);
+                                log.info("Successfully completed closing trace threads process");
+                            } else {
+                                log.info(
+                                        "Closing trace threads process completed but was interrupted during execution");
                             }
                         });
     }
@@ -101,19 +126,24 @@ public class TraceThreadsClosingJob extends Job implements InterruptableJob {
                     }
 
                     var now = Instant.now();
+                    var minLookback = completedFirstRun.get()
+                            ? null
+                            : traceThreadConfig.getColdStartLookback().toJavaDuration();
                     return enqueueInRedis(
                             traceThreadService
                                     .getProjectsWithPendingClosureThreads(
                                             now,
                                             defaultTimeoutToMarkThreadAsInactive,
+                                            minLookback,
                                             limit));
                 }),
                 Mono.fromCallable(() -> {
                     log.info("Could not acquire lock for trace threads closing job, skipping execution");
                     return null;
                 }),
-                traceThreadConfig.getCloseTraceThreadJobLockTime().toJavaDuration(), // Timeout to release the lock
-                traceThreadConfig.getCloseTraceThreadJobLockWaitTime().toJavaDuration()); // Timeout to acquiring the lock
+                traceThreadConfig.getCloseTraceThreadJobInterval().toJavaDuration(), // Lock TTL = interval, held until expiry to prevent other pods from running
+                traceThreadConfig.getCloseTraceThreadJobLockWaitTime().toJavaDuration(), // Timeout to acquiring the lock
+                true); // holdUntilExpiry — don't release lock on completion, let TTL expire naturally
     }
 
     private Mono<Void> enqueueInRedis(Flux<ProjectWithPendingClosureTraceThreads> flux) {
@@ -130,12 +160,8 @@ public class TraceThreadsClosingJob extends Job implements InterruptableJob {
                     return traceThreadService.addToPendingQueue(message.projectId())
                             .flatMap(pending -> {
                                 if (Boolean.TRUE.equals(pending)) {
-                                    var streamAddArgs = StreamAddArgs
-                                            .<Object, Object>entry(TraceThreadConfig.PAYLOAD_FIELD, message)
-                                            .trimNonStrict()
-                                            .maxLen(traceThreadConfig.getStreamMaxLen())
-                                            .limit(traceThreadConfig.getStreamTrimLimit());
-                                    return stream.add(streamAddArgs);
+                                    return stream.add(RedisStreamUtils.buildAddArgs(
+                                            TraceThreadConfig.PAYLOAD_FIELD, message, traceThreadConfig));
                                 } else {
                                     log.info("Project {} is already in the pending closure list, skipping enqueue",
                                             message.projectId());
@@ -152,6 +178,15 @@ public class TraceThreadsClosingJob extends Job implements InterruptableJob {
                     }
                 })
                 .then();
+    }
+
+    private void applyBackoff() {
+        int failures = consecutiveFailures.incrementAndGet();
+        int exponent = Math.min(failures, traceThreadConfig.getMaxBackoffExponent());
+        long intervalMs = traceThreadConfig.getCloseTraceThreadJobInterval().toJavaDuration().toMillis();
+        long backoffMs = intervalMs * (1L << exponent);
+        backoffUntilMillis.set(System.currentTimeMillis() + backoffMs);
+        log.warn("Applying exponential backoff: next execution in '{}' ms (failure #'{}')", backoffMs, failures);
     }
 
     private void errorLog(Throwable throwable) {

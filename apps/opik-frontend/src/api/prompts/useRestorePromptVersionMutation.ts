@@ -3,7 +3,7 @@ import { AxiosError } from "axios";
 import get from "lodash/get";
 
 import api, { PROMPTS_REST_ENDPOINT } from "@/api/api";
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@/ui/use-toast";
 
 type UseRestorePromptVersionMutationParams = {
   promptId: string;
@@ -46,6 +46,7 @@ const useRestorePromptVersionMutation = () => {
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["prompt-versions"] });
       queryClient.invalidateQueries({ queryKey: ["prompt"] });
+      queryClient.invalidateQueries({ queryKey: ["project-prompts"] });
       return queryClient.invalidateQueries({ queryKey: ["prompts"] });
     },
   });

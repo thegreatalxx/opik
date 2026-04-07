@@ -2,7 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import get from "lodash/get";
 import api, { DATASETS_REST_ENDPOINT } from "@/api/api";
 import { AxiosError } from "axios";
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@/ui/use-toast";
 
 type UseDatasetItemsFromCsvMutationParams = {
   datasetId: string;
@@ -55,6 +55,7 @@ const useDatasetItemsFromCsvMutation = () => {
       if (context) {
         queryClient.invalidateQueries({ queryKey: context.queryKey });
       }
+      queryClient.invalidateQueries({ queryKey: ["project-datasets"] });
       return queryClient.invalidateQueries({
         queryKey: ["datasets"],
       });

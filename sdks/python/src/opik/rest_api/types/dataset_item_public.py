@@ -9,12 +9,26 @@ from .dataset_item_public_source import DatasetItemPublicSource
 from .evaluator_item_public import EvaluatorItemPublic
 from .execution_policy_public import ExecutionPolicyPublic
 from .experiment_item_public import ExperimentItemPublic
+from .experiment_run_summary_public import ExperimentRunSummaryPublic
 from .json_node import JsonNode
 
 
 class DatasetItemPublic(UniversalBaseModel):
-    id: typing.Optional[str] = None
-    dataset_item_id: typing.Optional[str] = None
+    id: typing.Optional[str] = pydantic.Field(default=None)
+    """
+    Stable item identifier.
+    On write, used as the upsert key.
+    If omitted, a new ID is generated.
+    Remains the same across dataset versions
+    """
+
+    dataset_item_id: typing.Optional[str] = pydantic.Field(default=None)
+    """
+    Deprecated.
+    Always equals 'id'.
+    Retained for backward compatibility and will be removed in a future version
+    """
+
     trace_id: typing.Optional[str] = None
     span_id: typing.Optional[str] = None
     source: DatasetItemPublicSource
@@ -24,6 +38,7 @@ class DatasetItemPublic(UniversalBaseModel):
     evaluators: typing.Optional[typing.List[EvaluatorItemPublic]] = None
     execution_policy: typing.Optional[ExecutionPolicyPublic] = None
     experiment_items: typing.Optional[typing.List[ExperimentItemPublic]] = None
+    run_summaries_by_experiment: typing.Optional[typing.Dict[str, ExperimentRunSummaryPublic]] = None
     dataset_id: typing.Optional[str] = None
     created_at: typing.Optional[dt.datetime] = None
     last_updated_at: typing.Optional[dt.datetime] = None

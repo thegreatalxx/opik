@@ -3,13 +3,10 @@ package com.comet.opik.api.resources.utils.resources;
 import com.comet.opik.api.Dashboard;
 import com.comet.opik.api.Dashboard.DashboardPage;
 import com.comet.opik.api.DashboardScope;
-import com.comet.opik.api.DashboardType;
 import com.comet.opik.api.DashboardUpdate;
 import com.comet.opik.api.filter.DashboardFilter;
 import com.comet.opik.api.resources.utils.TestUtils;
 import com.comet.opik.api.sorting.SortingField;
-import com.comet.opik.utils.JsonUtils;
-import com.fasterxml.jackson.databind.JsonNode;
 import jakarta.ws.rs.client.Entity;
 import jakarta.ws.rs.core.HttpHeaders;
 import jakarta.ws.rs.core.Response;
@@ -94,12 +91,21 @@ public class DashboardResourceClient {
 
     public DashboardPage find(String apiKey, String workspaceName, int page, int size, String name,
             List<SortingField> sorting, List<DashboardFilter> filters, int expectedStatus) {
+        return find(apiKey, workspaceName, page, size, name, null, sorting, filters, expectedStatus);
+    }
+
+    public DashboardPage find(String apiKey, String workspaceName, int page, int size, String name,
+            UUID projectId, List<SortingField> sorting, List<DashboardFilter> filters, int expectedStatus) {
         var target = client.target(RESOURCE_PATH.formatted(baseURI))
                 .queryParam("page", page)
                 .queryParam("size", size);
 
         if (name != null) {
             target = target.queryParam("name", name);
+        }
+
+        if (projectId != null) {
+            target = target.queryParam("project_id", projectId);
         }
 
         if (CollectionUtils.isNotEmpty(sorting)) {
@@ -119,6 +125,33 @@ public class DashboardResourceClient {
                 return response.readEntity(DashboardPage.class);
             }
             return null;
+        }
+    }
+
+    public DashboardPage getProjectDashboards(UUID projectId, String apiKey, String workspaceName,
+            int page, int size, String name, List<SortingField> sorting, List<DashboardFilter> filters) {
+        var target = client.target("%s/v1/private/projects/%s/dashboards".formatted(baseURI, projectId))
+                .queryParam("page", page)
+                .queryParam("size", size);
+
+        if (name != null) {
+            target = target.queryParam("name", name);
+        }
+
+        if (CollectionUtils.isNotEmpty(sorting)) {
+            target = target.queryParam("sorting", TestUtils.toURLEncodedQueryParam(sorting));
+        }
+
+        if (CollectionUtils.isNotEmpty(filters)) {
+            target = target.queryParam("filters", TestUtils.toURLEncodedQueryParam(filters));
+        }
+
+        try (var response = target.request()
+                .header(HttpHeaders.AUTHORIZATION, apiKey)
+                .header(WORKSPACE_HEADER, workspaceName)
+                .get()) {
+            assertThat(response.getStatus()).isEqualTo(HttpStatus.SC_OK);
+            return response.readEntity(DashboardPage.class);
         }
     }
 
@@ -182,66 +215,6 @@ public class DashboardResourceClient {
     }
 
     public Dashboard.DashboardBuilder createPartialDashboard() {
-        return Dashboard.builder()
-                .name(UUID.randomUUID().toString())
-                .description("Test dashboard description")
-                .type(DashboardType.MULTI_PROJECT)
-                .scope(DashboardScope.WORKSPACE)
-                .config(createValidConfig());
-    }
-
-    public JsonNode createValidConfig() {
-        String configJson = """
-                {
-                    "version": 1,
-                    "layout": {
-                        "type": "grid",
-                        "columns": 24,
-                        "rowHeight": 10
-                    },
-                    "filters": {
-                        "dateRange": {
-                            "preset": "last_7_days"
-                        }
-                    },
-                    "widgets": [
-                        {
-                            "id": "widget-1",
-                            "type": "chart",
-                            "title": "Latency p95",
-                            "position": {"x": 0, "y": 0, "w": 6, "h": 8},
-                            "data": {
-                                "source": "traces",
-                                "aggregation": {"metric": "latency_ms", "op": "p95"}
-                            }
-                        }
-                    ]
-                }
-                """;
-        return JsonUtils.getJsonNodeFromString(configJson);
-    }
-
-    public JsonNode createInvalidConfigTooLarge() {
-        // Create a config that exceeds 256KB
-        StringBuilder largeConfig = new StringBuilder("{\"version\":1,\"data\":\"");
-        for (int i = 0; i < 300000; i++) {
-            largeConfig.append("x");
-        }
-        largeConfig.append("\"}");
-        return JsonUtils.getJsonNodeFromString(largeConfig.toString());
-    }
-
-    public JsonNode createInvalidConfigTooManyWidgets() {
-        StringBuilder config = new StringBuilder("{\"version\":1,\"widgets\":[");
-        for (int i = 0; i < 101; i++) {
-            if (i > 0) {
-                config.append(",");
-            }
-            config.append(String.format(
-                    "{\"id\":\"widget-%d\",\"type\":\"chart\",\"position\":{\"x\":0,\"y\":0,\"w\":1,\"h\":1}}",
-                    i));
-        }
-        config.append("]}");
-        return JsonUtils.getJsonNodeFromString(config.toString());
+        return DashboardTestDataFactory.createPartialDashboard(DashboardScope.WORKSPACE);
     }
 }

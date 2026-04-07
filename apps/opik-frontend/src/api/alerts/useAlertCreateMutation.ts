@@ -3,7 +3,7 @@ import get from "lodash/get";
 import api, { ALERTS_KEY, ALERTS_REST_ENDPOINT } from "@/api/api";
 import { Alert } from "@/types/alerts";
 import { AxiosError } from "axios";
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@/ui/use-toast";
 
 type UseAlertCreateMutationParams = {
   alert: Partial<Alert>;
@@ -34,6 +34,7 @@ const useAlertCreateMutation = () => {
       });
     },
     onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["project-alerts"] });
       return queryClient.invalidateQueries({
         queryKey: [ALERTS_KEY],
       });

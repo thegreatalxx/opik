@@ -6,6 +6,8 @@ export interface OptimizationPublic {
     id?: string;
     name?: string;
     datasetName: string;
+    /** Project ID. Takes precedence over project_name when both are provided. */
+    projectId?: string;
     objectiveName: string;
     status: OpikApi.OptimizationPublicStatus;
     metadata?: OpikApi.JsonListStringPublic;
@@ -13,8 +15,16 @@ export interface OptimizationPublic {
     datasetId?: string;
     numTrials?: number;
     feedbackScores?: OpikApi.FeedbackScoreAveragePublic[];
+    experimentScores?: OpikApi.FeedbackScoreAveragePublic[];
     createdAt?: Date;
     createdBy?: string;
     lastUpdatedAt?: Date;
     lastUpdatedBy?: string;
+    baselineObjectiveScore?: number;
+    bestObjectiveScore?: number;
+    baselineDuration?: number;
+    bestDuration?: number;
+    baselineCost?: number;
+    bestCost?: number;
+    totalOptimizationCost?: number;
 }

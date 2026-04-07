@@ -1,5 +1,6 @@
 package com.comet.opik.domain.experiments.aggregations;
 
+import com.comet.opik.api.AssertionScoreAverage;
 import com.comet.opik.api.DatasetItem.DatasetItemPage;
 import com.comet.opik.api.EvaluationMethod;
 import com.comet.opik.api.Experiment;
@@ -16,6 +17,7 @@ import com.comet.opik.api.PercentageValues;
 import com.comet.opik.api.ProjectStats;
 import com.comet.opik.api.VisibilityMode;
 import com.comet.opik.api.filter.ExperimentsComparisonFilter;
+import com.comet.opik.domain.CommentResultMapper;
 import com.comet.opik.domain.DatasetItemResultMapper;
 import com.comet.opik.domain.DatasetItemSearchCriteria;
 import com.comet.opik.domain.DatasetItemSearchCriteriaMapper;
@@ -66,12 +68,17 @@ import java.util.function.Function;
 import java.util.function.IntFunction;
 import java.util.stream.Collectors;
 
+import static com.comet.opik.domain.AsyncContextUtils.bindWorkspaceIdToFlux;
 import static com.comet.opik.domain.ExperimentGroupMappers.bindGroupCriteria;
+import static com.comet.opik.domain.experiments.aggregations.ExperimentAggregatesModel.AssertionScoreAggregations;
 import static com.comet.opik.domain.experiments.aggregations.ExperimentAggregatesModel.FeedbackScoreAggregations;
+import static com.comet.opik.domain.experiments.aggregations.ExperimentAggregatesModel.PassRateAggregation;
 import static com.comet.opik.domain.experiments.aggregations.ExperimentAggregatesModel.SpanAggregations;
 import static com.comet.opik.domain.experiments.aggregations.ExperimentAggregatesModel.TraceAggregations;
 import static com.comet.opik.domain.experiments.aggregations.ExperimentAggregatesUtils.BatchResult;
 import static com.comet.opik.domain.experiments.aggregations.ExperimentEntityData.ExperimentData;
+import static com.comet.opik.domain.experiments.aggregations.ExperimentSourceData.AssertionData;
+import static com.comet.opik.domain.experiments.aggregations.ExperimentSourceData.CommentsData;
 import static com.comet.opik.domain.experiments.aggregations.ExperimentSourceData.FeedbackScoreData;
 import static com.comet.opik.infrastructure.DatabaseUtils.getSTWithLogComment;
 import static com.comet.opik.utils.AsyncUtils.makeFluxContextAware;
@@ -81,7 +88,7 @@ import static com.comet.opik.utils.template.TemplateUtils.getQueryItemPlaceHolde
 @ImplementedBy(ExperimentAggregatesDAOImpl.class)
 public interface ExperimentAggregatesDAO {
 
-    Mono<Void> populateExperimentAggregate(@NonNull UUID experimentId);
+    Mono<Void> populateExperimentAggregate(UUID experimentId);
 
     Mono<BatchResult> populateExperimentItemAggregates(UUID experimentId, UUID cursor, int limit);
 
@@ -93,16 +100,15 @@ public interface ExperimentAggregatesDAO {
 
     Flux<ExperimentGroupAggregationItem> findGroupsAggregations(ExperimentGroupCriteria criteria);
 
-    Mono<Long> countDatasetItemsWithExperimentItemsFromAggregates(@NonNull DatasetItemSearchCriteria criteria,
-            @NonNull UUID versionId);
+    Mono<Long> countDatasetItemsWithExperimentItemsFromAggregates(DatasetItemSearchCriteria criteria, UUID versionId);
 
-    Mono<DatasetItemPage> getDatasetItemsWithExperimentItemsFromAggregates(
-            @NonNull DatasetItemSearchCriteria criteria,
-            @NonNull UUID versionId, int page, int size);
+    Mono<DatasetItemPage> getDatasetItemsWithExperimentItemsFromAggregates(DatasetItemSearchCriteria criteria,
+            UUID versionId, int page, int size);
 
-    Mono<ProjectStats> getExperimentItemsStatsFromAggregates(@NonNull UUID datasetId,
-            @NonNull UUID versionId, @NonNull Set<UUID> experimentIds,
+    Mono<ProjectStats> getExperimentItemsStatsFromAggregates(UUID datasetId, UUID versionId, Set<UUID> experimentIds,
             List<ExperimentsComparisonFilter> filters);
+
+    Mono<AggregatedExperimentCounts> getAggregationBranchCounts(AggregationBranchCountsCriteria criteria);
 }
 
 @Singleton
@@ -185,7 +191,12 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
                 feedback_scores_avg,
                 total_estimated_cost_sum,
                 total_estimated_cost_avg,
-                usage_avg
+                usage_avg,
+                pass_rate,
+                passed_count,
+                total_count,
+                comments_array_agg,
+                assertion_scores_avg
             FROM experiment_aggregates FINAL
             WHERE workspace_id = :workspace_id
             AND id = :experiment_id
@@ -420,6 +431,107 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
             ;
             """;
 
+    private static final String GET_PASS_RATE_AGGREGATION = """
+            WITH experiment_items_scope AS (
+                SELECT DISTINCT dataset_item_id, trace_id, execution_policy, id, experiment_id
+                FROM experiment_items FINAL
+                WHERE workspace_id = :workspace_id
+                AND experiment_id = :experiment_id
+            ), experiment_data AS (
+                SELECT execution_policy, id
+                FROM experiments FINAL
+                WHERE workspace_id = :workspace_id
+                AND id = :experiment_id
+                AND evaluation_method = 'evaluation_suite'
+            ), assertion_results_final AS (
+                SELECT
+                    entity_id,
+                    name,
+                    if(count() = 1, any(toFloat64(passed = 'passed')), avg(toFloat64(passed = 'passed'))) AS value
+                FROM (
+                    SELECT
+                        entity_id,
+                        name,
+                        passed,
+                        ROW_NUMBER() OVER (
+                            PARTITION BY workspace_id, project_id, entity_id, name, author
+                            ORDER BY last_updated_at DESC
+                        ) as rn
+                    FROM assertion_results
+                    WHERE entity_type = 'trace'
+                    AND workspace_id = :workspace_id
+                    AND project_id = :project_id
+                    AND entity_id IN (SELECT trace_id FROM experiment_items_scope)
+                )
+                WHERE rn = 1
+                GROUP BY entity_id, name
+            ), runs AS (
+                SELECT
+                    ei.dataset_item_id,
+                    ei.trace_id,
+                    JSONExtractUInt(ei.execution_policy, 'pass_threshold') AS item_pass_threshold,
+                    JSONExtractUInt(ed.execution_policy, 'pass_threshold') AS suite_pass_threshold,
+                    if(
+                        countIf(ar.name != '') = 0,
+                        1,
+                        if(minIf(ar.value, ar.name != '') >= 1.0, 1, 0)
+                    ) AS run_passed
+                FROM experiment_items_scope ei
+                INNER JOIN experiment_data ed ON ei.experiment_id = ed.id
+                LEFT JOIN assertion_results_final ar ON ar.entity_id = ei.trace_id
+                GROUP BY ei.dataset_item_id, ei.trace_id,
+                         item_pass_threshold, suite_pass_threshold
+            ), items AS (
+                SELECT
+                    dataset_item_id,
+                    if(sum(run_passed) >=
+                       if(item_pass_threshold > 0, item_pass_threshold,
+                          if(suite_pass_threshold > 0, suite_pass_threshold, 1)),
+                       1, 0) AS item_passed
+                FROM runs
+                GROUP BY dataset_item_id, item_pass_threshold, suite_pass_threshold
+            )
+            SELECT
+                :experiment_id as experiment_id,
+                toDecimal64(if(count(*) = 0, 0, sum(item_passed) / count(*)), 9) AS pass_rate,
+                sum(item_passed) AS passed_count,
+                count(*) AS total_count
+            FROM items
+            SETTINGS log_comment = '<log_comment>'
+            ;
+            """;
+
+    private static final String GET_ASSERTION_SCORE_AGGREGATIONS = """
+            WITH experiment_items AS (
+                SELECT DISTINCT trace_id
+                FROM experiment_items
+                WHERE workspace_id = :workspace_id
+                AND experiment_id = :experiment_id
+            ), assertion_avg AS (
+                SELECT
+                    name,
+                    toDecimal64(
+                        greatest(
+                            least(if(isFinite(avg(toFloat64(passed = 'passed'))), avg(toFloat64(passed = 'passed')), 0), 1.0),
+                            0.0
+                        ),
+                        9
+                    ) AS avg_value
+                FROM assertion_results FINAL
+                WHERE entity_type = 'trace'
+                AND workspace_id = :workspace_id
+                AND project_id = :project_id
+                AND entity_id IN (SELECT trace_id FROM experiment_items)
+                AND length(name) > 0
+                GROUP BY name
+            )
+            SELECT
+                :experiment_id as experiment_id,
+                (SELECT mapFromArrays(groupArray(name), groupArray(avg_value)) FROM assertion_avg) AS assertion_scores_avg
+            SETTINGS log_comment = '<log_comment>'
+            ;
+            """;
+
     /**
      * Insert experiment aggregate
      */
@@ -453,7 +565,12 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
                 total_estimated_cost_avg,
                 total_estimated_cost_percentiles,
                 usage_avg,
-                usage_total_tokens_percentiles
+                usage_total_tokens_percentiles,
+                pass_rate,
+                passed_count,
+                total_count,
+                comments_array_agg,
+                assertion_scores_avg
             )
             SETTINGS log_comment = '<log_comment>'
             VALUES (
@@ -484,7 +601,12 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
                 :total_estimated_cost_avg,
                 mapFromArrays(:total_estimated_cost_percentiles_keys, :total_estimated_cost_percentiles_values),
                 mapFromArrays(:usage_avg_keys, :usage_avg_values),
-                mapFromArrays(:usage_total_tokens_percentiles_keys, :usage_total_tokens_percentiles_values)
+                mapFromArrays(:usage_total_tokens_percentiles_keys, :usage_total_tokens_percentiles_values),
+                :pass_rate,
+                :passed_count,
+                :total_count,
+                :comments_array_agg,
+                mapFromArrays(:assertion_scores_avg_keys, :assertion_scores_avg_values)
             )
             ;
             """;
@@ -501,7 +623,8 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
                 created_at,
                 last_updated_at,
                 created_by,
-                last_updated_by
+                last_updated_by,
+                execution_policy
             FROM experiment_items FINAL
             WHERE workspace_id = :workspace_id
             AND experiment_id = :experiment_id
@@ -723,6 +846,147 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
             """;
 
     /**
+     * Get comments for experiment items with cursor
+     */
+    private static final String GET_COMMENTS_DATA = """
+            WITH experiment_items AS (
+                SELECT DISTINCT trace_id
+                FROM experiment_items FINAL
+                WHERE workspace_id = :workspace_id
+                AND experiment_id = :experiment_id
+                <if(cursor)>AND id > :cursor<endif>
+                ORDER BY id ASC
+                LIMIT :limit
+            )
+            SELECT
+                entity_id AS trace_id,
+                toJSONString(groupUniqArray(CAST(tuple(
+                    id,
+                    text,
+                    concat(replaceOne(toString(created_at), ' ', 'T'), 'Z'),
+                    concat(replaceOne(toString(last_updated_at), ' ', 'T'), 'Z'),
+                    created_by,
+                    last_updated_by,
+                    entity_id
+                ), 'Tuple(
+                    id FixedString(36),
+                    text String,
+                    created_at String,
+                    last_updated_at String,
+                    created_by String,
+                    last_updated_by String,
+                    entity_id FixedString(36)
+                )'))) AS comments_array_agg
+            FROM (
+                SELECT
+                    id,
+                    text,
+                    created_at,
+                    last_updated_at,
+                    created_by,
+                    last_updated_by,
+                    entity_id
+                FROM comments
+                WHERE workspace_id = :workspace_id
+                AND project_id = :project_id
+                AND entity_id IN (SELECT trace_id FROM experiment_items)
+                ORDER BY (workspace_id, project_id, entity_id, id) DESC, last_updated_at DESC
+                LIMIT 1 BY id
+            )
+            GROUP BY entity_id
+            SETTINGS log_comment = '<log_comment>'
+            ;
+            """;
+
+    /**
+     * Get assertions data per trace for experiment items (paginated)
+     */
+    private static final String GET_ASSERTIONS_DATA = """
+            WITH experiment_items AS (
+                SELECT DISTINCT trace_id
+                FROM experiment_items FINAL
+                WHERE workspace_id = :workspace_id
+                AND experiment_id = :experiment_id
+                <if(cursor)>AND id > :cursor<endif>
+                ORDER BY id ASC
+                LIMIT :limit
+            )
+            SELECT
+                entity_id AS trace_id,
+                toJSONString(
+                    groupArray(
+                        CAST(
+                            (name, toString(passed), reason),
+                            'Tuple(value String, passed String, reason String)'
+                        )
+                    )
+                ) AS assertions_array
+            FROM assertion_results FINAL
+            WHERE entity_type = 'trace'
+              AND workspace_id = :workspace_id
+              AND project_id = :project_id
+              AND entity_id IN (SELECT trace_id FROM experiment_items)
+            GROUP BY entity_id
+            SETTINGS log_comment = '<log_comment>'
+            ;
+            """;
+
+    /**
+     * Get comments aggregated at experiment level
+     */
+    private static final String GET_COMMENTS_AGGREGATION = """
+            WITH experiment_items AS (
+                SELECT DISTINCT trace_id
+                FROM experiment_items FINAL
+                WHERE workspace_id = :workspace_id
+                AND experiment_id = :experiment_id
+            )
+            SELECT
+                :experiment_id AS experiment_id,
+                toJSONString(groupUniqArrayArray(comments_array)) AS comments_array_agg
+            FROM (
+                SELECT
+                    entity_id,
+                    groupArray(CAST(tuple(
+                        id,
+                        text,
+                        concat(replaceOne(toString(created_at), ' ', 'T'), 'Z'),
+                        concat(replaceOne(toString(last_updated_at), ' ', 'T'), 'Z'),
+                        created_by,
+                        last_updated_by,
+                        entity_id
+                    ), 'Tuple(
+                        id FixedString(36),
+                        text String,
+                        created_at String,
+                        last_updated_at String,
+                        created_by String,
+                        last_updated_by String,
+                        entity_id FixedString(36)
+                    )')) AS comments_array
+                FROM (
+                    SELECT
+                        id,
+                        text,
+                        created_at,
+                        last_updated_at,
+                        created_by,
+                        last_updated_by,
+                        entity_id
+                    FROM comments
+                    WHERE workspace_id = :workspace_id
+                    AND project_id = :project_id
+                    AND entity_id IN (SELECT trace_id FROM experiment_items)
+                    ORDER BY (workspace_id, project_id, entity_id, id) DESC, last_updated_at DESC
+                    LIMIT 1 BY id
+                )
+                GROUP BY entity_id
+            )
+            SETTINGS log_comment = '<log_comment>'
+            ;
+            """;
+
+    /**
      * Insert experiment item aggregate
      */
     private static final String INSERT_EXPERIMENT_ITEM_AGGREGATE = """
@@ -744,11 +1008,14 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
                 usage,
                 feedback_scores,
                 feedback_scores_array,
+                comments_array_agg,
                 visibility_mode,
                 created_at,
                 last_updated_at,
                 created_by,
-                last_updated_by
+                last_updated_by,
+                execution_policy,
+                assertions_array
             )
             SETTINGS log_comment = '<log_comment>'
             FORMAT Values
@@ -770,11 +1037,14 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
                     if(:has_usage<item.index>, mapFromArrays(:usage_keys<item.index>, :usage_values<item.index>), CAST(map() AS Map(String, Int64)) ),
                     if(:has_feedback_scores<item.index>, mapFromArrays(:feedback_scores_keys<item.index>, CAST(:feedback_scores_values<item.index> AS Array(Decimal64(9)))), CAST(map() AS Map(String, Decimal64(9))) ),
                     :feedback_scores_array<item.index>,
+                    :comments_array_agg<item.index>,
                     :visibility_mode<item.index>,
                     parseDateTime64BestEffort(:created_at<item.index>, 9),
                     parseDateTime64BestEffort(:last_updated_at<item.index>, 9),
                     :created_by<item.index>,
-                    :last_updated_by<item.index>
+                    :last_updated_by<item.index>,
+                    :execution_policy<item.index>,
+                    :assertions_array<item.index>
                 )
                 <if(item.hasNext)>,<endif>
             }>
@@ -878,8 +1148,8 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
     private static final String SELECT_DATASET_ITEM_VERSIONS_WITH_EXPERIMENT_ITEMS_COUNT = """
             WITH dataset_item_versions_resolved AS (
                 SELECT
-                    div_dedup.id AS id,
-                    div_dedup.dataset_item_id AS dataset_item_id,
+                    div_dedup.dataset_item_id AS id,
+                    div_dedup.id AS row_id,
                     div_dedup.dataset_id AS dataset_id,
                     div_dedup.data AS data,
                     div_dedup.source AS source,
@@ -926,7 +1196,8 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
             SELECT COUNT(DISTINCT eia.dataset_item_id) as count
             FROM experiment_item_aggregates eia FINAL
             INNER JOIN experiment_aggregates ea FINAL ON ea.id = eia.experiment_id
-            LEFT JOIN dataset_item_versions_resolved AS di ON di.id = eia.dataset_item_id
+            LEFT JOIN dataset_item_versions_resolved AS di ON (di.id = eia.dataset_item_id OR di.row_id = eia.dataset_item_id)
+                AND di.dataset_version_id = COALESCE(nullIf(ea.dataset_version_id, ''), :version_id)
             WHERE eia.workspace_id = :workspace_id
             <if(experiment_ids)>AND eia.experiment_id IN :experiment_ids<endif>
             <if(has_target_projects)>AND eia.project_id IN :target_project_ids<endif>
@@ -950,8 +1221,8 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
     private static final String SELECT_DATASET_ITEM_VERSIONS_WITH_EXPERIMENT_ITEMS = """
             WITH dataset_item_versions_resolved AS (
                 SELECT
-                    div_dedup.id AS id,
-                    div_dedup.dataset_item_id AS dataset_item_id,
+                    div_dedup.dataset_item_id AS id,
+                    div_dedup.id AS row_id,
                     div_dedup.dataset_id AS dataset_id,
                     div_dedup.data AS data,
                     div_dedup.source AS source,
@@ -996,46 +1267,13 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
                     ORDER BY (div.workspace_id, div.dataset_id, div.dataset_version_id, div.id) DESC, div.last_updated_at DESC
                     LIMIT 1 BY div.id
                 ) AS div_dedup
-            ), comments_dedup AS (
-                SELECT
-                    id,
-                    text,
-                    created_at,
-                    last_updated_at,
-                    created_by,
-                    last_updated_by,
-                    entity_id
-                FROM comments
-                WHERE workspace_id = :workspace_id
-                AND entity_id IN (
-                    SELECT DISTINCT eia.trace_id
-                    FROM experiment_item_aggregates eia FINAL
-                    INNER JOIN experiment_aggregates ea FINAL ON ea.id = eia.experiment_id
-                    WHERE eia.workspace_id = :workspace_id
-                    AND ea.dataset_id = :dataset_id
-                    <if(experiment_ids)>AND eia.experiment_id IN :experiment_ids<endif>
-                )
-                ORDER BY (workspace_id, project_id, entity_id, id) DESC, last_updated_at DESC
-                LIMIT 1 BY id
-            ), comments_agg AS (
-                SELECT
-                    entity_id AS trace_id,
-                    groupUniqArray(tuple(
-                        id,
-                        text,
-                        created_at,
-                        last_updated_at,
-                        created_by,
-                        last_updated_by
-                    )) AS comments_array
-                FROM comments_dedup
-                GROUP BY entity_id
             )
             SELECT
                 di.id AS id,
-                di.dataset_item_id AS dataset_item_id,
+                di.id AS dataset_item_id,
                 di.dataset_id AS dataset_id,
                 di.data AS data,
+                di.description AS description,
                 di.source AS source,
                 di.trace_id AS trace_id,
                 di.span_id AS span_id,
@@ -1049,20 +1287,21 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
                 groupArray((eia.id, eia.experiment_id, eia.dataset_item_id, eia.trace_id,
                            <if(truncate)> eia.input_slim <else> eia.input <endif>,
                            <if(truncate)> eia.output_slim <else> eia.output <endif>,
-                           JSONExtract(eia.feedback_scores_array, 'Array(Tuple(entity_id String, name String, category_name String, value Decimal64(9), reason String, source String, created_at String, last_updated_at String, created_by String, last_updated_by String, value_by_author Map(String, Tuple(value Decimal64(9), reason String, category_name String, source String, last_updated_at String))))'),
+                           eia.feedback_scores_array,
                            eia.created_at, eia.last_updated_at, eia.created_by, eia.last_updated_by,
-                           ca.comments_array,
+                           eia.comments_array_agg,
                            toFloat64(eia.duration),
                            eia.total_estimated_cost,
                            eia.usage,
                            eia.visibility_mode,
                            eia.metadata,
-                           di.description
+                           di.description,
+                           eia.execution_policy
                 )) AS experiment_items_array
             FROM experiment_item_aggregates eia FINAL
             INNER JOIN experiment_aggregates ea FINAL ON ea.id = eia.experiment_id
-            LEFT JOIN dataset_item_versions_resolved AS di ON di.id = eia.dataset_item_id
-            LEFT JOIN comments_agg AS ca ON eia.trace_id = ca.trace_id
+            LEFT JOIN dataset_item_versions_resolved AS di ON (di.id = eia.dataset_item_id OR di.row_id = eia.dataset_item_id)
+                AND di.dataset_version_id = COALESCE(nullIf(ea.dataset_version_id, ''), :version_id)
             WHERE eia.workspace_id = :workspace_id
             <if(experiment_ids)>AND eia.experiment_id IN :experiment_ids<endif>
             <if(has_target_projects)>AND eia.project_id IN :target_project_ids<endif>
@@ -1079,7 +1318,7 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
                 OR multiSearchAnyCaseInsensitive(toString(COALESCE(di.data, map())), :searchTerms)
             )
             <endif>
-            GROUP BY di.id, di.dataset_item_id, di.dataset_id, di.data, di.source, di.trace_id, di.span_id, di.tags,
+            GROUP BY di.id, di.dataset_id, di.data, di.description, di.source, di.trace_id, di.span_id, di.tags,
                      di.evaluators, di.execution_policy, di.item_created_at, di.item_last_updated_at,
                      di.item_created_by, di.item_last_updated_by
             ORDER BY di.id DESC
@@ -1091,7 +1330,7 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
 
     private static final String SELECT_EXPERIMENT_ITEMS_STATS_FROM_AGGREGATES = """
             WITH valid_dataset_items AS (
-                SELECT id
+                SELECT id, dataset_item_id
                 FROM dataset_item_versions FINAL
                 WHERE workspace_id = :workspace_id
                 AND dataset_id = :dataset_id
@@ -1109,7 +1348,7 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
                 FROM experiment_item_aggregates FINAL
                 WHERE workspace_id = :workspace_id
                 AND experiment_id IN :experiment_ids
-                AND dataset_item_id IN (SELECT id FROM valid_dataset_items)
+                AND dataset_item_id IN (SELECT arrayJoin([id, dataset_item_id]) FROM valid_dataset_items)
                 <if(experiment_item_filters)>
                 AND (<experiment_item_filters>)
                 <endif>
@@ -1134,7 +1373,7 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
                 FROM experiment_item_aggregates FINAL
                 WHERE workspace_id = :workspace_id
                 AND experiment_id IN :experiment_ids
-                AND dataset_item_id IN (SELECT id FROM valid_dataset_items)
+                AND dataset_item_id IN (SELECT arrayJoin([id, dataset_item_id]) FROM valid_dataset_items)
                 <if(experiment_item_filters)>
                 AND (<experiment_item_filters>)
                 <endif>
@@ -1191,7 +1430,7 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
             FROM experiment_item_aggregates FINAL
             WHERE workspace_id = :workspace_id
             AND experiment_id IN :experiment_ids
-            AND dataset_item_id IN (SELECT id FROM valid_dataset_items)
+            AND dataset_item_id IN (SELECT arrayJoin([id, dataset_item_id]) FROM valid_dataset_items)
             <if(experiment_item_filters)>
             AND (<experiment_item_filters>)
             <endif>
@@ -1209,6 +1448,36 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
             ;
             """;
 
+    private static final String SELECT_EXPERIMENT_AGGREGATION_COUNTS = """
+            SELECT
+                count() AS total,
+                countIf(has_aggregated) AS aggregated,
+                countIf(NOT has_aggregated) AS not_aggregated
+            FROM (
+                SELECT
+                    e.id,
+                    notEmpty(agg.id) AS has_aggregated
+                FROM experiments e FINAL
+                LEFT JOIN (
+                    SELECT DISTINCT
+                        toString(id) AS id
+                    FROM experiment_aggregates
+                    WHERE workspace_id = :workspace_id
+                    <if(experiment_ids)> AND id IN :experiment_ids <endif>
+                    <if(dataset_id)> AND dataset_id = :dataset_id <endif>
+                    <if(id)> AND id = :id <endif>
+                    <if(ids_list)> AND id IN :ids_list <endif>
+                ) agg ON e.id = agg.id
+                WHERE e.workspace_id = :workspace_id
+                <if(experiment_ids)> AND e.id IN :experiment_ids <endif>
+                <if(dataset_id)> AND e.dataset_id = :dataset_id <endif>
+                <if(id)> AND e.id = :id <endif>
+                <if(ids_list)> AND e.id IN :ids_list <endif>
+            )
+            SETTINGS log_comment = '<log_comment>'
+            ;
+            """;
+
     @Override
     public Mono<Void> populateExperimentAggregate(UUID experimentId) {
 
@@ -1218,49 +1487,64 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
                     return getExperimentItemsCount(experimentId)
                             .flatMap(itemsCount -> {
                                 if (itemsCount == 0) {
-                                    // Handle experiments with zero items - insert empty aggregate row
                                     return insertExperimentAggregate(
                                             experimentData,
                                             createEmptyTraceAggregations(experimentId),
                                             createEmptySpanAggregations(experimentId),
                                             createEmptyFeedbackScoreAggregations(experimentId),
-                                            0L);
+                                            createEmptyPassRateAggregation(experimentId),
+                                            "[]",
+                                            0L,
+                                            createEmptyAssertionScoreAggregations(experimentId));
                                 }
 
-                                // Get project_id for experiments with items; wrap in Optional so that
-                                // the Mono always emits and we can branch on presence in flatMap
-                                // (avoids switchIfEmpty on Mono<Void>, which always fires)
                                 return getProjectId(experimentId)
                                         .map(Optional::of)
                                         .defaultIfEmpty(Optional.empty())
                                         .flatMap(projectIdOpt -> {
                                             if (projectIdOpt.isEmpty()) {
-                                                // Fallback: items exist but all referenced traces were deleted
                                                 return insertExperimentAggregate(
                                                         experimentData,
                                                         createEmptyTraceAggregations(experimentId),
                                                         createEmptySpanAggregations(experimentId),
                                                         createEmptyFeedbackScoreAggregations(experimentId),
-                                                        itemsCount);
+                                                        createEmptyPassRateAggregation(experimentId),
+                                                        EMPTY_ARRAY_STR,
+                                                        itemsCount,
+                                                        createEmptyAssertionScoreAggregations(experimentId));
                                             }
 
-                                            // Fetch aggregations using project_id for filtering
                                             var projectId = projectIdOpt.get();
                                             return Mono.zip(
                                                     getTraceAggregations(experimentId, projectId),
                                                     getSpanAggregations(experimentId, projectId),
-                                                    getFeedbackScoreAggregations(experimentId, projectId))
+                                                    getFeedbackScoreAggregations(experimentId, projectId),
+                                                    getPassRateAggregation(experimentId, projectId)
+                                                            .defaultIfEmpty(
+                                                                    createEmptyPassRateAggregation(experimentId)),
+                                                    getCommentsAggregation(experimentId, projectId)
+                                                            .defaultIfEmpty(EMPTY_ARRAY_STR),
+                                                    getAssertionScoreAggregations(experimentId, projectId)
+                                                            .defaultIfEmpty(
+                                                                    createEmptyAssertionScoreAggregations(
+                                                                            experimentId)))
                                                     .flatMap(tuple -> {
                                                         var traceAgg = tuple.getT1();
                                                         var spanAgg = tuple.getT2();
                                                         var feedbackAgg = tuple.getT3();
+                                                        var passRateAgg = tuple.getT4();
+                                                        var commentsAgg = tuple.getT5();
+                                                        var assertionAgg = tuple.getT6();
 
                                                         return insertExperimentAggregate(
                                                                 experimentData,
                                                                 traceAgg,
                                                                 spanAgg,
                                                                 feedbackAgg,
-                                                                itemsCount);
+                                                                passRateAgg,
+                                                                commentsAgg,
+                                                                itemsCount,
+                                                                assertionAgg);
                                                     });
                                         });
                             });
@@ -1291,18 +1575,26 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
                                         getSpansData(workspaceId, experimentId, projectId, cursorId, limit)
                                                 .collectList(),
                                         getFeedbackScoresData(workspaceId, experimentId, projectId, cursorId, limit)
+                                                .collectList(),
+                                        getCommentsData(workspaceId, experimentId, projectId, cursorId, limit)
+                                                .collectList(),
+                                        getAssertionsData(workspaceId, experimentId, projectId, cursorId, limit)
                                                 .collectList())
                                         .flatMap(tuple -> {
                                             var tracesData = tuple.getT1();
                                             var spansData = tuple.getT2();
                                             var feedbackData = tuple.getT3();
+                                            var commentsData = tuple.getT4();
+                                            var assertionsData = tuple.getT5();
 
                                             return insertExperimentItemAggregates(
                                                     projectId,
                                                     items,
                                                     tracesData,
                                                     spansData,
-                                                    feedbackData).map(count -> new BatchResult(count, lastCursor));
+                                                    feedbackData,
+                                                    commentsData,
+                                                    assertionsData).map(count -> new BatchResult(count, lastCursor));
                                         }));
                     });
         });
@@ -1311,7 +1603,7 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
     private Mono<ExperimentData> getExperimentData(UUID experimentId) {
         return asyncTemplate.nonTransaction(connection -> makeFluxContextAware((userName, workspaceId) -> {
             var template = getSTWithLogComment(GET_EXPERIMENT_DATA,
-                    "getExperimentData", workspaceId, experimentId.toString());
+                    "getExperimentData", workspaceId, userName, experimentId.toString());
 
             var statement = connection.createStatement(template.render())
                     .bind("workspace_id", workspaceId)
@@ -1325,7 +1617,7 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
     private Mono<UUID> getProjectId(UUID experimentId) {
         return asyncTemplate.nonTransaction(connection -> makeFluxContextAware((userName, workspaceId) -> {
             var template = getSTWithLogComment(GET_PROJECT_ID,
-                    "getProjectId", workspaceId, experimentId.toString());
+                    "getProjectId", workspaceId, userName, experimentId.toString());
 
             var statement = connection.createStatement(template.render())
                     .bind("workspace_id", workspaceId)
@@ -1355,6 +1647,12 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
                 this::mapFeedbackScoreAggregations);
     }
 
+    private Mono<PassRateAggregation> getPassRateAggregation(UUID experimentId, UUID projectId) {
+        return queryExperimentAggregation(
+                GET_PASS_RATE_AGGREGATION, "getPassRateAggregation", experimentId, projectId,
+                this::mapPassRateAggregation);
+    }
+
     /**
      * Executes a single-row aggregation query scoped to a workspace, experiment, and project.
      * Handles the repeated context-aware execution, parameter binding, and singleOrEmpty pattern
@@ -1367,7 +1665,7 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
             UUID projectId,
             Function<Row, T> rowMapper) {
         return asyncTemplate.nonTransaction(connection -> makeFluxContextAware((userName, workspaceId) -> {
-            var template = getSTWithLogComment(query, logName, workspaceId, experimentId.toString());
+            var template = getSTWithLogComment(query, logName, workspaceId, userName, experimentId.toString());
 
             var statement = connection.createStatement(template.render())
                     .bind("workspace_id", workspaceId)
@@ -1382,7 +1680,7 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
     private Mono<Long> getExperimentItemsCount(UUID experimentId) {
         return asyncTemplate.nonTransaction(connection -> makeFluxContextAware((userName, workspaceId) -> {
             var template = getSTWithLogComment(GET_EXPERIMENT_ITEMS_COUNT,
-                    "getExperimentItemsCount", workspaceId, experimentId.toString());
+                    "getExperimentItemsCount", workspaceId, userName, experimentId.toString());
 
             var statement = connection.createStatement(template.render())
                     .bind("workspace_id", workspaceId)
@@ -1399,11 +1697,14 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
             TraceAggregations traceAgg,
             SpanAggregations spanAgg,
             FeedbackScoreAggregations feedbackAgg,
-            long itemsCount) {
+            PassRateAggregation passRateAgg,
+            String commentsArrayAgg,
+            long itemsCount,
+            AssertionScoreAggregations assertionAgg) {
 
         return asyncTemplate.nonTransaction(connection -> {
             var template = getSTWithLogComment(INSERT_EXPERIMENT_AGGREGATE,
-                    "insertExperimentAggregate", experimentData.workspaceId(), experimentData.id().toString());
+                    "insertExperimentAggregate", experimentData.workspaceId(), "", experimentData.id().toString());
 
             // Convert Maps to key/value arrays for ClickHouse mapFromArrays
             var experimentScoresArrays = mapToArrays(
@@ -1471,7 +1772,19 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
                     .bind("usage_total_tokens_percentiles_keys", usageTotalTokensPercentilesArrays.keys())
                     .bind("usage_total_tokens_percentiles_values", usageTotalTokensPercentilesArrays.values())
                     .bind("feedback_scores_avg_keys", feedbackScoresAvgArrays.keys())
-                    .bind("feedback_scores_avg_values", feedbackScoresAvgArrays.values());
+                    .bind("feedback_scores_avg_values", feedbackScoresAvgArrays.values())
+                    .bind("pass_rate", passRateAgg.passRate())
+                    .bind("passed_count", passRateAgg.passedCount())
+                    .bind("total_count", passRateAgg.totalCount())
+                    .bind("comments_array_agg",
+                            StringUtils.isNotBlank(commentsArrayAgg) ? commentsArrayAgg : EMPTY_ARRAY_STR);
+
+            var assertionScoresAvgArrays = mapToArrays(
+                    ObjectUtils.getIfNull(assertionAgg.assertionScoresAvg(), Map.of()),
+                    String[]::new, Double[]::new,
+                    Double::doubleValue);
+            statement.bind("assertion_scores_avg_keys", assertionScoresAvgArrays.keys())
+                    .bind("assertion_scores_avg_values", assertionScoresAvgArrays.values());
 
             return makeMonoContextAware((userName, workspaceId) -> Mono.from(statement.execute()).then());
         });
@@ -1481,7 +1794,7 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
             UUID cursor, int limit) {
         return asyncTemplate.stream(connection -> makeFluxContextAware((userName, workspaceId) -> {
             var template = getSTWithLogComment(GET_EXPERIMENT_ITEMS,
-                    "getExperimentItems", workspaceId, experimentId.toString())
+                    "getExperimentItems", workspaceId, userName, experimentId.toString())
                     .add("cursor", cursor != null);
 
             var statement = connection.createStatement(template.render())
@@ -1524,7 +1837,7 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
             Function<Row, T> rowMapper) {
 
         return asyncTemplate.stream(connection -> {
-            var template = getSTWithLogComment(sqlTemplate, methodName, workspaceId, experimentId.toString())
+            var template = getSTWithLogComment(sqlTemplate, methodName, workspaceId, "", experimentId.toString())
                     .add("cursor", cursor != null);
 
             var statement = connection.createStatement(template.render())
@@ -1581,11 +1894,73 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
                 this::mapFeedbackScoreData);
     }
 
+    private Flux<CommentsData> getCommentsData(String workspaceId, UUID experimentId, UUID projectId,
+            UUID cursor, int limit) {
+        return streamWithExperimentPagination(
+                GET_COMMENTS_DATA,
+                "getCommentsData",
+                workspaceId,
+                experimentId,
+                projectId,
+                cursor,
+                limit,
+                this::mapCommentsData);
+    }
+
+    private Flux<AssertionData> getAssertionsData(String workspaceId, UUID experimentId, UUID projectId,
+            UUID cursor, int limit) {
+        return streamWithExperimentPagination(
+                GET_ASSERTIONS_DATA,
+                "getAssertionsData",
+                workspaceId,
+                experimentId,
+                projectId,
+                cursor,
+                limit,
+                this::mapAssertionData);
+    }
+
+    private Mono<String> getCommentsAggregation(UUID experimentId, UUID projectId) {
+        return queryExperimentAggregation(
+                GET_COMMENTS_AGGREGATION, "getCommentsAggregation", experimentId, projectId,
+                row -> {
+                    var value = row.get("comments_array_agg", String.class);
+                    return StringUtils.isNotBlank(value) ? value : EMPTY_ARRAY_STR;
+                });
+    }
+
+    private Mono<AssertionScoreAggregations> getAssertionScoreAggregations(UUID experimentId, UUID projectId) {
+        return queryExperimentAggregation(
+                GET_ASSERTION_SCORE_AGGREGATIONS, "getAssertionScoreAggregations", experimentId, projectId,
+                this::mapAssertionScoreAggregations);
+    }
+
+    private AssertionScoreAggregations mapAssertionScoreAggregations(Row row) {
+        Map<String, Object> raw = row.get("assertion_scores_avg", Map.class);
+        Map<String, Double> scoresAvg = Optional.ofNullable(raw)
+                .map(m -> m.entrySet().stream()
+                        .collect(Collectors.toMap(Map.Entry::getKey, e -> ((Number) e.getValue()).doubleValue())))
+                .orElse(null);
+        return AssertionScoreAggregations.builder()
+                .experimentId(getUUID(row, "experiment_id"))
+                .assertionScoresAvg(scoresAvg)
+                .build();
+    }
+
+    private AssertionScoreAggregations createEmptyAssertionScoreAggregations(UUID experimentId) {
+        return AssertionScoreAggregations.builder()
+                .experimentId(experimentId)
+                .assertionScoresAvg(Map.of())
+                .build();
+    }
+
     private void bindItemsParameters(Statement statement,
             List<ExperimentItemData> items,
             Map<UUID, TraceData> tracesMap,
             Map<UUID, SpanData> spansMap,
-            Map<UUID, FeedbackScoreData> feedbackMap) {
+            Map<UUID, FeedbackScoreData> feedbackMap,
+            Map<UUID, CommentsData> commentsMap,
+            Map<UUID, AssertionData> assertionsMap) {
 
         for (int i = 0; i < items.size(); i++) {
             var item = items.get(i);
@@ -1619,6 +1994,10 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
                     .bind("total_estimated_cost" + i,
                             Optional.ofNullable(span).map(SpanData::totalEstimatedCost).orElse(BigDecimal.ZERO))
                     .bind("feedback_scores_array" + i, feedbackScoresArray)
+                    .bind("comments_array_agg" + i,
+                            Optional.ofNullable(commentsMap.get(item.traceId()))
+                                    .map(CommentsData::commentsArrayAgg)
+                                    .orElse(EMPTY_ARRAY_STR))
                     .bind("visibility_mode" + i,
                             Optional.ofNullable(trace)
                                     .map(TraceData::visibilityMode)
@@ -1627,7 +2006,15 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
                     .bind("created_at" + i, item.createdAt().toString())
                     .bind("last_updated_at" + i, item.lastUpdatedAt().toString())
                     .bind("created_by" + i, item.createdBy())
-                    .bind("last_updated_by" + i, item.lastUpdatedBy());
+                    .bind("last_updated_by" + i, item.lastUpdatedBy())
+                    .bind("execution_policy" + i,
+                            Optional.ofNullable(item.executionPolicy())
+                                    .filter(StringUtils::isNotBlank)
+                                    .orElse(""))
+                    .bind("assertions_array" + i,
+                            Optional.ofNullable(assertionsMap.get(item.traceId()))
+                                    .map(AssertionData::assertionsArray)
+                                    .orElse(EMPTY_ARRAY_STR));
 
             // Bind array parameters only if maps are not empty
             var usageArrays = mapToArrays(usageMap, String[]::new, Long[]::new, Long::longValue);
@@ -1647,15 +2034,21 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
             List<ExperimentItemData> items,
             List<TraceData> tracesData,
             List<SpanData> spansData,
-            List<FeedbackScoreData> feedbackData) {
+            List<FeedbackScoreData> feedbackData,
+            List<CommentsData> commentsData,
+            List<AssertionData> assertionsData) {
 
         // Create lookup maps
         Map<UUID, TraceData> tracesMap = tracesData.stream()
-                .collect(Collectors.toMap(TraceData::traceId, t -> t));
+                .collect(Collectors.toMap(TraceData::traceId, Function.identity()));
         Map<UUID, SpanData> spansMap = spansData.stream()
-                .collect(Collectors.toMap(SpanData::traceId, s -> s));
+                .collect(Collectors.toMap(SpanData::traceId, Function.identity()));
         Map<UUID, FeedbackScoreData> feedbackMap = feedbackData.stream()
-                .collect(Collectors.toMap(FeedbackScoreData::traceId, f -> f));
+                .collect(Collectors.toMap(FeedbackScoreData::traceId, Function.identity()));
+        Map<UUID, CommentsData> commentsMap = commentsData.stream()
+                .collect(Collectors.toMap(CommentsData::traceId, Function.identity()));
+        Map<UUID, AssertionData> assertionsMap = assertionsData.stream()
+                .collect(Collectors.toMap(AssertionData::traceId, Function.identity()));
 
         return asyncTemplate.nonTransaction(connection -> {
             return makeMonoContextAware((userName, workspaceId) -> {
@@ -1663,7 +2056,7 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
                 List<TemplateUtils.QueryItem> queryItems = getQueryItemPlaceHolder(items.size());
 
                 var template = getSTWithLogComment(INSERT_EXPERIMENT_ITEM_AGGREGATE,
-                        "insertExperimentItemAggregate", workspaceId, items.size())
+                        "insertExperimentItemAggregate", workspaceId, userName, items.size())
                         .add("items", queryItems);
 
                 var statement = connection.createStatement(template.render())
@@ -1671,7 +2064,7 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
                         .bind("project_id", projectId);
 
                 // Bind item parameters in batch
-                bindItemsParameters(statement, items, tracesMap, spansMap, feedbackMap);
+                bindItemsParameters(statement, items, tracesMap, spansMap, feedbackMap, commentsMap, assertionsMap);
 
                 return Mono.from(statement.execute())
                         .flatMapMany(Result::getRowsUpdated)
@@ -1766,6 +2159,15 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
                 .build();
     }
 
+    private PassRateAggregation mapPassRateAggregation(Row row) {
+        return PassRateAggregation.builder()
+                .experimentId(getUUID(row, "experiment_id"))
+                .passRate(row.get("pass_rate", BigDecimal.class))
+                .passedCount(row.get("passed_count", Long.class))
+                .totalCount(row.get("total_count", Long.class))
+                .build();
+    }
+
     private ExperimentItemData mapExperimentItemData(Row row) {
         return ExperimentItemData.builder()
                 .id(getUUID(row, "id"))
@@ -1776,6 +2178,7 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
                 .lastUpdatedAt(row.get("last_updated_at", Instant.class))
                 .createdBy(row.get("created_by", String.class))
                 .lastUpdatedBy(row.get("last_updated_by", String.class))
+                .executionPolicy(row.get("execution_policy", String.class))
                 .build();
     }
 
@@ -1794,7 +2197,7 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
             return asyncTemplate.nonTransaction(connection -> {
 
                 var template = getSTWithLogComment(SELECT_EXPERIMENT_BY_ID,
-                        "getExperimentFromAggregates", workspaceId, experimentId.toString());
+                        "getExperimentFromAggregates", workspaceId, "", experimentId.toString());
 
                 var statement = connection.createStatement(template.render())
                         .bind("workspace_id", workspaceId)
@@ -1903,6 +2306,20 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
         // usage_avg is Map(String, Float64), read as Map<String, Double>
         Map<String, Double> usageAvg = row.get("usage_avg", Map.class);
 
+        // pass_rate fields are non-nullable in experiment_aggregates (DEFAULT 0)
+        // Convert 0 defaults to null for non-evaluation-suite experiments
+        Long totalCount = row.get("total_count", Long.class);
+        boolean hasPassRate = totalCount != null && totalCount > 0;
+
+        Map<String, Object> assertionScoresAvgRaw = row.get("assertion_scores_avg", Map.class);
+        List<AssertionScoreAverage> assertionScores = Optional.ofNullable(assertionScoresAvgRaw)
+                .filter(raw -> !raw.isEmpty())
+                .map(raw -> raw.entrySet().stream()
+                        .map(e -> new AssertionScoreAverage(e.getKey(),
+                                BigDecimal.valueOf(((Number) e.getValue()).doubleValue())))
+                        .toList())
+                .orElse(null);
+
         // Build Experiment with all fields from experiment_aggregates table
         return new Experiment(
                 id,
@@ -1917,8 +2334,9 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
                 evaluationMethod,
                 optimizationId,
                 feedbackScores,
-                null, // comments - not in DB
+                CommentResultMapper.parseCommentsFromJson(row.get("comments_array_agg", String.class)),
                 traceCount,
+                null, // datasetItemCount - not in aggregates table
                 createdAt,
                 duration,
                 totalEstimatedCost, // total_estimated_cost_sum
@@ -1933,9 +2351,10 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
                 promptVersions,
                 datasetVersionId,
                 null, // datasetVersionSummary - not in DB
-                null, // passRate - not in aggregates
-                null, // passedCount - not in aggregates
-                null); // totalCount - not in aggregates
+                hasPassRate ? row.get("pass_rate", BigDecimal.class) : null,
+                hasPassRate ? row.get("passed_count", Long.class) : null,
+                hasPassRate ? totalCount : null,
+                assertionScores);
     }
 
     /**
@@ -1953,12 +2372,8 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
         return StringUtils.isNotBlank(value) ? UUID.fromString(value) : null;
     }
 
-    /**
-     * Helper to convert Double to BigDecimal.
-     */
     private BigDecimal getBigDecimal(Row row, String columnName) {
-        Double value = row.get(columnName, Double.class);
-        return value != null ? BigDecimal.valueOf(value) : null;
+        return row.get(columnName, BigDecimal.class);
     }
 
     /**
@@ -2026,6 +2441,22 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
                 .build();
     }
 
+    private CommentsData mapCommentsData(Row row) {
+        var commentsArrayAgg = row.get("comments_array_agg", String.class);
+        return CommentsData.builder()
+                .traceId(getUUID(row, "trace_id"))
+                .commentsArrayAgg(StringUtils.isNotBlank(commentsArrayAgg) ? commentsArrayAgg : EMPTY_ARRAY_STR)
+                .build();
+    }
+
+    private AssertionData mapAssertionData(Row row) {
+        var assertionsArray = row.get("assertions_array", String.class);
+        return AssertionData.builder()
+                .traceId(getUUID(row, "trace_id"))
+                .assertionsArray(StringUtils.isNotBlank(assertionsArray) ? assertionsArray : EMPTY_ARRAY_STR)
+                .build();
+    }
+
     @Override
     public Mono<Long> countTotal(ExperimentSearchCriteria experimentSearchCriteria) {
         return asyncTemplate.nonTransaction(connection -> countTotalFromAggregates(experimentSearchCriteria, connection)
@@ -2049,7 +2480,7 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
 
     private ST buildCountTemplate(ExperimentSearchCriteria criteria, String workspaceId) {
         var template = getSTWithLogComment(FIND_COUNT_FROM_AGGREGATES, "count_experiments_from_aggregates",
-                workspaceId, "");
+                workspaceId, "", "");
         Optional.ofNullable(criteria.datasetId())
                 .ifPresent(datasetId -> template.add("dataset_id", datasetId));
         Optional.ofNullable(criteria.name())
@@ -2143,6 +2574,15 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
                 .build();
     }
 
+    private PassRateAggregation createEmptyPassRateAggregation(UUID experimentId) {
+        return PassRateAggregation.builder()
+                .experimentId(experimentId)
+                .passRate(BigDecimal.ZERO)
+                .passedCount(0L)
+                .totalCount(0L)
+                .build();
+    }
+
     @Override
     public Flux<ExperimentGroupItem> findGroups(ExperimentGroupCriteria criteria) {
         return streamGroupQuery(FIND_GROUPS_FROM_AGGREGATES, criteria,
@@ -2185,6 +2625,7 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
                     SELECT_DATASET_ITEM_VERSIONS_WITH_EXPERIMENT_ITEMS_COUNT,
                     "count_dataset_items_from_aggregates",
                     workspaceId,
+                    userName,
                     criteria.datasetId().toString());
 
             applyDatasetItemFiltersToTemplate(template, criteria);
@@ -2216,6 +2657,7 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
                     SELECT_DATASET_ITEM_VERSIONS_WITH_EXPERIMENT_ITEMS,
                     "get_dataset_items_from_aggregates",
                     workspaceId,
+                    userName,
                     criteria.datasetId().toString());
 
             applyDatasetItemFiltersToTemplate(template, criteria);
@@ -2265,7 +2707,7 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
     }
 
     private ST newGroupTemplate(String query, ExperimentGroupCriteria criteria, String workspaceId) {
-        var template = getSTWithLogComment(query, "find_groups_from_aggregates", workspaceId, "");
+        var template = getSTWithLogComment(query, "find_groups_from_aggregates", workspaceId, "", "");
         ExperimentGroupMappers.applyGroupCriteriaToTemplate(template, criteria, filterQueryBuilder);
         groupingQueryBuilder.addGroupingTemplateParams(criteria.groups(), template);
         return template;
@@ -2279,7 +2721,7 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
             List<ExperimentsComparisonFilter> filters) {
         return asyncTemplate.nonTransaction(connection -> makeFluxContextAware((userName, workspaceId) -> {
             var template = getSTWithLogComment(SELECT_EXPERIMENT_ITEMS_STATS_FROM_AGGREGATES,
-                    "getExperimentItemsStatsFromAggregates", workspaceId, datasetId);
+                    "getExperimentItemsStatsFromAggregates", workspaceId, userName, datasetId);
 
             // Apply filters to template
             FilterQueryBuilder.applyFiltersToTemplate(template, filters,
@@ -2301,5 +2743,49 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
                             (row, rowMetadata) -> StatsMapper.mapExperimentItemsStats(row)));
         }).singleOrEmpty())
                 .doOnError(error -> log.error("Failed to get experiment items stats from aggregates", error));
+    }
+
+    @Override
+    public Mono<AggregatedExperimentCounts> getAggregationBranchCounts(
+            @NonNull AggregationBranchCountsCriteria criteria) {
+        return asyncTemplate.nonTransaction(connection -> Mono.deferContextual(ctx -> {
+            String workspaceId = ctx.get(RequestContext.WORKSPACE_ID);
+
+            var template = getSTWithLogComment(SELECT_EXPERIMENT_AGGREGATION_COUNTS,
+                    "get_aggregation_branch_counts", workspaceId, "", criteria.datasetId());
+
+            Optional.ofNullable(criteria.experimentIds())
+                    .filter(CollectionUtils::isNotEmpty)
+                    .ifPresent(experimentIds -> template.add("experiment_ids", experimentIds));
+            Optional.ofNullable(criteria.datasetId())
+                    .ifPresent(datasetId -> template.add("dataset_id", datasetId));
+            Optional.ofNullable(criteria.id())
+                    .ifPresent(id -> template.add("id", id));
+            Optional.ofNullable(criteria.idsList())
+                    .filter(CollectionUtils::isNotEmpty)
+                    .ifPresent(idsList -> template.add("ids_list", idsList));
+
+            var statement = connection.createStatement(template.render());
+
+            Optional.ofNullable(criteria.experimentIds())
+                    .filter(CollectionUtils::isNotEmpty)
+                    .ifPresent(experimentIds -> statement.bind("experiment_ids",
+                            experimentIds.toArray(UUID[]::new)));
+            Optional.ofNullable(criteria.datasetId())
+                    .ifPresent(datasetId -> statement.bind("dataset_id", datasetId));
+            Optional.ofNullable(criteria.id())
+                    .ifPresent(id -> statement.bind("id", id));
+            Optional.ofNullable(criteria.idsList())
+                    .filter(CollectionUtils::isNotEmpty)
+                    .ifPresent(idsList -> statement.bind("ids_list", idsList.toArray(UUID[]::new)));
+
+            return makeFluxContextAware(bindWorkspaceIdToFlux(statement))
+                    .flatMap(result -> result
+                            .map((row, metadata) -> new AggregatedExperimentCounts(
+                                    row.get("aggregated", Long.class),
+                                    row.get("not_aggregated", Long.class))))
+                    .next()
+                    .defaultIfEmpty(AggregatedExperimentCounts.BOTH_BRANCHES);
+        }));
     }
 }

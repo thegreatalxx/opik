@@ -46,11 +46,12 @@ export class DashboardsClient {
         request: OpikApi.FindDashboardsRequest = {},
         requestOptions?: DashboardsClient.RequestOptions,
     ): Promise<core.WithRawResponse<OpikApi.DashboardPagePublic>> {
-        const { page, size, name, sorting, filters } = request;
+        const { page, size, name, projectId, sorting, filters } = request;
         const _queryParams: Record<string, unknown> = {
             page,
             size,
             name,
+            project_id: projectId,
             sorting,
             filters,
         };
@@ -335,18 +336,20 @@ export class DashboardsClient {
      * Update dashboard by id. Partial updates are supported - only provided fields will be updated.
      *
      * @param {string} dashboardId
-     * @param {OpikApi.DashboardUpdatePublic} request
+     * @param {OpikApi.UpdateDashboardRequest} request
      * @param {DashboardsClient.RequestOptions} requestOptions - Request-specific configuration.
      *
      * @throws {@link OpikApi.NotFoundError}
      * @throws {@link OpikApi.ConflictError}
      *
      * @example
-     *     await client.dashboards.updateDashboard("dashboardId")
+     *     await client.dashboards.updateDashboard("dashboardId", {
+     *         body: {}
+     *     })
      */
     public updateDashboard(
         dashboardId: string,
-        request: OpikApi.DashboardUpdatePublic = {},
+        request: OpikApi.UpdateDashboardRequest,
         requestOptions?: DashboardsClient.RequestOptions,
     ): core.HttpResponsePromise<OpikApi.DashboardPublic> {
         return core.HttpResponsePromise.fromPromise(this.__updateDashboard(dashboardId, request, requestOptions));
@@ -354,9 +357,10 @@ export class DashboardsClient {
 
     private async __updateDashboard(
         dashboardId: string,
-        request: OpikApi.DashboardUpdatePublic = {},
+        request: OpikApi.UpdateDashboardRequest,
         requestOptions?: DashboardsClient.RequestOptions,
     ): Promise<core.WithRawResponse<OpikApi.DashboardPublic>> {
+        const { body: _body } = request;
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             this._options?.headers,
             mergeOnlyDefinedHeaders({
@@ -376,7 +380,7 @@ export class DashboardsClient {
             contentType: "application/json",
             queryParameters: requestOptions?.queryParams,
             requestType: "json",
-            body: serializers.DashboardUpdatePublic.jsonOrThrow(request, {
+            body: serializers.DashboardUpdatePublic.jsonOrThrow(_body, {
                 unrecognizedObjectKeys: "strip",
                 omitUndefined: true,
             }),

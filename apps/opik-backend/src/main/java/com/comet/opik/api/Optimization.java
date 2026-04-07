@@ -11,11 +11,15 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
 import lombok.Builder;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+
+import static com.comet.opik.utils.ValidationUtils.NULL_OR_NOT_BLANK;
 
 @Builder(toBuilder = true)
 @JsonIgnoreProperties(ignoreUnknown = true)
@@ -25,6 +29,10 @@ public record Optimization(
                 Optimization.View.Public.class, Optimization.View.Write.class}) UUID id,
         @JsonView({Optimization.View.Public.class, Optimization.View.Write.class}) String name,
         @JsonView({Optimization.View.Public.class, Optimization.View.Write.class}) @NotBlank String datasetName,
+        @JsonView({
+                Optimization.View.Write.class}) @Schema(description = "Project name. Creates project if it doesn't exist. Ignored when project_id is provided.") @Pattern(regexp = NULL_OR_NOT_BLANK, message = "must not be blank") String projectName,
+        @JsonView({Optimization.View.Public.class,
+                Optimization.View.Write.class}) @Schema(description = "Project ID. Takes precedence over project_name when both are provided.") UUID projectId,
         @JsonView({Optimization.View.Public.class, Optimization.View.Write.class}) @NotBlank String objectiveName,
         @JsonView({Optimization.View.Public.class, Optimization.View.Write.class}) @NotNull OptimizationStatus status,
         @Schema(implementation = JsonListString.class) @JsonView({Optimization.View.Public.class,
@@ -35,12 +43,28 @@ public record Optimization(
         @JsonView({Optimization.View.Public.class}) @Schema(accessMode = Schema.AccessMode.READ_ONLY) Long numTrials,
         @JsonView({
                 Optimization.View.Public.class}) @Schema(accessMode = Schema.AccessMode.READ_ONLY) List<FeedbackScoreAverage> feedbackScores,
+        @JsonView({
+                Optimization.View.Public.class}) @Schema(accessMode = Schema.AccessMode.READ_ONLY) List<FeedbackScoreAverage> experimentScores,
         @JsonView({Optimization.View.Public.class}) @Schema(accessMode = Schema.AccessMode.READ_ONLY) Instant createdAt,
         @JsonView({Optimization.View.Public.class}) @Schema(accessMode = Schema.AccessMode.READ_ONLY) String createdBy,
         @JsonView({Optimization.View.Public.class,
                 Optimization.View.Write.class}) @InRange(before = InRangeValidator.MAX_ANALYTICS_DB) Instant lastUpdatedAt,
         @JsonView({
-                Optimization.View.Public.class}) @Schema(accessMode = Schema.AccessMode.READ_ONLY) String lastUpdatedBy){
+                Optimization.View.Public.class}) @Schema(accessMode = Schema.AccessMode.READ_ONLY) String lastUpdatedBy,
+        @JsonView({
+                Optimization.View.Public.class}) @Schema(accessMode = Schema.AccessMode.READ_ONLY) BigDecimal baselineObjectiveScore,
+        @JsonView({
+                Optimization.View.Public.class}) @Schema(accessMode = Schema.AccessMode.READ_ONLY) BigDecimal bestObjectiveScore,
+        @JsonView({
+                Optimization.View.Public.class}) @Schema(accessMode = Schema.AccessMode.READ_ONLY) BigDecimal baselineDuration,
+        @JsonView({
+                Optimization.View.Public.class}) @Schema(accessMode = Schema.AccessMode.READ_ONLY) BigDecimal bestDuration,
+        @JsonView({
+                Optimization.View.Public.class}) @Schema(accessMode = Schema.AccessMode.READ_ONLY) BigDecimal baselineCost,
+        @JsonView({
+                Optimization.View.Public.class}) @Schema(accessMode = Schema.AccessMode.READ_ONLY) BigDecimal bestCost,
+        @JsonView({
+                Optimization.View.Public.class}) @Schema(accessMode = Schema.AccessMode.READ_ONLY) BigDecimal totalOptimizationCost){
 
     @Builder(toBuilder = true)
     public record OptimizationPage(

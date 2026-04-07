@@ -85,7 +85,7 @@ databaseAnalytics:
   #   - failover=3
   #   - custom_http_params=max_query_size=100000000
   #  Description: query parameters that will be added to the connection string
-  queryParameters: ${ANALYTICS_DB_QUERY_PARAMETERS:-health_check_interval=2000&compress=1&auto_discovery=true&failover=3&custom_http_params=max_query_size=100000000,async_insert_busy_timeout_max_ms=250,async_insert_busy_timeout_min_ms=100,async_insert=1,wait_for_async_insert=1,async_insert_use_adaptive_busy_timeout=1,async_insert_deduplicate=1}
+  queryParameters: ${ANALYTICS_DB_QUERY_PARAMETERS:-health_check_interval=2000&compress=1&auto_discovery=true&failover=3&custom_http_params=max_query_size=100000000,async_insert_busy_timeout_max_ms=250,async_insert_busy_timeout_min_ms=100,async_insert=1,wait_for_async_insert=1,async_insert_use_adaptive_busy_timeout=1,async_insert_deduplicate=1,use_skip_indexes_if_final=1}
 
 # https://www.dropwizard.io/en/stable/manual/configuration.html#health
 health:
@@ -229,9 +229,9 @@ experimentAggregates:
 
 # Configuration for experiment denormalization (debounced re-computation of experiment aggregates)
 experimentDenormalization:
-  # Default: false
+  # Default: true
   # Description: Whether the experiment denormalization job and subscriber are enabled
-  enabled: ${EXPERIMENT_DENORMALIZATION_ENABLED:-false}
+  enabled: ${EXPERIMENT_DENORMALIZATION_ENABLED:-true}
   # Default: experiment_denormalization_stream
   # Description: The name of the Redis Stream used for experiment aggregates recomputation
   streamName: ${OPIK_REDIS_EXPERIMENT_DENORM_STREAM_NAME:-'experiment_denormalization_stream'}
@@ -344,6 +344,97 @@ rateLimit:
       userFacingBucketName: single_tracing_ops
       # Description: Rate limit error message
       errorMessage: "You have exceeded the rate limit for single tracing operations. Please try again later."
+    ollieStateUpload:
+      # Default: 4
+      # Description: how many ollie state uploads are allowed in the specified time bucket (per API key)
+      limit: ${RATE_LIMIT_OLLIE_STATE_UPLOAD:-4}
+      # Default: 60
+      # Description: Time bucket size in seconds
+      durationInSeconds: ${RATE_LIMIT_OLLIE_STATE_UPLOAD_DURATION_IN_SEC:-60}
+      # Description: Header name to use for rate limiting
+      headerName: Ollie-State-Upload
+      # Description: User facing bucket name
+      userFacingBucketName: ollie_state_upload
+      # Description: Rate limit error message
+      errorMessage: "You have exceeded the rate limit for ollie state uploads. Please try again later."
+    getSpans:
+      # Default: 30
+      # Description: how many getSpansByProject queries are allowed per workspace in the specified time bucket
+      limit: ${RATE_LIMIT_GET_SPANS_EVENTS_PER_WORKSPACE_LIMIT:-30}
+      # Default: 60
+      # Description: Time bucket size in seconds
+      durationInSeconds: ${RATE_LIMIT_WORKSPACE_EVENTS_DURATION_IN_SEC:-60}
+      # Description: Header name to use for rate limiting
+      headerName: Get-Spans
+      # Description: User facing bucket name
+      userFacingBucketName: get_spans
+      # Description: Rate limit error message
+      errorMessage: "You have exceeded the rate limit for this operation. Please try again later."
+    search_spans:
+      # Default: 30
+      # Description: how many searchSpans queries are allowed per workspace in the specified time bucket
+      limit: ${RATE_LIMIT_SEARCH_SPANS_EVENTS_PER_WORKSPACE_LIMIT:-30}
+      # Default: 60
+      # Description: Time bucket size in seconds
+      durationInSeconds: ${RATE_LIMIT_WORKSPACE_EVENTS_DURATION_IN_SEC:-60}
+      # Description: Header name to use for rate limiting
+      headerName: Search-Spans
+      # Description: User facing bucket name
+      userFacingBucketName: search_spans
+      # Description: Rate limit error message
+      errorMessage: "You have exceeded the rate limit for this operation. Please try again later."
+    getSpanStats:
+      # Default: 30
+      # Description: how many getSpanStats queries are allowed per workspace in the specified time bucket
+      limit: ${RATE_LIMIT_GET_SPAN_STATS_EVENTS_PER_WORKSPACE_LIMIT:-30}
+      # Default: 60
+      # Description: Time bucket size in seconds
+      durationInSeconds: ${RATE_LIMIT_WORKSPACE_EVENTS_DURATION_IN_SEC:-60}
+      # Description: Header name to use for rate limiting
+      headerName: Get-Span-Stats
+      # Description: User facing bucket name
+      userFacingBucketName: get_span_stats
+      # Description: Rate limit error message
+      errorMessage: "You have exceeded the rate limit for this operation. Please try again later."
+    getTraces:
+      # Default: 30
+      # Description: how many getTracesByProject queries are allowed per workspace in the specified time bucket
+      limit: ${RATE_LIMIT_GET_TRACES_EVENTS_PER_WORKSPACE_LIMIT:-30}
+      # Default: 60
+      # Description: Time bucket size in seconds
+      durationInSeconds: ${RATE_LIMIT_WORKSPACE_EVENTS_DURATION_IN_SEC:-60}
+      # Description: Header name to use for rate limiting
+      headerName: Get-Traces
+      # Description: User facing bucket name
+      userFacingBucketName: get_traces
+      # Description: Rate limit error message
+      errorMessage: "You have exceeded the rate limit for this operation. Please try again later."
+    searchTraces:
+      # Default: 30
+      # Description: how many searchTraces queries are allowed per workspace in the specified time bucket
+      limit: ${RATE_LIMIT_SEARCH_TRACES_EVENTS_PER_WORKSPACE_LIMIT:-30}
+      # Default: 60
+      # Description: Time bucket size in seconds
+      durationInSeconds: ${RATE_LIMIT_WORKSPACE_EVENTS_DURATION_IN_SEC:-60}
+      # Description: Header name to use for rate limiting
+      headerName: Search-Traces
+      # Description: User facing bucket name
+      userFacingBucketName: search_traces
+      # Description: Rate limit error message
+      errorMessage: "You have exceeded the rate limit for this operation. Please try again later."
+    getTraceStats:
+      # Default: 30
+      # Description: how many getTraceStats queries are allowed per workspace in the specified time bucket
+      limit: ${RATE_LIMIT_GET_TRACE_STATS_EVENTS_PER_WORKSPACE_LIMIT:-30}
+      # Default: 60
+      # Description: Time bucket size in seconds
+      durationInSeconds: ${RATE_LIMIT_WORKSPACE_EVENTS_DURATION_IN_SEC:-60}
+      # Description: Header name to use for rate limiting
+      headerName: Get-Trace-Stats
+      # Description: User facing bucket name
+      userFacingBucketName: get_trace_stats
+      # Description: Rate limit error message
+      errorMessage: "You have exceeded the rate limit for this operation. Please try again later."
 
 # Configuration for usage limit. This is not enabled by default for open source installations.
 # In order to support that, the remote authentication server must contain a `quotas` object in its authentication
@@ -573,6 +664,39 @@ optimizationLogs:
   # Description: Maximum number of concurrent S3 uploads during sync
   syncConcurrency: ${OPTIMIZATION_LOGS_SYNC_CONCURRENCY:-5}
 
+# Data retention policy enforcement
+# The job splits the workspace UUID space into N=executionsPerDay fractions and processes one fraction per tick.
+# Use a value that divides 1440 evenly for consistent interval spacing (e.g., 1, 2, 3, 4, 5, 6, 8, 10, 12, 16, 20, 24, 30, 32, 36, 48, 60, 80, 96, 120, 144, 160, 180, 240, 288).
+retention:
+  enabled: ${RETENTION_ENABLED:-false}
+  executionsPerDay: ${RETENTION_EXECUTIONS_PER_DAY:-48}
+  workspaceBatchSize: ${RETENTION_WORKSPACE_BATCH_SIZE:-1000}
+  slidingWindowDays: ${RETENTION_SLIDING_WINDOW_DAYS:-3}
+  # Progressive catch-up for apply-to-past rules. Deletes historical data older than the sliding window.
+  # At rule creation, estimates workspace span velocity (spans/week) to triage into tiers:
+  #   small  (<smallThreshold/week): batch one-shot delete, up to smallBatchSize workspaces per cycle
+  #   medium (smallThreshold..largeThreshold/week): 10 most outdated, mediumChunkDays per cycle each
+  #   large  (>=largeThreshold/week or estimation hit row limit): 1 most outdated, largeChunkDays per cycle
+  catchUp:
+    enabled: ${RETENTION_CATCH_UP_ENABLED:-true}
+    # Velocity thresholds (spans/week). Free tier ~6K/week, so 10K keeps them in the small (fast) path.
+    smallThreshold: ${RETENTION_CATCH_UP_SMALL_THRESHOLD:-10000}
+    largeThreshold: ${RETENTION_CATCH_UP_LARGE_THRESHOLD:-100000}
+    # Max workspaces processed per cycle per tier
+    smallBatchSize: ${RETENTION_CATCH_UP_SMALL_BATCH_SIZE:-200}
+    mediumBatchSize: ${RETENTION_CATCH_UP_MEDIUM_BATCH_SIZE:-10}
+    # Time window (days) deleted per cycle for medium and large workspaces
+    mediumChunkDays: ${RETENTION_CATCH_UP_MEDIUM_CHUNK_DAYS:-7}
+    largeChunkDays: ${RETENTION_CATCH_UP_LARGE_CHUNK_DAYS:-1}
+    # Assumed velocity when the estimation query fails with TOO_MANY_ROWS (>20M rows)
+    defaultVelocity: ${RETENTION_CATCH_UP_DEFAULT_VELOCITY:-1000000}
+    # Interval in minutes between catch-up cycles (default: 45)
+    intervalMinutes: ${RETENTION_CATCH_UP_INTERVAL_MINUTES:-45}
+    # Interval in minutes between estimation cycles for new rules (default: 5)
+    estimationIntervalMinutes: ${RETENTION_CATCH_UP_ESTIMATION_INTERVAL_MINUTES:-5}
+    # Earliest date for catch-up cursor start (service launch date)
+    serviceStartDate: ${RETENTION_CATCH_UP_SERVICE_START_DATE:-2024-09-01}
+
 # LLM providers client configuration
 llmProviderClient:
   # Default: 3
@@ -640,7 +764,16 @@ cacheManager:
     # Description: Dynamically created caches with their respective time to live in seconds
     automationRules: ${CACHE_MANAGER_AUTOMATION_RULES_DURATION:-PT1S}
     workspace_metadata: ${CACHE_MANAGER_WORKSPACE_METADATA_DURATION:-PT1H}
+    # Default: PT5M
+    # Description: Cache TTL for workspace version determination results, applied per workspace
+    # Scope: Per workspace (cache key includes workspace ID)
+    # Overrides: Overrides defaultDuration for the workspace_version cache group
+    # Operational impact: Lower values increase DB query frequency on workspace load; higher values delay version transitions after entity changes
+    workspace_version: ${CACHE_MANAGER_WORKSPACE_VERSION_DURATION:-PT5M}
     experiment_metadata: ${CACHE_MANAGER_EXPERIMENT_METADATA_DURATION:-PT1H}
+    # Default: PT30M
+    # Description: Cache TTL for the max(timeout_mark_thread_as_inactive) across all workspaces, used to compute the closing job lookback window
+    max_timeout_mark_thread_as_inactive: ${CACHE_MANAGER_MAX_TIMEOUT_MARK_THREAD_AS_INACTIVE_DURATION:-PT30M}
 
 # Configuration for clickhouse log appender
 clickHouseLogAppender:
@@ -681,6 +814,13 @@ s3Config:
   s3Url: ${S3_URL:-http://localhost:9001}
   # Description: Whether installation uses MinIO or AWS S3
   isMinIO: ${IS_MINIO:-true}
+
+# Ollie state persistence configuration
+ollieStateConfig:
+  # Default: 52428800 (50MB)
+  # Description: Maximum upload size in bytes for ollie state persistence
+  maxUploadSizeBytes: ${OLLIE_STATE_MAX_UPLOAD_SIZE_BYTES:-52428800}
+
 
 # Attachments configuration
 attachmentsConfig:
@@ -770,22 +910,64 @@ serviceToggles:
   # Default: false
   # Description: Whether or not Collaborators tab feature is enabled
   collaboratorsTabEnabled: ${TOGGLE_COLLABORATORS_TAB_ENABLED:-"false"}
-  # Default: false
-  # Description: Whether or not Agent Configuration feature is enabled
-  agentConfigurationEnabled: ${TOGGLE_AGENT_CONFIGURATION_ENABLED:-"false"}
+  # Default: version_1
+  # Description: Forces ALL workspaces to a specific navigation version. Highest priority override.
+  # Valid values: "disabled" (use version 1 entity check), "version_1" (force legacy), "version_2" (force project-first).
+  # Scope: Global — applies to all workspaces regardless of their entity state.
+  # Overrides: When not "disabled", overrides the version entity check and auth gate entirely.
+  # Operational impact: Set to "version_1" until V2 is ready, then change to "disabled" to enable entity-based determination.
+  forceWorkspaceVersion: ${TOGGLE_FORCE_WORKSPACE_VERSION:-"version_1"}
 
 # Local Runner configuration
 localRunner:
+  # Default: false
+  # Description: Whether the local runner feature is enabled
   enabled: ${TOGGLE_RUNNERS_ENABLED:-false}
+  # Default: 30m
+  # Description: Maximum time a job can run before being considered timed out
   jobTimeout: ${OPIK_RUNNER_JOB_TIMEOUT:-30m}
+  # Default: 100
+  # Description: Maximum number of pending jobs allowed in a runner's queue
   maxPendingJobsPerRunner: ${OPIK_RUNNER_MAX_PENDING:-100}
+  # Default: 15s
+  # Description: Time-to-live for runner heartbeats; runners not heartbeating within this window are considered dead
   heartbeatTtl: ${OPIK_RUNNER_HEARTBEAT_TTL:-15s}
+  # Default: 10s
+  # Description: How long the nextJob long-poll blocks waiting for a new job before returning empty
   nextJobPollTimeout: ${OPIK_RUNNER_NEXT_JOB_POLL_TIMEOUT:-10s}
+  # Default: 24h
+  # Description: How long after a runner dies before its data is purged from Redis
   deadRunnerPurgeTime: ${OPIK_RUNNER_DEAD_PURGE_HOURS:-24h}
+  # Default: 7d
+  # Description: How long completed job metadata is retained in Redis
   completedJobTtl: ${OPIK_RUNNER_COMPLETED_JOB_TTL:-7d}
+  # Default: 60s
+  # Description: Interval between reaper job executions that clean up dead runners
+  reaperJobInterval: ${OPIK_RUNNER_REAPER_JOB_INTERVAL:-60s}
+  # Default: 55s
+  # Description: How long the reaper holds its distributed lock while processing
   reaperLockDuration: ${OPIK_RUNNER_REAPER_LOCK_DURATION:-55s}
+  # Default: 5s
+  # Description: How long the reaper waits to acquire the distributed lock before giving up
   reaperLockWait: ${OPIK_RUNNER_REAPER_LOCK_WAIT:-5s}
+  # Default: 5s
+  # Description: Extra buffer added to the async response timeout beyond nextJobPollTimeout
   nextJobAsyncTimeoutBuffer: ${OPIK_RUNNER_ASYNC_TIMEOUT_BUFFER:-5s}
+  # Default: 300s
+  # Description: Time-to-live for pairing codes used during runner registration
+  pairingCodeTtl: ${OPIK_RUNNER_PAIRING_CODE_TTL:-1h}
+  # Default: 1h
+  # Description: Time-to-live for runner entries during the pairing process
+  pairingRunnerTtl: ${OPIK_RUNNER_PAIRING_RUNNER_TTL:-1h}
+  # Default: 100
+  # Description: Maximum number of runners the reaper processes per cycle across all workspaces
+  reaperMaxRunnersPerCycle: ${OPIK_RUNNER_REAPER_MAX_RUNNERS_PER_CYCLE:-100}
+  # Default: 50
+  # Description: Maximum number of agents allowed per runner
+  maxAgentsPerRunner: ${OPIK_RUNNER_MAX_AGENTS_PER_RUNNER:-50}
+  # Default: 1000
+  # Description: Maximum number of log entries a runner can send in a single batch
+  maxLogEntriesPerBatch: ${OPIK_RUNNER_MAX_LOG_ENTRIES_PER_BATCH:-1000}
 
 # Trace Thread configuration
 traceThreadConfig:
@@ -810,18 +992,34 @@ traceThreadConfig:
   # Default: trace_thread_closing_stream
   # Description: The name of the Redis Stream used for trace thread closing
   streamName: ${OPIK_REDIS_TRACE_THREAD_STREAM_NAME:-'trace_thread_closing_stream'}
-  # Default: 3s
+  # Default: 15s
   # Description: The interval at which the close trace thread job will run to inactive threads
-  closeTraceThreadJobInterval: ${OPIK_CLOSE_TRACE_THREAD_JOB_INTERVAL:-3s}
-  # Default: 4s
-  # Description: The time to wait for the close trace threads job to finish before releasing the lock
-  closeTraceThreadJobLockTime: ${OPIK_CLOSE_TRACE_THREAD_JOB_LOCK_TIME:-4s}
+  closeTraceThreadJobInterval: ${OPIK_CLOSE_TRACE_THREAD_JOB_INTERVAL:-15s}
   # Default: 300ms
   # Description: The time to wait for the close trace threads job to acquire the lock before giving up
   closeTraceThreadJobLockWaitTime: ${OPIK_CLOSE_TRACE_THREAD_JOB_LOCK_WAIT_TIME:-300ms}
   # Default: 2000
   # Description: The maximum number of item to process in a single close trace thread run
   closeTraceThreadMaxItemPerRun: ${OPIK_CLOSE_TRACE_THREAD_MAX_ITEM_PER_RUN:-2000}
+  # Default: 7d
+  # Type: Duration (e.g. 1d, 12h, 7d)
+  # Scope: Global — applies to the trace-thread closing job on every instance
+  # Description: On first run after startup (or after an outage), look back this far to catch threads
+  #   that became stale during downtime. The minmax skip index keeps cost proportional to matching
+  #   granules, so wider windows are cheap. Subsequent runs use the normal computed lookback.
+  # Impact: Larger values scan more granules on first run but reduce risk of missing stale threads
+  #   after prolonged outages. Smaller values reduce first-run cost but may miss old threads.
+  # Safe range: 1d–30d
+  coldStartLookback: ${OPIK_CLOSE_TRACE_THREAD_COLD_START_LOOKBACK:-7d}
+  # Default: 5
+  # Type: Integer (exponent, not the backoff duration itself)
+  # Scope: Global — applies to the trace-thread closing job on every instance
+  # Description: Max exponent for exponential backoff on consecutive failures.
+  #   Backoff duration = closeTraceThreadJobInterval * 2^exponent (e.g. 15s * 2^5 = 480s = 8min).
+  # Impact: Higher values allow longer backoff on persistent failures, reducing load on ClickHouse.
+  #   Lower values resume faster after transient errors but risk hammering a struggling server.
+  # Safe range: 1–10
+  maxBackoffExponent: ${OPIK_CLOSE_TRACE_THREAD_MAX_BACKOFF_EXPONENT:-5}
   # Default: 10
   # Description: Claim pending messages every N polling intervals
   claimIntervalRatio: ${OPIK_REDIS_TRACE_THREAD_CLAIM_INTERVAL_RATIO:-10}
@@ -993,3 +1191,8 @@ datasetVersioningMigration:
   # Description: Job execution timeout in seconds for the items_total migration
   # Should be long enough to complete the entire migration process
   itemsTotalJobTimeoutSeconds: ${DATASET_VERSION_ITEMS_TOTAL_MIGRATION_JOB_TIMEOUT_SECONDS:-3600}
+
+llmModelRegistry:
+  defaultResource: ${LLM_MODEL_REGISTRY_DEFAULT_RESOURCE:-llm-models-default.yaml}
+  localOverridePath: ${LLM_MODEL_REGISTRY_LOCAL_OVERRIDE_PATH:-}
+  refreshIntervalSeconds: ${LLM_MODEL_REGISTRY_REFRESH_INTERVAL_SECONDS:-300}

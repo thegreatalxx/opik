@@ -13,6 +13,8 @@ export const Optimization: core.serialization.ObjectSchema<serializers.Optimizat
         id: core.serialization.string().optional(),
         name: core.serialization.string().optional(),
         datasetName: core.serialization.property("dataset_name", core.serialization.string()),
+        projectName: core.serialization.property("project_name", core.serialization.string().optional()),
+        projectId: core.serialization.property("project_id", core.serialization.string().optional()),
         objectiveName: core.serialization.property("objective_name", core.serialization.string()),
         status: OptimizationStatus,
         metadata: JsonListString.optional(),
@@ -23,10 +25,27 @@ export const Optimization: core.serialization.ObjectSchema<serializers.Optimizat
             "feedback_scores",
             core.serialization.list(FeedbackScoreAverage).optional(),
         ),
+        experimentScores: core.serialization.property(
+            "experiment_scores",
+            core.serialization.list(FeedbackScoreAverage).optional(),
+        ),
         createdAt: core.serialization.property("created_at", core.serialization.date().optional()),
         createdBy: core.serialization.property("created_by", core.serialization.string().optional()),
         lastUpdatedAt: core.serialization.property("last_updated_at", core.serialization.date().optional()),
         lastUpdatedBy: core.serialization.property("last_updated_by", core.serialization.string().optional()),
+        baselineObjectiveScore: core.serialization.property(
+            "baseline_objective_score",
+            core.serialization.number().optional(),
+        ),
+        bestObjectiveScore: core.serialization.property("best_objective_score", core.serialization.number().optional()),
+        baselineDuration: core.serialization.property("baseline_duration", core.serialization.number().optional()),
+        bestDuration: core.serialization.property("best_duration", core.serialization.number().optional()),
+        baselineCost: core.serialization.property("baseline_cost", core.serialization.number().optional()),
+        bestCost: core.serialization.property("best_cost", core.serialization.number().optional()),
+        totalOptimizationCost: core.serialization.property(
+            "total_optimization_cost",
+            core.serialization.number().optional(),
+        ),
     });
 
 export declare namespace Optimization {
@@ -34,6 +53,8 @@ export declare namespace Optimization {
         id?: string | null;
         name?: string | null;
         dataset_name: string;
+        project_name?: string | null;
+        project_id?: string | null;
         objective_name: string;
         status: OptimizationStatus.Raw;
         metadata?: JsonListString.Raw | null;
@@ -41,9 +62,17 @@ export declare namespace Optimization {
         dataset_id?: string | null;
         num_trials?: number | null;
         feedback_scores?: FeedbackScoreAverage.Raw[] | null;
+        experiment_scores?: FeedbackScoreAverage.Raw[] | null;
         created_at?: string | null;
         created_by?: string | null;
         last_updated_at?: string | null;
         last_updated_by?: string | null;
+        baseline_objective_score?: number | null;
+        best_objective_score?: number | null;
+        baseline_duration?: number | null;
+        best_duration?: number | null;
+        baseline_cost?: number | null;
+        best_cost?: number | null;
+        total_optimization_cost?: number | null;
     }
 }

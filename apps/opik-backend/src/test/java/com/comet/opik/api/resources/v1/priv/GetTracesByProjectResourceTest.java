@@ -12,6 +12,7 @@ import com.comet.opik.api.Span;
 import com.comet.opik.api.Trace;
 import com.comet.opik.api.Trace.TracePage;
 import com.comet.opik.api.TraceSearchStreamRequest;
+import com.comet.opik.api.TraceUpdate;
 import com.comet.opik.api.VisibilityMode;
 import com.comet.opik.api.filter.Field;
 import com.comet.opik.api.filter.FieldType;
@@ -23,10 +24,12 @@ import com.comet.opik.api.resources.utils.AuthTestUtils;
 import com.comet.opik.api.resources.utils.ClickHouseContainerUtils;
 import com.comet.opik.api.resources.utils.ClientSupportUtils;
 import com.comet.opik.api.resources.utils.DurationUtils;
+import com.comet.opik.api.resources.utils.FilterTestUtils;
 import com.comet.opik.api.resources.utils.MigrationUtils;
 import com.comet.opik.api.resources.utils.MinIOContainerUtils;
 import com.comet.opik.api.resources.utils.MySQLContainerUtils;
 import com.comet.opik.api.resources.utils.RedisContainerUtils;
+import com.comet.opik.api.resources.utils.StatsUtils;
 import com.comet.opik.api.resources.utils.TestDropwizardAppExtensionUtils;
 import com.comet.opik.api.resources.utils.TestUtils;
 import com.comet.opik.api.resources.utils.TestWorkspace;
@@ -4066,32 +4069,15 @@ class GetTracesByProjectResourceTest {
     }
 
     private String getValidValue(Field field) {
-        return switch (field.getType()) {
-            case STRING, LIST, DICTIONARY, DICTIONARY_STATE_DB, MAP, CUSTOM, ENUM, STRING_STATE_DB ->
-                RandomStringUtils.secure().nextAlphanumeric(10);
-            case NUMBER, DURATION, FEEDBACK_SCORES_NUMBER -> String.valueOf(randomNumber(1, 10));
-            case DATE_TIME, DATE_TIME_STATE_DB -> Instant.now().toString();
-            case ERROR_CONTAINER -> "";
-        };
+        return FilterTestUtils.getValidValue(field);
     }
 
     private String getKey(Field field) {
-        return switch (field.getType()) {
-            case STRING, NUMBER, DURATION, MAP, DATE_TIME, LIST, ENUM, ERROR_CONTAINER, STRING_STATE_DB,
-                    DATE_TIME_STATE_DB,
-                    DICTIONARY, DICTIONARY_STATE_DB ->
-                null;
-            case FEEDBACK_SCORES_NUMBER, CUSTOM -> RandomStringUtils.secure().nextAlphanumeric(10);
-        };
+        return FilterTestUtils.getKey(field);
     }
 
     private String getInvalidValue(Field field) {
-        return switch (field.getType()) {
-            case STRING, DICTIONARY, DICTIONARY_STATE_DB, MAP, CUSTOM, LIST, ENUM, ERROR_CONTAINER, STRING_STATE_DB,
-                    DATE_TIME_STATE_DB ->
-                " ";
-            case NUMBER, DURATION, DATE_TIME, FEEDBACK_SCORES_NUMBER -> RandomStringUtils.secure().nextAlphanumeric(10);
-        };
+        return FilterTestUtils.getInvalidValue(field);
     }
 
     @Nested
@@ -4141,8 +4127,10 @@ class GetTracesByProjectResourceTest {
                     .toList();
 
             assertThat(actualTraces)
-                    .usingRecursiveFieldByFieldElementComparatorIgnoringFields(IGNORED_FIELDS_TRACES)
-                    .containsExactlyElementsOf(expectedTraces);
+                    .usingRecursiveComparison()
+                    .withComparatorForType(StatsUtils::compareDoubles, Double.class)
+                    .ignoringFields(IGNORED_FIELDS_TRACES)
+                    .isEqualTo(expectedTraces);
         }
 
         @ParameterizedTest
@@ -4610,6 +4598,57 @@ class GetTracesByProjectResourceTest {
             assertThat(actualEntity).isNotNull();
         }
 
+        @Test
+        void getTracesByProject__whenSortingByName__afterUpdate__thenReturnLatestVersion() {
+            var workspaceName = RandomStringUtils.secure().nextAlphanumeric(10);
+            var workspaceId = UUID.randomUUID().toString();
+            var apiKey = UUID.randomUUID().toString();
+
+            mockTargetWorkspace(apiKey, workspaceName, workspaceId);
+
+            var projectName = RandomStringUtils.secure().nextAlphanumeric(10);
+
+            var originalInput = JsonUtils.getJsonNodeFromString("{\"message\": \"original input\"}");
+            var updatedInput = JsonUtils.getJsonNodeFromString("{\"message\": \"updated input\"}");
+
+            var trace = Trace.builder()
+                    .id(idGenerator.generateId())
+                    .projectName(projectName)
+                    .name("ZZZ-original-name")
+                    .startTime(Instant.now().truncatedTo(ChronoUnit.MILLIS))
+                    .endTime(Instant.now().plus(1, ChronoUnit.SECONDS).truncatedTo(ChronoUnit.MILLIS))
+                    .input(originalInput)
+                    .output(JsonUtils.getJsonNodeFromString("{\"message\": \"original output\"}"))
+                    .build();
+
+            traceResourceClient.createTrace(trace, apiKey, workspaceName);
+
+            var traceUpdate = TraceUpdate.builder()
+                    .projectName(projectName)
+                    .name("AAA-updated-name")
+                    .input(updatedInput)
+                    .output(JsonUtils.getJsonNodeFromString("{\"message\": \"updated output\"}"))
+                    .build();
+
+            traceResourceClient.updateTrace(trace.id(), traceUpdate, apiKey, workspaceName);
+
+            var sorting = List.of(
+                    SortingField.builder()
+                            .field(SortableFields.NAME)
+                            .direction(Direction.DESC)
+                            .build());
+
+            var actualPage = traceResourceClient.getTraces(
+                    projectName, null, apiKey, workspaceName,
+                    List.of(), sorting, 10, Map.of());
+
+            assertThat(actualPage.content()).hasSize(1);
+
+            var returnedTrace = actualPage.content().getFirst();
+            assertThat(returnedTrace.name()).isEqualTo("AAA-updated-name");
+            assertThat(returnedTrace.input()).isEqualTo(updatedInput);
+        }
+
         @ParameterizedTest
         @EnumSource(Direction.class)
         void getTracesByProject__whenSortingByFeedbackScores__thenReturnTracesSorted(Direction direction) {
@@ -4808,6 +4847,56 @@ class GetTracesByProjectResourceTest {
             getAndAssertPage(workspaceName, projectName, null, List.of(), traces, traces.reversed(), List.of(), apiKey,
                     List.of(), exclude);
 
+        }
+
+        @Test
+        void getTracesByProject__whenExcludeFeedbackScoresWithFilter__thenReturnTracesExcludingAndFilteringScores() {
+            var apiKey = "apiKey-" + UUID.randomUUID();
+            var workspaceName = "workspace-" + RandomStringUtils.secure().nextAlphanumeric(32);
+            var workspaceId = UUID.randomUUID().toString();
+            var projectName = RandomStringUtils.secure().nextAlphanumeric(32);
+            mockTargetWorkspace(apiKey, workspaceName, workspaceId);
+
+            var traces = PodamFactoryUtils.manufacturePojoList(factory, Trace.class)
+                    .stream()
+                    .map(trace -> trace.toBuilder()
+                            .projectName(projectName)
+                            // We're creating feedback scores for these traces (by sending them in batch below)
+                            // but they should be excluded from the expected response by the "exclude" param,
+                            .feedbackScores(null)
+                            // Not logging any spans, so no expected usage
+                            .usage(null)
+                            .build())
+                    .toList();
+            traceResourceClient.batchCreateTraces(traces, apiKey, workspaceName);
+
+            // Creating multiple feedback scores for each trace
+            List<FeedbackScoreBatchItem> feedbackScores = traces.stream()
+                    .flatMap(trace -> PodamFactoryUtils.manufacturePojoList(factory, FeedbackScoreBatchItem.class)
+                            .stream()
+                            .map(feedbackScoreBatchItem -> feedbackScoreBatchItem.toBuilder()
+                                    .projectName(trace.projectName())
+                                    .id(trace.id())
+                                    .build()))
+                    .collect(Collectors.toList());
+            traceResourceClient.feedbackScores(feedbackScores, apiKey, workspaceName);
+
+            // Filter by the first trace's first feedback score
+            var filters = List.of(
+                    TraceFilter.builder()
+                            .field(TraceField.FEEDBACK_SCORES)
+                            .operator(Operator.EQUAL)
+                            .key(feedbackScores.getFirst().name())
+                            .value(feedbackScores.getFirst().value().toString())
+                            .build());
+
+            // The query still uses runs CTEs, joins etc. by enabling exclude_feedback_scores template
+            // because feedback_scores_filters is active.
+            // However, returned feedback scores are excluded (nulled) from the response
+            var expectedTraces = List.of(traces.getFirst());
+            var unexpectedTraces = traces.subList(1, traces.size());
+            getAndAssertPage(workspaceName, projectName, null, filters, traces, expectedTraces,
+                    unexpectedTraces, apiKey, List.of(), Set.of(Trace.TraceField.FEEDBACK_SCORES));
         }
 
         @Test

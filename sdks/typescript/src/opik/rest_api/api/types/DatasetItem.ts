@@ -3,7 +3,18 @@
 import type * as OpikApi from "../index.js";
 
 export interface DatasetItem {
+    /**
+     * Stable item identifier.
+     * On write, used as the upsert key.
+     * If omitted, a new ID is generated.
+     * Remains the same across dataset versions
+     */
     id?: string;
+    /**
+     * Deprecated.
+     * Always equals 'id'.
+     * Retained for backward compatibility and will be removed in a future version
+     */
     datasetItemId?: string;
     traceId?: string;
     spanId?: string;
@@ -14,6 +25,7 @@ export interface DatasetItem {
     evaluators?: OpikApi.EvaluatorItem[];
     executionPolicy?: OpikApi.ExecutionPolicy;
     experimentItems?: OpikApi.ExperimentItem[];
+    runSummariesByExperiment?: Record<string, OpikApi.ExperimentRunSummary>;
     datasetId?: string;
     createdAt?: Date;
     lastUpdatedAt?: Date;

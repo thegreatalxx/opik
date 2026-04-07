@@ -15,6 +15,7 @@ import com.comet.opik.api.ExperimentGroupEnrichInfoHolder;
 import com.comet.opik.api.ExperimentGroupItem;
 import com.comet.opik.api.ExperimentGroupResponse;
 import com.comet.opik.api.ExperimentSearchCriteria;
+import com.comet.opik.api.ExperimentStatus;
 import com.comet.opik.api.ExperimentStreamRequest;
 import com.comet.opik.api.ExperimentType;
 import com.comet.opik.api.ExperimentUpdate;
@@ -26,6 +27,8 @@ import com.comet.opik.api.events.ExperimentsDeleted;
 import com.comet.opik.api.events.webhooks.AlertEvent;
 import com.comet.opik.api.grouping.GroupBy;
 import com.comet.opik.api.sorting.ExperimentSortingFactory;
+import com.comet.opik.domain.experiments.aggregations.ExperimentAggregatesService;
+import com.comet.opik.domain.experiments.aggregations.ExperimentAggregationPublisher;
 import com.comet.opik.infrastructure.FeatureFlags;
 import com.comet.opik.infrastructure.OpikConfiguration;
 import com.comet.opik.infrastructure.auth.RequestContext;
@@ -46,6 +49,7 @@ import org.apache.commons.lang3.StringUtils;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
+import reactor.util.context.ContextView;
 
 import java.time.Instant;
 import java.util.List;
@@ -85,6 +89,8 @@ public class ExperimentService {
     private final @NonNull FeatureFlags featureFlags;
     private final @NonNull OpikConfiguration config;
     private final @NonNull ExperimentGroupEnricher experimentGroupEnricher;
+    private final @NonNull ExperimentAggregatesService experimentAggregatesService;
+    private final @NonNull ExperimentAggregationPublisher experimentAggregationPublisher;
 
     @WithSpan
     public Mono<ExperimentPage> find(
@@ -272,10 +278,32 @@ public class ExperimentService {
                 .collect(Collectors.toSet());
     }
 
-    public Flux<Experiment> findByName(String name) {
+    public Flux<Experiment> findByName(String name, String projectName) {
         Preconditions.checkArgument(StringUtils.isNotBlank(name), "Argument 'name' must not be blank");
-        log.info("Finding experiments by name '{}'", name);
-        return experimentDAO.findByName(name);
+        log.info("Finding experiments by name '{}' and projectName '{}'", name, projectName);
+
+        if (StringUtils.isBlank(projectName)) {
+            return experimentDAO.findByName(name);
+        }
+
+        return getProjectByName(projectName)
+                .flatMapMany(projectIdOpt -> {
+                    if (projectIdOpt.isEmpty()) {
+                        return Flux.empty();
+                    }
+                    return experimentDAO.findByName(name, projectIdOpt.get());
+                });
+    }
+
+    public Flux<Experiment> findByName(String name, UUID projectId) {
+        Preconditions.checkArgument(StringUtils.isNotBlank(name), "Argument 'name' must not be blank");
+        log.info("Finding experiments by name '{}' and projectId '{}'", name, projectId);
+
+        if (projectId == null) {
+            return experimentDAO.findByName(name);
+        }
+
+        return experimentDAO.findByName(name, projectId);
     }
 
     @WithSpan
@@ -324,18 +352,71 @@ public class ExperimentService {
     @WithSpan
     public Mono<Experiment> getById(@NonNull UUID id) {
         log.info("Getting experiment by id '{}'", id);
-        return enrichExperiment(
-                experimentDAO.getById(id),
-                "Not found experiment with id '%s'".formatted(id));
+        return enrichExperiment(experimentDAO.getById(id), "Not found experiment with id '%s'".formatted(id))
+                .doOnEach(signal -> {
+                    if (signal.isOnNext()) {
+                        var experiment = signal.get();
+                        triggerLazyAggregationIfNeeded(experiment.id(), experiment.status(),
+                                signal.getContextView());
+                    }
+                });
+    }
+
+    private void triggerLazyAggregationIfNeeded(UUID experimentId, ExperimentStatus status, ContextView ctx) {
+        if (status != ExperimentStatus.COMPLETED && status != ExperimentStatus.CANCELLED) {
+            return;
+        }
+
+        try {
+            String workspaceId = ctx.get(RequestContext.WORKSPACE_ID);
+            String userName = ctx.get(RequestContext.USER_NAME);
+
+            log.debug("Checking if lazy aggregation trigger needed for experiment: '{}', workspaceId: '{}'",
+                    experimentId, workspaceId);
+
+            experimentAggregatesService.getExperimentFromAggregates(experimentId)
+                    .hasElement()
+                    .filter(inAggregates -> !inAggregates)
+                    .flatMap(__ -> {
+                        log.info("Triggering lazy aggregation for experiment: '{}', workspaceId: '{}'",
+                                experimentId, workspaceId);
+                        return experimentAggregationPublisher.publish(Set.of(experimentId), workspaceId,
+                                userName);
+                    })
+                    .contextWrite(ctx)
+                    .subscribeOn(Schedulers.boundedElastic())
+                    .subscribe(
+                            null,
+                            error -> log.error("Failed lazy aggregation trigger for experiment: '{}'",
+                                    experimentId, error));
+        } catch (Exception e) {
+            log.warn("Could not trigger lazy aggregation for experiment '{}': missing request context", experimentId);
+        }
     }
 
     @WithSpan
     public Flux<Experiment> get(@NonNull ExperimentStreamRequest request) {
         log.info("Getting experiments by '{}'", request);
-        return experimentDAO.get(request)
-                .collectList()
-                .flatMap(this::enrichExperiments)
-                .flatMapMany(Flux::fromIterable);
+        if (StringUtils.isBlank(request.projectName())) {
+            return experimentDAO.get(request, null)
+                    .collectList()
+                    .flatMap(this::enrichExperiments)
+                    .flatMapMany(Flux::fromIterable);
+        }
+        return getProjectByName(request.projectName())
+                .flatMapMany(projectIdOpt -> {
+                    if (projectIdOpt.isEmpty()) {
+                        return Flux.empty();
+                    }
+                    return experimentDAO.get(request, projectIdOpt.get())
+                            .collectList()
+                            .flatMap(this::enrichExperiments)
+                            .flatMapMany(Flux::fromIterable);
+                });
+    }
+
+    private Mono<Optional<UUID>> getProjectByName(String projectName) {
+        return projectService.resolveProjectId(projectName);
     }
 
     private Mono<Experiment> enrichExperiment(Mono<Experiment> experimentMono, String errorMsg) {
@@ -411,35 +492,37 @@ public class ExperimentService {
         var id = experiment.id() == null ? idGenerator.generateId() : experiment.id();
         IdGenerator.validateVersion(id, "Experiment");
         var name = StringUtils.getIfBlank(experiment.name(), nameGenerator::generateName);
-        return datasetService.getOrCreateDataset(experiment.datasetName())
-                .flatMap(datasetId -> {
-                    // Case 1: Feature toggle OFF - skip version resolution (legacy behavior)
-                    if (!featureFlags.isDatasetVersioningEnabled()) {
-                        return processExperimentCreation(experiment, id, name, datasetId, null);
-                    }
+        return resolveProjectId(experiment)
+                .flatMap(resolvedExperiment -> datasetService
+                        .getOrCreateDataset(resolvedExperiment.datasetName(), resolvedExperiment.projectId())
+                        .flatMap(datasetId -> {
+                            // Case 1: Feature toggle OFF - skip version resolution (legacy behavior)
+                            if (!featureFlags.isDatasetVersioningEnabled()) {
+                                return processExperimentCreation(resolvedExperiment, id, name, datasetId, null);
+                            }
 
-                    // Case 2: Feature toggle ON - resolve version and link experiment
-                    return resolveDatasetVersion(experiment, datasetId)
-                            .flatMap(resolved -> {
-                                var experimentWithVersion = experiment.toBuilder()
-                                        .datasetVersionId(resolved.versionId())
-                                        .build();
-                                return processExperimentCreation(experimentWithVersion, id, name, datasetId,
-                                        resolved.executionPolicy());
-                            })
-                            .switchIfEmpty(Mono.defer(() -> {
-                                // No version found - proceed with null dataset_version_id
-                                log.info(
-                                        "No dataset version found for dataset '{}', creating experiment with null dataset_version_id",
-                                        datasetId);
-                                var experimentWithNullVersion = experiment.toBuilder()
-                                        .datasetVersionId(null)
-                                        .build();
-                                return processExperimentCreation(experimentWithNullVersion, id, name, datasetId, null);
-                            }));
-                })
-                // If a conflict occurs, we just return the id of the existing experiment.
-                // If any other error occurs, we throw it. The event is not posted for both cases.
+                            // Case 2: Feature toggle ON - resolve version and link experiment
+                            return resolveDatasetVersion(resolvedExperiment, datasetId)
+                                    .flatMap(resolved -> {
+                                        var experimentWithVersion = resolvedExperiment.toBuilder()
+                                                .datasetVersionId(resolved.versionId())
+                                                .build();
+                                        return processExperimentCreation(experimentWithVersion, id, name,
+                                                datasetId,
+                                                resolved.executionPolicy());
+                                    })
+                                    .switchIfEmpty(Mono.defer(() -> {
+                                        log.info(
+                                                "No dataset version found for dataset '{}', creating experiment with null dataset_version_id",
+                                                datasetId);
+                                        var experimentWithNullVersion = resolvedExperiment.toBuilder()
+                                                .datasetVersionId(null)
+                                                .build();
+                                        return processExperimentCreation(experimentWithNullVersion, id, name,
+                                                datasetId,
+                                                null);
+                                    }));
+                        }))
                 .onErrorResume(throwable -> handleCreateError(throwable, id));
     }
 
@@ -541,6 +624,13 @@ public class ExperimentService {
                         return Mono.empty();
                     });
         });
+    }
+
+    private Mono<Experiment> resolveProjectId(Experiment experiment) {
+        return projectService.resolveProjectIdOrCreate(experiment.projectId(), experiment.projectName())
+                .map(resolvedProjectId -> resolvedProjectId
+                        .map(id -> experiment.toBuilder().projectId(id).build())
+                        .orElse(experiment));
     }
 
     private boolean hasPromptVersionLinks(Experiment experiment) {
@@ -708,16 +798,25 @@ public class ExperimentService {
                     .doOnNext(experiments -> {
                         if (CollectionUtils.isNotEmpty(experiments)) {
                             log.info("Raising alert event for finished experiments, count '{}'", experiments.size());
-                            eventBus.post(AlertEvent.builder()
-                                    .eventType(EXPERIMENT_FINISHED)
-                                    .workspaceId(workspaceId)
-                                    .workspaceName(workspaceName)
-                                    .userName(userName)
-                                    .payload(experiments)
-                                    .build());
+                            experiments.stream()
+                                    .collect(Collectors.groupingBy(
+                                            e -> Optional.ofNullable(e.projectId())))
+                                    .forEach((projectId, projectExperiments) -> eventBus.post(AlertEvent.builder()
+                                            .eventType(EXPERIMENT_FINISHED)
+                                            .workspaceId(workspaceId)
+                                            .workspaceName(workspaceName)
+                                            .userName(userName)
+                                            .projectId(projectId.orElse(null))
+                                            .payload(projectExperiments)
+                                            .build()));
                         }
                     })
-                    .then();
+                    .then(Mono.defer(() -> experimentAggregationPublisher.publish(ids, workspaceId, userName)
+                            .onErrorResume(error -> {
+                                log.error("Failed to publish aggregation for finished experiments, workspaceId '{}'",
+                                        workspaceId, error);
+                                return Mono.empty();
+                            })));
         });
     }
 

@@ -2,6 +2,7 @@ package com.comet.opik.api.resources.v1.priv;
 
 import com.codahale.metrics.annotation.Timed;
 import com.comet.opik.api.WorkspaceConfiguration;
+import com.comet.opik.api.WorkspaceVersion;
 import com.comet.opik.api.error.ErrorMessage;
 import com.comet.opik.api.metrics.WorkspaceMetricRequest;
 import com.comet.opik.api.metrics.WorkspaceMetricResponse;
@@ -9,7 +10,10 @@ import com.comet.opik.api.metrics.WorkspaceMetricsSummaryRequest;
 import com.comet.opik.api.metrics.WorkspaceMetricsSummaryResponse;
 import com.comet.opik.domain.WorkspaceConfigurationService;
 import com.comet.opik.domain.WorkspaceMetricsService;
+import com.comet.opik.domain.workspaces.WorkspaceVersionService;
 import com.comet.opik.infrastructure.auth.RequestContext;
+import com.comet.opik.infrastructure.auth.RequiredPermissions;
+import com.comet.opik.infrastructure.auth.WorkspaceUserPermission;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -48,6 +52,7 @@ public class WorkspacesResource {
 
     private final @NonNull WorkspaceMetricsService workspaceMetricsService;
     private final @NonNull WorkspaceConfigurationService workspaceConfigurationService;
+    private final @NonNull WorkspaceVersionService workspaceVersionService;
     private final @NonNull Provider<RequestContext> requestContext;
 
     @Deprecated
@@ -146,6 +151,34 @@ public class WorkspacesResource {
     }
 
     @GET
+    @Path("/versions")
+    @Operation(operationId = "getWorkspaceVersion", summary = "Get workspace version", description = """
+            Determines whether the workspace should use Opik V1 (legacy workspace-scoped)
+            or Opik V2 (project-first) navigation. The backend is the single authority for this
+            determination, clients must never derive the version themselves.
+
+            Determination logic (priority order):
+            1) Feature flag override (TOGGLE_FORCE_WORKSPACE_VERSION)
+            2) Auth one-way V2 gate (authenticated mode only)
+            3) Version 1 entity check (entities without project_id)
+            4) Fallback on failure
+
+            In unauthenticated mode (authentication.enabled=false), auth steps are skipped.
+            Called by the frontend on workspace load.""", responses = {
+            @ApiResponse(responseCode = "200", description = "Workspace version", content = @Content(schema = @Schema(implementation = WorkspaceVersion.class)))
+    })
+    public Response getWorkspaceVersion() {
+        var workspaceId = requestContext.get().getWorkspaceId();
+        var authSuggestedVersion = requestContext.get().getOpikVersion();
+        log.info("Determining workspace version, workspaceId '{}', authSuggestedVersion '{}'",
+                workspaceId, authSuggestedVersion);
+        var workspaceVersion = workspaceVersionService.getWorkspaceVersion(workspaceId, authSuggestedVersion).block();
+        log.info("Determined workspace, workspaceId '{}', authSuggestedVersion '{}', version '{}'",
+                workspaceId, authSuggestedVersion, workspaceVersion.opikVersion().getValue());
+        return Response.ok().entity(workspaceVersion).build();
+    }
+
+    @GET
     @Path("/configurations")
     @Operation(operationId = "getWorkspaceConfiguration", summary = "Get workspace configuration", description = "Get workspace configuration", responses = {
             @ApiResponse(responseCode = "200", description = "Workspace Configuration", content = @Content(schema = @Schema(implementation = WorkspaceConfiguration.class))),
@@ -171,6 +204,7 @@ public class WorkspacesResource {
 
     @PUT
     @Path("/configurations")
+    @RequiredPermissions(WorkspaceUserPermission.WORKSPACE_SETTINGS_CONFIGURE)
     @Operation(operationId = "upsertWorkspaceConfiguration", summary = "Upsert workspace configuration", description = "Upsert workspace configuration", responses = {
             @ApiResponse(responseCode = "200", description = "Configuration Updated", content = @Content(schema = @Schema(implementation = WorkspaceConfiguration.class))),
             @ApiResponse(responseCode = "400", description = "Bad Request", content = @Content(schema = @Schema(implementation = ErrorMessage.class))),
@@ -194,6 +228,7 @@ public class WorkspacesResource {
 
     @DELETE
     @Path("/configurations")
+    @RequiredPermissions(WorkspaceUserPermission.WORKSPACE_SETTINGS_CONFIGURE)
     @Operation(operationId = "deleteWorkspaceConfiguration", summary = "Delete workspace configuration", description = "Delete workspace configuration", responses = {
             @ApiResponse(responseCode = "204", description = "Configuration Deleted"),
             @ApiResponse(responseCode = "404", description = "Configuration Not Found", content = @Content(schema = @Schema(implementation = ErrorMessage.class)))

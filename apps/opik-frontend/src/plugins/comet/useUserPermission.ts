@@ -1,10 +1,10 @@
 import { useCallback, useMemo } from "react";
 import find from "lodash/find";
 import useAppStore, { useLoggedInUserName } from "@/store/AppStore";
+import { getUserPermissionValue } from "@/plugins/comet/lib/permissions";
 import useCurrentOrganization from "./useCurrentOrganization";
 import useUserPermissions from "./useUserPermissions";
 import { ManagementPermissionsNames, ORGANIZATION_ROLE_TYPE } from "./types";
-import { getUserPermissionValue } from "@/plugins/comet/lib/permissions";
 
 const useUserPermission = (config?: { enabled?: boolean }) => {
   const configEnabled = config?.enabled ?? true;
@@ -60,17 +60,13 @@ const useUserPermission = (config?: { enabled?: boolean }) => {
   );
 
   const checkNullablePermission = useCallback(
-    (permissionName: ManagementPermissionsNames, requireExplicit?: boolean) => {
+    (permissionName: ManagementPermissionsNames) => {
       if (isWorkspaceOwner) return true;
 
       const permissionValue = getUserPermissionValue(
         workspacePermissions,
         permissionName,
       );
-
-      if (requireExplicit) {
-        return permissionValue === true;
-      }
 
       // should default to true if the permission is not found
       return permissionValue !== false;
@@ -83,6 +79,21 @@ const useUserPermission = (config?: { enabled?: boolean }) => {
     [checkNullablePermission],
   );
 
+  const canCreateDatasets = useMemo(
+    () => checkNullablePermission(ManagementPermissionsNames.DATASET_CREATE),
+    [checkNullablePermission],
+  );
+
+  const canEditDatasets = useMemo(
+    () => checkNullablePermission(ManagementPermissionsNames.DATASET_EDIT),
+    [checkNullablePermission],
+  );
+
+  const canDeleteDatasets = useMemo(
+    () => checkNullablePermission(ManagementPermissionsNames.DATASET_DELETE),
+    [checkNullablePermission],
+  );
+
   const canViewExperiments = useMemo(
     () =>
       canViewDatasets &&
@@ -90,8 +101,30 @@ const useUserPermission = (config?: { enabled?: boolean }) => {
     [canViewDatasets, checkNullablePermission],
   );
 
+  const canCreateExperiments = useMemo(
+    () =>
+      canViewExperiments &&
+      checkNullablePermission(ManagementPermissionsNames.EXPERIMENT_CREATE),
+    [canViewExperiments, checkNullablePermission],
+  );
+
   const canViewDashboards = useMemo(
     () => checkNullablePermission(ManagementPermissionsNames.DASHBOARD_VIEW),
+    [checkNullablePermission],
+  );
+
+  const canCreateDashboards = useMemo(
+    () => checkNullablePermission(ManagementPermissionsNames.DASHBOARD_CREATE),
+    [checkNullablePermission],
+  );
+
+  const canEditDashboards = useMemo(
+    () => checkNullablePermission(ManagementPermissionsNames.DASHBOARD_EDIT),
+    [checkNullablePermission],
+  );
+
+  const canDeleteDashboards = useMemo(
+    () => checkNullablePermission(ManagementPermissionsNames.DASHBOARD_DELETE),
     [checkNullablePermission],
   );
 
@@ -105,6 +138,12 @@ const useUserPermission = (config?: { enabled?: boolean }) => {
       checkNullablePermission(
         ManagementPermissionsNames.ANNOTATION_QUEUE_CREATE,
       ),
+    [checkNullablePermission],
+  );
+
+  const canEditAnnotationQueues = useMemo(
+    () =>
+      checkNullablePermission(ManagementPermissionsNames.ANNOTATION_QUEUE_EDIT),
     [checkNullablePermission],
   );
 
@@ -126,24 +165,10 @@ const useUserPermission = (config?: { enabled?: boolean }) => {
     [checkNullablePermission],
   );
 
-  const canDeleteDatasets = useMemo(
-    () => checkNullablePermission(ManagementPermissionsNames.DATASET_DELETE),
-    [checkNullablePermission],
-  );
-
   const canDeleteOptimizationRuns = useMemo(
     () =>
       checkNullablePermission(
         ManagementPermissionsNames.OPTIMIZATION_RUN_DELETE,
-      ),
-    [checkNullablePermission],
-  );
-
-  const canUpdateUserRole = useMemo(
-    () =>
-      checkNullablePermission(
-        ManagementPermissionsNames.USER_ROLE_UPDATE,
-        true,
       ),
     [checkNullablePermission],
   );
@@ -172,8 +197,21 @@ const useUserPermission = (config?: { enabled?: boolean }) => {
     [checkNullablePermission],
   );
 
+  const canUpdateOnlineEvaluationRules = useMemo(
+    () =>
+      checkNullablePermission(
+        ManagementPermissionsNames.ONLINE_EVALUATION_RULE_UPDATE,
+      ),
+    [checkNullablePermission],
+  );
+
   const canUpdateAlerts = useMemo(
     () => checkNullablePermission(ManagementPermissionsNames.ALERT_UPDATE),
+    [checkNullablePermission],
+  );
+
+  const canTagTrace = useMemo(
+    () => checkNullablePermission(ManagementPermissionsNames.TRACE_TAG),
     [checkNullablePermission],
   );
 
@@ -189,22 +227,30 @@ const useUserPermission = (config?: { enabled?: boolean }) => {
     canInviteMembers,
     isWorkspaceOwner,
     canViewExperiments,
+    canCreateExperiments,
     canViewDashboards,
+    canCreateDashboards,
+    canEditDashboards,
+    canDeleteDashboards,
     canViewDatasets,
+    canCreateDatasets,
+    canEditDatasets,
+    canDeleteDatasets,
+    canCreateProjects,
     canDeleteProjects,
     canCreateAnnotationQueues,
+    canEditAnnotationQueues,
     canDeleteAnnotationQueues,
     canDeleteTraces,
     canDeletePrompts,
-    canDeleteDatasets,
     canDeleteOptimizationRuns,
-    canUpdateUserRole,
     canConfigureWorkspaceSettings,
     canUpdateAIProviders,
-    canCreateProjects,
     canWriteComments,
+    canUpdateOnlineEvaluationRules,
     canUpdateAlerts,
     canAnnotateTraceSpanThread,
+    canTagTrace,
     isPending: isEnabled && isPending,
   };
 };

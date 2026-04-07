@@ -13,12 +13,10 @@ from ..errors.conflict_error import ConflictError
 from ..errors.not_found_error import NotFoundError
 from ..types.dashboard_page_public import DashboardPagePublic
 from ..types.dashboard_public import DashboardPublic
+from ..types.dashboard_update_public_type import DashboardUpdatePublicType
+from ..types.dashboard_write_type import DashboardWriteType
 from ..types.json_node_public import JsonNodePublic
 from ..types.json_node_write import JsonNodeWrite
-from .types.dashboard_update_public_scope import DashboardUpdatePublicScope
-from .types.dashboard_update_public_type import DashboardUpdatePublicType
-from .types.dashboard_write_scope import DashboardWriteScope
-from .types.dashboard_write_type import DashboardWriteType
 
 # this is used as the default value for optional parameters
 OMIT = typing.cast(typing.Any, ...)
@@ -34,6 +32,7 @@ class RawDashboardsClient:
         page: typing.Optional[int] = None,
         size: typing.Optional[int] = None,
         name: typing.Optional[str] = None,
+        project_id: typing.Optional[str] = None,
         sorting: typing.Optional[str] = None,
         filters: typing.Optional[str] = None,
         request_options: typing.Optional[RequestOptions] = None,
@@ -48,6 +47,8 @@ class RawDashboardsClient:
         size : typing.Optional[int]
 
         name : typing.Optional[str]
+
+        project_id : typing.Optional[str]
 
         sorting : typing.Optional[str]
 
@@ -68,6 +69,7 @@ class RawDashboardsClient:
                 "page": page,
                 "size": size,
                 "name": name,
+                "project_id": project_id,
                 "sorting": sorting,
                 "filters": filters,
             },
@@ -93,8 +95,9 @@ class RawDashboardsClient:
         *,
         name: str,
         config: JsonNodeWrite,
+        project_id: typing.Optional[str] = OMIT,
+        project_name: typing.Optional[str] = OMIT,
         type: typing.Optional[DashboardWriteType] = OMIT,
-        scope: typing.Optional[DashboardWriteScope] = OMIT,
         description: typing.Optional[str] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> HttpResponse[DashboardPublic]:
@@ -107,9 +110,13 @@ class RawDashboardsClient:
 
         config : JsonNodeWrite
 
-        type : typing.Optional[DashboardWriteType]
+        project_id : typing.Optional[str]
+            Project ID. Takes precedence over project_name when both are provided.
 
-        scope : typing.Optional[DashboardWriteScope]
+        project_name : typing.Optional[str]
+            For project scope, specify either project_id or project_name. If project_name is provided and the project does not exist, it will be created. Ignored when project_id is provided. If neither is provided, the dashboard is created at workspace level.
+
+        type : typing.Optional[DashboardWriteType]
 
         description : typing.Optional[str]
 
@@ -125,9 +132,10 @@ class RawDashboardsClient:
             "v1/private/dashboards",
             method="POST",
             json={
+                "project_id": project_id,
+                "project_name": project_name,
                 "name": name,
                 "type": type,
-                "scope": scope,
                 "description": description,
                 "config": config,
             },
@@ -237,7 +245,6 @@ class RawDashboardsClient:
         *,
         name: typing.Optional[str] = OMIT,
         type: typing.Optional[DashboardUpdatePublicType] = OMIT,
-        scope: typing.Optional[DashboardUpdatePublicScope] = OMIT,
         description: typing.Optional[str] = OMIT,
         config: typing.Optional[JsonNodePublic] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
@@ -252,8 +259,6 @@ class RawDashboardsClient:
         name : typing.Optional[str]
 
         type : typing.Optional[DashboardUpdatePublicType]
-
-        scope : typing.Optional[DashboardUpdatePublicScope]
 
         description : typing.Optional[str]
 
@@ -273,7 +278,6 @@ class RawDashboardsClient:
             json={
                 "name": name,
                 "type": type,
-                "scope": scope,
                 "description": description,
                 "config": config,
             },
@@ -368,6 +372,7 @@ class AsyncRawDashboardsClient:
         page: typing.Optional[int] = None,
         size: typing.Optional[int] = None,
         name: typing.Optional[str] = None,
+        project_id: typing.Optional[str] = None,
         sorting: typing.Optional[str] = None,
         filters: typing.Optional[str] = None,
         request_options: typing.Optional[RequestOptions] = None,
@@ -382,6 +387,8 @@ class AsyncRawDashboardsClient:
         size : typing.Optional[int]
 
         name : typing.Optional[str]
+
+        project_id : typing.Optional[str]
 
         sorting : typing.Optional[str]
 
@@ -402,6 +409,7 @@ class AsyncRawDashboardsClient:
                 "page": page,
                 "size": size,
                 "name": name,
+                "project_id": project_id,
                 "sorting": sorting,
                 "filters": filters,
             },
@@ -427,8 +435,9 @@ class AsyncRawDashboardsClient:
         *,
         name: str,
         config: JsonNodeWrite,
+        project_id: typing.Optional[str] = OMIT,
+        project_name: typing.Optional[str] = OMIT,
         type: typing.Optional[DashboardWriteType] = OMIT,
-        scope: typing.Optional[DashboardWriteScope] = OMIT,
         description: typing.Optional[str] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> AsyncHttpResponse[DashboardPublic]:
@@ -441,9 +450,13 @@ class AsyncRawDashboardsClient:
 
         config : JsonNodeWrite
 
-        type : typing.Optional[DashboardWriteType]
+        project_id : typing.Optional[str]
+            Project ID. Takes precedence over project_name when both are provided.
 
-        scope : typing.Optional[DashboardWriteScope]
+        project_name : typing.Optional[str]
+            For project scope, specify either project_id or project_name. If project_name is provided and the project does not exist, it will be created. Ignored when project_id is provided. If neither is provided, the dashboard is created at workspace level.
+
+        type : typing.Optional[DashboardWriteType]
 
         description : typing.Optional[str]
 
@@ -459,9 +472,10 @@ class AsyncRawDashboardsClient:
             "v1/private/dashboards",
             method="POST",
             json={
+                "project_id": project_id,
+                "project_name": project_name,
                 "name": name,
                 "type": type,
-                "scope": scope,
                 "description": description,
                 "config": config,
             },
@@ -571,7 +585,6 @@ class AsyncRawDashboardsClient:
         *,
         name: typing.Optional[str] = OMIT,
         type: typing.Optional[DashboardUpdatePublicType] = OMIT,
-        scope: typing.Optional[DashboardUpdatePublicScope] = OMIT,
         description: typing.Optional[str] = OMIT,
         config: typing.Optional[JsonNodePublic] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
@@ -586,8 +599,6 @@ class AsyncRawDashboardsClient:
         name : typing.Optional[str]
 
         type : typing.Optional[DashboardUpdatePublicType]
-
-        scope : typing.Optional[DashboardUpdatePublicScope]
 
         description : typing.Optional[str]
 
@@ -607,7 +618,6 @@ class AsyncRawDashboardsClient:
             json={
                 "name": name,
                 "type": type,
-                "scope": scope,
                 "description": description,
                 "config": config,
             },

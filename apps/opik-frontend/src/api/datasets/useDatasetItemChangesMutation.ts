@@ -2,17 +2,20 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { AxiosError } from "axios";
 
 import api, { DATASETS_REST_ENDPOINT } from "@/api/api";
-import { DatasetItem } from "@/types/datasets";
-import { useToast } from "@/components/ui/use-toast";
+import { DatasetItem, Evaluator } from "@/types/datasets";
+import { ExecutionPolicy } from "@/types/evaluation-suites";
+import { useToast } from "@/ui/use-toast";
 import { extractErrorMessage } from "@/lib/tags";
 
 interface DatasetItemChangesPayload {
   added_items: DatasetItem[];
   edited_items: Partial<DatasetItem>[];
   deleted_ids: string[];
-  base_version: string;
+  base_version: string | null;
   tags?: string[];
   change_description?: string;
+  evaluators?: Evaluator[];
+  execution_policy?: ExecutionPolicy;
 }
 
 interface UseDatasetItemChangesMutationParams {
@@ -57,7 +60,6 @@ const useDatasetItemChangesMutation = (
       }
 
       // For other errors, show toast
-
       toast({
         title: "Error",
         description: extractErrorMessage(error),
@@ -71,11 +73,15 @@ const useDatasetItemChangesMutation = (
       queryClient.invalidateQueries({
         queryKey: ["dataset-items", { datasetId: variables.datasetId }],
       });
+      queryClient.invalidateQueries({ queryKey: ["project-datasets"] });
       queryClient.invalidateQueries({
         queryKey: ["datasets"],
       });
       queryClient.invalidateQueries({
         queryKey: ["dataset", { datasetId: variables.datasetId }],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["dataset-versions"],
       });
     },
   });

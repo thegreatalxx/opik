@@ -16,6 +16,7 @@
 
 // Minimal/Ghost actions
 <Button variant="ghost">Link Action</Button>
+<Button variant="ghostInverted">Action on Dark BG</Button>
 <Button variant="minimal">Subtle Action</Button>
 
 // Link actions
@@ -149,6 +150,6 @@ className={cn("border", { "border-destructive": hasError })}
 
 ## Component Placement
 
-- **Reusable**: `components/shared/`
+- **Reusable**: `shared/`
 - **Page-specific**: Same folder as parent component
-- **Low-level UI**: `components/ui/`
+- **Low-level UI**: `ui/`

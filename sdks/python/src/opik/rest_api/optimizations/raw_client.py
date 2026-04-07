@@ -78,7 +78,9 @@ class RawOptimizationsClient:
         size: typing.Optional[int] = None,
         dataset_id: typing.Optional[str] = None,
         name: typing.Optional[str] = None,
+        dataset_name: typing.Optional[str] = None,
         dataset_deleted: typing.Optional[bool] = None,
+        project_id: typing.Optional[str] = None,
         filters: typing.Optional[str] = None,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> HttpResponse[OptimizationPagePublic]:
@@ -95,7 +97,11 @@ class RawOptimizationsClient:
 
         name : typing.Optional[str]
 
+        dataset_name : typing.Optional[str]
+
         dataset_deleted : typing.Optional[bool]
+
+        project_id : typing.Optional[str]
 
         filters : typing.Optional[str]
 
@@ -115,7 +121,9 @@ class RawOptimizationsClient:
                 "size": size,
                 "dataset_id": dataset_id,
                 "name": name,
+                "dataset_name": dataset_name,
                 "dataset_deleted": dataset_deleted,
+                "project_id": project_id,
                 "filters": filters,
             },
             request_options=request_options,
@@ -154,6 +162,8 @@ class RawOptimizationsClient:
         status: OptimizationWriteStatus,
         id: typing.Optional[str] = OMIT,
         name: typing.Optional[str] = OMIT,
+        project_name: typing.Optional[str] = OMIT,
+        project_id: typing.Optional[str] = OMIT,
         metadata: typing.Optional[JsonListStringWrite] = OMIT,
         studio_config: typing.Optional[OptimizationStudioConfigWrite] = OMIT,
         last_updated_at: typing.Optional[dt.datetime] = OMIT,
@@ -173,6 +183,12 @@ class RawOptimizationsClient:
         id : typing.Optional[str]
 
         name : typing.Optional[str]
+
+        project_name : typing.Optional[str]
+            Project name. Creates project if it doesn't exist. Ignored when project_id is provided.
+
+        project_id : typing.Optional[str]
+            Project ID. Takes precedence over project_name when both are provided.
 
         metadata : typing.Optional[JsonListStringWrite]
 
@@ -194,6 +210,8 @@ class RawOptimizationsClient:
                 "id": id,
                 "name": name,
                 "dataset_name": dataset_name,
+                "project_name": project_name,
+                "project_id": project_id,
                 "objective_name": objective_name,
                 "status": status,
                 "metadata": convert_and_respect_annotation_metadata(
@@ -226,6 +244,8 @@ class RawOptimizationsClient:
         status: OptimizationWriteStatus,
         id: typing.Optional[str] = OMIT,
         name: typing.Optional[str] = OMIT,
+        project_name: typing.Optional[str] = OMIT,
+        project_id: typing.Optional[str] = OMIT,
         metadata: typing.Optional[JsonListStringWrite] = OMIT,
         studio_config: typing.Optional[OptimizationStudioConfigWrite] = OMIT,
         last_updated_at: typing.Optional[dt.datetime] = OMIT,
@@ -245,6 +265,12 @@ class RawOptimizationsClient:
         id : typing.Optional[str]
 
         name : typing.Optional[str]
+
+        project_name : typing.Optional[str]
+            Project name. Creates project if it doesn't exist. Ignored when project_id is provided.
+
+        project_id : typing.Optional[str]
+            Project ID. Takes precedence over project_name when both are provided.
 
         metadata : typing.Optional[JsonListStringWrite]
 
@@ -266,6 +292,8 @@ class RawOptimizationsClient:
                 "id": id,
                 "name": name,
                 "dataset_name": dataset_name,
+                "project_name": project_name,
+                "project_id": project_id,
                 "objective_name": objective_name,
                 "status": status,
                 "metadata": convert_and_respect_annotation_metadata(
@@ -525,7 +553,9 @@ class AsyncRawOptimizationsClient:
         size: typing.Optional[int] = None,
         dataset_id: typing.Optional[str] = None,
         name: typing.Optional[str] = None,
+        dataset_name: typing.Optional[str] = None,
         dataset_deleted: typing.Optional[bool] = None,
+        project_id: typing.Optional[str] = None,
         filters: typing.Optional[str] = None,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> AsyncHttpResponse[OptimizationPagePublic]:
@@ -542,7 +572,11 @@ class AsyncRawOptimizationsClient:
 
         name : typing.Optional[str]
 
+        dataset_name : typing.Optional[str]
+
         dataset_deleted : typing.Optional[bool]
+
+        project_id : typing.Optional[str]
 
         filters : typing.Optional[str]
 
@@ -562,7 +596,9 @@ class AsyncRawOptimizationsClient:
                 "size": size,
                 "dataset_id": dataset_id,
                 "name": name,
+                "dataset_name": dataset_name,
                 "dataset_deleted": dataset_deleted,
+                "project_id": project_id,
                 "filters": filters,
             },
             request_options=request_options,
@@ -601,6 +637,8 @@ class AsyncRawOptimizationsClient:
         status: OptimizationWriteStatus,
         id: typing.Optional[str] = OMIT,
         name: typing.Optional[str] = OMIT,
+        project_name: typing.Optional[str] = OMIT,
+        project_id: typing.Optional[str] = OMIT,
         metadata: typing.Optional[JsonListStringWrite] = OMIT,
         studio_config: typing.Optional[OptimizationStudioConfigWrite] = OMIT,
         last_updated_at: typing.Optional[dt.datetime] = OMIT,
@@ -620,6 +658,12 @@ class AsyncRawOptimizationsClient:
         id : typing.Optional[str]
 
         name : typing.Optional[str]
+
+        project_name : typing.Optional[str]
+            Project name. Creates project if it doesn't exist. Ignored when project_id is provided.
+
+        project_id : typing.Optional[str]
+            Project ID. Takes precedence over project_name when both are provided.
 
         metadata : typing.Optional[JsonListStringWrite]
 
@@ -641,6 +685,8 @@ class AsyncRawOptimizationsClient:
                 "id": id,
                 "name": name,
                 "dataset_name": dataset_name,
+                "project_name": project_name,
+                "project_id": project_id,
                 "objective_name": objective_name,
                 "status": status,
                 "metadata": convert_and_respect_annotation_metadata(
@@ -673,6 +719,8 @@ class AsyncRawOptimizationsClient:
         status: OptimizationWriteStatus,
         id: typing.Optional[str] = OMIT,
         name: typing.Optional[str] = OMIT,
+        project_name: typing.Optional[str] = OMIT,
+        project_id: typing.Optional[str] = OMIT,
         metadata: typing.Optional[JsonListStringWrite] = OMIT,
         studio_config: typing.Optional[OptimizationStudioConfigWrite] = OMIT,
         last_updated_at: typing.Optional[dt.datetime] = OMIT,
@@ -692,6 +740,12 @@ class AsyncRawOptimizationsClient:
         id : typing.Optional[str]
 
         name : typing.Optional[str]
+
+        project_name : typing.Optional[str]
+            Project name. Creates project if it doesn't exist. Ignored when project_id is provided.
+
+        project_id : typing.Optional[str]
+            Project ID. Takes precedence over project_name when both are provided.
 
         metadata : typing.Optional[JsonListStringWrite]
 
@@ -713,6 +767,8 @@ class AsyncRawOptimizationsClient:
                 "id": id,
                 "name": name,
                 "dataset_name": dataset_name,
+                "project_name": project_name,
+                "project_id": project_id,
                 "objective_name": objective_name,
                 "status": status,
                 "metadata": convert_and_respect_annotation_metadata(

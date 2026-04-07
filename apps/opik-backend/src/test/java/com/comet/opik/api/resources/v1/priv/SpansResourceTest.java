@@ -10,8 +10,10 @@ import com.comet.opik.api.FeedbackScoreItem;
 import com.comet.opik.api.FeedbackScoreNames;
 import com.comet.opik.api.Project;
 import com.comet.opik.api.ReactServiceErrorResponse;
+import com.comet.opik.api.Source;
 import com.comet.opik.api.Span;
 import com.comet.opik.api.SpanBatch;
+import com.comet.opik.api.SpanBatchUpdate;
 import com.comet.opik.api.SpanSearchStreamRequest;
 import com.comet.opik.api.SpanUpdate;
 import com.comet.opik.api.Trace;
@@ -19,6 +21,8 @@ import com.comet.opik.api.Visibility;
 import com.comet.opik.api.attachment.AttachmentInfo;
 import com.comet.opik.api.attachment.EntityType;
 import com.comet.opik.api.error.ErrorMessage;
+import com.comet.opik.api.filter.Operator;
+import com.comet.opik.api.filter.SpanField;
 import com.comet.opik.api.filter.SpanFilter;
 import com.comet.opik.api.resources.utils.AuthTestUtils;
 import com.comet.opik.api.resources.utils.ClickHouseContainerUtils;
@@ -44,6 +48,7 @@ import com.comet.opik.domain.SpanType;
 import com.comet.opik.domain.cost.CostService;
 import com.comet.opik.extensions.DropwizardAppExtensionProvider;
 import com.comet.opik.extensions.RegisterApp;
+import com.comet.opik.infrastructure.auth.WorkspaceUserPermission;
 import com.comet.opik.infrastructure.usagelimit.Quota;
 import com.comet.opik.podam.PodamFactoryUtils;
 import com.comet.opik.utils.AttachmentPayloadUtilsTest;
@@ -81,6 +86,7 @@ import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.testcontainers.clickhouse.ClickHouseContainer;
 import org.testcontainers.containers.GenericContainer;
@@ -143,6 +149,7 @@ import static com.github.tomakehurst.wiremock.client.WireMock.matching;
 import static com.github.tomakehurst.wiremock.client.WireMock.matchingJsonPath;
 import static com.github.tomakehurst.wiremock.client.WireMock.okJson;
 import static com.github.tomakehurst.wiremock.client.WireMock.post;
+import static com.github.tomakehurst.wiremock.client.WireMock.postRequestedFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlPathEqualTo;
 import static java.util.stream.Collectors.toMap;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -292,6 +299,107 @@ class SpansResourceTest {
 
         SpanAssertions.assertPage(actualPage, page, expectedSpans.size(), expectedTotal);
         SpanAssertions.assertSpan(actualPage.content(), expectedSpans, unexpectedSpans, USER);
+    }
+
+    @Nested
+    @DisplayName("Required permissions")
+    class RequiredPermissionsTest {
+
+        @Test
+        @DisplayName("Create span passes required permissions to auth endpoint")
+        void createSpanPassesRequiredPermissionsToAuthEndpoint() {
+            String apiKey = UUID.randomUUID().toString();
+            String workspaceName = "test-workspace-" + UUID.randomUUID();
+            String workspaceId = UUID.randomUUID().toString();
+            mockTargetWorkspace(apiKey, workspaceName, workspaceId);
+
+            var span = podamFactory.manufacturePojo(Span.class);
+
+            wireMock.server().resetRequests();
+            spanResourceClient.createSpan(span, apiKey, workspaceName);
+
+            wireMock.server().verify(
+                    postRequestedFor(urlPathEqualTo("/opik/auth"))
+                            .withRequestBody(matchingJsonPath("$.requiredPermissions[0]",
+                                    equalTo(WorkspaceUserPermission.TRACE_SPAN_THREAD_LOG.getValue()))));
+        }
+
+        @Test
+        @DisplayName("Create spans batch passes required permissions to auth endpoint")
+        void createSpansBatchPassesRequiredPermissionsToAuthEndpoint() {
+            String apiKey = UUID.randomUUID().toString();
+            String workspaceName = "test-workspace-" + UUID.randomUUID();
+            String workspaceId = UUID.randomUUID().toString();
+            mockTargetWorkspace(apiKey, workspaceName, workspaceId);
+
+            var span = podamFactory.manufacturePojo(Span.class);
+
+            wireMock.server().resetRequests();
+            spanResourceClient.batchCreateSpans(List.of(span), apiKey, workspaceName);
+
+            wireMock.server().verify(
+                    postRequestedFor(urlPathEqualTo("/opik/auth"))
+                            .withRequestBody(matchingJsonPath("$.requiredPermissions[0]",
+                                    equalTo(WorkspaceUserPermission.TRACE_SPAN_THREAD_LOG.getValue()))));
+        }
+
+        @Test
+        @DisplayName("Batch update spans passes required permissions to auth endpoint")
+        void batchUpdateSpansPassesRequiredPermissionsToAuthEndpoint() {
+            String apiKey = UUID.randomUUID().toString();
+            String workspaceName = "test-workspace-" + UUID.randomUUID();
+            String workspaceId = UUID.randomUUID().toString();
+            mockTargetWorkspace(apiKey, workspaceName, workspaceId);
+
+            var span = podamFactory.manufacturePojo(Span.class);
+            var spanId = spanResourceClient.createSpan(span, apiKey, workspaceName);
+
+            var update = podamFactory.manufacturePojo(SpanUpdate.class).toBuilder()
+                    .parentSpanId(span.parentSpanId())
+                    .traceId(span.traceId())
+                    .projectName(span.projectName())
+                    .projectId(null)
+                    .build();
+            var batchUpdate = SpanBatchUpdate.builder()
+                    .ids(Set.of(spanId))
+                    .update(update)
+                    .build();
+
+            wireMock.server().resetRequests();
+            spanResourceClient.batchUpdateSpans(batchUpdate, apiKey, workspaceName);
+
+            wireMock.server().verify(
+                    postRequestedFor(urlPathEqualTo("/opik/auth"))
+                            .withRequestBody(matchingJsonPath("$.requiredPermissions[0]",
+                                    equalTo(WorkspaceUserPermission.TRACE_SPAN_THREAD_LOG.getValue()))));
+        }
+
+        @Test
+        @DisplayName("Update span passes required permissions to auth endpoint")
+        void updateSpanPassesRequiredPermissionsToAuthEndpoint() {
+            String apiKey = UUID.randomUUID().toString();
+            String workspaceName = "test-workspace-" + UUID.randomUUID();
+            String workspaceId = UUID.randomUUID().toString();
+            mockTargetWorkspace(apiKey, workspaceName, workspaceId);
+
+            var span = podamFactory.manufacturePojo(Span.class);
+            var spanId = spanResourceClient.createSpan(span, apiKey, workspaceName);
+
+            var update = podamFactory.manufacturePojo(SpanUpdate.class).toBuilder()
+                    .parentSpanId(span.parentSpanId())
+                    .traceId(span.traceId())
+                    .projectName(span.projectName())
+                    .projectId(null)
+                    .build();
+
+            wireMock.server().resetRequests();
+            spanResourceClient.updateSpan(spanId, update, apiKey, workspaceName);
+
+            wireMock.server().verify(
+                    postRequestedFor(urlPathEqualTo("/opik/auth"))
+                            .withRequestBody(matchingJsonPath("$.requiredPermissions[0]",
+                                    equalTo(WorkspaceUserPermission.TRACE_SPAN_THREAD_LOG.getValue()))));
+        }
     }
 
     @Nested
@@ -1168,7 +1276,7 @@ class SpansResourceTest {
                             "{\"created_from\":\"openai\",\"type\":\"openai_chat\",\"model\":\"gpt-3.5-turbo\"}");
             String metadataWithCost = """
                     {"cost": {
-                        "total_tokens": %s,
+                        "total_cost": %s,
                         "currency": "%s"
                       }}""";
 
@@ -1179,15 +1287,15 @@ class SpansResourceTest {
                             JsonUtils.getJsonNodeFromString(metadataWithCost.formatted("0.000339", "USD")), null),
                     Arguments.of(Map.of("completion_tokens", Math.abs(podamFactory.manufacturePojo(Integer.class)),
                             "prompt_tokens", Math.abs(podamFactory.manufacturePojo(Integer.class))),
-                            "gemini-1.5-pro-preview-0514", "google_vertexai",
+                            "gemini-2.5-pro", "google_vertexai",
                             null, null),
                     Arguments.of(Map.of("completion_tokens", Math.abs(podamFactory.manufacturePojo(Integer.class)),
                             "prompt_tokens", Math.abs(podamFactory.manufacturePojo(Integer.class))),
-                            "claude-3-5-haiku-latest", "anthropic",
+                            "claude-haiku-4-5", "anthropic",
                             null, null),
                     Arguments.of(Map.of("completion_tokens", Math.abs(podamFactory.manufacturePojo(Integer.class)),
                             "prompt_tokens", Math.abs(podamFactory.manufacturePojo(Integer.class))),
-                            "claude-3-5-sonnet-v2@20241022", "anthropic_vertexai",
+                            "claude-sonnet-4-5", "anthropic_vertexai",
                             null, null),
                     Arguments.of(Map.of("completion_tokens", Math.abs(podamFactory.manufacturePojo(Integer.class)),
                             "prompt_tokens", Math.abs(podamFactory.manufacturePojo(Integer.class))),
@@ -1213,7 +1321,7 @@ class SpansResourceTest {
                     Arguments.of(
                             Map.of("completion_tokens", Math.abs(podamFactory.manufacturePojo(Integer.class)),
                                     "prompt_tokens", Math.abs(podamFactory.manufacturePojo(Integer.class))),
-                            "claude-3-5-sonnet-latest", "anthropic",
+                            "claude-sonnet-4-5", "anthropic",
                             null, null),
                     Arguments.of(
                             Map.of("original_usage.input_tokens", Math.abs(podamFactory.manufacturePojo(Integer.class)),
@@ -1223,7 +1331,7 @@ class SpansResourceTest {
                                     Math.abs(podamFactory.manufacturePojo(Integer.class)),
                                     "original_usage.cache_creation_input_tokens",
                                     Math.abs(podamFactory.manufacturePojo(Integer.class))),
-                            "claude-3-5-sonnet-latest", "anthropic",
+                            "claude-sonnet-4-5", "anthropic",
                             null, null),
                     Arguments.of(
                             Map.of("original_usage.inputTokens", Math.abs(podamFactory.manufacturePojo(Integer.class)),
@@ -2122,13 +2230,13 @@ class SpansResourceTest {
         Stream<Arguments> update__whenCostIsChanged__thenAcceptUpdate() {
             String metadataWithCost = """
                     {"cost": {
-                        "total_tokens": %s,
+                        "total_cost": %s,
                         "currency": "%s"
                       }}""";
 
             return Stream.of(
                     arguments(SpanUpdate.builder().model("gpt-4o-2024-05-13").totalEstimatedCost(null).build(), null),
-                    arguments(SpanUpdate.builder().model("gemini-1.5-pro-002").provider("google_ai")
+                    arguments(SpanUpdate.builder().model("gemini-pro-latest").provider("google_ai")
                             .totalEstimatedCost(null).build(), null),
                     arguments(SpanUpdate.builder()
                             .usage(Map.of("completion_tokens", Math.abs(podamFactory.manufacturePojo(Integer.class)),
@@ -4001,6 +4109,182 @@ class SpansResourceTest {
                         assertThat(inputString).containsPattern("\\[input-attachment-\\d+-\\d+\\.(jpg|jpeg)\\]");
                         assertThat(outputString).containsPattern("\\[output-attachment-\\d+-\\d+\\.png\\]");
                     });
+        }
+    }
+
+    @Nested
+    @DisplayName("Source field on span creation")
+    class CreateSpanWithSource {
+
+        @ParameterizedTest
+        @EnumSource(Source.class)
+        @DisplayName("Create span with each valid source and verify it is stored")
+        void createSpanWithSource(Source source) {
+            var trace = podamFactory.manufacturePojo(Trace.class).toBuilder()
+                    .projectName(DEFAULT_PROJECT)
+                    .build();
+            var traceId = traceResourceClient.createTrace(trace, API_KEY, TEST_WORKSPACE);
+
+            var span = podamFactory.manufacturePojo(Span.class).toBuilder()
+                    .projectName(DEFAULT_PROJECT)
+                    .traceId(traceId)
+                    .source(source)
+                    .build();
+
+            var id = spanResourceClient.createSpan(span, API_KEY, TEST_WORKSPACE);
+
+            var actual = spanResourceClient.getById(id, TEST_WORKSPACE, API_KEY);
+            assertThat(actual.source()).isEqualTo(source);
+        }
+
+        @Test
+        @DisplayName("Create span without source defaults to null (unknown in storage)")
+        void createSpanWithoutSourceDefaultsToNull() {
+            var trace = podamFactory.manufacturePojo(Trace.class).toBuilder()
+                    .projectName(DEFAULT_PROJECT)
+                    .build();
+            var traceId = traceResourceClient.createTrace(trace, API_KEY, TEST_WORKSPACE);
+
+            var span = podamFactory.manufacturePojo(Span.class).toBuilder()
+                    .projectName(DEFAULT_PROJECT)
+                    .traceId(traceId)
+                    .source(null)
+                    .build();
+
+            var id = spanResourceClient.createSpan(span, API_KEY, TEST_WORKSPACE);
+
+            var actual = spanResourceClient.getById(id, TEST_WORKSPACE, API_KEY);
+            assertThat(actual.source()).isNull();
+        }
+
+        @Test
+        @DisplayName("Create span with invalid source returns 400")
+        void createSpanWithInvalidSourceReturns400() {
+            var trace = podamFactory.manufacturePojo(Trace.class).toBuilder()
+                    .projectName(DEFAULT_PROJECT)
+                    .build();
+            var traceId = traceResourceClient.createTrace(trace, API_KEY, TEST_WORKSPACE);
+
+            var body = """
+                    {
+                        "project_name": "%s",
+                        "trace_id": "%s",
+                        "name": "test-span",
+                        "type": "general",
+                        "start_time": "2024-01-01T00:00:00Z",
+                        "source": "invalid_source"
+                    }
+                    """.formatted(DEFAULT_PROJECT, traceId);
+
+            try (var response = client.target("%s/v1/private/spans".formatted(baseURI))
+                    .request()
+                    .accept(MediaType.APPLICATION_JSON_TYPE)
+                    .header(HttpHeaders.AUTHORIZATION, API_KEY)
+                    .header(WORKSPACE_HEADER, TEST_WORKSPACE)
+                    .post(Entity.json(body))) {
+
+                assertThat(response.getStatus()).isEqualTo(HttpStatus.SC_BAD_REQUEST);
+            }
+        }
+    }
+
+    @Nested
+    @DisplayName("Filter spans by source")
+    class FilterSpansBySource {
+
+        @ParameterizedTest
+        @EnumSource(Source.class)
+        @DisplayName("Filter spans by source EQUAL returns only matching spans")
+        void filterSpansBySourceEqual(Source source) {
+            var projectName = "span-source-filter-test-" + UUID.randomUUID();
+            var trace = podamFactory.manufacturePojo(Trace.class).toBuilder()
+                    .projectName(projectName)
+                    .build();
+            var traceId = traceResourceClient.createTrace(trace, API_KEY, TEST_WORKSPACE);
+
+            var matchingSpan = podamFactory.manufacturePojo(Span.class).toBuilder()
+                    .projectName(projectName)
+                    .traceId(traceId)
+                    .source(source)
+                    .usage(null)
+                    .feedbackScores(null)
+                    .build();
+
+            var otherSource = source == Source.SDK ? Source.EXPERIMENT : Source.SDK;
+            var nonMatchingSpan = podamFactory.manufacturePojo(Span.class).toBuilder()
+                    .projectName(projectName)
+                    .traceId(traceId)
+                    .source(otherSource)
+                    .usage(null)
+                    .feedbackScores(null)
+                    .build();
+
+            spanResourceClient.createSpan(matchingSpan, API_KEY, TEST_WORKSPACE);
+            spanResourceClient.createSpan(nonMatchingSpan, API_KEY, TEST_WORKSPACE);
+
+            var filters = List.of(SpanFilter.builder()
+                    .field(SpanField.SOURCE)
+                    .operator(Operator.EQUAL)
+                    .value(source.getValue())
+                    .build());
+
+            var page = spanResourceClient.findSpans(TEST_WORKSPACE, API_KEY, projectName, null, 1, 10,
+                    null, null, filters, List.of(), List.of());
+
+            SpanAssertions.assertSpan(page.content(), List.of(matchingSpan), List.of(nonMatchingSpan), USER);
+        }
+
+        @Test
+        @DisplayName("Filter by source SDK also returns legacy spans with unknown source (null)")
+        void filterBySourceSdkIncludesUnknownSourceSpans() {
+            var projectName = "span-source-filter-sdk-unknown-" + UUID.randomUUID();
+            var trace = podamFactory.manufacturePojo(Trace.class).toBuilder()
+                    .projectName(projectName)
+                    .build();
+            var traceId = traceResourceClient.createTrace(trace, API_KEY, TEST_WORKSPACE);
+
+            var sdkSpan = podamFactory.manufacturePojo(Span.class).toBuilder()
+                    .projectName(projectName)
+                    .traceId(traceId)
+                    .source(Source.SDK)
+                    .usage(null)
+                    .feedbackScores(null)
+                    .build();
+
+            var unknownSourceSpan = podamFactory.manufacturePojo(Span.class).toBuilder()
+                    .projectName(projectName)
+                    .traceId(traceId)
+                    .source(null)
+                    .usage(null)
+                    .feedbackScores(null)
+                    .build();
+
+            var experimentSpan = podamFactory.manufacturePojo(Span.class).toBuilder()
+                    .projectName(projectName)
+                    .traceId(traceId)
+                    .source(Source.EXPERIMENT)
+                    .usage(null)
+                    .feedbackScores(null)
+                    .build();
+
+            spanResourceClient.createSpan(sdkSpan, API_KEY, TEST_WORKSPACE);
+            spanResourceClient.createSpan(unknownSourceSpan, API_KEY, TEST_WORKSPACE);
+            spanResourceClient.createSpan(experimentSpan, API_KEY, TEST_WORKSPACE);
+
+            var filters = List.of(SpanFilter.builder()
+                    .field(SpanField.SOURCE)
+                    .operator(Operator.EQUAL)
+                    .value(Source.SDK.getValue())
+                    .build());
+
+            var page = spanResourceClient.findSpans(TEST_WORKSPACE, API_KEY, projectName, null, 1, 10,
+                    null, null, filters, List.of(), List.of());
+
+            // ClickHouse returns spans in descending insertion order;
+            // unknownSourceSpan was inserted after sdkSpan so it comes first.
+            SpanAssertions.assertSpan(page.content(),
+                    List.of(unknownSourceSpan, sdkSpan),
+                    List.of(experimentSpan), USER);
         }
     }
 }

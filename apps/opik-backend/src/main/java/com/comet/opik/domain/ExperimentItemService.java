@@ -19,9 +19,9 @@ import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.lang3.StringUtils;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-import reactor.core.scheduler.Schedulers;
 
 import java.util.EnumSet;
 import java.util.HashMap;
@@ -185,7 +185,7 @@ public class ExperimentItemService {
 
     private Mono<Map<UUID, Map<UUID, ExecutionPolicy>>> fetchItemPolicies(
             Set<UUID> datasetItemIds, Set<UUID> datasetVersionIds) {
-        if (!featureFlags.isDatasetVersioningEnabled() || datasetVersionIds.isEmpty()) {
+        if (datasetVersionIds.isEmpty()) {
             return Mono.just(Map.of());
         }
         return datasetItemVersionDAO
@@ -259,7 +259,7 @@ public class ExperimentItemService {
             return Mono.just(true);
         }
 
-        // When versioning is enabled, dataset item IDs are row IDs from dataset_item_versions
+        // When versioning is enabled, dataset item IDs are stable dataset_item_id values from dataset_item_versions
         // When versioning is disabled, dataset item IDs are from dataset_items (legacy table)
         // We need to check both tables to support backward compatibility
         if (featureFlags.isDatasetVersioningEnabled()) {
@@ -289,11 +289,21 @@ public class ExperimentItemService {
 
     public Flux<ExperimentItem> getExperimentItems(@NonNull ExperimentItemSearchCriteria criteria) {
         log.info("Getting experiment items by '{}'", criteria);
-        return experimentService.findByName(criteria.experimentName())
-                .subscribeOn(Schedulers.boundedElastic())
+        if (StringUtils.isBlank(criteria.projectName())) {
+            return findExperimentIdsAndGetItems(criteria.experimentName(), criteria);
+        }
+        return projectService.resolveProjectId(criteria.projectName())
+                .flatMapMany(projectIdOpt -> projectIdOpt
+                        .map(projectId -> findExperimentIdsAndGetItems(
+                                criteria.experimentName(), criteria.toBuilder().projectId(projectId).build()))
+                        .orElseGet(Flux::empty));
+    }
+
+    private Flux<ExperimentItem> findExperimentIdsAndGetItems(
+            String experimentName, ExperimentItemSearchCriteria criteria) {
+        return experimentService.findByName(experimentName, criteria.projectId())
                 .collect(Collectors.mapping(Experiment::id, Collectors.toUnmodifiableSet()))
-                .flatMapMany(experimentIds -> experimentItemDAO.getItems(
-                        experimentIds, criteria));
+                .flatMapMany(experimentIds -> experimentItemDAO.getItems(experimentIds, criteria));
     }
 
     public Mono<Void> delete(@NonNull Set<UUID> ids) {
@@ -325,14 +335,6 @@ public class ExperimentItemService {
             return Flux.empty();
         }
         return experimentItemDAO.getExperimentRefsByTraceIds(traceIds, statuses);
-    }
-
-    public Flux<ExperimentTraceRef> getExperimentRefsByItemIds(@NonNull Set<UUID> itemIds,
-            @NonNull Set<ExperimentStatus> statuses) {
-        if (itemIds.isEmpty()) {
-            return Flux.empty();
-        }
-        return experimentItemDAO.getExperimentRefsByItemIds(itemIds, statuses);
     }
 
     public Flux<ExperimentTraceRef> getExperimentRefsBySpanIds(@NonNull Set<UUID> spanIds,

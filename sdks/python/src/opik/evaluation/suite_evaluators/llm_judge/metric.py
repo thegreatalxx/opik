@@ -6,14 +6,27 @@ in the backend and used with evaluation suites. The evaluator can
 evaluate one or more assertions/criteria against the agent's output.
 """
 
+import logging
 from typing import Any, Dict, List, Optional
+
+import tenacity
 
 from opik.evaluation.models import models_factory
 from opik.evaluation.metrics import score_result
+from opik.exceptions import LLMJudgeParseError
 
 from opik.evaluation.suite_evaluators import base
 from . import config as llm_judge_config
 from . import parsers
+
+LOGGER = logging.getLogger(__name__)
+
+_RETRY_POLICY = tenacity.retry(
+    retry=tenacity.retry_if_exception_type(LLMJudgeParseError),
+    stop=tenacity.stop_after_attempt(3),
+    before_sleep=tenacity.before_sleep_log(LOGGER, logging.WARNING),
+    reraise=True,
+)
 
 
 LLM_JUDGE_SYSTEM_PROMPT = """You are an expert judge tasked with evaluating if an AI agent's output satisfies a set of assertions.
@@ -27,15 +40,20 @@ For each assertion, provide:
 LLM_JUDGE_USER_TEMPLATE = """## Input
 The INPUT section contains all data that the agent received. This may include the actual user query, conversation history, context, metadata, or other structured information. Identify the core user request within this data.
 
+---BEGIN INPUT---
 {input}
+---END INPUT---
 
 ## Output
 The OUTPUT section contains all data produced by the agent. This may include the agent's response text, tool calls, intermediate results, metadata, or other structured information. Focus on the substantive response when evaluating assertions.
 
+---BEGIN OUTPUT---
 {output}
+---END OUTPUT---
 
 ## Assertions
-Evaluate each of the following assertions against the agent's output:
+Evaluate each of the following assertions against the agent's output.
+Use the provided field key as the JSON property name for each assertion result.
 
 {assertions}
 """
@@ -53,19 +71,17 @@ def _format_value(value: Any) -> str:
 def _generate_prompt(
     input: Any,
     output: Any,
-    assertions: List[str],
+    assertions_text: str,
 ) -> str:
     """Generate the LLM query for evaluating assertions.
 
     Combines the system prompt and user template into a single string
     because the model's generate_string API accepts only one input string.
     """
-    assertions_str = "\n".join(f"- {assertion}" for assertion in assertions)
-
     user_content = LLM_JUDGE_USER_TEMPLATE.format(
         input=_format_value(input),
         output=_format_value(output),
-        assertions=assertions_str,
+        assertions=assertions_text,
     )
     return LLM_JUDGE_SYSTEM_PROMPT + "\n" + user_content
 
@@ -91,6 +107,9 @@ class LLMJudge(base.BaseSuiteEvaluator):
         project_name: Optional project name for tracking.
         seed: Optional seed value for reproducible model generation.
         temperature: Optional temperature value for model generation.
+        reasoning_effort: Optional reasoning effort level for the model.
+            Supported values depend on the provider (e.g., "low", "medium", "high"
+            for OpenAI reasoning models).
 
     Example:
         >>> from opik.evaluation.suite_evaluators import LLMJudge
@@ -120,6 +139,7 @@ class LLMJudge(base.BaseSuiteEvaluator):
         project_name: Optional[str] = None,
         seed: Optional[int] = None,
         temperature: Optional[float] = None,
+        reasoning_effort: Optional[str] = None,
     ):
         super().__init__(name=name, track=track, project_name=project_name)
 
@@ -127,8 +147,12 @@ class LLMJudge(base.BaseSuiteEvaluator):
 
         self._seed = seed
         self._temperature = temperature
+        self._reasoning_effort = reasoning_effort
         self._model_name: str = model or llm_judge_config.DEFAULT_MODEL_NAME
-        self._init_model(temperature=temperature)
+        self._reasoning_effort = (
+            reasoning_effort or llm_judge_config.DEFAULT_REASONING_EFFORT
+        )
+        self._init_model()
 
     @property
     def assertions(self) -> List[str]:
@@ -140,6 +164,7 @@ class LLMJudge(base.BaseSuiteEvaluator):
             self._model_name == other._model_name
             and self._temperature == other._temperature
             and self._seed == other._seed
+            and self._reasoning_effort == other._reasoning_effort
             and self.track == other.track
         )
 
@@ -175,17 +200,17 @@ class LLMJudge(base.BaseSuiteEvaluator):
             track=first.track,
             seed=first._seed,
             temperature=first._temperature,
+            reasoning_effort=first._reasoning_effort,
         )
 
-    def _init_model(
-        self,
-        temperature: Optional[float],
-    ) -> None:
-        model_kwargs = {}
-        if temperature is not None:
-            model_kwargs["temperature"] = temperature
+    def _init_model(self) -> None:
+        model_kwargs: Dict[str, Any] = {}
+        if self._temperature is not None:
+            model_kwargs["temperature"] = self._temperature
         if self._seed is not None:
             model_kwargs["seed"] = self._seed
+        if self._reasoning_effort is not None:
+            model_kwargs["reasoning_effort"] = self._reasoning_effort
 
         self._model = models_factory.get(
             model_name=self._model_name, track=self.track, **model_kwargs
@@ -214,20 +239,30 @@ class LLMJudge(base.BaseSuiteEvaluator):
                 - value: True if passed, False if failed
                 - reason: Explanation from the judge
         """
+        try:
+            return self._generate_and_parse(input=input, output=output)
+        except LLMJudgeParseError as e:
+            LOGGER.warning(
+                "LLMJudge scoring failed after retries: %s", e, exc_info=True
+            )
+            return e.results
+
+    @_RETRY_POLICY
+    def _generate_and_parse(
+        self,
+        input: Any,
+        output: Any,
+    ) -> List[score_result.ScoreResult]:
+        schema = parsers.ResponseSchema(self._assertions)
         llm_query = _generate_prompt(
             input=input,
             output=output,
-            assertions=self._assertions,
+            assertions_text=schema.format_assertions(),
         )
-        response_format = parsers.build_response_format_model(self._assertions)
         model_output = self._model.generate_string(
-            input=llm_query, response_format=response_format
+            input=llm_query, response_format=schema.response_format
         )
-
-        return parsers.parse_model_output(
-            content=model_output,
-            assertions=self._assertions,
-        )
+        return schema.parse(model_output)
 
     async def ascore(
         self,
@@ -248,20 +283,30 @@ class LLMJudge(base.BaseSuiteEvaluator):
         Returns:
             List[ScoreResult]: A list of ScoreResult objects, one per assertion.
         """
+        try:
+            return await self._agenerate_and_parse(input=input, output=output)
+        except LLMJudgeParseError as e:
+            LOGGER.warning(
+                "LLMJudge async scoring failed after retries: %s", e, exc_info=True
+            )
+            return e.results
+
+    @_RETRY_POLICY
+    async def _agenerate_and_parse(
+        self,
+        input: Any,
+        output: Any,
+    ) -> List[score_result.ScoreResult]:
+        schema = parsers.ResponseSchema(self._assertions)
         llm_query = _generate_prompt(
             input=input,
             output=output,
-            assertions=self._assertions,
+            assertions_text=schema.format_assertions(),
         )
-        response_format = parsers.build_response_format_model(self._assertions)
         model_output = await self._model.agenerate_string(
-            input=llm_query, response_format=response_format
+            input=llm_query, response_format=schema.response_format
         )
-
-        return parsers.parse_model_output(
-            content=model_output,
-            assertions=self._assertions,
-        )
+        return schema.parse(model_output)
 
     def to_config(self) -> llm_judge_config.LLMJudgeConfig:
         """
@@ -289,6 +334,7 @@ class LLMJudge(base.BaseSuiteEvaluator):
             name=None,
             temperature=self._temperature,
             seed=self._seed,
+            custom_parameters={"reasoning_effort": self._reasoning_effort},
         )
 
         messages = [
@@ -362,6 +408,9 @@ class LLMJudge(base.BaseSuiteEvaluator):
         init_kwargs = init_kwargs or {}
         model = init_kwargs.get("model")
 
+        custom = config.model.custom_parameters or {}
+        reasoning_effort = custom.get("reasoning_effort")
+
         return cls(
             assertions=assertion_texts,
             name=config.name,
@@ -370,4 +419,5 @@ class LLMJudge(base.BaseSuiteEvaluator):
             project_name=project_name,
             seed=config.model.seed,
             temperature=config.model.temperature,
+            reasoning_effort=reasoning_effort,
         )

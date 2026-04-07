@@ -3,7 +3,6 @@ package com.comet.opik.api.resources.v1.priv;
 import com.comet.opik.api.BatchDelete;
 import com.comet.opik.api.BatchDeleteByProject;
 import com.comet.opik.api.Comment;
-import com.comet.opik.api.Dataset;
 import com.comet.opik.api.DeleteFeedbackScore;
 import com.comet.opik.api.DeleteTraceThreads;
 import com.comet.opik.api.ErrorInfo;
@@ -16,6 +15,7 @@ import com.comet.opik.api.FeedbackScoreNames;
 import com.comet.opik.api.Project;
 import com.comet.opik.api.ReactServiceErrorResponse;
 import com.comet.opik.api.ScoreSource;
+import com.comet.opik.api.Source;
 import com.comet.opik.api.Span;
 import com.comet.opik.api.Trace;
 import com.comet.opik.api.TraceBatchUpdate;
@@ -65,6 +65,7 @@ import com.comet.opik.domain.SpanType;
 import com.comet.opik.domain.cost.CostService;
 import com.comet.opik.extensions.DropwizardAppExtensionProvider;
 import com.comet.opik.extensions.RegisterApp;
+import com.comet.opik.infrastructure.auth.WorkspaceUserPermission;
 import com.comet.opik.infrastructure.db.TransactionTemplateAsync;
 import com.comet.opik.infrastructure.usagelimit.Quota;
 import com.comet.opik.podam.InRangeStrategy;
@@ -78,7 +79,9 @@ import com.github.tomakehurst.wiremock.client.WireMock;
 import com.google.common.collect.Lists;
 import com.redis.testcontainers.RedisContainer;
 import jakarta.ws.rs.NotFoundException;
+import jakarta.ws.rs.client.Entity;
 import jakarta.ws.rs.core.HttpHeaders;
+import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import lombok.Builder;
 import org.apache.commons.collections4.CollectionUtils;
@@ -157,11 +160,13 @@ import static com.comet.opik.api.validation.InRangeValidator.MAX_ANALYTICS_DB_PR
 import static com.comet.opik.api.validation.InRangeValidator.MIN_ANALYTICS_DB;
 import static com.comet.opik.domain.ProjectService.DEFAULT_PROJECT;
 import static com.comet.opik.infrastructure.auth.RequestContext.SESSION_COOKIE;
+import static com.comet.opik.infrastructure.auth.RequestContext.WORKSPACE_HEADER;
 import static com.github.tomakehurst.wiremock.client.WireMock.equalTo;
 import static com.github.tomakehurst.wiremock.client.WireMock.matching;
 import static com.github.tomakehurst.wiremock.client.WireMock.matchingJsonPath;
 import static com.github.tomakehurst.wiremock.client.WireMock.okJson;
 import static com.github.tomakehurst.wiremock.client.WireMock.post;
+import static com.github.tomakehurst.wiremock.client.WireMock.postRequestedFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlPathEqualTo;
 import static java.util.UUID.randomUUID;
 import static java.util.function.Predicate.not;
@@ -260,6 +265,154 @@ class TracesResourceTest {
 
     private UUID getProjectId(String projectName, String workspaceName, String apiKey) {
         return projectResourceClient.getByName(projectName, apiKey, workspaceName).id();
+    }
+
+    @Nested
+    @DisplayName("Required permissions")
+    class RequiredPermissionsTest {
+
+        @Test
+        @DisplayName("Delete trace by id passes required permissions to auth endpoint")
+        void deleteTraceByIdPassesRequiredPermissionsToAuthEndpoint() {
+            String apiKey = UUID.randomUUID().toString();
+            String workspaceName = "test-workspace-" + UUID.randomUUID();
+            String workspaceId = UUID.randomUUID().toString();
+            mockTargetWorkspace(apiKey, workspaceName, workspaceId);
+
+            var trace = factory.manufacturePojo(Trace.class).toBuilder()
+                    .projectName(DEFAULT_PROJECT)
+                    .build();
+            var id = traceResourceClient.createTrace(trace, apiKey, workspaceName);
+
+            wireMock.server().resetRequests();
+            traceResourceClient.callDeleteTrace(id, apiKey, workspaceName).close();
+
+            wireMock.server().verify(
+                    postRequestedFor(urlPathEqualTo("/opik/auth"))
+                            .withRequestBody(matchingJsonPath("$.requiredPermissions[0]",
+                                    equalTo(WorkspaceUserPermission.TRACE_DELETE.getValue()))));
+        }
+
+        @Test
+        @DisplayName("Delete traces batch passes required permissions to auth endpoint")
+        void deleteTracesBatchPassesRequiredPermissionsToAuthEndpoint() {
+            String apiKey = UUID.randomUUID().toString();
+            String workspaceName = "test-workspace-" + UUID.randomUUID();
+            String workspaceId = UUID.randomUUID().toString();
+            mockTargetWorkspace(apiKey, workspaceName, workspaceId);
+
+            var trace = factory.manufacturePojo(Trace.class).toBuilder()
+                    .projectName(DEFAULT_PROJECT)
+                    .build();
+            var id = traceResourceClient.createTrace(trace, apiKey, workspaceName);
+            var projectId = getProjectId(DEFAULT_PROJECT, workspaceName, apiKey);
+
+            wireMock.server().resetRequests();
+            traceResourceClient.deleteTraces(
+                    new BatchDeleteByProject(Set.of(id), projectId), workspaceName, apiKey);
+
+            wireMock.server().verify(
+                    postRequestedFor(urlPathEqualTo("/opik/auth"))
+                            .withRequestBody(matchingJsonPath("$.requiredPermissions[0]",
+                                    equalTo(WorkspaceUserPermission.TRACE_DELETE.getValue()))));
+        }
+
+        @Test
+        @DisplayName("Create trace passes required permissions to auth endpoint")
+        void createTracePassesRequiredPermissionsToAuthEndpoint() {
+            String apiKey = UUID.randomUUID().toString();
+            String workspaceName = "test-workspace-" + UUID.randomUUID();
+            String workspaceId = UUID.randomUUID().toString();
+            mockTargetWorkspace(apiKey, workspaceName, workspaceId);
+
+            var trace = factory.manufacturePojo(Trace.class).toBuilder()
+                    .projectName(DEFAULT_PROJECT)
+                    .build();
+
+            wireMock.server().resetRequests();
+            traceResourceClient.createTrace(trace, apiKey, workspaceName);
+
+            wireMock.server().verify(
+                    postRequestedFor(urlPathEqualTo("/opik/auth"))
+                            .withRequestBody(matchingJsonPath("$.requiredPermissions[0]",
+                                    equalTo(WorkspaceUserPermission.TRACE_SPAN_THREAD_LOG.getValue()))));
+        }
+
+        @Test
+        @DisplayName("Open trace thread passes required permissions to auth endpoint")
+        void openTraceThreadPassesRequiredPermissionsToAuthEndpoint() {
+            String apiKey = UUID.randomUUID().toString();
+            String workspaceName = "test-workspace-" + UUID.randomUUID();
+            String workspaceId = UUID.randomUUID().toString();
+            mockTargetWorkspace(apiKey, workspaceName, workspaceId);
+
+            var trace = factory.manufacturePojo(Trace.class).toBuilder()
+                    .projectName(DEFAULT_PROJECT)
+                    .build();
+            traceResourceClient.createTrace(trace, apiKey, workspaceName);
+            var projectId = getProjectId(DEFAULT_PROJECT, workspaceName, apiKey);
+
+            wireMock.server().resetRequests();
+            traceResourceClient.openTraceThread(UUID.randomUUID().toString(), projectId,
+                    DEFAULT_PROJECT, apiKey, workspaceName);
+
+            wireMock.server().verify(
+                    postRequestedFor(urlPathEqualTo("/opik/auth"))
+                            .withRequestBody(matchingJsonPath("$.requiredPermissions[0]",
+                                    equalTo(WorkspaceUserPermission.TRACE_SPAN_THREAD_LOG.getValue()))));
+        }
+
+        @Test
+        @DisplayName("Update thread passes required permissions to auth endpoint")
+        void updateThreadPassesRequiredPermissionsToAuthEndpoint() {
+            String apiKey = UUID.randomUUID().toString();
+            String workspaceName = "test-workspace-" + UUID.randomUUID();
+            String workspaceId = UUID.randomUUID().toString();
+            mockTargetWorkspace(apiKey, workspaceName, workspaceId);
+
+            var trace = factory.manufacturePojo(Trace.class).toBuilder()
+                    .projectName(DEFAULT_PROJECT)
+                    .build();
+            traceResourceClient.createTrace(trace, apiKey, workspaceName);
+            var projectId = getProjectId(DEFAULT_PROJECT, workspaceName, apiKey);
+            var threadId = UUID.randomUUID().toString();
+            traceResourceClient.openTraceThread(threadId, projectId, DEFAULT_PROJECT, apiKey, workspaceName);
+
+            var threadUpdate = TraceThreadUpdate.builder()
+                    .tags(Set.of("test-tag"))
+                    .build();
+
+            wireMock.server().resetRequests();
+            traceResourceClient.updateThread(threadUpdate, UUID.randomUUID(), apiKey, workspaceName,
+                    HttpStatus.SC_NOT_FOUND);
+
+            wireMock.server().verify(
+                    postRequestedFor(urlPathEqualTo("/opik/auth"))
+                            .withRequestBody(matchingJsonPath("$.requiredPermissions[0]",
+                                    equalTo(WorkspaceUserPermission.TRACE_SPAN_THREAD_LOG.getValue()))));
+        }
+
+        @Test
+        @DisplayName("Batch update threads passes required permissions to auth endpoint")
+        void batchUpdateThreadsPassesRequiredPermissionsToAuthEndpoint() {
+            String apiKey = UUID.randomUUID().toString();
+            String workspaceName = "test-workspace-" + UUID.randomUUID();
+            String workspaceId = UUID.randomUUID().toString();
+            mockTargetWorkspace(apiKey, workspaceName, workspaceId);
+
+            var batchUpdate = TraceThreadBatchUpdate.builder()
+                    .ids(Set.of(UUID.randomUUID()))
+                    .update(TraceThreadUpdate.builder().tags(Set.of("test-tag")).build())
+                    .build();
+
+            wireMock.server().resetRequests();
+            traceResourceClient.callBatchUpdateThreads(batchUpdate, apiKey, workspaceName).close();
+
+            wireMock.server().verify(
+                    postRequestedFor(urlPathEqualTo("/opik/auth"))
+                            .withRequestBody(matchingJsonPath("$.requiredPermissions[0]",
+                                    equalTo(WorkspaceUserPermission.TRACE_SPAN_THREAD_LOG.getValue()))));
+        }
     }
 
     @Nested
@@ -3159,6 +3312,7 @@ class TracesResourceTest {
                     .errorInfo(traceUpdate.errorInfo())
                     .threadId(traceUpdate.threadId())
                     .ttft(traceUpdate.ttft())
+                    .source(traceUpdate.source())
                     .build();
             traceResourceClient.updateTrace(id, traceUpdate, API_KEY, TEST_WORKSPACE);
 
@@ -3185,6 +3339,9 @@ class TracesResourceTest {
                     .build();
             traceResourceClient.createTrace(newTrace, API_KEY, TEST_WORKSPACE);
 
+            // The update arrives first and sets source; when the create arrives, the existing non-unknown
+            // source is preserved (INSERT SQL: if old.source != 'unknown', keep old.source)
+            var effectiveSource = traceUpdate.source() != null ? traceUpdate.source() : newTrace.source();
             var expectedTrace = newTrace.toBuilder()
                     .name(traceUpdate.name())
                     .endTime(traceUpdate.endTime())
@@ -3197,6 +3354,7 @@ class TracesResourceTest {
                             newTrace.startTime(), traceUpdate.endTime()))
                     .threadId(traceUpdate.threadId())
                     .ttft(traceUpdate.ttft())
+                    .source(effectiveSource)
                     .build();
             getAndAssert(expectedTrace, null, API_KEY, TEST_WORKSPACE);
         }
@@ -3269,6 +3427,7 @@ class TracesResourceTest {
                             trace.startTime(), traceUpdate.endTime()))
                     .threadId(traceUpdate.threadId())
                     .ttft(traceUpdate.ttft())
+                    .source(traceUpdate.source())
                     .build();
             getAndAssert(expectedTrace, null, API_KEY, TEST_WORKSPACE);
         }
@@ -3472,6 +3631,7 @@ class TracesResourceTest {
                     .duration(DurationUtils.getDurationInMillisWithSubMilliPrecision(trace.startTime(),
                             traceUpdate.endTime()))
                     .ttft(traceUpdate.ttft())
+                    .source(traceUpdate.source())
                     .build();
             getAndAssert(updatedTrace, projectId, API_KEY, TEST_WORKSPACE);
         }
@@ -6451,7 +6611,7 @@ class TracesResourceTest {
             UUID projectId = projectResourceClient.createProject(project, API_KEY, workspaceName);
 
             var datasetName = "dataset-" + RandomStringUtils.secure().nextAlphanumeric(10);
-            var dataset = factory.manufacturePojo(Dataset.class).toBuilder()
+            var dataset = DatasetResourceClient.buildDataset(factory).toBuilder()
                     .name(datasetName)
                     .build();
             var datasetId = datasetResourceClient.createDataset(dataset, API_KEY, workspaceName);
@@ -6797,6 +6957,150 @@ class TracesResourceTest {
                     .containsOnly(experiment1Id);
             assertThat(actualTraces).extracting(Trace::id)
                     .containsExactlyInAnyOrder(trace1.id(), trace2.id());
+        }
+    }
+
+    @Nested
+    @DisplayName("Source field on trace creation")
+    class CreateTraceWithSource {
+
+        @ParameterizedTest
+        @EnumSource(Source.class)
+        @DisplayName("Create trace with each valid source and verify it is stored")
+        void createTraceWithSource(Source source) {
+            var trace = factory.manufacturePojo(Trace.class).toBuilder()
+                    .projectName(DEFAULT_PROJECT)
+                    .source(source)
+                    .build();
+
+            var id = traceResourceClient.createTrace(trace, API_KEY, TEST_WORKSPACE);
+
+            var actual = traceResourceClient.getById(id, TEST_WORKSPACE, API_KEY);
+            assertThat(actual.source()).isEqualTo(source);
+        }
+
+        @Test
+        @DisplayName("Create trace without source defaults to null (unknown in storage)")
+        void createTraceWithoutSourceDefaultsToNull() {
+            var trace = factory.manufacturePojo(Trace.class).toBuilder()
+                    .projectName(DEFAULT_PROJECT)
+                    .source(null)
+                    .build();
+
+            var id = traceResourceClient.createTrace(trace, API_KEY, TEST_WORKSPACE);
+
+            var actual = traceResourceClient.getById(id, TEST_WORKSPACE, API_KEY);
+            assertThat(actual.source()).isNull();
+        }
+
+        @Test
+        @DisplayName("Create trace with invalid source returns 400")
+        void createTraceWithInvalidSourceReturns400() {
+            var body = """
+                    {
+                        "project_name": "%s",
+                        "name": "test-trace",
+                        "start_time": "2024-01-01T00:00:00Z",
+                        "source": "invalid_source"
+                    }
+                    """.formatted(DEFAULT_PROJECT);
+
+            try (var response = client.target("%s/v1/private/traces".formatted(baseURI))
+                    .request()
+                    .accept(MediaType.APPLICATION_JSON_TYPE)
+                    .header(HttpHeaders.AUTHORIZATION, API_KEY)
+                    .header(WORKSPACE_HEADER, TEST_WORKSPACE)
+                    .post(Entity.json(body))) {
+
+                assertThat(response.getStatus()).isEqualTo(org.apache.http.HttpStatus.SC_BAD_REQUEST);
+            }
+        }
+    }
+
+    @Nested
+    @DisplayName("Filter traces by source")
+    class FilterTracesBySource {
+
+        @ParameterizedTest
+        @EnumSource(Source.class)
+        @DisplayName("Filter traces by source EQUAL returns only matching traces")
+        void filterTracesBySourceEqual(Source source) {
+            var projectName = "source-filter-test-" + UUID.randomUUID();
+
+            var matchingTrace = factory.manufacturePojo(Trace.class).toBuilder()
+                    .projectName(projectName)
+                    .source(source)
+                    .usage(null)
+                    .feedbackScores(null)
+                    .build();
+
+            var otherSource = source == Source.SDK ? Source.EXPERIMENT : Source.SDK;
+            var nonMatchingTrace = factory.manufacturePojo(Trace.class).toBuilder()
+                    .projectName(projectName)
+                    .source(otherSource)
+                    .usage(null)
+                    .feedbackScores(null)
+                    .build();
+
+            traceResourceClient.createTrace(matchingTrace, API_KEY, TEST_WORKSPACE);
+            traceResourceClient.createTrace(nonMatchingTrace, API_KEY, TEST_WORKSPACE);
+
+            var filters = List.of(TraceFilter.builder()
+                    .field(TraceField.SOURCE)
+                    .operator(Operator.EQUAL)
+                    .value(source.getValue())
+                    .build());
+
+            var page = traceResourceClient.getTraces(projectName, null, API_KEY, TEST_WORKSPACE,
+                    filters, List.of(), 10, Map.of());
+
+            TraceAssertions.assertTraces(page.content(), List.of(matchingTrace), List.of(nonMatchingTrace), USER);
+        }
+
+        @Test
+        @DisplayName("Filter by source SDK also returns legacy traces with unknown source (null)")
+        void filterBySourceSdkIncludesUnknownSourceTraces() {
+            var projectName = "source-filter-sdk-unknown-" + UUID.randomUUID();
+
+            var sdkTrace = factory.manufacturePojo(Trace.class).toBuilder()
+                    .projectName(projectName)
+                    .source(Source.SDK)
+                    .usage(null)
+                    .feedbackScores(null)
+                    .build();
+
+            var unknownSourceTrace = factory.manufacturePojo(Trace.class).toBuilder()
+                    .projectName(projectName)
+                    .source(null)
+                    .usage(null)
+                    .feedbackScores(null)
+                    .build();
+
+            var experimentTrace = factory.manufacturePojo(Trace.class).toBuilder()
+                    .projectName(projectName)
+                    .source(Source.EXPERIMENT)
+                    .usage(null)
+                    .feedbackScores(null)
+                    .build();
+
+            traceResourceClient.createTrace(sdkTrace, API_KEY, TEST_WORKSPACE);
+            traceResourceClient.createTrace(unknownSourceTrace, API_KEY, TEST_WORKSPACE);
+            traceResourceClient.createTrace(experimentTrace, API_KEY, TEST_WORKSPACE);
+
+            var filters = List.of(TraceFilter.builder()
+                    .field(TraceField.SOURCE)
+                    .operator(Operator.EQUAL)
+                    .value(Source.SDK.getValue())
+                    .build());
+
+            var page = traceResourceClient.getTraces(projectName, null, API_KEY, TEST_WORKSPACE,
+                    filters, List.of(), 10, Map.of());
+
+            // ClickHouse returns traces in descending insertion order;
+            // unknownSourceTrace was inserted after sdkTrace so it comes first.
+            TraceAssertions.assertTraces(page.content(),
+                    List.of(unknownSourceTrace, sdkTrace),
+                    List.of(experimentTrace), USER);
         }
     }
 

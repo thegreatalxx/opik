@@ -15,6 +15,11 @@ class OptimizationPublic(UniversalBaseModel):
     id: typing.Optional[str] = None
     name: typing.Optional[str] = None
     dataset_name: str
+    project_id: typing.Optional[str] = pydantic.Field(default=None)
+    """
+    Project ID. Takes precedence over project_name when both are provided.
+    """
+
     objective_name: str
     status: OptimizationPublicStatus
     metadata: typing.Optional[JsonListStringPublic] = None
@@ -22,10 +27,18 @@ class OptimizationPublic(UniversalBaseModel):
     dataset_id: typing.Optional[str] = None
     num_trials: typing.Optional[int] = None
     feedback_scores: typing.Optional[typing.List[FeedbackScoreAveragePublic]] = None
+    experiment_scores: typing.Optional[typing.List[FeedbackScoreAveragePublic]] = None
     created_at: typing.Optional[dt.datetime] = None
     created_by: typing.Optional[str] = None
     last_updated_at: typing.Optional[dt.datetime] = None
     last_updated_by: typing.Optional[str] = None
+    baseline_objective_score: typing.Optional[float] = None
+    best_objective_score: typing.Optional[float] = None
+    baseline_duration: typing.Optional[float] = None
+    best_duration: typing.Optional[float] = None
+    baseline_cost: typing.Optional[float] = None
+    best_cost: typing.Optional[float] = None
+    total_optimization_cost: typing.Optional[float] = None
 
     if IS_PYDANTIC_V2:
         model_config: typing.ClassVar[pydantic.ConfigDict] = pydantic.ConfigDict(extra="allow", frozen=True)  # type: ignore # Pydantic v2

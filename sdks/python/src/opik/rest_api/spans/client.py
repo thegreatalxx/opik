@@ -18,8 +18,10 @@ from ..types.span_filter_public import SpanFilterPublic
 from ..types.span_page_public import SpanPagePublic
 from ..types.span_public import SpanPublic
 from ..types.span_update import SpanUpdate
+from ..types.span_update_source import SpanUpdateSource
 from ..types.span_update_type import SpanUpdateType
 from ..types.span_write import SpanWrite
+from ..types.span_write_source import SpanWriteSource
 from ..types.span_write_type import SpanWriteType
 from ..types.value_entry import ValueEntry
 from .raw_client import AsyncRawSpansClient, RawSpansClient
@@ -351,6 +353,7 @@ class SpansClient:
         total_estimated_cost: typing.Optional[float] = OMIT,
         total_estimated_cost_version: typing.Optional[str] = OMIT,
         ttft: typing.Optional[float] = OMIT,
+        source: typing.Optional[SpanWriteSource] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> None:
         """
@@ -400,6 +403,8 @@ class SpansClient:
         ttft : typing.Optional[float]
             Time to first token in milliseconds
 
+        source : typing.Optional[SpanWriteSource]
+
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
 
@@ -435,6 +440,7 @@ class SpansClient:
             total_estimated_cost=total_estimated_cost,
             total_estimated_cost_version=total_estimated_cost_version,
             ttft=ttft,
+            source=source,
             request_options=request_options,
         )
         return _response.data
@@ -521,6 +527,7 @@ class SpansClient:
         total_estimated_cost: typing.Optional[float] = OMIT,
         error_info: typing.Optional[ErrorInfo] = OMIT,
         ttft: typing.Optional[float] = OMIT,
+        source: typing.Optional[SpanUpdateSource] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> None:
         """
@@ -573,6 +580,8 @@ class SpansClient:
 
         ttft : typing.Optional[float]
 
+        source : typing.Optional[SpanUpdateSource]
+
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
 
@@ -607,6 +616,7 @@ class SpansClient:
             total_estimated_cost=total_estimated_cost,
             error_info=error_info,
             ttft=ttft,
+            source=source,
             request_options=request_options,
         )
         return _response.data
@@ -679,7 +689,6 @@ class SpansClient:
         *,
         project_id: typing.Optional[str] = None,
         type: typing.Optional[FindFeedbackScoreNames1RequestType] = None,
-        exclude_category_names: typing.Optional[typing.Union[str, typing.Sequence[str]]] = None,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> FeedbackScoreNamesPublic:
         """
@@ -690,8 +699,6 @@ class SpansClient:
         project_id : typing.Optional[str]
 
         type : typing.Optional[FindFeedbackScoreNames1RequestType]
-
-        exclude_category_names : typing.Optional[typing.Union[str, typing.Sequence[str]]]
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -708,10 +715,7 @@ class SpansClient:
         client.spans.find_feedback_score_names1()
         """
         _response = self._raw_client.find_feedback_score_names1(
-            project_id=project_id,
-            type=type,
-            exclude_category_names=exclude_category_names,
-            request_options=request_options,
+            project_id=project_id, type=type, request_options=request_options
         )
         return _response.data
 
@@ -1299,6 +1303,7 @@ class AsyncSpansClient:
         total_estimated_cost: typing.Optional[float] = OMIT,
         total_estimated_cost_version: typing.Optional[str] = OMIT,
         ttft: typing.Optional[float] = OMIT,
+        source: typing.Optional[SpanWriteSource] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> None:
         """
@@ -1348,6 +1353,8 @@ class AsyncSpansClient:
         ttft : typing.Optional[float]
             Time to first token in milliseconds
 
+        source : typing.Optional[SpanWriteSource]
+
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
 
@@ -1386,6 +1393,7 @@ class AsyncSpansClient:
             total_estimated_cost=total_estimated_cost,
             total_estimated_cost_version=total_estimated_cost_version,
             ttft=ttft,
+            source=source,
             request_options=request_options,
         )
         return _response.data
@@ -1478,6 +1486,7 @@ class AsyncSpansClient:
         total_estimated_cost: typing.Optional[float] = OMIT,
         error_info: typing.Optional[ErrorInfo] = OMIT,
         ttft: typing.Optional[float] = OMIT,
+        source: typing.Optional[SpanUpdateSource] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> None:
         """
@@ -1530,6 +1539,8 @@ class AsyncSpansClient:
 
         ttft : typing.Optional[float]
 
+        source : typing.Optional[SpanUpdateSource]
+
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
 
@@ -1567,6 +1578,7 @@ class AsyncSpansClient:
             total_estimated_cost=total_estimated_cost,
             error_info=error_info,
             ttft=ttft,
+            source=source,
             request_options=request_options,
         )
         return _response.data
@@ -1645,7 +1657,6 @@ class AsyncSpansClient:
         *,
         project_id: typing.Optional[str] = None,
         type: typing.Optional[FindFeedbackScoreNames1RequestType] = None,
-        exclude_category_names: typing.Optional[typing.Union[str, typing.Sequence[str]]] = None,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> FeedbackScoreNamesPublic:
         """
@@ -1656,8 +1667,6 @@ class AsyncSpansClient:
         project_id : typing.Optional[str]
 
         type : typing.Optional[FindFeedbackScoreNames1RequestType]
-
-        exclude_category_names : typing.Optional[typing.Union[str, typing.Sequence[str]]]
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -1677,10 +1686,7 @@ class AsyncSpansClient:
         asyncio.run(main())
         """
         _response = await self._raw_client.find_feedback_score_names1(
-            project_id=project_id,
-            type=type,
-            exclude_category_names=exclude_category_names,
-            request_options=request_options,
+            project_id=project_id, type=type, request_options=request_options
         )
         return _response.data
 

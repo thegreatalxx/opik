@@ -23,7 +23,9 @@ from ..types.trace_thread_filter import TraceThreadFilter
 from ..types.trace_thread_page import TraceThreadPage
 from ..types.trace_thread_update import TraceThreadUpdate
 from ..types.trace_update import TraceUpdate
+from ..types.trace_update_source import TraceUpdateSource
 from ..types.trace_write import TraceWrite
+from ..types.trace_write_source import TraceWriteSource
 from ..types.value_entry import ValueEntry
 from .raw_client import AsyncRawTracesClient, RawTracesClient
 
@@ -475,6 +477,7 @@ class TracesClient:
         last_updated_at: typing.Optional[dt.datetime] = OMIT,
         ttft: typing.Optional[float] = OMIT,
         thread_id: typing.Optional[str] = OMIT,
+        source: typing.Optional[TraceWriteSource] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> None:
         """
@@ -510,6 +513,8 @@ class TracesClient:
 
         thread_id : typing.Optional[str]
 
+        source : typing.Optional[TraceWriteSource]
+
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
 
@@ -538,6 +543,7 @@ class TracesClient:
             last_updated_at=last_updated_at,
             ttft=ttft,
             thread_id=thread_id,
+            source=source,
             request_options=request_options,
         )
         return _response.data
@@ -618,6 +624,7 @@ class TracesClient:
         error_info: typing.Optional[ErrorInfo] = OMIT,
         thread_id: typing.Optional[str] = OMIT,
         ttft: typing.Optional[float] = OMIT,
+        source: typing.Optional[TraceUpdateSource] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> None:
         """
@@ -658,6 +665,8 @@ class TracesClient:
 
         ttft : typing.Optional[float]
 
+        source : typing.Optional[TraceUpdateSource]
+
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
 
@@ -686,6 +695,7 @@ class TracesClient:
             error_info=error_info,
             thread_id=thread_id,
             ttft=ttft,
+            source=source,
             request_options=request_options,
         )
         return _response.data
@@ -885,11 +895,7 @@ class TracesClient:
         return _response.data
 
     def find_feedback_score_names2(
-        self,
-        *,
-        project_id: typing.Optional[str] = None,
-        exclude_category_names: typing.Optional[typing.Union[str, typing.Sequence[str]]] = None,
-        request_options: typing.Optional[RequestOptions] = None,
+        self, *, project_id: typing.Optional[str] = None, request_options: typing.Optional[RequestOptions] = None
     ) -> FeedbackScoreNamesPublic:
         """
         Find Feedback Score names
@@ -897,8 +903,6 @@ class TracesClient:
         Parameters
         ----------
         project_id : typing.Optional[str]
-
-        exclude_category_names : typing.Optional[typing.Union[str, typing.Sequence[str]]]
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -914,9 +918,7 @@ class TracesClient:
         client = OpikApi(api_key="YOUR_API_KEY", workspace_name="YOUR_WORKSPACE_NAME", )
         client.traces.find_feedback_score_names2()
         """
-        _response = self._raw_client.find_feedback_score_names2(
-            project_id=project_id, exclude_category_names=exclude_category_names, request_options=request_options
-        )
+        _response = self._raw_client.find_feedback_score_names2(project_id=project_id, request_options=request_options)
         return _response.data
 
     def find_trace_threads_feedback_score_names(
@@ -2099,6 +2101,7 @@ class AsyncTracesClient:
         last_updated_at: typing.Optional[dt.datetime] = OMIT,
         ttft: typing.Optional[float] = OMIT,
         thread_id: typing.Optional[str] = OMIT,
+        source: typing.Optional[TraceWriteSource] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> None:
         """
@@ -2134,6 +2137,8 @@ class AsyncTracesClient:
 
         thread_id : typing.Optional[str]
 
+        source : typing.Optional[TraceWriteSource]
+
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
 
@@ -2165,6 +2170,7 @@ class AsyncTracesClient:
             last_updated_at=last_updated_at,
             ttft=ttft,
             thread_id=thread_id,
+            source=source,
             request_options=request_options,
         )
         return _response.data
@@ -2251,6 +2257,7 @@ class AsyncTracesClient:
         error_info: typing.Optional[ErrorInfo] = OMIT,
         thread_id: typing.Optional[str] = OMIT,
         ttft: typing.Optional[float] = OMIT,
+        source: typing.Optional[TraceUpdateSource] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> None:
         """
@@ -2291,6 +2298,8 @@ class AsyncTracesClient:
 
         ttft : typing.Optional[float]
 
+        source : typing.Optional[TraceUpdateSource]
+
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
 
@@ -2322,6 +2331,7 @@ class AsyncTracesClient:
             error_info=error_info,
             thread_id=thread_id,
             ttft=ttft,
+            source=source,
             request_options=request_options,
         )
         return _response.data
@@ -2539,11 +2549,7 @@ class AsyncTracesClient:
         return _response.data
 
     async def find_feedback_score_names2(
-        self,
-        *,
-        project_id: typing.Optional[str] = None,
-        exclude_category_names: typing.Optional[typing.Union[str, typing.Sequence[str]]] = None,
-        request_options: typing.Optional[RequestOptions] = None,
+        self, *, project_id: typing.Optional[str] = None, request_options: typing.Optional[RequestOptions] = None
     ) -> FeedbackScoreNamesPublic:
         """
         Find Feedback Score names
@@ -2551,8 +2557,6 @@ class AsyncTracesClient:
         Parameters
         ----------
         project_id : typing.Optional[str]
-
-        exclude_category_names : typing.Optional[typing.Union[str, typing.Sequence[str]]]
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -2572,7 +2576,7 @@ class AsyncTracesClient:
         asyncio.run(main())
         """
         _response = await self._raw_client.find_feedback_score_names2(
-            project_id=project_id, exclude_category_names=exclude_category_names, request_options=request_options
+            project_id=project_id, request_options=request_options
         )
         return _response.data
 

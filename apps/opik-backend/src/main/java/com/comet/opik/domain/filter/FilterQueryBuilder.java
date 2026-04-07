@@ -139,6 +139,7 @@ public class FilterQueryBuilder {
             ImmutableMap.<Operator, Map<FieldType, String>>builder()
                     .put(Operator.CONTAINS, new EnumMap<>(Map.of(
                             FieldType.STRING, "ilike(%1$s, CONCAT('%%', :filter%2$d ,'%%'))",
+                            FieldType.STRING_EXACT, "%1$s LIKE CONCAT('%%', :filter%2$d ,'%%')",
                             FieldType.STRING_STATE_DB, "%1$s LIKE CONCAT('%%', :filter%2$d ,'%%')",
                             FieldType.LIST,
                             "arrayExists(element -> (ilike(element, CONCAT('%%', :filter%2$d ,'%%'))), %1$s) = 1",
@@ -152,6 +153,7 @@ public class FilterQueryBuilder {
                             "ilike(arrayElement(mapValues(%1$s),indexOf(mapKeys(%1$s), :filterKey%2$d)), CONCAT('%%', :filter%2$d ,'%%'))")))
                     .put(Operator.NOT_CONTAINS, new EnumMap<>(Map.of(
                             FieldType.STRING, "notILike(%1$s, CONCAT('%%', :filter%2$d ,'%%'))",
+                            FieldType.STRING_EXACT, "%1$s NOT LIKE CONCAT('%%', :filter%2$d ,'%%')",
                             FieldType.STRING_STATE_DB, "%1$s NOT LIKE CONCAT('%%', :filter%2$d ,'%%')",
                             FieldType.LIST,
                             "arrayExists(element -> (ilike(element, CONCAT('%%', :filter%2$d ,'%%'))), %1$s) = 0",
@@ -164,6 +166,7 @@ public class FilterQueryBuilder {
                             "JSON_VALUE(%1$s, :filterKey%2$d) NOT LIKE CONCAT('%%', :filter%2$d ,'%%')")))
                     .put(Operator.STARTS_WITH, new EnumMap<>(Map.of(
                             FieldType.STRING, "startsWith(lower(%1$s), lower(:filter%2$d))",
+                            FieldType.STRING_EXACT, "startsWith(%1$s, :filter%2$d)",
                             FieldType.STRING_STATE_DB, "%1$s LIKE CONCAT(:filter%2$d ,'%%')",
                             // MAP values are stored as JSON strings with possible escaped quotes (e.g., "\"hello\"")
                             // First remove escaped quotes with replaceAll, then trim remaining quotes with trimBoth
@@ -175,6 +178,7 @@ public class FilterQueryBuilder {
                             "JSON_VALUE(%1$s, :filterKey%2$d) LIKE CONCAT(:filter%2$d ,'%%')")))
                     .put(Operator.ENDS_WITH, new EnumMap<>(Map.of(
                             FieldType.STRING, "endsWith(lower(%1$s), lower(:filter%2$d))",
+                            FieldType.STRING_EXACT, "endsWith(%1$s, :filter%2$d)",
                             FieldType.STRING_STATE_DB, "%1$s LIKE CONCAT('%%', :filter%2$d)",
                             // MAP values are stored as JSON strings with possible escaped quotes (e.g., "\"hello\"")
                             // First remove escaped quotes with replaceAll, then trim remaining quotes with trimBoth
@@ -186,6 +190,7 @@ public class FilterQueryBuilder {
                             "JSON_VALUE(%1$s, :filterKey%2$d) LIKE CONCAT('%%', :filter%2$d)")))
                     .put(Operator.EQUAL, new EnumMap<>(Map.ofEntries(
                             Map.entry(FieldType.STRING, "lower(%1$s) = lower(:filter%2$d)"),
+                            Map.entry(FieldType.STRING_EXACT, "%1$s = :filter%2$d"),
                             Map.entry(FieldType.STRING_STATE_DB, "lower(%1$s) = lower(:filter%2$d)"),
                             Map.entry(FieldType.DATE_TIME, "%1$s = parseDateTime64BestEffort(:filter%2$d, 9)"),
                             Map.entry(FieldType.DATE_TIME_STATE_DB, "%1$s = :filter%2$d"),
@@ -202,9 +207,11 @@ public class FilterQueryBuilder {
                             // First remove escaped quotes with replaceAll, then trim remaining quotes with trimBoth
                             Map.entry(FieldType.MAP,
                                     "lower(trimBoth(replaceAll(arrayElement(mapValues(%1$s),indexOf(mapKeys(%1$s), :filterKey%2$d)), '\\\\\"', ''), '\"')) = lower(:filter%2$d)"),
-                            Map.entry(FieldType.ENUM, "%1$s = :filter%2$d"))))
+                            Map.entry(FieldType.ENUM, "%1$s = :filter%2$d"),
+                            Map.entry(FieldType.ENUM_LEGACY, "(%1$s = :filter%2$d OR %1$s = '%3$s')"))))
                     .put(Operator.NOT_EQUAL, new EnumMap<>(Map.ofEntries(
                             Map.entry(FieldType.STRING, "lower(%1$s) != lower(:filter%2$d)"),
+                            Map.entry(FieldType.STRING_EXACT, "%1$s != :filter%2$d"),
                             Map.entry(FieldType.STRING_STATE_DB, "lower(%1$s) != lower(:filter%2$d)"),
                             Map.entry(FieldType.DATE_TIME, "%1$s != parseDateTime64BestEffort(:filter%2$d, 9)"),
                             Map.entry(FieldType.DATE_TIME_STATE_DB, "%1$s != :filter%2$d"),
@@ -221,9 +228,11 @@ public class FilterQueryBuilder {
                             // First remove escaped quotes with replaceAll, then trim remaining quotes with trimBoth
                             Map.entry(FieldType.MAP,
                                     "lower(trimBoth(replaceAll(arrayElement(mapValues(%1$s),indexOf(mapKeys(%1$s), :filterKey%2$d)), '\\\\\"', ''), '\"')) != lower(:filter%2$d)"),
-                            Map.entry(FieldType.ENUM, "%1$s != :filter%2$d"))))
+                            Map.entry(FieldType.ENUM, "%1$s != :filter%2$d"),
+                            Map.entry(FieldType.ENUM_LEGACY, "(%1$s != :filter%2$d AND %1$s != '%3$s')"))))
                     .put(Operator.GREATER_THAN, new EnumMap<>(Map.ofEntries(
                             Map.entry(FieldType.STRING, "lower(%1$s) > lower(:filter%2$d)"),
+                            Map.entry(FieldType.STRING_EXACT, "%1$s > :filter%2$d"),
                             Map.entry(FieldType.DATE_TIME, "%1$s > parseDateTime64BestEffort(:filter%2$d, 9)"),
                             Map.entry(FieldType.DATE_TIME_STATE_DB, "%1$s > :filter%2$d"),
                             Map.entry(FieldType.NUMBER, "%1$s > :filter%2$d"),
@@ -245,6 +254,7 @@ public class FilterQueryBuilder {
                                     "JSON_VALUE(%1$s, :filterKey%2$d RETURNING DOUBLE NULL ON EMPTY NULL ON ERROR) >= CAST(:filter%2$d AS DOUBLE)"))))
                     .put(Operator.LESS_THAN, new EnumMap<>(Map.ofEntries(
                             Map.entry(FieldType.STRING, "lower(%1$s) < lower(:filter%2$d)"),
+                            Map.entry(FieldType.STRING_EXACT, "%1$s < :filter%2$d"),
                             Map.entry(FieldType.DATE_TIME, "%1$s < parseDateTime64BestEffort(:filter%2$d, 9)"),
                             Map.entry(FieldType.DATE_TIME_STATE_DB, "%1$s < :filter%2$d"),
                             Map.entry(FieldType.NUMBER, "%1$s < :filter%2$d"),
@@ -270,14 +280,22 @@ public class FilterQueryBuilder {
                             FieldType.ERROR_CONTAINER,
                             "empty(%1$s)",
                             FieldType.LIST,
-                            "empty(%1$s)")))
+                            "empty(%1$s)",
+                            FieldType.DICTIONARY,
+                            "(JSON_EXISTS(%1$s, :filterKey%2$d) = false OR JSON_VALUE(%1$s, :filterKey%2$d) = '' OR JSON_VALUE(%1$s, :filterKey%2$d) = 'null')",
+                            FieldType.DICTIONARY_STATE_DB,
+                            "(JSON_EXISTS(%1$s, :filterKey%2$d) = false OR JSON_VALUE(%1$s, :filterKey%2$d) = '' OR JSON_VALUE(%1$s, :filterKey%2$d) = 'null')")))
                     .put(Operator.IS_NOT_EMPTY, new EnumMap<>(Map.of(
                             FieldType.FEEDBACK_SCORES_NUMBER,
                             "empty(arrayFilter(element -> (element = lower(:filterKey%2$d)), groupArray(lower(name)))) = 0",
                             FieldType.ERROR_CONTAINER,
                             "notEmpty(%1$s)",
                             FieldType.LIST,
-                            "notEmpty(%1$s)")))
+                            "notEmpty(%1$s)",
+                            FieldType.DICTIONARY,
+                            "(JSON_EXISTS(%1$s, :filterKey%2$d) = true AND JSON_VALUE(%1$s, :filterKey%2$d) != '' AND JSON_VALUE(%1$s, :filterKey%2$d) != 'null')",
+                            FieldType.DICTIONARY_STATE_DB,
+                            "(JSON_EXISTS(%1$s, :filterKey%2$d) = true AND JSON_VALUE(%1$s, :filterKey%2$d) != '' AND JSON_VALUE(%1$s, :filterKey%2$d) != 'null')")))
                     .build());
 
     private static final Map<TraceField, String> TRACE_FIELDS_MAP = new EnumMap<>(
@@ -310,6 +328,7 @@ public class FilterQueryBuilder {
                     .put(TraceField.EXPERIMENT_ID, EXPERIMENT_ID_DB)
                     .put(TraceField.CREATED_AT, CREATED_AT_DB)
                     .put(TraceField.LAST_UPDATED_AT, LAST_UPDATED_AT_DB)
+                    .put(TraceField.SOURCE, SOURCE_DB)
                     .build());
 
     private static final Map<TraceThreadField, String> TRACE_THREAD_FIELDS_MAP = new EnumMap<>(
@@ -327,6 +346,7 @@ public class FilterQueryBuilder {
                     .put(TraceThreadField.STATUS, STATUS_DB)
                     .put(TraceThreadField.TAGS, TAGS_DB)
                     .put(TraceThreadField.ANNOTATION_QUEUE_IDS, THREAD_ANNOTATION_QUEUE_IDS_ANALYTICS_DB)
+                    .put(TraceThreadField.SOURCE, SOURCE_DB)
                     .build());
 
     private static final Map<SpanField, String> SPAN_FIELDS_MAP = new EnumMap<>(
@@ -354,6 +374,7 @@ public class FilterQueryBuilder {
                     .put(SpanField.ERROR_TYPE, ERROR_TYPE_DB)
                     .put(SpanField.TYPE, TYPE_ANALYTICS_DB)
                     .put(SpanField.TRACE_ID, TRACE_ID_DB)
+                    .put(SpanField.SOURCE, SOURCE_DB)
                     .build());
 
     private static final Map<ExperimentField, String> EXPERIMENT_FIELDS_MAP = new EnumMap<>(
@@ -370,6 +391,7 @@ public class FilterQueryBuilder {
             ImmutableMap.<OptimizationField, String>builder()
                     .put(OptimizationField.METADATA, METADATA_ANALYTICS_DB)
                     .put(OptimizationField.DATASET_ID, DATASET_ID_ANALYTICS_DB)
+                    .put(OptimizationField.PROJECT_ID, PROJECT_ID_DB)
                     .put(OptimizationField.STATUS, STATUS_DB)
                     .build());
 
@@ -528,7 +550,9 @@ public class FilterQueryBuilder {
                 TraceField.GUARDRAILS,
                 TraceField.VISIBILITY_MODE,
                 TraceField.ERROR_INFO,
-                TraceField.ERROR_TYPE));
+                TraceField.ERROR_TYPE,
+                TraceField.SOURCE,
+                TraceThreadField.SOURCE));
 
         map.put(FilterStrategy.EXPERIMENT_AGGREGATION, Set.of(
                 TraceField.EXPERIMENT_ID));
@@ -566,7 +590,8 @@ public class FilterQueryBuilder {
                 SpanField.ERROR_INFO,
                 SpanField.ERROR_TYPE,
                 SpanField.TYPE,
-                SpanField.TRACE_ID));
+                SpanField.TRACE_ID,
+                SpanField.SOURCE));
 
         map.put(FilterStrategy.FEEDBACK_SCORES, Set.of(
                 TraceField.FEEDBACK_SCORES,
@@ -584,6 +609,8 @@ public class FilterQueryBuilder {
         map.put(FilterStrategy.SPAN_FEEDBACK_SCORES, Set.of(SpanField.FEEDBACK_SCORES));
 
         map.put(FilterStrategy.EXPERIMENT_SCORES, Set.of(ExperimentField.EXPERIMENT_SCORES));
+
+        map.put(FilterStrategy.EXPERIMENT_SCORES_AGGREGATED, Set.of(ExperimentField.EXPERIMENT_SCORES));
 
         map.put(FilterStrategy.EXPERIMENT_ITEM, Set.of(
                 ExperimentsComparisonValidKnownField.OUTPUT,
@@ -702,6 +729,7 @@ public class FilterQueryBuilder {
         map.put(FilterStrategy.OPTIMIZATION, Set.of(
                 OptimizationField.METADATA,
                 OptimizationField.DATASET_ID,
+                OptimizationField.PROJECT_ID,
                 OptimizationField.STATUS));
 
         map.put(FilterStrategy.DASHBOARD, Set.of(
@@ -751,28 +779,43 @@ public class FilterQueryBuilder {
             return getAggregatedFeedbackScoresTemplate(filter.operator());
         }
 
+        // For aggregated experiment scores (Map(String, Float64)), use Float64-based map access patterns
+        if ((filterStrategy == FilterStrategy.EXPERIMENT_SCORES_AGGREGATED
+                || filterStrategy == FilterStrategy.EXPERIMENT_SCORES_AGGREGATED_IS_EMPTY)
+                && filter.field().getType() == FieldType.FEEDBACK_SCORES_NUMBER) {
+            return getAggregatedExperimentScoresTemplate(filter.operator());
+        }
+
         return ANALYTICS_DB_OPERATOR_MAP.get(filter.operator()).get(filter.field().getType());
     }
 
-    private static String getAggregatedFeedbackScoresTemplate(Operator operator) {
+    private static String getAggregatedMapScoresTemplate(Operator operator, String valueCast) {
         return switch (operator) {
             case EQUAL ->
-                "arrayExists(k -> lower(k) = lower(:filterKey%2$d) AND %1$s[k] = toDecimal64(:filter%2$d, 9), mapKeys(%1$s))";
+                "arrayExists(k -> lower(k) = lower(:filterKey%2$d) AND %1$s[k] = " + valueCast + ", mapKeys(%1$s))";
             case NOT_EQUAL ->
-                "arrayExists(k -> lower(k) = lower(:filterKey%2$d) AND %1$s[k] != toDecimal64(:filter%2$d, 9), mapKeys(%1$s))";
+                "arrayExists(k -> lower(k) = lower(:filterKey%2$d) AND %1$s[k] != " + valueCast + ", mapKeys(%1$s))";
             case GREATER_THAN ->
-                "arrayExists(k -> lower(k) = lower(:filterKey%2$d) AND %1$s[k] > toDecimal64(:filter%2$d, 9), mapKeys(%1$s))";
+                "arrayExists(k -> lower(k) = lower(:filterKey%2$d) AND %1$s[k] > " + valueCast + ", mapKeys(%1$s))";
             case GREATER_THAN_EQUAL ->
-                "arrayExists(k -> lower(k) = lower(:filterKey%2$d) AND %1$s[k] >= toDecimal64(:filter%2$d, 9), mapKeys(%1$s))";
+                "arrayExists(k -> lower(k) = lower(:filterKey%2$d) AND %1$s[k] >= " + valueCast + ", mapKeys(%1$s))";
             case LESS_THAN ->
-                "arrayExists(k -> lower(k) = lower(:filterKey%2$d) AND %1$s[k] < toDecimal64(:filter%2$d, 9), mapKeys(%1$s))";
+                "arrayExists(k -> lower(k) = lower(:filterKey%2$d) AND %1$s[k] < " + valueCast + ", mapKeys(%1$s))";
             case LESS_THAN_EQUAL ->
-                "arrayExists(k -> lower(k) = lower(:filterKey%2$d) AND %1$s[k] <= toDecimal64(:filter%2$d, 9), mapKeys(%1$s))";
+                "arrayExists(k -> lower(k) = lower(:filterKey%2$d) AND %1$s[k] <= " + valueCast + ", mapKeys(%1$s))";
             case IS_EMPTY -> "NOT arrayExists(k -> lower(k) = lower(:filterKey%2$d), mapKeys(%1$s))";
             case IS_NOT_EMPTY -> "arrayExists(k -> lower(k) = lower(:filterKey%2$d), mapKeys(%1$s))";
             default -> throw new IllegalArgumentException(
-                    "Unsupported operator for aggregated feedback scores: '%s'".formatted(operator));
+                    "Unsupported operator for aggregated map scores: '%s'".formatted(operator));
         };
+    }
+
+    private static String getAggregatedFeedbackScoresTemplate(Operator operator) {
+        return getAggregatedMapScoresTemplate(operator, "toDecimal64(:filter%2$d, 9)");
+    }
+
+    private static String getAggregatedExperimentScoresTemplate(Operator operator) {
+        return getAggregatedMapScoresTemplate(operator, "toFloat64(:filter%2$d)");
     }
 
     public static Optional<Boolean> hasGuardrailsFilter(@NonNull List<? extends Filter> filters) {
@@ -823,11 +866,45 @@ public class FilterQueryBuilder {
             return Optional.of(FILTER_STRATEGY_MAP.get(FilterStrategy.FEEDBACK_SCORES_AGGREGATED));
         }
 
-        // For aggregated feedback scores with non-IS_EMPTY operators, use EXPERIMENT fields (will skip feedback score filters)
-        if (filter.operator() != Operator.IS_EMPTY && isFeedbackScore(filter)
-                && (filterStrategy == FilterStrategy.FEEDBACK_SCORES_AGGREGATED
-                        || filterStrategy == FilterStrategy.FEEDBACK_SCORES_AGGREGATED_IS_EMPTY)) {
-            return Optional.of(FILTER_STRATEGY_MAP.get(FilterStrategy.EXPERIMENT));
+        if (filter.operator() == Operator.IS_NOT_EMPTY
+                && filterStrategy == FilterStrategy.FEEDBACK_SCORES_AGGREGATED_IS_EMPTY) {
+            return Optional.of(FILTER_STRATEGY_MAP.get(FilterStrategy.FEEDBACK_SCORES_AGGREGATED));
+        }
+
+        if (filter.operator() == Operator.IS_EMPTY
+                && filterStrategy == FilterStrategy.EXPERIMENT_SCORES_AGGREGATED_IS_EMPTY) {
+            return Optional.of(FILTER_STRATEGY_MAP.get(FilterStrategy.EXPERIMENT_SCORES_AGGREGATED));
+        }
+
+        if (filter.operator() == Operator.IS_NOT_EMPTY
+                && filterStrategy == FilterStrategy.EXPERIMENT_SCORES_AGGREGATED_IS_EMPTY) {
+            return Optional.of(FILTER_STRATEGY_MAP.get(FilterStrategy.EXPERIMENT_SCORES_AGGREGATED));
+        }
+
+        // Skip IS_NOT_EMPTY for FEEDBACK_SCORES_AGGREGATED — it is handled by FEEDBACK_SCORES_AGGREGATED_IS_EMPTY
+        if (filter.operator() == Operator.IS_NOT_EMPTY && isFeedbackScore(filter)
+                && filterStrategy == FilterStrategy.FEEDBACK_SCORES_AGGREGATED) {
+            return Optional.empty();
+        }
+
+        // Skip IS_NOT_EMPTY for EXPERIMENT_SCORES_AGGREGATED — it is handled by EXPERIMENT_SCORES_AGGREGATED_IS_EMPTY
+        if (filter.operator() == Operator.IS_NOT_EMPTY && isFeedbackScore(filter)
+                && filterStrategy == FilterStrategy.EXPERIMENT_SCORES_AGGREGATED) {
+            return Optional.empty();
+        }
+
+        // Skip numerical operators for FEEDBACK_SCORES_AGGREGATED_IS_EMPTY — only IS_EMPTY/IS_NOT_EMPTY are handled there
+        if (filter.operator() != Operator.IS_EMPTY && filter.operator() != Operator.IS_NOT_EMPTY
+                && isFeedbackScore(filter)
+                && filterStrategy == FilterStrategy.FEEDBACK_SCORES_AGGREGATED_IS_EMPTY) {
+            return Optional.empty();
+        }
+
+        // Skip numerical operators for EXPERIMENT_SCORES_AGGREGATED_IS_EMPTY — only IS_EMPTY/IS_NOT_EMPTY are handled there
+        if (filter.operator() != Operator.IS_EMPTY && filter.operator() != Operator.IS_NOT_EMPTY
+                && isFeedbackScore(filter)
+                && filterStrategy == FilterStrategy.EXPERIMENT_SCORES_AGGREGATED_IS_EMPTY) {
+            return Optional.empty();
         }
 
         if (isNotEmptyScoresFilter(filterStrategy, filter)) {
@@ -836,7 +913,8 @@ public class FilterQueryBuilder {
 
         // Only allow IS_EMPTY for _IS_EMPTY strategies (not for regular AGGREGATED strategy)
         if (filter.operator() == Operator.IS_EMPTY && isFeedbackScore(filter)
-                && filterStrategy != FilterStrategy.FEEDBACK_SCORES_AGGREGATED_IS_EMPTY) {
+                && filterStrategy != FilterStrategy.FEEDBACK_SCORES_AGGREGATED_IS_EMPTY
+                && filterStrategy != FilterStrategy.EXPERIMENT_SCORES_AGGREGATED_IS_EMPTY) {
             return Optional.empty();
         }
 
@@ -846,8 +924,7 @@ public class FilterQueryBuilder {
     private static boolean isNotEmptyScoresFilter(FilterStrategy filterStrategy, Filter filter) {
         return filter.operator() == Operator.IS_NOT_EMPTY
                 && Set.of(FilterStrategy.FEEDBACK_SCORES_IS_EMPTY, FilterStrategy.TRACE_SPAN_FEEDBACK_SCORES_IS_EMPTY,
-                        FilterStrategy.SPAN_FEEDBACK_SCORES_IS_EMPTY, FilterStrategy.EXPERIMENT_SCORES_IS_EMPTY,
-                        FilterStrategy.FEEDBACK_SCORES_AGGREGATED_IS_EMPTY)
+                        FilterStrategy.SPAN_FEEDBACK_SCORES_IS_EMPTY, FilterStrategy.EXPERIMENT_SCORES_IS_EMPTY)
                         .contains(filterStrategy);
     }
 
@@ -857,8 +934,9 @@ public class FilterQueryBuilder {
 
     private static String toAnalyticsDbFilter(Filter filter, int i, FilterStrategy filterStrategy) {
         var template = toAnalyticsDbOperator(filter, filterStrategy);
-        var formattedTemplate = template.formatted(getAnalyticsDbField(filter.field(), filterStrategy, i), i);
-        return "(%s)".formatted(formattedTemplate);
+        var dbField = getAnalyticsDbField(filter.field(), filterStrategy, i);
+        var enumFallbackTemplate = ANALYTICS_DB_OPERATOR_MAP.get(filter.operator()).get(FieldType.ENUM);
+        return filter.field().getType().buildFilter(template, dbField, i, filter.value(), enumFallbackTemplate);
     }
 
     private static String getAnalyticsDbField(Field field, FilterStrategy filterStrategy, int i) {
@@ -894,6 +972,14 @@ public class FilterQueryBuilder {
                 || filterStrategy == FilterStrategy.FEEDBACK_SCORES_AGGREGATED_IS_EMPTY)
                 && field == ExperimentField.EXPERIMENT_SCORES) {
             return "experiment_scores";
+        }
+
+        // experiment_aggregates.experiment_scores is Map(String, Float64); qualify with alias to avoid
+        // ambiguity with experiments.experiment_scores (JSON blob) in the same FROM clause
+        if ((filterStrategy == FilterStrategy.EXPERIMENT_SCORES_AGGREGATED
+                || filterStrategy == FilterStrategy.EXPERIMENT_SCORES_AGGREGATED_IS_EMPTY)
+                && field == ExperimentField.EXPERIMENT_SCORES) {
+            return "agg.experiment_scores";
         }
 
         return switch (field) {

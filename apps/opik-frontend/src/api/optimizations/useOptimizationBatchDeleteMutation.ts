@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import get from "lodash/get";
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@/ui/use-toast";
 import api, { OPTIMIZATIONS_KEY, OPTIMIZATIONS_REST_ENDPOINT } from "@/api/api";
 
 type UseOptimizationBatchDeleteMutationParams = {
@@ -32,6 +32,7 @@ const useOptimizationBatchDeleteMutation = () => {
       });
     },
     onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["project-datasets"] });
       queryClient.invalidateQueries({ queryKey: ["datasets"] });
       return queryClient.invalidateQueries({
         queryKey: [OPTIMIZATIONS_KEY],

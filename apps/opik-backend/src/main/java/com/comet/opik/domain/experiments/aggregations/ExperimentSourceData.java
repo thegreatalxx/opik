@@ -66,4 +66,28 @@ public class ExperimentSourceData {
             Map<String, BigDecimal> feedbackScores,
             String feedbackScoresArray) {
     }
+
+    /**
+     * Raw comments data for aggregation.
+     *
+     * @param traceId           The trace ID
+     * @param commentsArrayAgg  JSON string of comments array for this trace
+     */
+    @Builder
+    public record CommentsData(
+            UUID traceId,
+            String commentsArrayAgg) {
+    }
+
+    /**
+     * Raw assertion data for aggregation.
+     *
+     * @param traceId          The trace ID
+     * @param assertionsArray  JSON string of assertions array for this trace
+     */
+    @Builder
+    public record AssertionData(
+            UUID traceId,
+            String assertionsArray) {
+    }
 }

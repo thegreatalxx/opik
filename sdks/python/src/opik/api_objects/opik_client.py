@@ -24,8 +24,8 @@ from . import (
     opik_query_language,
     rest_helpers,
     search_helpers,
-    span,
-    trace,
+    span as span_module,
+    trace as trace_module,
 )
 from .annotation_queue import (
     TracesAnnotationQueue,
@@ -43,7 +43,8 @@ from .experiment import helpers as experiment_helpers
 from .experiment import rest_operations as experiment_rest_operations
 from . import prompt as prompt_module
 from .prompt import client as prompt_client
-from .agent_config.config import AgentConfig
+from .agent_config.base import AgentConfig
+from .agent_config.config import AgentConfigManager
 from .threads import threads_client
 from .trace import migration as trace_migration, trace_client
 from .. import config as opik_config
@@ -69,10 +70,10 @@ from ..message_processing.replay import replay_manager
 from ..rest_api import client as rest_api_client
 from ..rest_api.core.api_error import ApiError
 from ..rest_api.types import (
-    dataset_public,
     project_public,
     span_public,
     trace_public,
+    trace_thread,
     span_filter_public,
     trace_filter_public,
 )
@@ -82,12 +83,14 @@ from ..types import (
     FeedbackScoreDict,
     LLMProvider,
     SpanType,
+    TraceSource,
 )
 from ..file_upload import upload_manager
 
 LOGGER = logging.getLogger(__name__)
 
 T = TypeVar("T")
+_AgentConfigT = TypeVar("_AgentConfigT", bound=AgentConfig)
 QueueT = TypeVar("QueueT", TracesAnnotationQueue, ThreadsAnnotationQueue)
 
 
@@ -290,7 +293,7 @@ class Opik:
         thread_id: Optional[str] = None,
         attachments: Optional[List[Attachment]] = None,
         **ignored_kwargs: Any,
-    ) -> trace.Trace:
+    ) -> trace_module.Trace:
         """
         Create and log a new trace.
 
@@ -314,6 +317,41 @@ class Opik:
         Returns:
             trace.Trace: The created trace object.
         """
+        return self.__internal_api__trace__(
+            id=id,
+            name=name,
+            start_time=start_time,
+            end_time=end_time,
+            input=input,
+            output=output,
+            metadata=metadata,
+            tags=tags,
+            feedback_scores=feedback_scores,
+            project_name=project_name,
+            error_info=error_info,
+            thread_id=thread_id,
+            attachments=attachments,
+            source="sdk",
+        )
+
+    def __internal_api__trace__(
+        self,
+        id: Optional[str] = None,
+        name: Optional[str] = None,
+        start_time: Optional[datetime.datetime] = None,
+        end_time: Optional[datetime.datetime] = None,
+        input: Optional[Dict[str, Any]] = None,
+        output: Optional[Dict[str, Any]] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+        tags: Optional[List[str]] = None,
+        feedback_scores: Optional[List[FeedbackScoreDict]] = None,
+        project_name: Optional[str] = None,
+        error_info: Optional[ErrorInfoDict] = None,
+        thread_id: Optional[str] = None,
+        attachments: Optional[List[Attachment]] = None,
+        source: TraceSource = "sdk",
+        **ignored_kwargs: Any,
+    ) -> trace_module.Trace:
         id = id if id is not None else id_helpers.generate_id()
         start_time = (
             start_time if start_time is not None else datetime_helpers.local_timestamp()
@@ -336,6 +374,7 @@ class Opik:
             error_info=error_info,
             thread_id=thread_id,
             last_updated_at=last_updated_at,
+            source=source,
         )
         self._streamer.put(create_trace_message)
         self._display_trace_url(trace_id=id, project_name=project_name)
@@ -360,11 +399,12 @@ class Opik:
                     )
                 )
 
-        return trace.Trace(
+        return trace_module.Trace(
             id=id,
             message_streamer=self._streamer,
             project_name=project_name,
             url_override=self._config.url_override,
+            source=source,
         )
 
     def copy_traces(
@@ -402,13 +442,13 @@ class Opik:
         spans_public = self.search_spans(project_name=project_name)
 
         trace_data = [
-            trace.trace_public_to_trace_data(
+            trace_module.trace_public_to_trace_data(
                 project_name=project_name, trace_public=trace_public_
             )
             for trace_public_ in traces_public
         ]
         span_data = [
-            span.span_public_to_span_data(
+            span_module.span_public_to_span_data(
                 project_name=project_name, span_public_=span_public_
             )
             for span_public_ in spans_public
@@ -421,10 +461,10 @@ class Opik:
         )
 
         for trace_data_ in new_trace_data:
-            self.trace(**trace_data_.as_parameters)
+            self.__internal_api__trace__(**trace_data_.as_parameters)
 
         for span_data_ in new_span_data:
-            self.span(**span_data_.as_parameters)
+            self.__internal_api__span__(**span_data_.as_parameters)
 
         if delete_original_project:
             trace_ids = [trace_.id for trace_ in trace_data]
@@ -455,7 +495,7 @@ class Opik:
         error_info: Optional[ErrorInfoDict] = None,
         total_cost: Optional[float] = None,
         attachments: Optional[List[Attachment]] = None,
-    ) -> span.Span:
+    ) -> span_module.Span:
         """
         Create and log a new span.
 
@@ -489,6 +529,52 @@ class Opik:
         Returns:
             span.Span: The created span object.
         """
+        return self.__internal_api__span__(
+            trace_id=trace_id,
+            id=id,
+            parent_span_id=parent_span_id,
+            name=name,
+            type=type,
+            start_time=start_time,
+            end_time=end_time,
+            metadata=metadata,
+            input=input,
+            output=output,
+            tags=tags,
+            usage=usage,
+            feedback_scores=feedback_scores,
+            project_name=project_name,
+            model=model,
+            provider=provider,
+            error_info=error_info,
+            total_cost=total_cost,
+            attachments=attachments,
+            source="sdk",
+        )
+
+    def __internal_api__span__(
+        self,
+        trace_id: Optional[str] = None,
+        id: Optional[str] = None,
+        parent_span_id: Optional[str] = None,
+        name: Optional[str] = None,
+        type: SpanType = "general",
+        start_time: Optional[datetime.datetime] = None,
+        end_time: Optional[datetime.datetime] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+        input: Optional[Dict[str, Any]] = None,
+        output: Optional[Dict[str, Any]] = None,
+        tags: Optional[List[str]] = None,
+        usage: Optional[Union[Dict[str, Any], llm_usage.OpikUsage]] = None,
+        feedback_scores: Optional[List[FeedbackScoreDict]] = None,
+        project_name: Optional[str] = None,
+        model: Optional[str] = None,
+        provider: Optional[Union[str, LLMProvider]] = None,
+        error_info: Optional[ErrorInfoDict] = None,
+        total_cost: Optional[float] = None,
+        attachments: Optional[List[Attachment]] = None,
+        source: TraceSource = "sdk",
+    ) -> span_module.Span:
         id = id if id is not None else id_helpers.generate_id()
         start_time = (
             start_time if start_time is not None else datetime_helpers.local_timestamp()
@@ -514,6 +600,7 @@ class Opik:
                 error_info=error_info,
                 thread_id=None,
                 last_updated_at=datetime_helpers.local_timestamp(),
+                source=source,
             )
             self._streamer.put(create_trace_message)
 
@@ -525,7 +612,7 @@ class Opik:
                 cast(List[BatchFeedbackScoreDict], feedback_scores), project_name
             )
 
-        return span.span_client.create_span(
+        return span_module.span_client.create_span(
             trace_id=trace_id,
             project_name=project_name,
             url_override=self._config.url_override,
@@ -546,6 +633,7 @@ class Opik:
             error_info=error_info,
             total_cost=total_cost,
             attachments=attachments,
+            source=source,
         )
 
     def update_span(
@@ -609,7 +697,7 @@ class Opik:
         Returns:
             None
         """
-        span.span_client.update_span(
+        span_module.span_client.update_span(
             id=id,
             trace_id=trace_id,
             parent_span_id=parent_span_id,
@@ -627,6 +715,7 @@ class Opik:
             error_info=error_info,
             total_cost=total_cost,
             attachments=attachments,
+            source="sdk",
         )
 
     def update_trace(
@@ -689,6 +778,7 @@ class Opik:
             tags=tags,
             error_info=error_info,
             thread_id=thread_id,
+            source="sdk",
         )
 
     def log_spans_feedback_scores(
@@ -820,6 +910,61 @@ class Opik:
             scores=scores, project_name=project_name
         )
 
+    def search_threads(
+        self,
+        project_name: Optional[str] = None,
+        filter_string: Optional[str] = None,
+        max_results: int = 1000,
+        truncate: bool = True,
+    ) -> List[trace_thread.TraceThread]:
+        """Search for threads in a given project based on specific criteria.
+
+        Args:
+            project_name: The name of the project to search the threads for. If not provided,
+                the project name configured when the Client was created will be used.
+            filter_string: A filter string to narrow down the search using Opik Query Language (OQL).
+                The format is: `"<COLUMN> <OPERATOR> <VALUE> [AND <COLUMN> <OPERATOR> <VALUE>]*"`
+
+                Supported columns:
+                - `id`: String (=, !=, contains, not_contains, starts_with, ends_with, >, <)
+                - `first_message`, `last_message`: String (=, !=, contains, not_contains, starts_with, ends_with, >, <)
+                - `status`: Enum (=, !=)
+                - `start_time`, `end_time`, `created_at`, `last_updated_at`: DateTime (=, !=, >, >=, <, <=)
+                - `feedback_scores`: Numeric with dot notation (=, !=, >, >=, <, <=, is_empty, is_not_empty)
+                - `tags`, `annotation_queue_ids`: List (=, !=, contains, not_contains, is_empty, is_not_empty)
+                - `duration`, `number_of_messages`: Numeric (=, !=, >, >=, <, <=)
+
+                Examples:
+                - `status = "active"` - Filter by thread status
+                - `id = "thread_123"` - Filter by specific thread ID
+                - `number_of_messages >= 5` - Filter by message count
+                - `first_message contains "hello"` - Filter by first message content
+                - `feedback_scores.user_frustration > 0.5` - Filter by feedback score
+                - `tags contains "important"` - Filter by tag
+
+                If not provided, all threads in the project will be returned up to the limit.
+            max_results: The maximum number of threads to retrieve. The default value is 1000.
+            truncate: Whether to truncate image data stored in input, output, or metadata.
+
+        Returns:
+            A list of TraceThread objects that match the search criteria.
+
+        Example:
+            >>> from opik import Opik
+            >>> client = Opik()
+            >>> threads = client.search_threads(
+            >>>     project_name="Demo Project",
+            >>>     filter_string='id = "thread_123"',
+            >>>     max_results=10,
+            >>> )
+        """
+        return self.get_threads_client().search_threads(
+            project_name=project_name,
+            filter_string=filter_string,
+            max_results=max_results,
+            truncate=truncate,
+        )
+
     def delete_trace_feedback_score(self, trace_id: str, name: str) -> None:
         """
         Deletes a feedback score associated with a specific trace.
@@ -856,40 +1001,41 @@ class Opik:
             name=name,
         )
 
-    def get_dataset(self, name: str) -> dataset.Dataset:
+    def get_dataset(
+        self, name: str, project_name: Optional[str] = None
+    ) -> dataset.Dataset:
         """
         Get dataset by name
 
         Args:
             name: The name of the dataset
+            project_name: The name of the project to which the dataset belongs. If None, uses the default project name.
 
         Returns:
             dataset.Dataset: dataset object associated with the name passed.
         """
-        dataset_fern: dataset_public.DatasetPublic = (
-            self._rest_client.datasets.get_dataset_by_identifier(dataset_name=name)
+        project_name = self._resolve_project_name(project_name)
+        dataset_fern = self._rest_client.datasets.get_dataset_by_identifier(
+            dataset_name=name, project_name=project_name
         )
 
-        dataset_ = dataset.Dataset(
-            name=name,
-            description=dataset_fern.description,
+        return dataset.Dataset.from_public(
+            dataset_fern=dataset_fern,
+            project_name=project_name,
             rest_client=self._rest_client,
-            dataset_items_count=dataset_fern.dataset_items_count,
         )
-
-        dataset_.__internal_api__sync_hashes__()
-
-        return dataset_
 
     def get_datasets(
         self,
         max_results: int = 100,
         sync_items: bool = True,
+        project_name: Optional[str] = None,
     ) -> List[dataset.Dataset]:
         """
         Returns all datasets up to the specified limit.
 
         Args:
+            project_name: The name of the project to which the datasets belong. If None, uses the default project name.
             max_results: The maximum number of datasets to return.
             sync_items: Whether to sync the hashes of the dataset items. This is used to deduplicate items when fetching the dataset but it can be an expensive operation.
 
@@ -897,7 +1043,10 @@ class Opik:
             List[dataset.Dataset]: A list of dataset objects that match the filter string.
         """
         datasets = dataset_rest_operations.get_datasets(
-            self._rest_client, max_results, sync_items
+            project_name=self._resolve_project_name(project_name),
+            rest_client=self._rest_client,
+            max_results=max_results,
+            sync_items=sync_items,
         )
 
         return datasets
@@ -906,6 +1055,7 @@ class Opik:
         self,
         dataset_name: str,
         max_results: int = 100,
+        project_name: Optional[str] = None,
     ) -> List[experiment.Experiment]:
         """
         Returns all experiments up to the specified limit.
@@ -913,12 +1063,14 @@ class Opik:
         Args:
             dataset_name: The name of the dataset
             max_results: The maximum number of experiments to return.
+            project_name: The name of the project to which the datasets belong. If None, uses the default project name.
 
         Returns:
             List[experiment.Experiment]: A list of experiment objects.
         """
+        project_name = self._resolve_project_name(project_name)
         dataset_id = dataset_rest_operations.get_dataset_id(
-            self._rest_client, dataset_name
+            self._rest_client, dataset_name=dataset_name, project_name=project_name
         )
 
         experiments_client = self.get_experiments_client()
@@ -932,17 +1084,24 @@ class Opik:
 
         return experiments
 
-    def delete_dataset(self, name: str) -> None:
+    def delete_dataset(self, name: str, project_name: Optional[str] = None) -> None:
         """
         Delete dataset by name
 
         Args:
             name: The name of the dataset
+            project_name: The name of the project to which the dataset belongs. If None, uses the default project name.
         """
-        self._rest_client.datasets.delete_dataset_by_name(dataset_name=name)
+        project_name = self._resolve_project_name(project_name)
+        self._rest_client.datasets.delete_dataset_by_name(
+            dataset_name=name, project_name=project_name
+        )
 
     def create_dataset(
-        self, name: str, description: Optional[str] = None
+        self,
+        name: str,
+        description: Optional[str] = None,
+        project_name: Optional[str] = None,
     ) -> dataset.Dataset:
         """
         Create a new dataset.
@@ -950,15 +1109,22 @@ class Opik:
         Args:
             name: The name of the dataset.
             description: An optional description of the dataset.
+            project_name: The name of the project to which the dataset belongs. If None, uses the default project name.
 
         Returns:
             dataset.Dataset: The created dataset object.
         """
-        self._rest_client.datasets.create_dataset(name=name, description=description)
+        project_name = self._resolve_project_name(project_name)
+        self._rest_client.datasets.create_dataset(
+            name=name,
+            description=description,
+            project_name=project_name,
+        )
 
         result = dataset.Dataset(
             name=name,
             description=description,
+            project_name=project_name,
             rest_client=self._rest_client,
             dataset_items_count=0,
         )
@@ -968,7 +1134,10 @@ class Opik:
         return result
 
     def get_or_create_dataset(
-        self, name: str, description: Optional[str] = None
+        self,
+        name: str,
+        description: Optional[str] = None,
+        project_name: Optional[str] = None,
     ) -> dataset.Dataset:
         """
         Get an existing dataset by name or create a new one if it does not exist.
@@ -976,15 +1145,18 @@ class Opik:
         Args:
             name: The name of the dataset.
             description: An optional description of the dataset.
+            project_name: The name of the project to which the dataset belongs. If None, uses the default project name.
 
         Returns:
             dataset.Dataset: The dataset object.
         """
         try:
-            return self.get_dataset(name)
+            return self.get_dataset(name, project_name=project_name)
         except ApiError as e:
             if e.status_code == 404:
-                return self.create_dataset(name, description)
+                return self.create_dataset(
+                    name, description=description, project_name=project_name
+                )
             raise
 
     def create_evaluation_suite(
@@ -994,6 +1166,7 @@ class Opik:
         assertions: Optional[List[str]] = None,
         execution_policy: Optional[dataset_execution_policy.ExecutionPolicy] = None,
         tags: Optional[List[str]] = None,
+        project_name: Optional[str] = None,
     ) -> evaluation_suite.EvaluationSuite:
         """
         Create a new evaluation suite for regression testing.
@@ -1010,6 +1183,7 @@ class Opik:
             execution_policy: Suite-level execution policy.
                 Example: {"runs_per_item": 3, "pass_threshold": 2}
             tags: Optional list of tags for the suite.
+            project_name: Optional name of the project to associate the suite with.
 
         Returns:
             EvaluationSuite: The created evaluation suite object.
@@ -1018,6 +1192,7 @@ class Opik:
             >>> suite = client.create_evaluation_suite(
             ...     name="Refund Policy Tests",
             ...     description="Regression tests for refund scenarios",
+            ...     project_name="custom-project",
             ...     assertions=[
             ...         "No hallucinated information",
             ...         "Response is helpful",
@@ -1039,9 +1214,11 @@ class Opik:
             assertions, None, "suite-level assertions"
         )
 
+        project_name = self._resolve_project_name(project_name)
         rest_operations.create_evaluation_suite_dataset(
             rest_client=self._rest_client,
             dataset_name=name,
+            project_name=project_name,
             description=description,
             evaluators=evaluators,
             exec_policy=execution_policy,
@@ -1050,6 +1227,7 @@ class Opik:
         suite_dataset = dataset.Dataset(
             name=name,
             description=description,
+            project_name=project_name,
             rest_client=self._rest_client,
             dataset_items_count=0,
         )
@@ -1059,7 +1237,9 @@ class Opik:
             dataset_=suite_dataset,
         )
 
-    def get_evaluation_suite(self, name: str) -> evaluation_suite.EvaluationSuite:
+    def get_evaluation_suite(
+        self, name: str, project_name: Optional[str] = None
+    ) -> evaluation_suite.EvaluationSuite:
         """
         Get an existing evaluation suite by name.
 
@@ -1068,6 +1248,7 @@ class Opik:
 
         Args:
             name: The name of the evaluation suite.
+            project_name: Optional name of the project the suite is associated with.
 
         Returns:
             EvaluationSuite: The evaluation suite object.
@@ -1075,18 +1256,17 @@ class Opik:
         Raises:
             ApiError: If no dataset with the given name exists (404).
         """
-        dataset_fern: dataset_public.DatasetPublic = (
-            self._rest_client.datasets.get_dataset_by_identifier(dataset_name=name)
+        project_name = self._resolve_project_name(project_name)
+        dataset_fern = self._rest_client.datasets.get_dataset_by_identifier(
+            dataset_name=name,
+            project_name=project_name,
         )
 
-        suite_dataset = dataset.Dataset(
-            name=name,
-            description=dataset_fern.description,
+        suite_dataset = dataset.Dataset.from_public(
+            dataset_fern=dataset_fern,
+            project_name=project_name,
             rest_client=self._rest_client,
-            dataset_items_count=dataset_fern.dataset_items_count,
         )
-
-        suite_dataset.__internal_api__sync_hashes__()
 
         return evaluation_suite.EvaluationSuite(
             name=name,
@@ -1100,6 +1280,7 @@ class Opik:
         assertions: Optional[List[str]] = None,
         execution_policy: Optional[dataset_execution_policy.ExecutionPolicy] = None,
         tags: Optional[List[str]] = None,
+        project_name: Optional[str] = None,
     ) -> evaluation_suite.EvaluationSuite:
         """
         Get an existing evaluation suite by name or create a new one if it does not exist.
@@ -1115,6 +1296,7 @@ class Opik:
                 expected behavior that will be checked by an LLM.
             execution_policy: Execution policy for the suite.
             tags: Optional list of tags for the suite.
+            project_name: Optional name of the project the suite is associated with.
 
         Returns:
             EvaluationSuite: The evaluation suite object.
@@ -1125,7 +1307,7 @@ class Opik:
             validators.validate_execution_policy(execution_policy)
 
         try:
-            suite = self.get_evaluation_suite(name)
+            suite = self.get_evaluation_suite(name, project_name=project_name)
         except ApiError as e:
             if e.status_code == 404:
                 return self.create_evaluation_suite(
@@ -1134,6 +1316,7 @@ class Opik:
                     execution_policy=execution_policy,
                     assertions=assertions,
                     tags=tags,
+                    project_name=project_name,
                 )
             raise
 
@@ -1161,6 +1344,7 @@ class Opik:
         optimization_id: Optional[str] = None,
         tags: Optional[List[str]] = None,
         dataset_version_id: Optional[str] = None,
+        project_name: Optional[str] = None,
     ) -> experiment.Experiment:
         """
         Creates a new experiment using the given dataset name and optional parameters.
@@ -1176,6 +1360,7 @@ class Opik:
             optimization_id: Optional ID of the optimization associated with the experiment.
             tags: Optional list of tags to associate with the experiment.
             dataset_version_id: Optional ID of the dataset version to associate with the experiment.
+            project_name: Optional name of the project to associate the experiment with.
 
         Returns:
             experiment.Experiment: The newly created experiment object.
@@ -1192,6 +1377,8 @@ class Opik:
             prompts=checked_prompts,
         )
 
+        project_name = self._resolve_project_name(project_name)
+
         self._rest_client.experiments.create_experiment(
             name=name,
             dataset_name=dataset_name,
@@ -1203,6 +1390,7 @@ class Opik:
             optimization_id=optimization_id,
             tags=tags,
             dataset_version_id=dataset_version_id,
+            project_name=project_name,
         )
 
         experiment_ = experiment.Experiment(
@@ -1214,6 +1402,7 @@ class Opik:
             experiments_client=self.get_experiments_client(),
             prompts=checked_prompts,
             tags=tags,
+            project_name=project_name,
         )
 
         return experiment_
@@ -1254,12 +1443,15 @@ class Opik:
 
         self._rest_client.experiments.update_experiment(id, **request_params)
 
-    def get_experiment_by_name(self, name: str) -> experiment.Experiment:
+    def get_experiment_by_name(
+        self, name: str, project_name: Optional[str] = None
+    ) -> experiment.Experiment:
         """
         Returns an existing experiment by its name.
 
         Args:
             name: The name of the experiment.
+            project_name: The name of the project the experiment belongs to. If None, uses the default project name.
 
         Returns:
             experiment.Experiment: the API object for an existing experiment.
@@ -1267,8 +1459,9 @@ class Opik:
         LOGGER.warning(
             "Deprecated, use `get_experiments_by_name` or `get_experiment_by_id` instead."
         )
+        project_name = self._resolve_project_name(project_name)
         experiment_public = experiment_rest_operations.get_experiment_data_by_name(
-            rest_client=self._rest_client, name=name
+            rest_client=self._rest_client, name=name, project_name=project_name
         )
 
         return experiment.Experiment(
@@ -1279,21 +1472,26 @@ class Opik:
             streamer=self._streamer,
             experiments_client=self.get_experiments_client(),
             tags=experiment_public.tags,
+            project_name=experiment_public.project_name,
         )
 
-    def get_experiments_by_name(self, name: str) -> List[experiment.Experiment]:
+    def get_experiments_by_name(
+        self, name: str, project_name: Optional[str] = None
+    ) -> List[experiment.Experiment]:
         """
         Returns a list of existing experiments containing the given string in their name.
         Search is case-insensitive.
 
         Args:
             name: The string to search for in the experiment names.
+            project_name: The project name to search within. If None, uses the default project.
 
         Returns:
             List[experiment.Experiment]: List of existing experiments.
         """
+        project_name = self._resolve_project_name(project_name)
         experiments_public = experiment_rest_operations.get_experiments_data_by_name(
-            rest_client=self._rest_client, name=name
+            rest_client=self._rest_client, name=name, project_name=project_name
         )
         result = []
 
@@ -1306,6 +1504,7 @@ class Opik:
                 streamer=self._streamer,
                 experiments_client=self.get_experiments_client(),
                 tags=public_experiment.tags,
+                project_name=public_experiment.project_name,
             )
             result.append(experiment_)
 
@@ -1340,6 +1539,7 @@ class Opik:
             streamer=self._streamer,
             experiments_client=self.get_experiments_client(),
             tags=experiment_public.tags,
+            project_name=experiment_public.project_name,
         )
 
     def end(self, timeout: Optional[int] = None) -> None:
@@ -1439,10 +1639,12 @@ class Opik:
             entity_type="traces",
         )
 
+        project_name = self._resolve_project_name(project_name)
+
         search_functor = functools.partial(
             search_helpers.search_traces_with_filters,
             rest_client=self._rest_client,
-            project_name=project_name or self._project_name,
+            project_name=project_name,
             filters=filters_,
             max_results=max_results,
             truncate=truncate,
@@ -1535,10 +1737,11 @@ class Opik:
             entity_type="spans",
         )
 
+        project_name = self._resolve_project_name(project_name)
         search_functor = functools.partial(
             search_helpers.search_spans_with_filters,
             rest_client=self._rest_client,
-            project_name=project_name or self._project_name,
+            project_name=project_name,
             trace_id=trace_id,
             filters=filters,
             max_results=max_results,
@@ -1660,6 +1863,7 @@ class Opik:
         description: Optional[str] = None,
         change_description: Optional[str] = None,
         tags: Optional[List[str]] = None,
+        project_name: Optional[str] = None,
     ) -> prompt_module.Prompt:
         """
         Creates a new text prompt with the given name and template.
@@ -1674,6 +1878,7 @@ class Opik:
             description: Optional description of the prompt (up to 255 characters).
             change_description: Optional description of changes in this version.
             tags: Optional list of tags to associate with the prompt.
+            project_name: Optional project name to associate with the prompt. If not provided, the default project will be used.
 
         Returns:
             A Prompt object containing details of the created or retrieved prompt.
@@ -1683,6 +1888,7 @@ class Opik:
             ApiError: If there is an error during the creation of the prompt.
         """
         prompt_client_ = prompt_client.PromptClient(self._rest_client)
+        project_name = self._resolve_project_name(project_name)
         prompt_version = prompt_client_.create_prompt(
             name=name,
             prompt=prompt,
@@ -1692,8 +1898,11 @@ class Opik:
             description=description,
             change_description=change_description,
             tags=tags,
+            project_name=project_name,
         )
-        return prompt_module.Prompt.from_fern_prompt_version(name, prompt_version)
+        return prompt_module.Prompt.from_fern_prompt_version(
+            name, prompt_version, project_name=project_name
+        )
 
     def create_chat_prompt(
         self,
@@ -1705,6 +1914,7 @@ class Opik:
         description: Optional[str] = None,
         change_description: Optional[str] = None,
         tags: Optional[List[str]] = None,
+        project_name: Optional[str] = None,
     ) -> prompt_module.ChatPrompt:
         """
         Creates a new chat prompt with the given name and message templates.
@@ -1719,6 +1929,7 @@ class Opik:
             description: Optional description of the prompt (up to 255 characters).
             change_description: Optional description of changes in this version.
             tags: Optional list of tags to associate with the prompt.
+            project_name: Optional project name for the prompt.
 
         Returns:
             A ChatPrompt object containing details of the created or retrieved chat prompt.
@@ -1727,6 +1938,7 @@ class Opik:
             PromptTemplateStructureMismatch: If a text prompt with the same name already exists (template structure is immutable).
             ApiError: If there is an error during the creation of the prompt.
         """
+        project_name = self._resolve_project_name(project_name)
         return prompt_module.ChatPrompt(
             name=name,
             messages=messages,
@@ -1736,12 +1948,14 @@ class Opik:
             description=description,
             change_description=change_description,
             tags=tags,
+            project_name=project_name,
         )
 
     def get_prompt(
         self,
         name: str,
         commit: Optional[str] = None,
+        project_name: Optional[str] = None,
     ) -> Optional[prompt_module.Prompt]:
         """
         Retrieve a text prompt by name and optional commit version.
@@ -1751,6 +1965,7 @@ class Opik:
         Parameters:
             name: The name of the prompt.
             commit: An optional commit version of the prompt. If not provided, the latest version is retrieved.
+            project_name: The name of the project to retrieve the prompt from. If not provided, the default project will be used.
 
         Returns:
             Prompt: The details of the specified text prompt, or None if not found.
@@ -1759,19 +1974,26 @@ class Opik:
             PromptTemplateStructureMismatch: If the prompt exists but is a chat prompt (template structure mismatch).
         """
         prompt_client_ = prompt_client.PromptClient(self._rest_client)
+        project_name = self._resolve_project_name(project_name)
         fern_prompt_version = prompt_client_.get_prompt(
-            name=name, commit=commit, raise_if_not_template_structure="text"
+            name=name,
+            commit=commit,
+            raise_if_not_template_structure="text",
+            project_name=project_name,
         )
 
         if fern_prompt_version is None:
             return None
 
-        return prompt_module.Prompt.from_fern_prompt_version(name, fern_prompt_version)
+        return prompt_module.Prompt.from_fern_prompt_version(
+            name, fern_prompt_version, project_name=project_name
+        )
 
     def get_chat_prompt(
         self,
         name: str,
         commit: Optional[str] = None,
+        project_name: Optional[str] = None,
     ) -> Optional[prompt_module.ChatPrompt]:
         """
         Retrieve a chat prompt by name and optional commit version.
@@ -1781,6 +2003,7 @@ class Opik:
         Parameters:
             name: The name of the prompt.
             commit: An optional commit version of the prompt. If not provided, the latest version is retrieved.
+            project_name: The name of the project to retrieve the prompt from. If not provided, the default project will be used.
 
         Returns:
             ChatPrompt: The details of the specified chat prompt, or None if not found.
@@ -1789,15 +2012,19 @@ class Opik:
             PromptTemplateStructureMismatch: If the prompt exists but is a text prompt (template structure mismatch).
         """
         prompt_client_ = prompt_client.PromptClient(self._rest_client)
+        project_name = self._resolve_project_name(project_name)
         fern_prompt_version = prompt_client_.get_prompt(
-            name=name, commit=commit, raise_if_not_template_structure="chat"
+            name=name,
+            commit=commit,
+            raise_if_not_template_structure="chat",
+            project_name=project_name,
         )
 
         if fern_prompt_version is None:
             return None
 
         return prompt_module.ChatPrompt.from_fern_prompt_version(
-            name, fern_prompt_version
+            name, fern_prompt_version, project_name=project_name
         )
 
     def get_prompt_history(
@@ -1805,6 +2032,7 @@ class Opik:
         name: str,
         search: Optional[str] = None,
         filter_string: Optional[str] = None,
+        project_name: Optional[str] = None,
     ) -> List[prompt_module.Prompt]:
         """
         Retrieve all text prompt versions history for a given prompt name.
@@ -1812,6 +2040,7 @@ class Opik:
         Parameters:
             name: The name of the prompt.
             search: Optional search text to find in template or change description fields.
+            project_name: The name of the project to retrieve the prompt history from. If not provided, the default project will be used.
             filter_string: A filter string to narrow down the search using Opik Query Language (OQL).
                 The format is: "<COLUMN> <OPERATOR> <VALUE> [AND <COLUMN> <OPERATOR> <VALUE>]*"
 
@@ -1838,33 +2067,37 @@ class Opik:
 
         Example:
             # Get all versions of a prompt
-            versions = client.get_prompt_history(name="my-prompt")
+            versions = client.get_prompt_history(name="my-prompt", project_name="my-project")
 
             # Filter by tags (versions containing "production" tag)
             versions = client.get_prompt_history(
                 name="my-prompt",
+                project_name="my-project",
                 filter_string='tags contains "production"'
             )
 
             # Search for specific text in template or change description fields
             versions = client.get_prompt_history(
                 name="my-prompt",
+                project_name="my-project",
                 search="customer"
             )
 
             # Combine search and filtering
             versions = client.get_prompt_history(
                 name="my-prompt",
+                project_name="my-project",
                 search="customer",
                 filter_string='tags contains "production"'
             )
         """
         prompt_client_ = prompt_client.PromptClient(self._rest_client)
+        project_name = self._resolve_project_name(project_name)
 
         # First, validate that this is a text prompt by trying to get the latest version
         # Let PromptTemplateStructureMismatch exception propagate - this is a hard error
         latest_version = prompt_client_.get_prompt(
-            name=name, raise_if_not_template_structure="text"
+            name=name, raise_if_not_template_structure="text", project_name=project_name
         )
 
         if latest_version is None:
@@ -1872,11 +2105,16 @@ class Opik:
 
         # Now get all versions (we know it's a text prompt)
         fern_prompt_versions = prompt_client_.get_all_prompt_versions(
-            name=name, search=search, filter_string=filter_string
+            name=name,
+            search=search,
+            filter_string=filter_string,
+            project_name=project_name,
         )
 
         result = [
-            prompt_module.Prompt.from_fern_prompt_version(name, version)
+            prompt_module.Prompt.from_fern_prompt_version(
+                name, version, project_name=project_name
+            )
             for version in fern_prompt_versions
         ]
         return result
@@ -1886,6 +2124,7 @@ class Opik:
         name: str,
         search: Optional[str] = None,
         filter_string: Optional[str] = None,
+        project_name: Optional[str] = None,
     ) -> List[prompt_module.ChatPrompt]:
         """
         Retrieve all chat prompt versions history for a given prompt name.
@@ -1893,6 +2132,7 @@ class Opik:
         Parameters:
             name: The name of the prompt.
             search: Optional search text to find in template or change description fields.
+            project_name: The name of the project to retrieve the prompt history from. If not provided, the default project will be used.
             filter_string: A filter string to narrow down the search using Opik Query Language (OQL).
                 The format is: "<COLUMN> <OPERATOR> <VALUE> [AND <COLUMN> <OPERATOR> <VALUE>]*"
 
@@ -1919,33 +2159,37 @@ class Opik:
 
         Example:
             # Get all versions of a chat prompt
-            versions = client.get_chat_prompt_history(name="my-chat-prompt")
+            versions = client.get_chat_prompt_history(name="my-chat-prompt", project_name="my-project")
 
             # Filter by tags (versions containing "production" tag)
             versions = client.get_chat_prompt_history(
                 name="my-chat-prompt",
+                project_name="my-project",
                 filter_string='tags contains "production"'
             )
 
             # Search for specific text in template or change description fields
             versions = client.get_chat_prompt_history(
                 name="my-chat-prompt",
+                project_name="my-project",
                 search="helpful assistant"
             )
 
             # Combine search and filtering
             versions = client.get_chat_prompt_history(
                 name="my-chat-prompt",
+                project_name="my-project",
                 search="helpful assistant",
                 filter_string='tags contains "production"'
             )
         """
         prompt_client_ = prompt_client.PromptClient(self._rest_client)
+        project_name = self._resolve_project_name(project_name)
 
         # First, validate that this is a chat prompt by trying to get the latest version
         # Let PromptTemplateStructureMismatch exception propagate - this is a hard error
         latest_version = prompt_client_.get_prompt(
-            name=name, raise_if_not_template_structure="chat"
+            name=name, raise_if_not_template_structure="chat", project_name=project_name
         )
 
         if latest_version is None:
@@ -1953,22 +2197,30 @@ class Opik:
 
         # Now get all versions (we know it's a chat prompt)
         fern_prompt_versions = prompt_client_.get_all_prompt_versions(
-            name=name, search=search, filter_string=filter_string
+            name=name,
+            search=search,
+            filter_string=filter_string,
+            project_name=project_name,
         )
 
         result = [
-            prompt_module.ChatPrompt.from_fern_prompt_version(name, version)
+            prompt_module.ChatPrompt.from_fern_prompt_version(
+                name, version, project_name=project_name
+            )
             for version in fern_prompt_versions
         ]
         return result
 
-    def get_all_prompts(self, name: str) -> List[prompt_module.Prompt]:
+    def get_all_prompts(
+        self, name: str, project_name: Optional[str] = None
+    ) -> List[prompt_module.Prompt]:
         """
         DEPRECATED: Please use Opik.get_prompt_history() instead.
         Retrieve all the prompt versions history for a given prompt name.
 
         Parameters:
             name: The name of the prompt.
+            project_name: The name of the project to retrieve the prompt history from. If not provided, the default project will be used.
 
         Returns:
             List[prompt_module.Prompt]: A list of Prompt instances for the given name.
@@ -1976,15 +2228,16 @@ class Opik:
         LOGGER.warning(
             "Opik.get_all_prompts() is deprecated. Please use Opik.get_prompt_history() instead."
         )
-        return self.get_prompt_history(name)
+        return self.get_prompt_history(name, project_name=project_name)
 
     def search_prompts(
-        self, filter_string: Optional[str] = None
+        self, filter_string: Optional[str] = None, project_name: Optional[str] = None
     ) -> List[Union[prompt_module.Prompt, prompt_module.ChatPrompt]]:
         """
         Retrieve the latest prompt versions (both string and chat prompts) for the given search parameters.
 
         Parameters:
+            project_name: The name of the project to search in. If not provided, the default project will be used.
             filter_string: A filter string to narrow down the search using Opik Query Language (OQL).
                 The format is: "<COLUMN> <OPERATOR> <VALUE> [AND <COLUMN> <OPERATOR> <VALUE>]*"
 
@@ -2018,8 +2271,12 @@ class Opik:
         oql = opik_query_language.OpikQueryLanguage.for_traces(filter_string or "")
         parsed_filters = oql.get_filter_expressions()
 
+        project_name = self._resolve_project_name(project_name)
+
         prompt_client_ = prompt_client.PromptClient(self._rest_client)
-        search_results = prompt_client_.search_prompts(parsed_filters=parsed_filters)
+        search_results = prompt_client_.search_prompts(
+            parsed_filters=parsed_filters, project_name=project_name
+        )
 
         # Convert to Prompt or ChatPrompt objects based on template_structure
         prompts: List[Union[prompt_module.Prompt, prompt_module.ChatPrompt]] = []
@@ -2027,13 +2284,17 @@ class Opik:
             if result.template_structure == "chat":
                 prompts.append(
                     prompt_module.ChatPrompt.from_fern_prompt_version(
-                        result.name, result.prompt_version_detail
+                        result.name,
+                        result.prompt_version_detail,
+                        project_name=project_name,
                     )
                 )
             else:
                 prompts.append(
                     prompt_module.Prompt.from_fern_prompt_version(
-                        result.name, result.prompt_version_detail
+                        result.name,
+                        result.prompt_version_detail,
+                        project_name=project_name,
                     )
                 )
 
@@ -2046,8 +2307,11 @@ class Opik:
         name: Optional[str] = None,
         metadata: Optional[Dict[str, Any]] = None,
         optimization_id: Optional[str] = None,
+        project_name: Optional[str] = None,
     ) -> optimization.Optimization:
         id = optimization_id or id_helpers.generate_id()
+
+        project_name = self._resolve_project_name(project_name)
 
         self._rest_client.optimizations.create_optimization(
             id=id,
@@ -2056,10 +2320,11 @@ class Opik:
             objective_name=objective_name,
             status="running",
             metadata=metadata,
+            project_name=project_name,
         )
 
         optimization_client = optimization.Optimization(
-            id=id, rest_client=self._rest_client
+            id=id, rest_client=self._rest_client, project_name=project_name
         )
         return optimization_client
 
@@ -2067,7 +2332,19 @@ class Opik:
         self._rest_client.optimizations.delete_optimizations_by_id(ids=ids)
 
     def get_optimization_by_id(self, id: str) -> optimization.Optimization:
-        _ = self._rest_client.optimizations.get_optimization_by_id(id)
+        result = self._rest_client.optimizations.get_optimization_by_id(id)
+        try:
+            project = self.get_project(result.project_id)
+            return optimization.Optimization(
+                id=result.id,
+                rest_client=self._rest_client,
+                project_name=project.name,
+            )
+        except Exception as e:
+            LOGGER.warning(
+                f"Failed to get project for optimization with ID: {id}, reason: {e}"
+            )
+
         return optimization.Optimization(id=id, rest_client=self._rest_client)
 
     def get_experiments_client(self) -> experiments_client.ExperimentsClient:
@@ -2306,15 +2583,108 @@ class Opik:
             ids=[queue_id]
         )
 
-    def get_agent_config(
+    def create_agent_config_version(
         self,
+        config: AgentConfig,
         project_name: Optional[str] = None,
-    ) -> AgentConfig:
-        project_name = project_name or self._project_name
-        return AgentConfig(
-            project_name=project_name,
+        description: Optional[str] = None,
+    ) -> str:
+        """Write a config version to the backend. No-op if nothing changed.
+
+        Args:
+            config: An instance of a user-defined ``AgentConfig`` subclass.
+            project_name: Opik project name. Defaults to the client's default.
+            description: Optional description stored with the version.
+
+        Returns:
+            The version name — either the newly created version or the
+            existing version when values already match.
+        """
+        if not isinstance(config, AgentConfig) or type(config) is AgentConfig:
+            raise TypeError(
+                "config must be an instance of an AgentConfig subclass, "
+                f"got {type(config).__name__}"
+            )
+
+        manager = AgentConfigManager(
+            project_name=project_name or self._project_name,
             rest_client_=self._rest_client,
         )
+        return config._create_version(manager, description)
+
+    def get_agent_config(
+        self,
+        *,
+        fallback: _AgentConfigT,
+        project_name: Optional[str] = None,
+        env: Optional[str] = None,
+        latest: bool = False,
+        version: Optional[str] = None,
+        timeout_in_seconds: Optional[int] = 5,
+    ) -> _AgentConfigT:
+        """Fetch an agent config from the backend.
+
+        Exactly one selector must be used to specify which version to fetch
+        (passing more than one raises ``ValueError``):
+
+        * ``env`` — fetch the version deployed to an environment (e.g. ``"prod"``).
+          This is the default when no selector is provided.
+        * ``latest=True`` — fetch the most recently published version.
+        * ``version`` — fetch a specific version by name, as returned by
+          ``create_agent_config_version``.
+
+        Args:
+            fallback: An instance of a user-defined ``AgentConfig`` subclass.
+                Used as the return value when the backend has no config, and
+                its type determines the return type.
+            project_name: Opik project name. Defaults to the client's default.
+            env: Environment tag to fetch. Defaults to ``"prod"`` when no other
+                selector is provided.
+            latest: If ``True``, fetch the latest version regardless of env tags.
+            version: Fetch a specific version by its name.
+            timeout_in_seconds: Maximum seconds to wait for the backend
+                response. If the request takes longer, ``fallback`` is returned
+                and the cache continues refreshing in the background. Pass
+                ``None`` to wait indefinitely.
+        """
+        if not isinstance(fallback, AgentConfig) or type(fallback) is AgentConfig:
+            raise TypeError(
+                "fallback must be an instance of an AgentConfig subclass, "
+                f"got {type(fallback).__name__}"
+            )
+
+        selectors = sum([env is not None, latest, version is not None])
+        if selectors > 1:
+            raise ValueError(
+                "Specify exactly one of 'env' (fetch by environment tag), "
+                "'latest=True' (fetch the newest version), "
+                "or 'version' (fetch by version name)."
+            )
+        if selectors == 0:
+            env = "prod"
+
+        resolved_project = project_name or self._project_name
+        manager = AgentConfigManager(
+            project_name=resolved_project,
+            rest_client_=self._rest_client,
+        )
+        return cast(
+            _AgentConfigT,
+            type(fallback)._resolve_from_backend(
+                fallback,
+                manager,
+                resolved_project,
+                env=env,
+                latest=latest,
+                version=version,
+                timeout_in_seconds=timeout_in_seconds,
+            ),
+        )
+
+    def _resolve_project_name(self, project_name: Optional[str]) -> str:
+        if project_name is None:
+            return self._project_name
+        return project_name
 
 
 @functools.lru_cache()

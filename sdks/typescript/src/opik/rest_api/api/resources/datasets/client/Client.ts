@@ -236,13 +236,15 @@ export class DatasetsClient {
         request: OpikApi.FindDatasetsRequest = {},
         requestOptions?: DatasetsClient.RequestOptions,
     ): Promise<core.WithRawResponse<OpikApi.DatasetPagePublic>> {
-        const { page, size, withExperimentsOnly, withOptimizationsOnly, promptId, name, sorting, filters } = request;
+        const { page, size, withExperimentsOnly, withOptimizationsOnly, promptId, projectId, name, sorting, filters } =
+            request;
         const _queryParams: Record<string, unknown> = {
             page,
             size,
             with_experiments_only: withExperimentsOnly,
             with_optimizations_only: withOptimizationsOnly,
             prompt_id: promptId,
+            project_id: projectId,
             name,
             sorting,
             filters,
@@ -363,7 +365,9 @@ export class DatasetsClient {
     }
 
     /**
-     * Create/update dataset items based on dataset item id
+     * Create/update dataset items based on dataset item id.
+     * Each item's 'id' field is the stable identifier and upsert key.
+     * Provide it to update an existing item, or omit it to create a new one.
      *
      * @param {OpikApi.DatasetItemBatchWrite} request
      * @param {DatasetsClient.RequestOptions} requestOptions - Request-specific configuration.

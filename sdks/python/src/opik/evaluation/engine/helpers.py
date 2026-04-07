@@ -1,5 +1,5 @@
 import contextlib
-from typing import Optional, Iterator
+from typing import Any, Dict, Optional, Iterator
 
 from opik.api_objects import experiment, opik_client, trace
 from opik.api_objects.experiment import experiment_item
@@ -15,6 +15,7 @@ def evaluate_llm_task_context(
     dataset_item_id: str,
     trace_data: trace.TraceData,
     client: opik_client.Opik,
+    execution_policy: Optional[Dict[str, Any]] = None,
 ) -> Iterator[None]:
     error_info: Optional[ErrorInfoDict] = None
     try:
@@ -34,7 +35,7 @@ def evaluate_llm_task_context(
         trace_data.init_end_time()
 
         client = client if client is not None else opik_client.get_client_cached()
-        client.trace(**trace_data.as_parameters)
+        client.__internal_api__trace__(**trace_data.as_parameters)
 
         # Only insert experiment item if an experiment is provided
         if experiment is not None:
@@ -42,6 +43,7 @@ def evaluate_llm_task_context(
                 dataset_item_id=dataset_item_id,
                 trace_id=trace_data.id,
                 project_name=trace_data.project_name,
+                execution_policy=execution_policy,
             )
             experiment.insert(experiment_items_references=[experiment_item_])
 
@@ -67,4 +69,4 @@ def evaluate_llm_task_result_spans_context(
             trace_data.error_info = error_info
 
         trace_data.init_end_time()
-        client.trace(**trace_data.as_parameters)
+        client.__internal_api__trace__(**trace_data.as_parameters)

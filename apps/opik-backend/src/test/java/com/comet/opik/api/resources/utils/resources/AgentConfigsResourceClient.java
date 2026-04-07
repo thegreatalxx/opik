@@ -1,6 +1,7 @@
 package com.comet.opik.api.resources.utils.resources;
 
 import com.comet.opik.api.AgentConfigCreate;
+import com.comet.opik.api.AgentConfigRemoveValues;
 import com.comet.opik.api.resources.utils.TestUtils;
 import com.comet.opik.domain.AgentBlueprint;
 import jakarta.ws.rs.client.Entity;
@@ -20,11 +21,14 @@ public class AgentConfigsResourceClient {
 
     private static final String RESOURCE_PATH = "%s/v1/private/agent-configs";
     private static final String BLUEPRINTS_PATH = RESOURCE_PATH + "/blueprints";
+    private static final String REMOVE_KEYS_PATH = BLUEPRINTS_PATH + "/remove-keys";
     private static final String LATEST_BLUEPRINT_PATH = RESOURCE_PATH + "/blueprints/latest/projects/%s";
     private static final String BLUEPRINT_BY_ID_PATH = RESOURCE_PATH + "/blueprints/%s";
     private static final String BLUEPRINT_BY_ENV_PATH = RESOURCE_PATH + "/blueprints/environments/%s/projects/%s";
     private static final String DELTA_PATH = RESOURCE_PATH + "/blueprints/%s/deltas";
+    private static final String BLUEPRINT_BY_NAME_PATH = RESOURCE_PATH + "/blueprints/projects/%s/names/%s";
     private static final String ENVIRONMENTS_PATH = RESOURCE_PATH + "/blueprints/environments";
+    private static final String ENVIRONMENTS_BY_NAME_PATH = RESOURCE_PATH + "/blueprints/environments/%s/projects/%s";
     private static final String HISTORY_PATH = RESOURCE_PATH + "/blueprints/history/projects/%s";
 
     private final ClientSupport client;
@@ -56,6 +60,26 @@ public class AgentConfigsResourceClient {
         }
     }
 
+    public UUID updateAgentConfig(AgentConfigCreate request, String apiKey,
+            String workspaceName, int expectedStatus) {
+        try (var actualResponse = client.target(BLUEPRINTS_PATH.formatted(baseURI))
+                .request()
+                .accept(MediaType.APPLICATION_JSON_TYPE)
+                .header(HttpHeaders.AUTHORIZATION, apiKey)
+                .header(WORKSPACE_HEADER, workspaceName)
+                .method("PATCH", Entity.json(request))) {
+
+            assertThat(actualResponse.getStatusInfo().getStatusCode()).isEqualTo(expectedStatus);
+
+            if (expectedStatus == HttpStatus.SC_CREATED) {
+                assertThat(actualResponse.getLocation()).isNotNull();
+                return TestUtils.getIdFromLocation(actualResponse.getLocation());
+            }
+
+            return null;
+        }
+    }
+
     public Response createAgentConfigWithResponse(AgentConfigCreate request, String apiKey,
             String workspaceName) {
         return client.target(BLUEPRINTS_PATH.formatted(baseURI))
@@ -64,6 +88,16 @@ public class AgentConfigsResourceClient {
                 .header(HttpHeaders.AUTHORIZATION, apiKey)
                 .header(WORKSPACE_HEADER, workspaceName)
                 .post(Entity.json(request));
+    }
+
+    public Response updateAgentConfigWithResponse(AgentConfigCreate request, String apiKey,
+            String workspaceName) {
+        return client.target(BLUEPRINTS_PATH.formatted(baseURI))
+                .request()
+                .accept(MediaType.APPLICATION_JSON_TYPE)
+                .header(HttpHeaders.AUTHORIZATION, apiKey)
+                .header(WORKSPACE_HEADER, workspaceName)
+                .method("PATCH", Entity.json(request));
     }
 
     public Response createAgentConfigWithResponse(String body, String apiKey, String workspaceName) {
@@ -178,6 +212,78 @@ public class AgentConfigsResourceClient {
                 .post(Entity.json(request))) {
 
             assertThat(actualResponse.getStatusInfo().getStatusCode()).isEqualTo(expectedStatus);
+        }
+    }
+
+    public AgentBlueprint getBlueprintByName(String name, UUID projectId, UUID maskId, String apiKey,
+            String workspaceName, int expectedStatus) {
+        var target = client.target(BLUEPRINT_BY_NAME_PATH.formatted(baseURI, projectId, name));
+
+        if (maskId != null) {
+            target = target.queryParam("mask_id", maskId);
+        }
+
+        try (var actualResponse = target
+                .request()
+                .accept(MediaType.APPLICATION_JSON_TYPE)
+                .header(HttpHeaders.AUTHORIZATION, apiKey)
+                .header(WORKSPACE_HEADER, workspaceName)
+                .get()) {
+
+            assertThat(actualResponse.getStatusInfo().getStatusCode()).isEqualTo(expectedStatus);
+
+            if (expectedStatus == HttpStatus.SC_OK) {
+                return actualResponse.readEntity(AgentBlueprint.class);
+            }
+
+            return null;
+        }
+    }
+
+    public void setEnvByBlueprintName(String envName, UUID projectId,
+            com.comet.opik.api.AgentConfigEnvSetByName request, String apiKey,
+            String workspaceName, int expectedStatus) {
+        try (var actualResponse = client
+                .target(ENVIRONMENTS_BY_NAME_PATH.formatted(baseURI, envName, projectId))
+                .request()
+                .header(HttpHeaders.AUTHORIZATION, apiKey)
+                .header(WORKSPACE_HEADER, workspaceName)
+                .put(Entity.json(request))) {
+
+            assertThat(actualResponse.getStatusInfo().getStatusCode()).isEqualTo(expectedStatus);
+        }
+    }
+
+    public void deleteEnv(String envName, UUID projectId, String apiKey,
+            String workspaceName, int expectedStatus) {
+        try (var actualResponse = client
+                .target(ENVIRONMENTS_BY_NAME_PATH.formatted(baseURI, envName, projectId))
+                .request()
+                .header(HttpHeaders.AUTHORIZATION, apiKey)
+                .header(WORKSPACE_HEADER, workspaceName)
+                .delete()) {
+
+            assertThat(actualResponse.getStatusInfo().getStatusCode()).isEqualTo(expectedStatus);
+        }
+    }
+
+    public UUID removeConfigKeys(AgentConfigRemoveValues request, String apiKey,
+            String workspaceName, int expectedStatus) {
+        try (var actualResponse = client.target(REMOVE_KEYS_PATH.formatted(baseURI))
+                .request()
+                .accept(MediaType.APPLICATION_JSON_TYPE)
+                .header(HttpHeaders.AUTHORIZATION, apiKey)
+                .header(WORKSPACE_HEADER, workspaceName)
+                .post(Entity.json(request))) {
+
+            assertThat(actualResponse.getStatusInfo().getStatusCode()).isEqualTo(expectedStatus);
+
+            if (expectedStatus == HttpStatus.SC_CREATED) {
+                assertThat(actualResponse.getLocation()).isNotNull();
+                return TestUtils.getIdFromLocation(actualResponse.getLocation());
+            }
+
+            return null;
         }
     }
 

@@ -13,6 +13,7 @@ from typing import (
     cast,
 )
 
+from opik.types import TraceSource
 from ..api_objects.prompt import base_prompt
 from ..api_objects import opik_client
 from ..api_objects import dataset, experiment
@@ -284,6 +285,7 @@ def evaluate(
         prompts=checked_prompts,
         tags=experiment_tags,
         dataset_version_id=getattr(dataset.get_version_info(), "id", None),
+        project_name=project_name,
     )
 
     # wrap scoring functions if any
@@ -309,6 +311,7 @@ def evaluate(
         trial_count=trial_count,
         experiment_scoring_functions=experiment_scoring_functions,
         dataset_filter_string=dataset_filter_string,
+        source="experiment",
     )
 
 
@@ -316,15 +319,20 @@ def evaluate_suite(
     dataset: dataset.Dataset,
     task: LLMTask,
     *,
-    experiment_name_prefix: Optional[str] = None,
-    experiment_name: Optional[str] = None,
-    project_name: Optional[str] = None,
-    experiment_config: Optional[Dict[str, Any]] = None,
-    prompts: Optional[List[base_prompt.BasePrompt]] = None,
-    experiment_tags: Optional[List[str]] = None,
-    verbose: int = 1,
-    task_threads: int = 16,
-    evaluator_model: Optional[str] = None,
+    client: Optional[opik_client.Opik],
+    dataset_item_ids: Optional[List[str]],
+    dataset_filter_string: Optional[str],
+    experiment_name_prefix: Optional[str],
+    experiment_name: Optional[str],
+    project_name: Optional[str],
+    experiment_config: Optional[Dict[str, Any]],
+    prompts: Optional[List[base_prompt.BasePrompt]],
+    experiment_tags: Optional[List[str]],
+    verbose: int,
+    task_threads: int,
+    evaluator_model: Optional[str],
+    optimization_id: Optional[str],
+    experiment_type: Optional[str],
 ) -> "suite_types.EvaluationSuiteResult":
     """
     Run evaluation on a dataset configured as an evaluation suite.
@@ -339,14 +347,15 @@ def evaluate_suite(
     Returns:
         EvaluationSuiteResult with pass/fail status for each item and the suite.
     """
-    client = opik_client.get_client_cached()
+    if client is None:
+        client = opik_client.get_client_cached()
 
     experiment_name = _use_or_create_experiment_name(
         experiment_name=experiment_name,
         experiment_name_prefix=experiment_name_prefix,
     )
 
-    experiment_ = client.create_experiment(
+    create_experiment_kwargs: Dict[str, Any] = dict(
         name=experiment_name,
         dataset_name=dataset.name,
         experiment_config=experiment_config,
@@ -354,7 +363,23 @@ def evaluate_suite(
         evaluation_method="evaluation_suite",
         tags=experiment_tags,
         dataset_version_id=None,
+        project_name=project_name,
     )
+    source = "experiment"
+    if optimization_id is not None:
+        create_experiment_kwargs["type"] = experiment_type or "trial"
+        create_experiment_kwargs["optimization_id"] = optimization_id
+        source = "optimization"
+
+    experiment_ = client.create_experiment(**create_experiment_kwargs)
+
+    if verbose >= 1:
+        experiment_url = url_helpers.get_experiment_url_by_id(
+            experiment_id=experiment_.id,
+            dataset_id=dataset.id,
+            url_override=client.config.url_override,
+        )
+        report.display_evaluation_in_progress(experiment_url)
 
     eval_result, total_time = _evaluate_suite_task(
         client=client,
@@ -365,16 +390,16 @@ def evaluate_suite(
         verbose=verbose,
         task_threads=task_threads,
         evaluator_model=evaluator_model,
+        dataset_item_ids=dataset_item_ids,
+        dataset_filter_string=dataset_filter_string,
+        source=source,  # type: ignore[arg-type]
     )
 
-    suite_result = suite_result_constructor.build_suite_result(eval_result)
-
-    if verbose >= 1:
-        report.display_suite_results(
-            dataset.name, total_time, suite_result, verbose=verbose
-        )
-
-    return suite_result
+    return suite_result_constructor.build_suite_result(
+        eval_result,
+        suite_name=dataset.name,
+        total_time=total_time,
+    )
 
 
 def _evaluate_task(
@@ -394,6 +419,7 @@ def _evaluate_task(
     trial_count: int,
     experiment_scoring_functions: List[ExperimentScoreFunction],
     dataset_filter_string: Optional[str],
+    source: TraceSource,
 ) -> evaluation_result.EvaluationResult:
     start_time = time.time()
 
@@ -415,6 +441,7 @@ def _evaluate_task(
             project_name=project_name,
             workers=task_threads,
             verbose=verbose,
+            source=source,
         )
         test_results = evaluation_engine.run_and_score(
             dataset_items=items_iter,
@@ -484,7 +511,10 @@ def _evaluate_suite_task(
     project_name: Optional[str],
     verbose: int,
     task_threads: int,
+    source: TraceSource,
     evaluator_model: Optional[str],
+    dataset_item_ids: Optional[List[str]] = None,
+    dataset_filter_string: Optional[str] = None,
 ) -> Tuple[evaluation_result.EvaluationResult, float]:
     start_time = time.time()
 
@@ -493,9 +523,9 @@ def _evaluate_suite_task(
         execution_policy = dataset.get_execution_policy()
         items_iter = dataset.__internal_api__stream_items_as_dataclasses__(
             nb_samples=None,
-            dataset_item_ids=None,
+            dataset_item_ids=dataset_item_ids,
             batch_size=EVALUATION_STREAM_DATASET_BATCH_SIZE,
-            filter_string=None,
+            filter_string=dataset_filter_string,
         )
         total = dataset.dataset_items_count
 
@@ -504,6 +534,7 @@ def _evaluate_suite_task(
             project_name=project_name,
             workers=task_threads,
             verbose=verbose,
+            source=source,
         )
         test_results = evaluation_engine.run_and_score(
             dataset_items=items_iter,
@@ -535,9 +566,6 @@ def _evaluate_suite_task(
         experiment_scores=[],
     )
 
-    if verbose >= 1:
-        report.display_experiment_link(experiment_url=experiment_url)
-
     client.flush()
 
     _try_notifying_about_experiment_completion(experiment)
@@ -554,6 +582,7 @@ def evaluate_experiment(
     scoring_key_mapping: Optional[ScoringKeyMappingType] = None,
     experiment_id: Optional[str] = None,
     experiment_scoring_functions: Optional[List[ExperimentScoreFunction]] = None,
+    project_name: Optional[str] = None,
 ) -> evaluation_result.EvaluationResult:
     """Update the existing experiment with new evaluation metrics. You can use either `scoring_metrics` or `scorer_functions` to calculate
     evaluation metrics. The scorer functions doesn't require `scoring_key_mapping` and use reserved parameters
@@ -590,6 +619,8 @@ def evaluate_experiment(
             Each function takes a list of TestResult objects and returns a list of ScoreResult objects.
             These scores are computed after all test results are collected and represent aggregate
             metrics across the entire experiment.
+
+        project_name: The name of the project to which the experiment belongs. If not provided, the default project will be used.
     """
     experiment_scoring_functions = (
         [] if experiment_scoring_functions is None else experiment_scoring_functions
@@ -603,10 +634,12 @@ def evaluate_experiment(
         experiment = client.get_experiment_by_id(id=experiment_id)
     else:
         experiment = rest_operations.get_experiment_with_unique_name(
-            client=client, experiment_name=experiment_name
+            client=client, experiment_name=experiment_name, project_name=project_name
         )
 
-    dataset_ = client.get_dataset(name=experiment.dataset_name)
+    dataset_ = client.get_dataset(
+        name=experiment.dataset_name, project_name=project_name
+    )
 
     test_cases = rest_operations.get_experiment_test_cases(
         experiment_=experiment,
@@ -631,6 +664,7 @@ def evaluate_experiment(
             project_name=project_name,
             workers=scoring_threads,
             verbose=verbose,
+            source="experiment",
         )
         test_results = evaluation_engine.score_test_cases(
             test_cases=test_cases,
@@ -874,6 +908,7 @@ def evaluate_prompt(
         prompts=prompts,
         tags=experiment_tags,
         dataset_version_id=getattr(dataset.get_version_info(), "id", None),
+        project_name=project_name,
     )
 
     # wrap scoring functions if any
@@ -903,6 +938,7 @@ def evaluate_prompt(
             project_name=project_name,
             workers=task_threads,
             verbose=verbose,
+            source="experiment",
         )
         test_results = evaluation_engine.run_and_score(
             dataset_items=items_iter,
@@ -1111,6 +1147,7 @@ def evaluate_optimization_trial(
         optimization_id=optimization_id,
         tags=experiment_tags,
         dataset_version_id=getattr(dataset.get_version_info(), "id", None),
+        project_name=project_name,
     )
 
     return _evaluate_task(
@@ -1129,6 +1166,7 @@ def evaluate_optimization_trial(
         trial_count=trial_count,
         experiment_scoring_functions=experiment_scoring_functions,
         dataset_filter_string=dataset_filter_string,
+        source="optimization",
     )
 
 
@@ -1238,6 +1276,7 @@ def evaluate_on_dict_items(
             project_name=project_name,
             workers=scoring_threads,
             verbose=verbose,
+            source="experiment",
         )
         test_results = evaluation_engine.run_and_score(
             dataset_items=iter(dataset_items),
