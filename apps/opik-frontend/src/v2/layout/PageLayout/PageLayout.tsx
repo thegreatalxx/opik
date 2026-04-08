@@ -38,9 +38,7 @@ const PageLayout = () => {
   const showAssistantSidebar = !!AssistantSidebar;
 
   const assistantWidth = showAssistantSidebar ? assistantSidebarWidth : 0;
-  const isMobile = useMediaQuery(
-    `(max-width: ${1023 + assistantWidth}px)`,
-  );
+  const isMobile = useMediaQuery(`(max-width: ${1023 + assistantWidth}px)`);
   const expanded = isMobile ? false : storedExpanded;
 
   const handleSidebarWidthChange = useCallback((width: number) => {
