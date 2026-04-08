@@ -34,7 +34,7 @@ import UserCommentHoverList from "@/shared/UserComment/UserCommentHoverList";
 import TagsHoverCard from "@/shared/TagsHoverCard/TagsHoverCard";
 import { useIsFeatureEnabled } from "@/contexts/feature-toggles-provider";
 import { FeatureToggleKeys } from "@/types/feature-toggles";
-import { TRACE_TYPE_FOR_TREE } from "@/constants/traces";
+import { TRACE_TYPE_FOR_TREE, TRACE_TYPE_COLORS_MAP } from "@/constants/traces";
 
 const EXPAND_HOTKEYS = ["⏎"];
 const DETAILS_SECTION_COMPONENTS = [
@@ -77,7 +77,6 @@ const VirtualizedTreeViewer: React.FC<VirtualizedTreeViewerProps> = ({
     previous: undefined,
   });
 
-  const hasDurationTimeline = config[TREE_DATABLOCK_TYPE.DURATION_TIMELINE];
   const hasOtherConfig = useMemo(
     () =>
       (isGuardrailsEnabled
@@ -87,8 +86,30 @@ const VirtualizedTreeViewer: React.FC<VirtualizedTreeViewerProps> = ({
     [config, isGuardrailsEnabled],
   );
 
-  const estimatedHeight =
-    36 + (hasDurationTimeline ? 18 : 0) + (hasOtherConfig ? 30 : 0);
+  // For each node, track which ancestor depth levels have a continuing vertical line
+  const connectorInfo = useMemo(() => {
+    const info: boolean[][] = new Array(flattenedTree.length);
+    const hasFollowing: boolean[] = [];
+
+    for (let i = flattenedTree.length - 1; i >= 0; i--) {
+      const node = flattenedTree[i];
+      const depths: boolean[] = [];
+
+      for (let d = 1; d <= node.depth; d++) {
+        depths.push(hasFollowing[d] ?? false);
+      }
+
+      info[i] = depths;
+      hasFollowing[node.depth] = true;
+      for (let d = node.depth + 1; d < hasFollowing.length; d++) {
+        hasFollowing[d] = false;
+      }
+    }
+
+    return info;
+  }, [flattenedTree]);
+
+  const estimatedHeight = 38;
 
   const rowVirtualizer = useVirtualizer({
     count: flattenedTree.length,
@@ -150,35 +171,6 @@ const VirtualizedTreeViewer: React.FC<VirtualizedTreeViewerProps> = ({
     [flattenedTree, rowId],
   );
 
-  const renderDurationTimeline = (node: TreeNode) => {
-    const widthPercentage = Math.min(
-      (node.data.duration / node.data.maxDuration) * 100,
-      100,
-    );
-
-    const offset = node.data.startTimestamp - node.data.maxStartTime;
-    const offsetPercentage = Math.max(
-      (offset / node.data.maxDuration) * 100,
-      0,
-    );
-
-    return (
-      <div className="w-full pb-1 pl-4 pt-1.5">
-        <div className="relative w-full">
-          <div className="absolute inset-x-0 top-[0.5px] h-px bg-border" />
-          <div
-            className="absolute top-0 h-0.5 rounded-full transition-[width,left] duration-500 ease-in-out"
-            style={{
-              background: node.data.spanColor,
-              width: widthPercentage + "%",
-              left: offsetPercentage + "%",
-            }}
-          />
-        </div>
-      </div>
-    );
-  };
-
   const renderDetailsContainer = (node: TreeNode) => {
     const guardrailStatus = get(node.data?.output, "guardrail_result", null);
 
@@ -239,7 +231,7 @@ const VirtualizedTreeViewer: React.FC<VirtualizedTreeViewerProps> = ({
     );
 
     return (
-      <div className="flex h-5 items-center gap-3 overflow-x-hidden">
+      <div className="flex flex-wrap items-center gap-x-3 overflow-x-hidden">
         {Boolean(guardrailStatus !== null) && (
           <TooltipWrapper
             content={
@@ -263,6 +255,31 @@ const VirtualizedTreeViewer: React.FC<VirtualizedTreeViewerProps> = ({
             </div>
           </TooltipWrapper>
         )}
+        {config[TREE_DATABLOCK_TYPE.MODEL] && (model || provider) && (
+          <TooltipWrapper
+            content={`Model: ${model || "NA"}, Provider: ${provider || "NA"}`}
+          >
+            <div className="comet-body-xs-accented flex items-center gap-1 text-muted-slate">
+              <Brain className="size-3 shrink-0" />{" "}
+              <div className="truncate">
+                {provider} {model}
+              </div>
+            </div>
+          </TooltipWrapper>
+        )}
+        {config[TREE_DATABLOCK_TYPE.ESTIMATED_COST] &&
+          !isUndefined(estimatedCost) && (
+            <TooltipWrapper
+              content={`Estimated cost ${formatCost(estimatedCost, {
+                modifier: "full",
+              })}`}
+            >
+              <div className="comet-body-xs-accented flex items-center gap-1 text-muted-slate">
+                <Coins className="size-3 shrink-0" />{" "}
+                {formatCost(estimatedCost)}
+              </div>
+            </TooltipWrapper>
+          )}
         {config[TREE_DATABLOCK_TYPE.NUMBERS_OF_TOKENS] && isNumber(tokens) && (
           <TooltipWrapper content={`Total amount of tokens: ${tokens}`}>
             <div className="comet-body-xs-accented flex items-center gap-1 text-muted-slate">
@@ -277,19 +294,6 @@ const VirtualizedTreeViewer: React.FC<VirtualizedTreeViewerProps> = ({
               <div className="comet-body-xs-accented flex items-center gap-1 text-muted-slate">
                 <ArrowRightLeft className="size-3 shrink-0" /> {promptTokens}/
                 {completionTokens}
-              </div>
-            </TooltipWrapper>
-          )}
-        {config[TREE_DATABLOCK_TYPE.ESTIMATED_COST] &&
-          !isUndefined(estimatedCost) && (
-            <TooltipWrapper
-              content={`Estimated cost ${formatCost(estimatedCost, {
-                modifier: "full",
-              })}`}
-            >
-              <div className="comet-body-xs-accented flex items-center gap-1 text-muted-slate">
-                <Coins className="size-3 shrink-0" />{" "}
-                {formatCost(estimatedCost)}
               </div>
             </TooltipWrapper>
           )}
@@ -328,24 +332,12 @@ const VirtualizedTreeViewer: React.FC<VirtualizedTreeViewerProps> = ({
               </div>
             </TagsHoverCard>
           )}
-        {config[TREE_DATABLOCK_TYPE.MODEL] && (model || provider) && (
-          <TooltipWrapper
-            content={`Model: ${model || "NA"}, Provider: ${provider || "NA"}`}
-          >
-            <div className="comet-body-xs-accented flex items-center gap-1 text-muted-slate">
-              <Brain className="size-3 shrink-0" />{" "}
-              <div className="truncate">
-                {provider} {model}
-              </div>
-            </div>
-          </TooltipWrapper>
-        )}
       </div>
     );
   };
 
   return (
-    <div className="w-full px-4">
+    <div className="w-full">
       <div
         className="relative w-full"
         style={{
@@ -359,80 +351,158 @@ const VirtualizedTreeViewer: React.FC<VirtualizedTreeViewerProps> = ({
           const isOutOfSearch = node.data.isInSearch === false;
           const name = node.name || "NA";
 
+          const typeColors = TRACE_TYPE_COLORS_MAP[node.data.type];
+
           return (
             <div
               key={node.id}
               className={cn(
-                "absolute left-0 flex w-full flex-col gap-1.5 px-1.5 py-2 cursor-pointer rounded-md hover:bg-primary-foreground",
+                "absolute left-0 flex h-[38px] w-full flex-col px-2 pt-1 cursor-pointer border-l-8 border-transparent",
+                "hover:bg-[var(--row-bg)]",
                 {
-                  "bg-primary-foreground": isFocused,
+                  "bg-[var(--row-bg)] border-[var(--row-color)]": isFocused,
                   "opacity-50": isOutOfSearch,
                 },
               )}
-              style={{
-                top: virtualRow.start,
-                height: virtualRow.size,
-              }}
+              style={
+                {
+                  "--row-bg": typeColors?.bg,
+                  "--row-color": typeColors?.color,
+                  top: virtualRow.start,
+                } as React.CSSProperties
+              }
               onClick={() => selectRow(node.id)}
             >
+              <div className="pointer-events-none absolute inset-0">
+                {node.depth > 0 &&
+                  Array.from({ length: node.depth }, (_, i) => {
+                    const d = i + 1;
+                    const isOwnDepth = d === node.depth;
+                    const hasContinuation =
+                      connectorInfo[virtualRow.index]?.[i] ?? false;
+                    const parentIconCenterX = 8 + (d - 1) * 24 + 8;
+                    const childIconLeft = 8 + d * 24;
+
+                    if (!isOwnDepth && !hasContinuation) return null;
+
+                    return (
+                      <React.Fragment key={d}>
+                        {isOwnDepth ? (
+                          hasContinuation ? (
+                            <>
+                              <div
+                                className="absolute w-px bg-muted-foreground/40"
+                                style={{
+                                  left: parentIconCenterX,
+                                  top: 0,
+                                  height: "100%",
+                                }}
+                              />
+                              <div
+                                className="absolute border-b border-l border-muted-foreground/40 rounded-bl-md"
+                                style={{
+                                  left: parentIconCenterX,
+                                  top: 6,
+                                  height: 6,
+
+                                  width: childIconLeft - parentIconCenterX,
+                                }}
+                              />
+                            </>
+                          ) : (
+                            <div
+                              className="absolute border-b border-l border-muted-foreground/40 rounded-bl-md"
+                              style={{
+                                left: parentIconCenterX,
+                                top: 0,
+                                height: 12,
+
+                                width: childIconLeft - parentIconCenterX,
+                              }}
+                            />
+                          )
+                        ) : (
+                          <div
+                            className="absolute w-px bg-muted-foreground/40"
+                            style={{
+                              left: parentIconCenterX,
+                              top: 0,
+                              height: "100%",
+                            }}
+                          />
+                        )}
+                      </React.Fragment>
+                    );
+                  })}
+                {isExpandable && expandedTreeRows.has(node.id) && (
+                  <div
+                    className="absolute w-px bg-muted-foreground/40"
+                    style={{
+                      left: 8 + node.depth * 24 + 8,
+                      top: 20,
+                      bottom: 0,
+                    }}
+                  />
+                )}
+              </div>
               <div
-                className="flex"
+                className="flex items-center"
                 style={{
-                  paddingLeft: node.depth * 12,
+                  paddingLeft: node.depth * 24,
                 }}
               >
-                <div className="mr-1 flex h-5 w-4 shrink-0 items-center justify-center">
-                  {isExpandable && (
-                    <TooltipWrapper
-                      content="Expand/Collapse"
-                      hotkeys={EXPAND_HOTKEYS}
-                    >
-                      <Button
-                        variant="ghost"
-                        size="icon-3xs"
-                        onClick={() => toggleExpand(node.id)}
-                      >
-                        <ChevronRight
-                          className={cn({
-                            "transform rotate-90": expandedTreeRows.has(
-                              node.id,
-                            ),
-                          })}
-                        />
-                      </Button>
-                    </TooltipWrapper>
-                  )}
-                </div>
-                <div className="flex min-w-1 flex-auto flex-col justify-stretch gap-2">
-                  <div className="flex items-center gap-2">
-                    <BaseTraceDataTypeIcon type={node.data.type} />
-                    <TooltipWrapper content={name}>
-                      <span
-                        className={cn(
-                          "truncate text-foreground-secondary",
-                          isFocused ? "comet-body-s-accented" : "comet-body-s",
-                        )}
-                      >
-                        {name}
-                      </span>
-                    </TooltipWrapper>
-                    {node.data.hasError && (
-                      <>
-                        <div className="flex-auto" />
-                        <TooltipWrapper
-                          content={node.data.error_info?.message ?? "Has error"}
-                        >
-                          <div className="flex size-5 items-center justify-center rounded-sm bg-[var(--error-indicator-background)]">
-                            <TriangleAlert className="size-3 text-[var(--error-indicator-text)]" />
-                          </div>
-                        </TooltipWrapper>
-                      </>
+                <BaseTraceDataTypeIcon type={node.data.type} />
+                <TooltipWrapper content={name}>
+                  <span
+                    className={cn(
+                      "ml-2 truncate text-foreground-secondary",
+                      isFocused ? "comet-body-xs-accented" : "comet-body-xs",
                     )}
-                  </div>
-                  {hasOtherConfig && renderDetailsContainer(node)}
-                </div>
+                  >
+                    {name}
+                  </span>
+                </TooltipWrapper>
+                <div className="flex-auto" />
+                {node.data.hasError && (
+                  <TooltipWrapper
+                    content={node.data.error_info?.message ?? "Has error"}
+                  >
+                    <div className="flex size-5 items-center justify-center rounded-sm bg-[var(--error-indicator-background)]">
+                      <TriangleAlert className="size-3 text-[var(--error-indicator-text)]" />
+                    </div>
+                  </TooltipWrapper>
+                )}
+                {isExpandable && (
+                  <TooltipWrapper
+                    content="Expand/Collapse"
+                    hotkeys={EXPAND_HOTKEYS}
+                  >
+                    <Button
+                      variant="ghost"
+                      size="icon-3xs"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleExpand(node.id);
+                      }}
+                    >
+                      <ChevronRight
+                        className={cn({
+                          "transform rotate-90": expandedTreeRows.has(node.id),
+                        })}
+                      />
+                    </Button>
+                  </TooltipWrapper>
+                )}
               </div>
-              {hasDurationTimeline && renderDurationTimeline(node)}
+              {hasOtherConfig && (
+                <div
+                  style={{
+                    paddingLeft: node.depth * 24 + 24,
+                  }}
+                >
+                  {renderDetailsContainer(node)}
+                </div>
+              )}
             </div>
           );
         })}
