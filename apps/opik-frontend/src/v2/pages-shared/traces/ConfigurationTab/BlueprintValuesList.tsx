@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { ChevronDown } from "lucide-react";
 
 import { BlueprintValue, BlueprintValueType } from "@/types/agent-configs";
@@ -28,6 +28,11 @@ const renderValue = (v: BlueprintValue) => {
 export const useBlueprintCollapse = (values: BlueprintValue[]) => {
   const allKeys = useMemo(() => values.map((v) => v.key), [values]);
   const [openItems, setOpenItems] = useState<string[]>(allKeys);
+
+  useEffect(() => {
+    setOpenItems(allKeys);
+  }, [allKeys]);
+
   const allExpanded = openItems.length === allKeys.length;
   const toggleAll = () => setOpenItems(allExpanded ? [] : allKeys);
 
