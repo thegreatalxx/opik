@@ -207,7 +207,7 @@ const AgentConfigurationTab: React.FC<AgentConfigurationTabProps> = ({
         />
       </div>
 
-      <div className="min-w-0 flex-1 lg:w-[50vw] [overflow-anchor:none]">
+      <div className="min-w-0 flex-1 [overflow-anchor:none] lg:w-[50vw]">
         <div className="mx-6 mt-6 hidden lg:block">
           <h1 className="comet-title-xs">Agent configuration</h1>
         </div>
