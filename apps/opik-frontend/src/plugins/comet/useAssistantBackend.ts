@@ -136,10 +136,11 @@ export default function useAssistantBackend(
   const isComputeLoadingRef = useRef(isComputeLoading);
   isComputeLoadingRef.current = isComputeLoading;
 
-  const retry = useCallback(() => {
+  // Core reset — used by both auto-retry and manual retry.
+  // Does not touch retryCount so auto-recovery doesn't escalate the UI.
+  const resetBackend = useCallback(() => {
     if (isComputeLoadingRef.current) return;
 
-    setRetryCount((c) => c + 1);
     setIsTimedOut(false);
     healthPollStartRef.current = 0;
     trackedBaseUrlRef.current = null;
@@ -148,6 +149,12 @@ export default function useAssistantBackend(
     queryClient.resetQueries({ queryKey: ["assistant-health"] });
     queryClient.resetQueries({ queryKey: ["assistant-compute"] });
   }, [queryClient]);
+
+  // User-initiated retry — increments retryCount for UI escalation
+  const retry = useCallback(() => {
+    setRetryCount((c) => c + 1);
+    resetBackend();
+  }, [resetBackend]);
 
   // Phase 2: Poll health endpoint until the pod is ready
   const { data: healthResult, error: healthError } = useQuery<{
@@ -200,14 +207,15 @@ export default function useAssistantBackend(
   }
 
   // Auto-retry when keepalive detects pod death (ready → error).
-  // healthError fires while healthResult.ready stays true from cache.
+  // Uses resetBackend (not retry) so retryCount stays 0 — the user
+  // gets a fresh "retry now" prompt if auto-recovery fails.
   if (
     podStateRef.current === "ready" &&
     healthError &&
     !isComputeLoadingRef.current
   ) {
     podStateRef.current = "down";
-    queueMicrotask(() => retry());
+    queueMicrotask(() => resetBackend());
   }
 
   // Dev mode — static URL, no network calls (queries are disabled via enabled: !IS_DEV)
