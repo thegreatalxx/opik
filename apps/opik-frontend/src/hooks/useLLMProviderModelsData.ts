@@ -1984,6 +1984,10 @@ export const PROVIDER_MODELS: PROVIDER_MODELS_TYPE = {
       label: "Gemini 2.0 Flash-Lite",
     },
     {
+      value: PROVIDER_MODEL_TYPE.GEMMA_4_27B_IT,
+      label: "Gemma 4 27B",
+    },
+    {
       value: PROVIDER_MODEL_TYPE.LYRIA_3_CLIP_PREVIEW,
       label: "Lyria 3 Clip Preview",
     },

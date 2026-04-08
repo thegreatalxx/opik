@@ -574,6 +574,7 @@ export enum PROVIDER_MODEL_TYPE {
   GEMINI_3_1_FLASH_LITE_PREVIEW = "gemini-3.1-flash-lite-preview",
   GEMINI_3_1_PRO = "gemini-3.1-pro-preview",
   GEMINI_PRO_VISION = "gemini-pro-vision",
+  GEMMA_4_27B_IT = "gemma-4-27b-it",
   LYRIA_3_CLIP_PREVIEW = "lyria-3-clip-preview",
   LYRIA_3_PRO_PREVIEW = "lyria-3-pro-preview",
   NANO_BANANA_PRO_PREVIEW = "nano-banana-pro-preview",
