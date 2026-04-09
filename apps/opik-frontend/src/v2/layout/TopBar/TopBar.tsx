@@ -2,6 +2,7 @@ import React from "react";
 import Breadcrumbs from "@/v2/layout/Breadcrumbs/Breadcrumbs";
 import usePluginsStore from "@/store/PluginsStore";
 import AppDebugInfo from "@/v2/layout/AppDebugInfo/AppDebugInfo";
+import AgentConnectionIndicator from "@/v2/layout/TopBar/AgentConnectionIndicator";
 import SettingsMenu from "../SettingsMenu/SettingsMenu";
 
 const TopBar: React.FC = () => {
@@ -15,6 +16,7 @@ const TopBar: React.FC = () => {
       </div>
 
       <div className="flex items-center gap-2">
+        <AgentConnectionIndicator />
         <AppDebugInfo />
         {UpgradeButton && <UpgradeButton />}
         {UserMenu ? <UserMenu /> : <SettingsMenu />}
