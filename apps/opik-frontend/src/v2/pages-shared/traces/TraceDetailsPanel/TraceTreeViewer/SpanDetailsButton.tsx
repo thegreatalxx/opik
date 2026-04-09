@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo } from "react";
-import { Eye, EyeOff, ScanText } from "lucide-react";
+import { Eye, EyeOff, MoreVertical } from "lucide-react";
 
 import { DropdownOption, OnChangeFn } from "@/types/shared";
 import { Button } from "@/ui/button";
@@ -72,8 +72,8 @@ const SpanDetailsButton: React.FC<SpanDetailsButtonProps> = ({
     <DropdownMenu>
       <TooltipWrapper content="Span details">
         <DropdownMenuTrigger asChild>
-          <Button variant="outline" size="icon-2xs">
-            <ScanText />
+          <Button variant="ghost" size="icon-2xs">
+            <MoreVertical className="size-3" />
           </Button>
         </DropdownMenuTrigger>
       </TooltipWrapper>

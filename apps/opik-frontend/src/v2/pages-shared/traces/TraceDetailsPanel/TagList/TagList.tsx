@@ -12,6 +12,7 @@ type TagListProps = {
   traceId: string;
   spanId?: string;
   className?: string;
+  tagVariant?: string;
 };
 
 const TagList: React.FunctionComponent<TagListProps> = ({
@@ -20,6 +21,7 @@ const TagList: React.FunctionComponent<TagListProps> = ({
   projectId,
   traceId,
   spanId,
+  tagVariant,
   className,
 }) => {
   const workspaceName = useAppStore((state) => state.activeWorkspaceName);
@@ -84,6 +86,7 @@ const TagList: React.FunctionComponent<TagListProps> = ({
       size="sm"
       className={className}
       canAdd={isMutable}
+      tagVariant={tagVariant}
     />
   );
 };

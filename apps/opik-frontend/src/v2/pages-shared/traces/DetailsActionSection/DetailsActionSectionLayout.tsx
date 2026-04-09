@@ -49,7 +49,7 @@ const DetailsActionSectionLayout: React.FC<DetailsActionSectionLayoutProps> = ({
     <div className="relative flex size-full min-w-60 flex-col overflow-hidden pt-14">
       <div className="absolute inset-x-0 top-0 flex shrink-0 items-center justify-between gap-2 overflow-x-hidden px-6 pt-6">
         <div className="flex items-center gap-2 overflow-x-hidden">
-          <div className="comet-title-s flex w-full items-center gap-1">
+          <div className="comet-title-xs flex w-full items-center gap-1">
             <span className="truncate">{title}</span>
             {explainer && <ExplainerIcon {...explainer} />}
             {tag}

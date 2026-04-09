@@ -21,6 +21,7 @@ export type TagListRendererProps = {
   addButtonText?: string;
   tagType?: string; // For error messages (e.g., "tag", "version tag")
   canAdd?: boolean;
+  tagVariant?: string;
 };
 
 const TagListRenderer: React.FC<TagListRendererProps> = ({
@@ -36,6 +37,7 @@ const TagListRenderer: React.FC<TagListRendererProps> = ({
   addButtonText = "Add tag",
   tagType = "tag",
   canAdd = true,
+  tagVariant,
 }) => {
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
@@ -81,13 +83,14 @@ const TagListRenderer: React.FC<TagListRendererProps> = ({
         <Tag className={`${tagMarginClass} ${tagSizeClass} text-muted-slate`} />
       </TooltipWrapper>
       {[...immutableTags].sort().map((tag) => (
-        <RemovableTag label={tag} key={`immutable-${tag}`} size="md" />
+        <RemovableTag label={tag} key={`immutable-${tag}`} size="md" variant={tagVariant} />
       ))}
       {[...tags].sort().map((tag) => (
         <RemovableTag
           label={tag}
           key={tag}
           size="md"
+          variant={tagVariant}
           onDelete={() => onDeleteTag(tag)}
         />
       ))}
