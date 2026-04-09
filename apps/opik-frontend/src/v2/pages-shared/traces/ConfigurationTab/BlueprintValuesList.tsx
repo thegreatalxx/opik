@@ -72,7 +72,7 @@ const BlueprintValuesList: React.FC<BlueprintValuesListProps> = ({
       >
         {values.map((v) => (
           <AccordionItem key={v.key} value={v.key} className="border-none py-1">
-            <CustomAccordionTrigger className="flex select-none items-center justify-between gap-1 rounded-sm p-1 px-0 transition-colors hover:bg-primary-foreground [&[data-state=open]>div>svg:first-child]:rotate-90">
+            <CustomAccordionTrigger className="flex select-none flex-col gap-0.5 rounded-sm p-1 px-0 transition-colors hover:bg-primary-foreground [&[data-state=open]>div:first-child>svg:first-child]:rotate-90">
               <div className="flex items-center gap-2">
                 <ChevronRight className="size-3.5 shrink-0 text-light-slate transition-transform duration-200" />
                 <BlueprintTypeIcon type={v.type} />
@@ -82,7 +82,7 @@ const BlueprintValuesList: React.FC<BlueprintValuesListProps> = ({
               </div>
               {v.description && (
                 <TooltipWrapper content={v.description}>
-                  <span className="comet-body-xs max-w-[50%] truncate text-light-slate">
+                  <span className="comet-body-xs ml-6 w-fit max-w-full truncate text-light-slate">
                     {v.description}
                   </span>
                 </TooltipWrapper>
