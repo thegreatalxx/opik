@@ -115,10 +115,7 @@ const PlaygroundOutputAssertionStatus: React.FunctionComponent<
   }
 
   return (
-    <StatusTag
-      {...statusInfo}
-      className={stale ? "opacity-50" : undefined}
-    />
+    <StatusTag {...statusInfo} className={stale ? "opacity-50" : undefined} />
   );
 };
 

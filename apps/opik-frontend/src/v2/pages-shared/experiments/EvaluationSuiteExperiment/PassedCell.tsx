@@ -105,9 +105,13 @@ export function getStatusInfoForExperiment(
   };
 }
 
-export const StatusTag: React.FC<
-  StatusInfo & { className?: string }
-> = ({ status, assertionsByRun, passedCount, totalCount, className }) => {
+export const StatusTag: React.FC<StatusInfo & { className?: string }> = ({
+  status,
+  assertionsByRun,
+  passedCount,
+  totalCount,
+  className,
+}) => {
   if (!status) {
     return <span className="text-muted-slate">{"\u2014"}</span>;
   }

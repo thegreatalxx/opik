@@ -220,7 +220,7 @@ describe("getStatusInfoForExperiment", () => {
   describe("aggregated item", () => {
     it("expands trialItems for passedCount and assertionsByRun", () => {
       const row = makeRow();
-      const aggregated: AggregatedExperimentItem = {
+      const aggregated = {
         ...makeItem({ id: "agg", status: ExperimentItemStatus.FAILED }),
         trialCount: 2,
         trialItems: [
@@ -235,7 +235,7 @@ describe("getStatusInfoForExperiment", () => {
             assertion_results: [{ value: "check", passed: false }],
           }),
         ],
-      };
+      } as AggregatedExperimentItem;
       const result = getStatusInfoForExperiment(row, "exp-1", aggregated);
       expect(result.passedCount).toBe(1);
       expect(result.assertionsByRun).toHaveLength(2);

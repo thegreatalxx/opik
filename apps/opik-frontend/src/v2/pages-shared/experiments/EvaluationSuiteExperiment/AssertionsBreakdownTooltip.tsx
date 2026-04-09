@@ -3,11 +3,7 @@ import * as AccordionPrimitive from "@radix-ui/react-accordion";
 import { ChevronDown, CircleCheck, CircleX } from "lucide-react";
 
 import { cn } from "@/lib/utils";
-import {
-  HoverCard,
-  HoverCardContent,
-  HoverCardTrigger,
-} from "@/ui/hover-card";
+import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/ui/hover-card";
 import { Accordion, AccordionContent, AccordionItem } from "@/ui/accordion";
 import { AssertionResult } from "@/types/datasets";
 
@@ -36,6 +32,28 @@ export const AssertionsBreakdownTooltip: React.FC<
     });
   }, []);
 
+  const scrollToFirstFailedAssertion = useCallback((runIdx: number) => {
+    // Double RAF: first positions the run, second targets the failed assertion
+    // after layout is stable (defaultValue means no animation delay needed)
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const container = scrollContainerRef.current;
+        if (!container) return;
+        const runItem = container.querySelector(
+          `[data-run-idx="${runIdx}"]`,
+        ) as HTMLElement | null;
+        if (!runItem) return;
+        const firstFailed = runItem.querySelector(
+          '[data-assertion-passed="false"]',
+        ) as HTMLElement | null;
+        const target = firstFailed ?? runItem;
+        const containerTop = container.getBoundingClientRect().top;
+        const targetTop = target.getBoundingClientRect().top;
+        container.scrollTop += targetTop - containerTop;
+      });
+    });
+  }, []);
+
   const defaultOpenIdx = useMemo(
     () => assertionsByRun.findIndex((run) => run.some((a) => !a.passed)),
     [assertionsByRun],
@@ -43,9 +61,10 @@ export const AssertionsBreakdownTooltip: React.FC<
 
   const handleOpenChange = useCallback(
     (open: boolean) => {
-      if (open) scrollToRun(defaultOpenIdx >= 0 ? defaultOpenIdx : 0);
+      if (open)
+        scrollToFirstFailedAssertion(defaultOpenIdx >= 0 ? defaultOpenIdx : 0);
     },
-    [defaultOpenIdx, scrollToRun],
+    [defaultOpenIdx, scrollToFirstFailedAssertion],
   );
 
   const handleValueChange = useCallback(
@@ -63,11 +82,7 @@ export const AssertionsBreakdownTooltip: React.FC<
   const defaultValue = `run-${defaultOpenIdx >= 0 ? defaultOpenIdx : 0}`;
 
   return (
-    <HoverCard
-      openDelay={200}
-      closeDelay={500}
-      onOpenChange={handleOpenChange}
-    >
+    <HoverCard openDelay={200} closeDelay={500} onOpenChange={handleOpenChange}>
       <HoverCardTrigger asChild>{children}</HoverCardTrigger>
       <HoverCardContent
         side="bottom"
@@ -120,7 +135,11 @@ export const AssertionsBreakdownTooltip: React.FC<
                   </AccordionPrimitive.Header>
                   <AccordionContent className="p-0">
                     {run.map((assertion, aIdx) => (
-                      <div key={aIdx} className="flex gap-2 px-3 py-2">
+                      <div
+                        key={aIdx}
+                        className="flex gap-2 px-3 py-2"
+                        data-assertion-passed={String(assertion.passed)}
+                      >
                         {assertion.passed ? (
                           <CircleCheck className="mt-0.5 size-3.5 shrink-0 text-success" />
                         ) : (
