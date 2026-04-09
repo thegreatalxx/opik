@@ -160,7 +160,7 @@ const TraceTreeViewer: React.FunctionComponent<TraceTreeViewerProps> = ({
 
   return (
     <div
-      className="relative size-full max-w-full overflow-auto pb-4"
+      className="relative size-full overflow-y-auto overflow-x-hidden pb-4"
       ref={scrollRef}
     >
       <div className="max-w-full pt-2">
