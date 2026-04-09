@@ -32,21 +32,9 @@ import { formatCost } from "@/lib/money";
 import FeedbackScoreHoverCard from "@/shared/FeedbackScoreTag/FeedbackScoreHoverCard";
 import UserCommentHoverList from "@/shared/UserComment/UserCommentHoverList";
 import TagsHoverCard from "@/shared/TagsHoverCard/TagsHoverCard";
-import { useIsFeatureEnabled } from "@/contexts/feature-toggles-provider";
-import { FeatureToggleKeys } from "@/types/feature-toggles";
 import { TRACE_TYPE_FOR_TREE, TRACE_TYPE_COLORS_MAP } from "@/constants/traces";
 
 const EXPAND_HOTKEYS = ["⏎"];
-const DETAILS_SECTION_COMPONENTS = [
-  TREE_DATABLOCK_TYPE.DURATION,
-  TREE_DATABLOCK_TYPE.NUMBERS_OF_TOKENS,
-  TREE_DATABLOCK_TYPE.TOKENS_BREAKDOWN,
-  TREE_DATABLOCK_TYPE.ESTIMATED_COST,
-  TREE_DATABLOCK_TYPE.NUMBER_OF_SCORES,
-  TREE_DATABLOCK_TYPE.NUMBER_OF_COMMENTS,
-  TREE_DATABLOCK_TYPE.NUMBER_OF_TAGS,
-  TREE_DATABLOCK_TYPE.MODEL,
-];
 
 type VirtualizedTreeViewerProps = {
   scrollRef: React.RefObject<HTMLDivElement>;
@@ -64,10 +52,6 @@ const VirtualizedTreeViewer: React.FC<VirtualizedTreeViewerProps> = ({
   const { flattenedTree, expandedTreeRows, toggleExpand } =
     useTreeDetailsStore();
 
-  const isGuardrailsEnabled = useIsFeatureEnabled(
-    FeatureToggleKeys.GUARDRAILS_ENABLED,
-  );
-
   const [scrollToRowId, setScrollToRowId] = React.useState<
     string | undefined
   >();
@@ -76,15 +60,6 @@ const VirtualizedTreeViewer: React.FC<VirtualizedTreeViewerProps> = ({
     current: undefined,
     previous: undefined,
   });
-
-  const hasOtherConfig = useMemo(
-    () =>
-      (isGuardrailsEnabled
-        ? [TREE_DATABLOCK_TYPE.GUARDRAILS, ...DETAILS_SECTION_COMPONENTS]
-        : DETAILS_SECTION_COMPONENTS
-      ).reduce((acc, block) => acc || config[block], false),
-    [config, isGuardrailsEnabled],
-  );
 
   // For each node, track which ancestor depth levels have a continuing vertical line
   const connectorInfo = useMemo(() => {
@@ -123,7 +98,7 @@ const VirtualizedTreeViewer: React.FC<VirtualizedTreeViewerProps> = ({
 
   useEffect(() => {
     rowVirtualizer.measure();
-  }, [hasDurationTimeline, hasOtherConfig, rowVirtualizer]);
+  }, [hasDurationTimeline, config, rowVirtualizer]);
 
   const selectRow = useCallback(
     (id: string) => {
@@ -170,6 +145,45 @@ const VirtualizedTreeViewer: React.FC<VirtualizedTreeViewerProps> = ({
       }
     },
     [flattenedTree, rowId],
+  );
+
+  const nodeHasDetails = useCallback(
+    (node: TreeNode) => {
+      const guardrailStatus = get(node.data?.output, "guardrail_result", null);
+      const {
+        tokens,
+        comments,
+        tags,
+        model,
+        provider,
+        feedback_scores: feedbackScores,
+        span_feedback_scores: spanFeedbackScores,
+        total_estimated_cost: estimatedCost,
+        type,
+      } = node.data;
+      const isTrace = type === TRACE_TYPE_FOR_TREE;
+      const promptTokens = node.data.usage?.prompt_tokens;
+      const completionTokens = node.data.usage?.completion_tokens;
+
+      return (
+        guardrailStatus !== null ||
+        (config[TREE_DATABLOCK_TYPE.DURATION] && node.data.duration) ||
+        (config[TREE_DATABLOCK_TYPE.MODEL] && (model || provider)) ||
+        (config[TREE_DATABLOCK_TYPE.ESTIMATED_COST] &&
+          !isUndefined(estimatedCost)) ||
+        (config[TREE_DATABLOCK_TYPE.NUMBERS_OF_TOKENS] && isNumber(tokens)) ||
+        (config[TREE_DATABLOCK_TYPE.TOKENS_BREAKDOWN] &&
+          isNumber(promptTokens) &&
+          isNumber(completionTokens)) ||
+        (config[TREE_DATABLOCK_TYPE.NUMBER_OF_SCORES] &&
+          (Boolean(feedbackScores?.length) ||
+            (isTrace && Boolean(spanFeedbackScores?.length)))) ||
+        (config[TREE_DATABLOCK_TYPE.NUMBER_OF_COMMENTS] &&
+          Boolean(comments?.length)) ||
+        (config[TREE_DATABLOCK_TYPE.NUMBER_OF_TAGS] && Boolean(tags?.length))
+      );
+    },
+    [config],
   );
 
   const renderDetailsContainer = (node: TreeNode) => {
@@ -495,7 +509,7 @@ const VirtualizedTreeViewer: React.FC<VirtualizedTreeViewerProps> = ({
                   </TooltipWrapper>
                 )}
               </div>
-              {hasOtherConfig && (
+              {nodeHasDetails(node) && (
                 <div
                   style={{
                     paddingLeft: node.depth * 24 + 24,
@@ -504,7 +518,7 @@ const VirtualizedTreeViewer: React.FC<VirtualizedTreeViewerProps> = ({
                   {renderDetailsContainer(node)}
                 </div>
               )}
-              {hasDurationTimeline && (
+              {hasDurationTimeline && node.data.maxDuration > 0 && (
                 <div
                   className="px-2"
                   style={{ paddingLeft: node.depth * 24 + 24 }}
