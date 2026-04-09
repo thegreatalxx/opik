@@ -1,10 +1,19 @@
-import React from "react";
+import React, { useCallback, useMemo, useState } from "react";
+import { ChevronRight, FoldVertical, UnfoldVertical } from "lucide-react";
 
 import { BlueprintValue, BlueprintValueType } from "@/types/agent-configs";
 import { formatBlueprintValue } from "@/utils/agent-configurations";
 import TooltipWrapper from "@/shared/TooltipWrapper/TooltipWrapper";
 import BlueprintTypeIcon from "./BlueprintTypeIcon";
 import BlueprintValuePrompt from "./BlueprintValuePrompt";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  CustomAccordionTrigger,
+} from "@/ui/accordion";
+import { Button } from "@/ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/ui/tooltip";
 
 const renderValue = (v: BlueprintValue) => {
   if (v.type === BlueprintValueType.PROMPT) {
@@ -24,25 +33,69 @@ type BlueprintValuesListProps = {
 
 const BlueprintValuesList: React.FC<BlueprintValuesListProps> = ({
   values,
-}) => (
-  <div className="flex flex-col divide-y">
-    {values.map((v) => (
-      <div key={v.key} className="flex flex-col gap-2 py-4">
-        <div className="flex items-center gap-2">
-          <BlueprintTypeIcon type={v.type} />
-          <span className="comet-body-s-accented text-foreground">{v.key}</span>
+}) => {
+  const allKeys = useMemo(() => values.map((v) => v.key), [values]);
+  const [expandedKeys, setExpandedKeys] = useState<string[]>(allKeys);
+
+  const isAllExpanded =
+    allKeys.length > 0 && expandedKeys.length === allKeys.length;
+
+  const handleToggleAll = useCallback(() => {
+    setExpandedKeys(isAllExpanded ? [] : allKeys);
+  }, [isAllExpanded, allKeys]);
+
+  return (
+    <div className="flex flex-col">
+      {values.length > 1 && (
+        <div className="flex justify-end">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                onClick={handleToggleAll}
+                variant="outline"
+                size="icon-2xs"
+              >
+                {isAllExpanded ? <FoldVertical /> : <UnfoldVertical />}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">
+              {isAllExpanded ? "Collapse all" : "Expand all"}
+            </TooltipContent>
+          </Tooltip>
         </div>
-        {v.description && (
-          <TooltipWrapper content={v.description}>
-            <span className="comet-body-xs w-fit max-w-full truncate text-light-slate">
-              {v.description}
-            </span>
-          </TooltipWrapper>
-        )}
-        <div className="overflow-hidden">{renderValue(v)}</div>
-      </div>
-    ))}
-  </div>
-);
+      )}
+      <Accordion
+        type="multiple"
+        value={expandedKeys}
+        onValueChange={setExpandedKeys}
+        className="flex flex-col divide-y"
+      >
+        {values.map((v) => (
+          <AccordionItem key={v.key} value={v.key} className="border-none py-1">
+            <CustomAccordionTrigger className="flex select-none items-center justify-between gap-1 rounded-sm p-1 px-0 transition-colors hover:bg-primary-foreground [&[data-state=open]>div>svg:first-child]:rotate-90">
+              <div className="flex items-center gap-2">
+                <ChevronRight className="size-3.5 shrink-0 text-light-slate transition-transform duration-200" />
+                <BlueprintTypeIcon type={v.type} />
+                <span className="comet-body-s-accented text-foreground">
+                  {v.key}
+                </span>
+              </div>
+              {v.description && (
+                <TooltipWrapper content={v.description}>
+                  <span className="comet-body-xs max-w-[50%] truncate text-light-slate">
+                    {v.description}
+                  </span>
+                </TooltipWrapper>
+              )}
+            </CustomAccordionTrigger>
+            <AccordionContent className="pb-2">
+              {renderValue(v)}
+            </AccordionContent>
+          </AccordionItem>
+        ))}
+      </Accordion>
+    </div>
+  );
+};
 
 export default BlueprintValuesList;
