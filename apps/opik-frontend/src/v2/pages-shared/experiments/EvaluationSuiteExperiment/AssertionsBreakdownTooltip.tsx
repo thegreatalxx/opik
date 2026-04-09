@@ -56,20 +56,20 @@ export const AssertionsBreakdownTooltip: React.FC<
                       <span className="comet-body-xs-accented text-foreground">
                         Run {runIdx + 1}
                       </span>
-                      <div className="flex items-center gap-1">
-                        {allPassed ? (
-                          <CircleCheck className="size-3.5 shrink-0 text-success" />
-                        ) : (
-                          <CircleX className="size-3.5 shrink-0 text-destructive" />
+                      <div
+                        className={cn(
+                          "inline-flex items-center gap-1 rounded-full border border-transparent px-2 py-0.5 font-mono text-xs font-semibold",
+                          allPassed
+                            ? "bg-success/15 text-success"
+                            : "bg-destructive/15 text-destructive",
                         )}
-                        <span
-                          className={cn(
-                            "comet-body-xs",
-                            allPassed ? "text-success" : "text-destructive",
-                          )}
-                        >
-                          {passedCount}/{run.length} assertions passed
-                        </span>
+                      >
+                        {allPassed ? (
+                          <CircleCheck className="size-3 shrink-0" />
+                        ) : (
+                          <CircleX className="size-3 shrink-0" />
+                        )}
+                        {passedCount}/{run.length} assertions passed
                       </div>
                     </div>
                   </AccordionTrigger>
@@ -82,7 +82,7 @@ export const AssertionsBreakdownTooltip: React.FC<
                           <CircleX className="mt-0.5 size-3.5 shrink-0 text-destructive" />
                         )}
                         <div className="flex flex-col gap-0.5">
-                          <p className="comet-body-xs text-foreground">
+                          <p className="comet-body-xs-accented text-foreground">
                             {assertion.value}
                           </p>
                           {assertion.reason && (
