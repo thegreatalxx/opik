@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useParams, useRouter } from "@tanstack/react-router";
+import { useLocation, useParams, useRouter } from "@tanstack/react-router";
 import {
   AssistantSidebarBridge,
   BridgeContext,
@@ -237,9 +237,18 @@ function useBridgeContext(assistantBackendUrl: string): BridgeContext {
   const workspaceId = workspace?.workspaceId ?? "";
   const projectName = project?.name ?? null;
   const resolvedProjectId = projectId ?? null;
-
   const organizationId = workspace?.organizationId ?? null;
   const projectStats = useProjectOnboardingStats(resolvedProjectId);
+
+  const { searchStr } = useLocation();
+  const { traceId, spanId, threadId } = useMemo(() => {
+    const p = new URLSearchParams(searchStr);
+    return {
+      traceId: p.get("trace") || null,
+      spanId: p.get("span") || null,
+      threadId: p.get("thread") || null,
+    };
+  }, [searchStr]);
 
   return useMemo<BridgeContext>(
     () => ({
@@ -248,6 +257,9 @@ function useBridgeContext(assistantBackendUrl: string): BridgeContext {
       organizationId,
       projectId: resolvedProjectId,
       projectName,
+      traceId,
+      spanId,
+      threadId,
       baseApiUrl: BASE_API_URL,
       assistantBackendUrl,
       theme: "light",
@@ -259,6 +271,9 @@ function useBridgeContext(assistantBackendUrl: string): BridgeContext {
       organizationId,
       resolvedProjectId,
       projectName,
+      traceId,
+      spanId,
+      threadId,
       assistantBackendUrl,
       projectStats,
     ],

@@ -16,6 +16,9 @@ export interface BridgeContext {
   organizationId?: string | null;
   projectId: string | null;
   projectName: string | null;
+  traceId: string | null;
+  spanId: string | null;
+  threadId: string | null;
   baseApiUrl: string;
   assistantBackendUrl: string;
   theme: BridgeTheme;
