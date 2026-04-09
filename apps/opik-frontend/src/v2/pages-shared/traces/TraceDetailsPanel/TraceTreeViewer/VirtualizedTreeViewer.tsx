@@ -35,6 +35,69 @@ import TagsHoverCard from "@/shared/TagsHoverCard/TagsHoverCard";
 import { TRACE_TYPE_FOR_TREE, TRACE_TYPE_COLORS_MAP } from "@/constants/traces";
 
 const EXPAND_HOTKEYS = ["⏎"];
+const INDENT_PX = 24;
+const ICON_OFFSET = 8;
+
+const VerticalLine: React.FC<{
+  left: number;
+  top?: number | string;
+  bottom?: number | string;
+  height?: number | string;
+}> = ({ left, top = 0, bottom, height }) => (
+  <div
+    className="absolute w-px bg-light-slate/40"
+    style={{ left, top, bottom, height }}
+  />
+);
+
+const TreeConnectors: React.FC<{
+  depth: number;
+  connectors: boolean[];
+  isExpanded: boolean;
+  isExpandable: boolean;
+}> = ({ depth, connectors, isExpanded, isExpandable }) => (
+  <div className="pointer-events-none absolute inset-0">
+    {depth > 0 &&
+      Array.from({ length: depth }, (_, i) => {
+        const d = i + 1;
+        const isOwnDepth = d === depth;
+        const hasContinuation = connectors[i] ?? false;
+        const parentCenterX = ICON_OFFSET + (d - 1) * INDENT_PX + ICON_OFFSET;
+        const childLeft = ICON_OFFSET + d * INDENT_PX;
+        const branchWidth = childLeft - parentCenterX;
+
+        if (!isOwnDepth && !hasContinuation) return null;
+
+        if (!isOwnDepth) {
+          return <VerticalLine key={d} left={parentCenterX} height="100%" />;
+        }
+
+        return (
+          <React.Fragment key={d}>
+            {hasContinuation && (
+              <VerticalLine left={parentCenterX} height="100%" />
+            )}
+            <div
+              className="absolute border-b border-l border-light-slate/40 rounded-bl-md"
+              style={{
+                left: parentCenterX,
+                top: hasContinuation ? 6 : 0,
+                height: hasContinuation ? 6 : 12,
+                width: branchWidth,
+              }}
+            />
+          </React.Fragment>
+        );
+      })}
+    {isExpandable && isExpanded && (
+      <VerticalLine
+        left={ICON_OFFSET + depth * INDENT_PX + ICON_OFFSET}
+        top={20}
+        bottom={0}
+      />
+    )}
+  </div>
+);
 
 type VirtualizedTreeViewerProps = {
   scrollRef: React.RefObject<HTMLDivElement>;
@@ -390,80 +453,16 @@ const VirtualizedTreeViewer: React.FC<VirtualizedTreeViewerProps> = ({
               }
               onClick={() => selectRow(node.id)}
             >
-              <div className="pointer-events-none absolute inset-0">
-                {node.depth > 0 &&
-                  Array.from({ length: node.depth }, (_, i) => {
-                    const d = i + 1;
-                    const isOwnDepth = d === node.depth;
-                    const hasContinuation =
-                      connectorInfo[virtualRow.index]?.[i] ?? false;
-                    const parentIconCenterX = 8 + (d - 1) * 24 + 8;
-                    const childIconLeft = 8 + d * 24;
-
-                    if (!isOwnDepth && !hasContinuation) return null;
-
-                    return (
-                      <React.Fragment key={d}>
-                        {isOwnDepth ? (
-                          hasContinuation ? (
-                            <>
-                              <div
-                                className="absolute w-px bg-light-slate/40"
-                                style={{
-                                  left: parentIconCenterX,
-                                  top: 0,
-                                  height: "100%",
-                                }}
-                              />
-                              <div
-                                className="absolute border-b border-l border-light-slate/40 rounded-bl-md"
-                                style={{
-                                  left: parentIconCenterX,
-                                  top: 6,
-                                  height: 6,
-                                  width: childIconLeft - parentIconCenterX,
-                                }}
-                              />
-                            </>
-                          ) : (
-                            <div
-                              className="absolute border-b border-l border-light-slate/40 rounded-bl-md"
-                              style={{
-                                left: parentIconCenterX,
-                                top: 0,
-                                height: 12,
-                                width: childIconLeft - parentIconCenterX,
-                              }}
-                            />
-                          )
-                        ) : (
-                          <div
-                            className="absolute w-px bg-light-slate/40"
-                            style={{
-                              left: parentIconCenterX,
-                              top: 0,
-                              height: "100%",
-                            }}
-                          />
-                        )}
-                      </React.Fragment>
-                    );
-                  })}
-                {isExpandable && expandedTreeRows.has(node.id) && (
-                  <div
-                    className="absolute w-px bg-light-slate/40"
-                    style={{
-                      left: 8 + node.depth * 24 + 8,
-                      top: 20,
-                      bottom: 0,
-                    }}
-                  />
-                )}
-              </div>
+              <TreeConnectors
+                depth={node.depth}
+                connectors={connectorInfo[virtualRow.index] ?? []}
+                isExpandable={isExpandable}
+                isExpanded={expandedTreeRows.has(node.id)}
+              />
               <div
                 className="flex items-center"
                 style={{
-                  paddingLeft: node.depth * 24,
+                  paddingLeft: node.depth * INDENT_PX,
                 }}
               >
                 <BaseTraceDataTypeIcon type={node.data.type} />
@@ -512,7 +511,7 @@ const VirtualizedTreeViewer: React.FC<VirtualizedTreeViewerProps> = ({
               {nodeHasDetails(node) && (
                 <div
                   style={{
-                    paddingLeft: node.depth * 24 + 24,
+                    paddingLeft: node.depth * INDENT_PX + INDENT_PX,
                   }}
                 >
                   {renderDetailsContainer(node)}
@@ -521,7 +520,7 @@ const VirtualizedTreeViewer: React.FC<VirtualizedTreeViewerProps> = ({
               {hasDurationTimeline && node.data.maxDuration > 0 && (
                 <div
                   className="px-2"
-                  style={{ paddingLeft: node.depth * 24 + 24 }}
+                  style={{ paddingLeft: node.depth * INDENT_PX + INDENT_PX }}
                 >
                   <div className="relative h-1 w-full">
                     <div className="absolute inset-x-0 top-[1.5px] h-px bg-border" />

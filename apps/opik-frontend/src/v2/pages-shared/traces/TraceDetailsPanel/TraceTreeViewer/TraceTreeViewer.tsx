@@ -1,5 +1,4 @@
 import React, { useCallback, useEffect, useMemo, useRef } from "react";
-import useLocalStorageState from "use-local-storage-state";
 
 import {
   addAllParentIds,
@@ -13,11 +12,8 @@ import NoData from "@/shared/NoData/NoData";
 import VirtualizedTreeViewer from "@/v2/pages-shared/traces/TraceDetailsPanel/TraceTreeViewer/VirtualizedTreeViewer";
 import useTreeDetailsStore, {
   TreeNode,
+  TreeNodeConfig,
 } from "@/v2/pages-shared/traces/TraceDetailsPanel/TreeDetailsStore";
-import {
-  SELECTED_TREE_DATABLOCKS_KEY,
-  SELECTED_TREE_DATABLOCKS_DEFAULT_VALUE,
-} from "@/v2/pages-shared/traces/TraceDetailsPanel/treeConfig";
 
 type TraceTreeViewerProps = {
   trace: Trace;
@@ -26,6 +22,7 @@ type TraceTreeViewerProps = {
   onSelectRow: (id: string) => void;
   search?: string;
   filters: Filters;
+  config: TreeNodeConfig;
 };
 
 const TraceTreeViewer: React.FunctionComponent<TraceTreeViewerProps> = ({
@@ -35,15 +32,10 @@ const TraceTreeViewer: React.FunctionComponent<TraceTreeViewerProps> = ({
   onSelectRow,
   search,
   filters,
+  config,
 }) => {
   const traceSpans = useMemo(() => spans ?? [], [spans]);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const [config, setConfig] = useLocalStorageState(
-    SELECTED_TREE_DATABLOCKS_KEY,
-    {
-      defaultValue: SELECTED_TREE_DATABLOCKS_DEFAULT_VALUE,
-    },
-  );
 
   const hasSearch = Boolean(search && search.length);
   const hasFilter = Boolean(filters.length);

@@ -47,6 +47,8 @@ const BaseTraceDataTypeIcon: React.FunctionComponent<
 > = ({ type = TRACE_TYPE_FOR_TREE }) => {
   const data = ICONS_MAP[type];
 
+  if (!data) return null;
+
   return (
     <div
       style={{ background: data.color }}

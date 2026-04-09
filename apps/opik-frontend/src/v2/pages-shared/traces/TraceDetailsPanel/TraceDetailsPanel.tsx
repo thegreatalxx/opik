@@ -9,6 +9,7 @@ import useLocalStorageState from "use-local-storage-state";
 import { ChevronDown, Expand } from "lucide-react";
 
 import { OnChangeFn } from "@/types/shared";
+import { cn } from "@/lib/utils";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/ui/dialog";
 import TooltipWrapper from "@/shared/TooltipWrapper/TooltipWrapper";
 import ZoomPanContainer from "@/shared/ZoomPanContainer/ZoomPanContainer";
@@ -50,6 +51,38 @@ import {
 } from "@/constants/traces";
 
 const MAX_SPANS_LOAD_SIZE = 15000;
+
+const AgentGraphHeader: React.FC<{
+  isCollapsed: boolean;
+  onToggleCollapse: () => void;
+  onFullscreen: () => void;
+  border: "top" | "bottom";
+}> = ({ isCollapsed, onToggleCollapse, onFullscreen, border }) => (
+  <div
+    className={cn(
+      "flex h-10 shrink-0 items-center justify-between bg-muted/50 px-3",
+      border === "top" ? "border-t" : "border-b",
+    )}
+  >
+    <span className="comet-body-xs-accented">Agent graph</span>
+    <div className="flex items-center gap-1">
+      <TooltipWrapper content="Open in fullscreen">
+        <button
+          className="flex size-6 cursor-pointer items-center justify-center rounded-sm text-muted-foreground hover:bg-muted"
+          onClick={onFullscreen}
+        >
+          <Expand className="size-3.5" />
+        </button>
+      </TooltipWrapper>
+      <button
+        className="flex size-6 cursor-pointer items-center justify-center rounded-sm text-muted-foreground hover:bg-muted"
+        onClick={onToggleCollapse}
+      >
+        <ChevronDown className={cn("size-3.5", isCollapsed && "-rotate-90")} />
+      </button>
+    </div>
+  </div>
+);
 
 type TraceDetailsPanelProps = {
   projectId?: string;
@@ -219,6 +252,18 @@ const TraceDetailsPanel: React.FunctionComponent<TraceDetailsPanelProps> = ({
       return <NoData />;
     }
 
+    const treeViewer = (
+      <TraceTreeViewer
+        trace={trace}
+        spans={spansData?.content}
+        rowId={spanId || traceId}
+        onSelectRow={handleRowSelect}
+        search={search}
+        filters={filters}
+        config={treeConfig}
+      />
+    );
+
     return (
       <div className="relative size-full">
         <ResizablePanelGroup direction="horizontal" autoSaveId="trace-sidebar">
@@ -247,14 +292,7 @@ const TraceDetailsPanel: React.FunctionComponent<TraceDetailsPanelProps> = ({
                     minSize={20}
                   >
                     <div className="size-full overflow-hidden">
-                      <TraceTreeViewer
-                        trace={trace}
-                        spans={spansData?.content}
-                        rowId={spanId || traceId}
-                        onSelectRow={handleRowSelect}
-                        search={search}
-                        filters={filters}
-                      />
+                      {treeViewer}
                     </div>
                   </ResizablePanel>
                   <ResizableHandle />
@@ -264,95 +302,37 @@ const TraceDetailsPanel: React.FunctionComponent<TraceDetailsPanelProps> = ({
                     minSize={15}
                   >
                     <div className="flex size-full flex-col overflow-hidden">
-                      <div className="flex h-10 shrink-0 items-center justify-between border-b bg-muted/50 px-3">
-                        <span className="comet-body-xs-accented">
-                          Agent graph
-                        </span>
-                        <div className="flex items-center gap-1">
-                          <TooltipWrapper content="Open in fullscreen">
-                            <button
-                              className="flex size-6 cursor-pointer items-center justify-center rounded-sm text-muted-foreground hover:bg-muted"
-                              onClick={() => setIsGraphFullscreen(true)}
-                            >
-                              <Expand className="size-3.5" />
-                            </button>
-                          </TooltipWrapper>
-                          <button
-                            className="flex size-6 cursor-pointer items-center justify-center rounded-sm text-muted-foreground hover:bg-muted"
-                            onClick={() => setIsGraphCollapsed(true)}
-                          >
-                            <ChevronDown className="size-3.5" />
-                          </button>
-                        </div>
-                      </div>
+                      <AgentGraphHeader
+                        isCollapsed={false}
+                        onToggleCollapse={() => setIsGraphCollapsed(true)}
+                        onFullscreen={() => setIsGraphFullscreen(true)}
+                        border="bottom"
+                      />
                       <div className="flex-auto overflow-hidden p-2">
                         <AgentGraphTab data={agentGraphData} />
                       </div>
-                      <Dialog
-                        open={isGraphFullscreen}
-                        onOpenChange={setIsGraphFullscreen}
-                      >
-                        <DialogContent
-                          className="max-w-[90vw] max-h-[90vh] w-full h-full"
-                          onEscapeKeyDown={(e) => e.stopPropagation()}
-                          onOpenAutoFocus={(e) => e.preventDefault()}
-                        >
-                          <DialogHeader>
-                            <DialogTitle>Agent graph</DialogTitle>
-                          </DialogHeader>
-                          <div className="flex-auto overflow-hidden">
-                            <ZoomPanContainer expandButton={false}>
-                              <MermaidDiagram
-                                chart={agentGraphData.data}
-                              />
-                            </ZoomPanContainer>
-                          </div>
-                        </DialogContent>
-                      </Dialog>
                     </div>
                   </ResizablePanel>
                 </ResizablePanelGroup>
               ) : (
                 <>
                   <div className="relative flex-auto overflow-hidden">
-                    <TraceTreeViewer
-                      trace={trace}
-                      spans={spansData?.content}
-                      rowId={spanId || traceId}
-                      onSelectRow={handleRowSelect}
-                      search={search}
-                      filters={filters}
-                    />
+                    {treeViewer}
                   </div>
                   {agentGraphData && (
-                    <div className="flex h-10 shrink-0 items-center justify-between border-t bg-muted/50 px-3">
-                      <span className="comet-body-xs-accented">
-                        Agent graph
-                      </span>
-                      <div className="flex items-center gap-1">
-                        <TooltipWrapper content="Open in fullscreen">
-                          <button
-                            className="flex size-6 cursor-pointer items-center justify-center rounded-sm text-muted-foreground hover:bg-muted"
-                            onClick={() => setIsGraphFullscreen(true)}
-                          >
-                            <Expand className="size-3.5" />
-                          </button>
-                        </TooltipWrapper>
-                        <button
-                          className="flex size-6 cursor-pointer items-center justify-center rounded-sm text-muted-foreground hover:bg-muted"
-                          onClick={() => setIsGraphCollapsed(false)}
-                        >
-                          <ChevronDown className="size-3.5 -rotate-90" />
-                        </button>
-                      </div>
-                    </div>
+                    <AgentGraphHeader
+                      isCollapsed
+                      onToggleCollapse={() => setIsGraphCollapsed(false)}
+                      onFullscreen={() => setIsGraphFullscreen(true)}
+                      border="top"
+                    />
                   )}
                 </>
               )}
             </div>
           </ResizablePanel>
           <ResizableHandle />
-          <ResizablePanel id="data-viever" defaultSize={60} minSize={30}>
+          <ResizablePanel id="data-viewer" defaultSize={60} minSize={30}>
             <div className="flex size-full flex-col">
               <TraceDataToolbar
                 dataToView={dataToView}
@@ -402,6 +382,24 @@ const TraceDetailsPanel: React.FunctionComponent<TraceDetailsPanelProps> = ({
             </>
           )}
         </ResizablePanelGroup>
+        {agentGraphData && (
+          <Dialog open={isGraphFullscreen} onOpenChange={setIsGraphFullscreen}>
+            <DialogContent
+              className="max-w-[90vw] max-h-[90vh] w-full h-full"
+              onEscapeKeyDown={(e) => e.stopPropagation()}
+              onOpenAutoFocus={(e) => e.preventDefault()}
+            >
+              <DialogHeader>
+                <DialogTitle>Agent graph</DialogTitle>
+              </DialogHeader>
+              <div className="flex-auto overflow-hidden">
+                <ZoomPanContainer expandButton={false}>
+                  <MermaidDiagram chart={agentGraphData.data} />
+                </ZoomPanContainer>
+              </div>
+            </DialogContent>
+          </Dialog>
+        )}
       </div>
     );
   };
