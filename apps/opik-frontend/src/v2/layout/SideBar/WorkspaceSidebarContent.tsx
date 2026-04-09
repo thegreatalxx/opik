@@ -53,11 +53,6 @@ const WorkspaceSidebarContent: React.FC<WorkspaceSidebarContentProps> = ({
         to: "/$workspaceName/projects/$projectId/home",
         params: { workspaceName, projectId: activeProjectId },
       });
-    } else {
-      navigate({
-        to: "/$workspaceName",
-        params: { workspaceName },
-      });
     }
   };
 
@@ -100,17 +95,18 @@ const WorkspaceSidebarContent: React.FC<WorkspaceSidebarContentProps> = ({
       </div>
 
       <div className="shrink-0 pt-2">
-        {expanded ? (
-          backButton
-        ) : (
-          <TooltipWrapper
-            content={backButtonLabel}
-            side="right"
-            delayDuration={0}
-          >
-            {backButton}
-          </TooltipWrapper>
-        )}
+        {activeProjectId &&
+          (expanded ? (
+            backButton
+          ) : (
+            <TooltipWrapper
+              content={backButtonLabel}
+              side="right"
+              delayDuration={0}
+            >
+              {backButton}
+            </TooltipWrapper>
+          ))}
         <Separator className="my-4" />
         <ul className="flex flex-col">
           <GitHubStarListItem expanded={expanded} />
