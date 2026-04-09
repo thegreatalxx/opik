@@ -16,7 +16,7 @@ metadata:
   twitter:site: "@CometML"
 
 announcement:
-  message: "Join the Comet team at AI Engineer Europe, April 8-10! <a href=\"https://www.ai.engineer/europe\" rel=\"nofollow\" target=\"_blank\">Register</a>"
+  message: "Subscribe to our Luma calendar to stay updated on upcoming events! <a href=\"https://luma.com/cometml\" rel=\"nofollow\" target=\"_blank\">Subscribe here</a>"
 
 title: Opik Documentation
 favicon: img/logo.svg
@@ -327,6 +327,10 @@ redirects:
     permanent: true
   - source: "/docs/opik/reference/ruby-otel-sdk/overview"
     destination: "/docs/opik/integrations/opentelemetry-ruby-sdk"
+    permanent: true
+  # Batching docs redirect
+  - source: "/docs/opik/tracing/batching_and_updates"
+    destination: "/docs/opik/reference/python-sdk/troubleshooting/batching-and-updates"
     permanent: true
   # Cookbook redirects
   - source: "/docs/opik/cookbook/overview"

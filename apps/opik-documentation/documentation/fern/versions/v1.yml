@@ -892,6 +892,12 @@ navigation:
           - page: REST API Client
             path: ../docs/reference/python-sdk/rest-api.mdx
             slug: rest-api
+          - section: Troubleshooting
+            slug: troubleshooting
+            contents:
+              - page: Batching and updates
+                path: ../docs/reference/python-sdk/troubleshooting/batching-and-updates.mdx
+                slug: batching-and-updates
       - section: Typescript SDK
         slug: typescript-sdk
         contents:

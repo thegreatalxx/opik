@@ -112,14 +112,12 @@ export class InProcessRunnerLoop {
         const job = await this.api.runners.nextJob(this.runnerId);
         this.pollFailures = 0;
         nextBackoff = 1_000;
-        this.spawnJob(job);
-      } catch (err) {
-        if (err instanceof OpikApiError && err.statusCode === 204) {
-          this.pollFailures = 0;
-          nextBackoff = 1_000;
+        if (job === null) {
           this.scheduleNextPoll(POLL_IDLE_INTERVAL_MS, nextBackoff);
           return;
         }
+        this.spawnJob(job);
+      } catch (err) {
         this.pollFailures++;
         if (this.pollFailures === 1) {
           const statusCode = err instanceof OpikApiError ? err.statusCode : undefined;
@@ -321,13 +319,14 @@ export function castInputValue(value: unknown, type: string): unknown {
     case "boolean":
       if (typeof value === "boolean") return value;
       return deserializeValue(String(value), "boolean");
-    case "number": {
+    case "float":
+    case "integer": {
       if (typeof value === "number") return value;
       const result = deserializeValue(String(value), "float");
       if (typeof result === "number" && Number.isNaN(result)) {
         throw new TypeError(`Cannot cast "${value}" to number`);
       }
-      return result;
+      return type === "integer" ? Math.trunc(result as number) : result;
     }
     case "string":
     default:
