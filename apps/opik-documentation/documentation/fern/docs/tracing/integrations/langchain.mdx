@@ -9,6 +9,10 @@ og:title: Unlock LangChain's Potential with Opik
 title: Observability for LangChain (Python) with Opik
 ---
 
+<Note>
+  In Opik 2.0, datasets and experiments are project-scoped. Make sure to specify a `project_name` when creating datasets and running experiments so they are associated with the correct project.
+</Note>
+
 Opik provides seamless integration with LangChain, allowing you to easily log and trace your LangChain-based applications. By using the `OpikTracer` callback, you can automatically capture detailed information about your LangChain runs, including inputs, outputs, metadata, and cost tracking for each step in your chain.
 
 ## Key Features
@@ -143,7 +147,7 @@ synthetic_questions = json.loads(completion.choices[0].message.content)["result"
 
 # Create dataset in Opik
 opik_client = opik.Opik()
-dataset = opik_client.get_or_create_dataset(name="synthetic_questions")
+dataset = opik_client.get_or_create_dataset(name="synthetic_questions", project_name="my-project")
 dataset.insert([{"question": question} for question in synthetic_questions])
 ```
 
@@ -211,6 +215,7 @@ res = evaluate(
     task=evaluation_task,
     scoring_metrics=[valid_sql_query],
     nb_samples=20,
+    project_name="my-project",
 )
 ```
 

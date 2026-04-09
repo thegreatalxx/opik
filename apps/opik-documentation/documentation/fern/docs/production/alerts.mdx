@@ -9,6 +9,10 @@ og:title: Alerts Configuration - Opik
 title: Alerts
 ---
 
+<Note>
+  In Opik 2.0, prompts, datasets, and experiments are project-scoped. Alert events such as prompt changes and feedback scores are now associated with specific projects.
+</Note>
+
 Alerts allow you to configure automated webhook notifications for important events in your Opik workspace. When specific events occur — such as trace errors, new feedback scores, or prompt changes — Opik sends HTTP POST requests to your configured endpoint with detailed event data.
 
 Opik provides three destination types for alerts:

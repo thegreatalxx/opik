@@ -7,6 +7,10 @@ og:title: Manage Datasets with Opik TypeScript SDK
 title: Datasets
 ---
 
+<Note>
+  In Opik 2.0, datasets are project-scoped. Make sure to specify a `projectName` when creating datasets so they are associated with the correct project.
+</Note>
+
 The Opik TypeScript SDK provides robust functionality for creating and managing datasets. Datasets in Opik serve as collections of data items that can be used for various purposes, including evaluation.
 
 ## Dataset Fundamentals
@@ -36,7 +40,8 @@ type QuestionAnswerItem = {
 // Create a typed dataset
 const dataset = await opik.createDataset<QuestionAnswerItem>(
   "qa-dataset", // Dataset name
-  "Question-Answer pairs for evaluation" // Dataset description
+  "Question-Answer pairs for evaluation", // Dataset description
+  "my-project" // Project name
 );
 ```
 
@@ -48,13 +53,15 @@ const dataset = await opik.createDataset<QuestionAnswerItem>(
 // Create a new dataset
 await opik.createDataset<YourItemType>(
   "dataset-name",
-  "Optional dataset description"
+  "Optional dataset description",
+  "my-project"
 );
 
 // Get an existing dataset or create it if it doesn't exist
 const dataset = await opik.getOrCreateDataset<YourItemType>(
   "dataset-name",
-  "Optional dataset description"
+  "Optional dataset description",
+  "my-project"
 );
 ```
 
@@ -192,6 +199,7 @@ const result = await evaluate({
   task: myTask,
   scoringMetrics: [new ExactMatch()],
   experimentName: "Evaluation on v2",
+  projectName: "my-project",
 });
 ```
 
@@ -216,6 +224,7 @@ Creates a new dataset.
 
 - `name: string` - The name of the dataset
 - `description?: string` - Optional description of the dataset
+- `projectName?: string` - Optional project name to scope the dataset. If not provided, uses the client's configured project.
 
 **Returns:** `Promise<Dataset<T>>` - A promise that resolves to the created Dataset object
 
@@ -226,6 +235,7 @@ Retrieves an existing dataset by name.
 **Arguments:**
 
 - `name: string` - The name of the dataset to retrieve
+- `projectName?: string` - Optional project name to scope the dataset lookup. If not provided, uses the client's configured project.
 
 **Returns:** `Promise<Dataset<T>>` - A promise that resolves to the Dataset object
 
@@ -237,6 +247,7 @@ Retrieves an existing dataset by name or creates it if it doesn't exist.
 
 - `name: string` - The name of the dataset
 - `description?: string` - Optional description (used only if creating a new dataset)
+- `projectName?: string` - Optional project name to scope the dataset. If not provided, uses the client's configured project.
 
 **Returns:** `Promise<Dataset<T>>` - A promise that resolves to the existing or newly created Dataset object
 
@@ -247,6 +258,7 @@ Retrieves a list of datasets.
 **Arguments:**
 
 - `maxResults?: number` - Optional maximum number of datasets to retrieve (default: 100)
+- `projectName?: string` - Optional project name to filter datasets by. If not provided, uses the client's configured project.
 
 **Returns:** `Promise<Dataset<T>[]>` - A promise that resolves to an array of Dataset objects
 

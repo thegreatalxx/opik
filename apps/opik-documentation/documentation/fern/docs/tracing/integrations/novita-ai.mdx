@@ -9,6 +9,10 @@ og:title: Integrate Novita AI Models with Opik - Opik
 title: Observability for Novita AI with Opik
 ---
 
+<Note>
+  In Opik 2.0, datasets and experiments are project-scoped. Make sure to specify a `project_name` when creating datasets and running experiments so they are associated with the correct project.
+</Note>
+
 [Novita AI](https://novita.ai/) is an AI cloud platform that helps developers easily deploy AI models through a simple API, backed by affordable and reliable GPU cloud infrastructure. It provides access to a wide range of models including DeepSeek, Qwen, Llama, and other popular LLMs.
 
 This guide explains how to integrate Opik with Novita AI via LiteLLM. By using the LiteLLM integration provided by Opik, you can easily track and evaluate your Novita AI API calls within your Opik projects as Opik will automatically log the input prompt, model used, token usage, and response generated.
@@ -223,6 +227,7 @@ evaluation_results = evaluate(
     dataset=your_dataset,
     task=evaluation_task,
     scoring_metrics=[hallucination_metric],
+    project_name="my-project",
 )
 ```
 

@@ -9,6 +9,10 @@ title: Cookbook - Evaluate moderation metric
 
 # Evaluating Opik's Moderation Metric
 
+<Note>
+  In Opik 2.0, datasets and experiments are project-scoped. Make sure to specify a `project_name` when creating datasets and running experiments so they are associated with the correct project.
+</Note>
+
 For this guide we will be evaluating the Moderation metric included in the LLM Evaluation SDK which will showcase both how to use the `evaluation` functionality in the platform as well as the quality of the Moderation metric included in the SDK.
 
 ## Creating an account on Comet.com
@@ -58,7 +62,7 @@ client = opik.Opik()
 
 # Create dataset
 dataset = client.get_or_create_dataset(
-    name="OpenAIModerationDataset", description="OpenAI Moderation Dataset"
+    name="OpenAIModerationDataset", description="OpenAI Moderation Dataset", project_name="my-project"
 )
 
 # Insert items into dataset
@@ -140,6 +144,7 @@ res = evaluate(
     task=evaluation_task,
     scoring_metrics=[moderation_metric],
     experiment_config=experiment_config,
+    project_name="my-project",
     scoring_key_mapping={"reference": "expected_output", "output": "moderation_score"},
 )
 ```

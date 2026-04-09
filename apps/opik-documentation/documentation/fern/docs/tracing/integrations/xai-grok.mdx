@@ -9,6 +9,10 @@ og:title: Integrate xAI Grok with Opik for Enhanced AI Tracking
 title: Observability for xAI Grok with Opik
 ---
 
+<Note>
+  In Opik 2.0, datasets and experiments are project-scoped. Make sure to specify a `project_name` when creating datasets and running experiments so they are associated with the correct project.
+</Note>
+
 [xAI](https://x.ai/) is an AI company founded by Elon Musk that develops the Grok series of large language models. Grok models are designed to have access to real-time information and are built with a focus on truthfulness, competence, and maximum benefit to humanity.
 
 This guide explains how to integrate Opik with xAI Grok via LiteLLM. By using the LiteLLM integration provided by Opik, you can easily track and evaluate your xAI API calls within your Opik projects as Opik will automatically log the input prompt, model used, token usage, and response generated.
@@ -274,6 +278,7 @@ evaluation_results = evaluate(
     dataset=your_dataset,
     task=evaluation_task,
     scoring_metrics=[hallucination_metric],
+    project_name="my-project",
 )
 ```
 
