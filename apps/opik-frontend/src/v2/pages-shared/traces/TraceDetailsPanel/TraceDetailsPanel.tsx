@@ -4,6 +4,7 @@ import { BooleanParam, JsonParam, useQueryParam } from "use-query-params";
 import find from "lodash/find";
 import isBoolean from "lodash/isBoolean";
 import isFunction from "lodash/isFunction";
+import useLocalStorageState from "use-local-storage-state";
 
 import { OnChangeFn } from "@/types/shared";
 import {
@@ -16,11 +17,10 @@ import Loader from "@/shared/Loader/Loader";
 import TraceDataViewer from "./TraceDataViewer/TraceDataViewer";
 import TraceTreeViewer from "./TraceTreeViewer/TraceTreeViewer";
 import TraceAIViewer from "./TraceAIViewer/TraceAIViewer";
-import TraceAnnotateViewer from "./TraceAnnotateViewer/TraceAnnotateViewer";
+import AnnotatePanel from "./AnnotatePanel/AnnotatePanel";
 import NoData from "@/shared/NoData/NoData";
-import { Span } from "@/types/traces";
+import { BASE_TRACE_DATA_TYPE, Span } from "@/types/traces";
 import ResizableSidePanel from "@/shared/ResizableSidePanel/ResizableSidePanel";
-import CommentsViewer from "./CommentsViewer/CommentsViewer";
 import useLazySpansList from "@/api/traces/useLazySpansList";
 import {
   DetailsActionSection,
@@ -28,8 +28,19 @@ import {
 } from "@/v2/pages-shared/traces/DetailsActionSection";
 import useTreeDetailsStore from "@/v2/pages-shared/traces/TraceDetailsPanel/TreeDetailsStore";
 import TraceDetailsActionsPanel from "@/v2/pages-shared/traces/TraceDetailsPanel/TraceDetailsActionsPanel";
+import {
+  TraceTreeToolbar,
+  TraceDataToolbar,
+} from "@/v2/pages-shared/traces/TraceDetailsPanel/TraceDetailsToolbar";
+import {
+  SELECTED_TREE_DATABLOCKS_KEY,
+  SELECTED_TREE_DATABLOCKS_DEFAULT_VALUE,
+} from "@/v2/pages-shared/traces/TraceDetailsPanel/treeConfig";
 import get from "lodash/get";
-import { METADATA_AGENT_GRAPH_KEY } from "@/constants/traces";
+import {
+  METADATA_AGENT_GRAPH_KEY,
+  TRACE_TYPE_FOR_TREE,
+} from "@/constants/traces";
 
 const MAX_SPANS_LOAD_SIZE = 15000;
 
@@ -64,7 +75,7 @@ const TraceDetailsPanel: React.FunctionComponent<TraceDetailsPanelProps> = ({
     useDetailsActionSectionState("lastSection");
   const { flattenedTree } = useTreeDetailsStore();
 
-  const [graph = false, setGraph] = useQueryParam(
+  const [graph = false] = useQueryParam(
     `trace_panel_graph`,
     BooleanParam,
     {
@@ -88,10 +99,17 @@ const TraceDetailsPanel: React.FunctionComponent<TraceDetailsPanelProps> = ({
     },
   );
 
+  const [treeConfig, setTreeConfig] = useLocalStorageState(
+    SELECTED_TREE_DATABLOCKS_KEY,
+    {
+      defaultValue: SELECTED_TREE_DATABLOCKS_DEFAULT_VALUE,
+    },
+  );
+
   const { data: trace, isPending: isTracePending } = useTraceById(
     {
       traceId,
-      stripAttachments: true, // Keep attachments stripped - frontend fetches them separately
+      stripAttachments: true,
     },
     {
       placeholderData: keepPreviousData,
@@ -110,7 +128,7 @@ const TraceDetailsPanel: React.FunctionComponent<TraceDetailsPanelProps> = ({
       projectId,
       page: 1,
       size: MAX_SPANS_LOAD_SIZE,
-      stripAttachments: true, // Keep attachments stripped - frontend fetches them separately
+      stripAttachments: true,
     },
     {
       placeholderData: keepPreviousData,
@@ -123,8 +141,6 @@ const TraceDetailsPanel: React.FunctionComponent<TraceDetailsPanelProps> = ({
     ["metadata", METADATA_AGENT_GRAPH_KEY],
     null,
   );
-  const hasAgentGraph = Boolean(agentGraphData);
-
   const handleRowSelect = useCallback(
     (id: string) => setSpanId(id === traceId ? "" : id),
     [setSpanId, traceId],
@@ -140,6 +156,12 @@ const TraceDetailsPanel: React.FunctionComponent<TraceDetailsPanelProps> = ({
   const treeData = useMemo(() => {
     return [...(trace ? [trace] : []), ...(spansData?.content || [])];
   }, [spansData?.content, trace]);
+
+  const spanCount = spansData?.content?.length ?? 0;
+
+  const traceType: BASE_TRACE_DATA_TYPE | undefined = trace
+    ? TRACE_TYPE_FOR_TREE
+    : undefined;
 
   const horizontalNavigation = useMemo(
     () =>
@@ -174,7 +196,6 @@ const TraceDetailsPanel: React.FunctionComponent<TraceDetailsPanelProps> = ({
   }, [spanId, traceId, handleRowSelect, flattenedTree]);
 
   const handleTraceDelete = useCallback(() => {
-    // Navigate to previous/next trace before deleting, or close if it's the only trace
     if (hasPreviousRow && onRowChange) {
       onRowChange(-1);
     } else if (hasNextRow && onRowChange) {
@@ -197,31 +218,51 @@ const TraceDetailsPanel: React.FunctionComponent<TraceDetailsPanelProps> = ({
       <div className="relative size-full">
         <ResizablePanelGroup direction="horizontal" autoSaveId="trace-sidebar">
           <ResizablePanel id="tree-viewer" defaultSize={40} minSize={20}>
-            <TraceTreeViewer
-              projectId={projectId}
-              trace={trace}
-              spans={spansData?.content}
-              rowId={spanId || traceId}
-              onSelectRow={handleRowSelect}
-              search={search}
-              setSearch={setSearch}
-              filters={filters}
-              setFilters={setFilters}
-            />
+            <div className="flex size-full flex-col">
+              <TraceTreeToolbar
+                spanCount={spanCount}
+                search={search}
+                setSearch={setSearch}
+                filters={filters}
+                setFilters={setFilters}
+                isSpansLazyLoading={isSpansLazyLoading}
+                treeData={treeData}
+                config={treeConfig}
+                setConfig={setTreeConfig}
+              />
+              <div className="relative flex-auto overflow-hidden">
+                <TraceTreeViewer
+                  trace={trace}
+                  spans={spansData?.content}
+                  rowId={spanId || traceId}
+                  onSelectRow={handleRowSelect}
+                  search={search}
+                  filters={filters}
+                />
+              </div>
+            </div>
           </ResizablePanel>
           <ResizableHandle />
           <ResizablePanel id="data-viever" defaultSize={60} minSize={30}>
-            <TraceDataViewer
-              graphData={graph ? agentGraphData : undefined}
-              data={dataToView}
-              projectId={projectId}
-              spanId={spanId}
-              traceId={traceId}
-              activeSection={activeSection}
-              setActiveSection={setActiveSection}
-              isSpansLazyLoading={isSpansLazyLoading}
-              search={search}
-            />
+            <div className="flex size-full flex-col">
+              <TraceDataToolbar
+                dataToView={dataToView}
+                setActiveSection={setActiveSection}
+              />
+              <div className="relative flex-auto overflow-hidden">
+                <TraceDataViewer
+                  graphData={graph ? agentGraphData : undefined}
+                  data={dataToView}
+                  projectId={projectId}
+                  spanId={spanId}
+                  traceId={traceId}
+                  activeSection={activeSection}
+                  setActiveSection={setActiveSection}
+                  isSpansLazyLoading={isSpansLazyLoading}
+                  search={search}
+                />
+              </div>
+            </div>
           </ResizablePanel>
           {Boolean(activeSection) && (
             <>
@@ -231,17 +272,8 @@ const TraceDetailsPanel: React.FunctionComponent<TraceDetailsPanelProps> = ({
                 defaultSize={40}
                 minSize={30}
               >
-                {activeSection === DetailsActionSection.Annotations && (
-                  <TraceAnnotateViewer
-                    data={dataToView}
-                    spanId={spanId}
-                    traceId={traceId}
-                    activeSection={activeSection}
-                    setActiveSection={setActiveSection}
-                  />
-                )}
-                {activeSection === DetailsActionSection.Comments && (
-                  <CommentsViewer
+                {activeSection === DetailsActionSection.Annotate && (
+                  <AnnotatePanel
                     data={dataToView}
                     spanId={spanId}
                     traceId={traceId}
@@ -275,23 +307,20 @@ const TraceDetailsPanel: React.FunctionComponent<TraceDetailsPanelProps> = ({
         <TraceDetailsActionsPanel
           traceId={traceId}
           spanId={spanId}
+          traceName={trace?.name}
+          traceType={traceType}
           threadId={trace?.thread_id}
           setThreadId={setThreadId}
           projectId={projectId}
           onDelete={handleTraceDelete}
-          isSpansLazyLoading={isSpansLazyLoading}
-          search={search}
-          setSearch={setSearch}
-          filters={filters}
-          setFilters={setFilters}
+          onClose={onClose}
           treeData={treeData}
-          graph={graph}
-          setGraph={setGraph}
-          hasAgentGraph={hasAgentGraph}
           setActiveSection={setActiveSection}
+          horizontalNavigation={horizontalNavigation}
         />
       }
       onClose={onClose}
+      hideDefaultControls
       horizontalNavigation={horizontalNavigation}
       verticalNavigation={verticalNavigation}
       minWidth={700}
