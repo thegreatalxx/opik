@@ -1,13 +1,18 @@
 import React from "react";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/ui/hover-card";
 import ColoredTag from "@/shared/ColoredTag/ColoredTag";
+import { TagProps } from "@/ui/tag";
 
 type TagsHoverCardProps = {
   tags: string[];
   children: React.ReactNode;
-  tagVariant?: string;
+  tagVariant?: TagProps["variant"];
 };
-const TagsHoverCard: React.FC<TagsHoverCardProps> = ({ tags, children, tagVariant }) => {
+const TagsHoverCard: React.FC<TagsHoverCardProps> = ({
+  tags,
+  children,
+  tagVariant,
+}) => {
   return (
     <HoverCard openDelay={500}>
       <HoverCardTrigger asChild>{children}</HoverCardTrigger>
