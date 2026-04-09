@@ -2,7 +2,6 @@ import React, { useCallback, useMemo } from "react";
 import { Span, Trace } from "@/types/traces";
 import { usePermissions } from "@/contexts/PermissionsContext";
 import FeedbackScoreTag from "@/shared/FeedbackScoreTag/FeedbackScoreTag";
-import { EXPLAINER_ID, EXPLAINERS_MAP } from "@/constants/explainers";
 import {
   DetailsActionSectionLayout,
   DetailsActionSectionValue,
@@ -53,9 +52,12 @@ const AnnotatePanel: React.FC<AnnotatePanelProps> = ({
   const { mutate: setTraceFeedbackScore } = useTraceFeedbackScoreSetMutation();
   const { mutate: feedbackScoreDelete } = useTraceFeedbackScoreDeleteMutation();
 
-  const onUpdateFeedbackScore = (update: UpdateFeedbackScoreData) => {
-    setTraceFeedbackScore({ ...update, traceId, spanId });
-  };
+  const onUpdateFeedbackScore = useCallback(
+    (update: UpdateFeedbackScoreData) => {
+      setTraceFeedbackScore({ ...update, traceId, spanId });
+    },
+    [setTraceFeedbackScore, traceId, spanId],
+  );
 
   const onDeleteFeedbackScore = useCallback(
     (name: string, author?: string, spanIdToDelete?: string) => {
@@ -81,29 +83,38 @@ const AnnotatePanel: React.FC<AnnotatePanelProps> = ({
   const updateSpanMutation = useUpdateSpanCommentMutation();
   const updateTraceMutation = useUpdateTraceCommentMutation();
 
-  const onCommentSubmit = (text: string) => {
-    if (!spanId) {
-      createTraceMutation.mutate({ text, traceId });
-      return;
-    }
-    createSpanMutation.mutate({ text, spanId, projectId });
-  };
+  const onCommentSubmit = useCallback(
+    (text: string) => {
+      if (!spanId) {
+        createTraceMutation.mutate({ text, traceId });
+        return;
+      }
+      createSpanMutation.mutate({ text, spanId, projectId });
+    },
+    [spanId, traceId, projectId, createTraceMutation, createSpanMutation],
+  );
 
-  const onCommentEdit = (commentId: string, text: string) => {
-    if (!spanId) {
-      updateTraceMutation.mutate({ text, commentId, traceId });
-      return;
-    }
-    updateSpanMutation.mutate({ text, commentId, projectId });
-  };
+  const onCommentEdit = useCallback(
+    (commentId: string, text: string) => {
+      if (!spanId) {
+        updateTraceMutation.mutate({ text, commentId, traceId });
+        return;
+      }
+      updateSpanMutation.mutate({ text, commentId, projectId });
+    },
+    [spanId, traceId, projectId, updateTraceMutation, updateSpanMutation],
+  );
 
-  const onCommentDelete = (commentId: string) => {
-    if (!spanId) {
-      traceDeleteMutation.mutate({ ids: [commentId], traceId });
-      return;
-    }
-    spanDeleteMutation.mutate({ ids: [commentId], projectId });
-  };
+  const onCommentDelete = useCallback(
+    (commentId: string) => {
+      if (!spanId) {
+        traceDeleteMutation.mutate({ ids: [commentId], traceId });
+        return;
+      }
+      spanDeleteMutation.mutate({ ids: [commentId], projectId });
+    },
+    [spanId, traceId, projectId, traceDeleteMutation, spanDeleteMutation],
+  );
 
   return (
     <DetailsActionSectionLayout
