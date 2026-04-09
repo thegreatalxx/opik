@@ -507,13 +507,15 @@ const AddToDatasetDialog: React.FunctionComponent<AddToDatasetDialogProps> = ({
             <DialogTitle>Add to evaluation suite</DialogTitle>
           </DialogHeader>
           <DialogAutoScrollBody>
-            <ExplainerDescription
-              className="mb-4"
-              {...EXPLAINERS_MAP[
-                EXPLAINER_ID
-                  .why_would_i_want_to_add_traces_to_an_evaluation_suite
-              ]}
-            />
+            {!selectedDataset && (
+              <ExplainerDescription
+                className="mb-4"
+                {...EXPLAINERS_MAP[
+                  EXPLAINER_ID
+                    .why_would_i_want_to_add_traces_to_an_evaluation_suite
+                ]}
+              />
+            )}
             <div className="my-2 flex items-center justify-between">
               <h3 className="comet-title-xs">Select an evaluation suite</h3>
               {canCreateDatasets && (
@@ -536,7 +538,7 @@ const AddToDatasetDialog: React.FunctionComponent<AddToDatasetDialogProps> = ({
               className="w-full"
             />
             {renderAlert()}
-            <div className="my-4 flex max-h-[300px] min-h-36 max-w-full flex-col justify-stretch overflow-y-auto sm:max-h-[400px]">
+            <div className="my-4 flex max-h-[225px] min-h-36 max-w-full flex-col justify-stretch overflow-y-auto">
               {renderListItems()}
             </div>
             {total > DEFAULT_SIZE && (
