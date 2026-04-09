@@ -58,11 +58,11 @@ export function getStatusFromExperimentItems(
     status,
     assertionsByRun,
     passedCount,
-    totalCount: items.length,
+    totalCount: row.execution_policy?.runs_per_item ?? items.length,
   };
 }
 
-function getStatusInfoForExperiment(
+export function getStatusInfoForExperiment(
   row: ExperimentsCompare,
   experimentId: string,
   item: ExperimentItem | undefined,
@@ -99,17 +99,15 @@ function getStatusInfoForExperiment(
   return {
     status,
     assertionsByRun,
-    passedCount,
-    totalCount: expItems.length,
+    passedCount: summary?.passed_runs ?? passedCount,
+    // Fall back to 0 when no summary and no policy — status will be SKIPPED so count isn't rendered
+    totalCount: summary?.total_runs ?? row.execution_policy?.runs_per_item ?? 0,
   };
 }
 
 export const StatusTag: React.FC<
   StatusInfo & { className?: string }
 > = ({ status, assertionsByRun, passedCount, totalCount, className }) => {
-  const hasAssertions =
-    assertionsByRun.length > 0 && assertionsByRun[0].length > 0;
-
   if (!status) {
     return <span className="text-muted-slate">{"\u2014"}</span>;
   }
@@ -128,7 +126,7 @@ export const StatusTag: React.FC<
             : isSkipped
               ? "bg-muted text-muted-foreground"
               : "bg-destructive/15 text-destructive",
-          hasAssertions ? "cursor-pointer" : "cursor-default",
+          "cursor-default",
           className,
         )}
       >
