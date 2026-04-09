@@ -1,4 +1,10 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import isUndefined from "lodash/isUndefined";
 import { Database, MessageCircleWarning, Plus } from "lucide-react";
 import { keepPreviousData } from "@tanstack/react-query";
@@ -26,7 +32,7 @@ import SearchInput from "@/shared/SearchInput/SearchInput";
 import useAddTracesToDatasetMutation from "@/api/datasets/useAddTracesToDatasetMutation";
 import useAddSpansToDatasetMutation from "@/api/datasets/useAddSpansToDatasetMutation";
 import useDatasetVersionsList from "@/api/datasets/useDatasetVersionsList";
-import { Dataset } from "@/types/datasets";
+import { Dataset, DATASET_TYPE } from "@/types/datasets";
 import {
   DEFAULT_EXECUTION_POLICY,
   MAX_RUNS_PER_ITEM,
@@ -79,6 +85,7 @@ const AddToDatasetDialog: React.FunctionComponent<AddToDatasetDialogProps> = ({
   const [openDialog, setOpenDialog] = useState<boolean>(false);
   const [fetching, setFetching] = useState<boolean>(false);
   const [selectedDataset, setSelectedDataset] = useState<Dataset | null>(null);
+  const configSectionRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   const { navigate } = useNavigateToExperiment();
   const {
@@ -370,6 +377,12 @@ const AddToDatasetDialog: React.FunctionComponent<AddToDatasetDialogProps> = ({
             setAssertions([]);
             setRunsPerItem(DEFAULT_EXECUTION_POLICY.runs_per_item);
             setPassThreshold(DEFAULT_EXECUTION_POLICY.pass_threshold);
+            setTimeout(() => {
+              configSectionRef.current?.scrollIntoView({
+                behavior: "smooth",
+                block: "nearest",
+              });
+            }, 0);
           }}
         >
           <div className="flex flex-col gap-0.5">
@@ -447,7 +460,12 @@ const AddToDatasetDialog: React.FunctionComponent<AddToDatasetDialogProps> = ({
     type: "trace" | "span",
     includeNestedSpans: boolean = false,
   ) => (
-    <Accordion type="single" collapsible defaultValue="" className="mb-4">
+    <Accordion
+      type="single"
+      collapsible
+      defaultValue="metadata"
+      className="mb-4"
+    >
       <AccordionItem value="metadata" className="border-t">
         <AccordionTrigger>
           {type === "trace"
@@ -514,8 +532,6 @@ const AddToDatasetDialog: React.FunctionComponent<AddToDatasetDialogProps> = ({
                   .why_would_i_want_to_add_traces_to_an_evaluation_suite
               ]}
             />
-            {hasOnlyTraces && renderMetadataConfiguration("trace", true)}
-            {hasOnlySpans && renderMetadataConfiguration("span")}
             <div className="my-2 flex items-center justify-between">
               <h3 className="comet-title-xs">Select an evaluation suite</h3>
               {canCreateDatasets && (
@@ -552,11 +568,18 @@ const AddToDatasetDialog: React.FunctionComponent<AddToDatasetDialogProps> = ({
                 ></DataTablePagination>
               </div>
             )}
-            {selectedDataset && (
+            {selectedDataset?.type === DATASET_TYPE.DATASET && (
+              <div ref={configSectionRef}>
+                {hasOnlyTraces && renderMetadataConfiguration("trace", true)}
+                {hasOnlySpans && renderMetadataConfiguration("span")}
+              </div>
+            )}
+            {selectedDataset?.type === DATASET_TYPE.EVALUATION_SUITE && (
               <Accordion
+                ref={configSectionRef}
                 type="single"
                 collapsible
-                defaultValue=""
+                defaultValue="assertions"
                 className="mt-2"
               >
                 <AccordionItem value="assertions" className="border-t">
