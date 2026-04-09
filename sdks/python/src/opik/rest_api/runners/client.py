@@ -198,6 +198,7 @@ class RunnersClient:
         *,
         type: BridgeCommandSubmitRequestType,
         args: JsonNode,
+        command_id: typing.Optional[str] = OMIT,
         timeout_seconds: typing.Optional[int] = OMIT,
         hmac: typing.Optional[str] = OMIT,
         sequence: typing.Optional[int] = OMIT,
@@ -213,6 +214,8 @@ class RunnersClient:
         type : BridgeCommandSubmitRequestType
 
         args : JsonNode
+
+        command_id : typing.Optional[str]
 
         timeout_seconds : typing.Optional[int]
 
@@ -239,6 +242,7 @@ class RunnersClient:
             runner_id,
             type=type,
             args=args,
+            command_id=command_id,
             timeout_seconds=timeout_seconds,
             hmac=hmac,
             sequence=sequence,
@@ -1052,6 +1056,7 @@ class AsyncRunnersClient:
         *,
         type: BridgeCommandSubmitRequestType,
         args: JsonNode,
+        command_id: typing.Optional[str] = OMIT,
         timeout_seconds: typing.Optional[int] = OMIT,
         hmac: typing.Optional[str] = OMIT,
         sequence: typing.Optional[int] = OMIT,
@@ -1067,6 +1072,8 @@ class AsyncRunnersClient:
         type : BridgeCommandSubmitRequestType
 
         args : JsonNode
+
+        command_id : typing.Optional[str]
 
         timeout_seconds : typing.Optional[int]
 
@@ -1096,6 +1103,7 @@ class AsyncRunnersClient:
             runner_id,
             type=type,
             args=args,
+            command_id=command_id,
             timeout_seconds=timeout_seconds,
             hmac=hmac,
             sequence=sequence,

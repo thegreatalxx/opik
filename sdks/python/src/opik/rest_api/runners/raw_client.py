@@ -338,6 +338,7 @@ class RawRunnersClient:
         *,
         type: BridgeCommandSubmitRequestType,
         args: JsonNode,
+        command_id: typing.Optional[str] = OMIT,
         timeout_seconds: typing.Optional[int] = OMIT,
         hmac: typing.Optional[str] = OMIT,
         sequence: typing.Optional[int] = OMIT,
@@ -353,6 +354,8 @@ class RawRunnersClient:
         type : BridgeCommandSubmitRequestType
 
         args : JsonNode
+
+        command_id : typing.Optional[str]
 
         timeout_seconds : typing.Optional[int]
 
@@ -372,6 +375,7 @@ class RawRunnersClient:
             f"v1/private/local-runners/{jsonable_encoder(runner_id)}/bridge/commands",
             method="POST",
             json={
+                "command_id": command_id,
                 "type": type,
                 "args": args,
                 "timeout_seconds": timeout_seconds,
@@ -1816,6 +1820,7 @@ class AsyncRawRunnersClient:
         *,
         type: BridgeCommandSubmitRequestType,
         args: JsonNode,
+        command_id: typing.Optional[str] = OMIT,
         timeout_seconds: typing.Optional[int] = OMIT,
         hmac: typing.Optional[str] = OMIT,
         sequence: typing.Optional[int] = OMIT,
@@ -1831,6 +1836,8 @@ class AsyncRawRunnersClient:
         type : BridgeCommandSubmitRequestType
 
         args : JsonNode
+
+        command_id : typing.Optional[str]
 
         timeout_seconds : typing.Optional[int]
 
@@ -1850,6 +1857,7 @@ class AsyncRawRunnersClient:
             f"v1/private/local-runners/{jsonable_encoder(runner_id)}/bridge/commands",
             method="POST",
             json={
+                "command_id": command_id,
                 "type": type,
                 "args": args,
                 "timeout_seconds": timeout_seconds,

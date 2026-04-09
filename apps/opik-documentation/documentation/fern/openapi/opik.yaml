@@ -9781,9 +9781,9 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/LlmAsJudgeMessageContent"
-        structured_content:
-          type: boolean
         string_content:
+          type: boolean
+        structured_content:
           type: boolean
     LlmAsJudgeMessageContent:
       required:
@@ -10226,9 +10226,9 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/LlmAsJudgeMessageContent_Write"
-        structured_content:
-          type: boolean
         string_content:
+          type: boolean
+        structured_content:
           type: boolean
     LlmAsJudgeModelParameters_Write:
       required:
@@ -10681,9 +10681,9 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/LlmAsJudgeMessageContent_Public"
-        structured_content:
-          type: boolean
         string_content:
+          type: boolean
+        structured_content:
           type: boolean
     LlmAsJudgeModelParameters_Public:
       required:
@@ -16043,6 +16043,9 @@ components:
       - type
       type: object
       properties:
+        command_id:
+          type: string
+          format: uuid
         type:
           type: string
           enum:
@@ -16386,6 +16389,7 @@ components:
           pattern: daemon|browser
           type: string
         step:
+          maximum: 2
           minimum: 0
           type: integer
           format: int32

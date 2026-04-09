@@ -1379,7 +1379,7 @@ class LocalRunnerServiceImpl implements LocalRunnerService {
         String argsJson = validateAndSerializePayload(request.args(), "args");
 
         int timeoutSeconds = resolveCommandTimeout(request.timeoutSeconds());
-        UUID commandId = idGenerator.generateId();
+        UUID commandId = request.commandId() != null ? request.commandId() : idGenerator.generateId();
         String now = Instant.now().toString();
 
         Map<String, String> commandFields = new HashMap<>();

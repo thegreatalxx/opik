@@ -12,6 +12,7 @@ import type * as OpikApi from "../../../../index.js";
  *     }
  */
 export interface BridgeCommandSubmitRequest {
+    commandId?: string;
     type: OpikApi.BridgeCommandSubmitRequestType;
     args: OpikApi.JsonNode;
     timeoutSeconds?: number;
