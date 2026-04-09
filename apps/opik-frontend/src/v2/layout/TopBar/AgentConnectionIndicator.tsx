@@ -14,12 +14,16 @@ const AgentConnectionIndicator: React.FC = () => {
     },
   });
 
-  const { data: runner } = useSandboxConnectionStatus(
+  const { data: runner, isLoading } = useSandboxConnectionStatus(
     { projectId: projectId! },
     { enabled: !!projectId },
   );
 
-  if (!projectId || runner?.status === RunnerConnectionStatus.CONNECTED) {
+  if (
+    !projectId ||
+    isLoading ||
+    runner?.status === RunnerConnectionStatus.CONNECTED
+  ) {
     return null;
   }
 
