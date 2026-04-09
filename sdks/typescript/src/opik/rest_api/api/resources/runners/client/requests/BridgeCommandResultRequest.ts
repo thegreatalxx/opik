@@ -13,4 +13,6 @@ export interface BridgeCommandResultRequest {
     result?: OpikApi.JsonNode;
     error?: OpikApi.JsonNode;
     durationMs?: number;
+    hmac?: string;
+    sequence?: number;
 }

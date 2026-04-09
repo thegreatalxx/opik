@@ -13,5 +13,7 @@ import lombok.Builder;
 public record BridgeCommandSubmitRequest(
         @NotNull BridgeCommandType type,
         @NotNull JsonNode args,
-        Integer timeoutSeconds) {
+        Integer timeoutSeconds,
+        String hmac,
+        Long sequence) {
 }

@@ -23,6 +23,8 @@ class BridgeCommand(UniversalBaseModel):
     picked_up_at: typing.Optional[dt.datetime] = None
     completed_at: typing.Optional[dt.datetime] = None
     duration_ms: typing.Optional[int] = None
+    hmac: typing.Optional[str] = None
+    sequence: typing.Optional[int] = None
 
     if IS_PYDANTIC_V2:
         model_config: typing.ClassVar[pydantic.ConfigDict] = pydantic.ConfigDict(extra="allow", frozen=True)  # type: ignore # Pydantic v2

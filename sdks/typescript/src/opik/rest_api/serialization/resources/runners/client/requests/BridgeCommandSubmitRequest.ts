@@ -13,6 +13,8 @@ export const BridgeCommandSubmitRequest: core.serialization.Schema<
     type: BridgeCommandSubmitRequestType,
     args: JsonNode,
     timeoutSeconds: core.serialization.property("timeout_seconds", core.serialization.number().optional()),
+    hmac: core.serialization.string().optional(),
+    sequence: core.serialization.number().optional(),
 });
 
 export declare namespace BridgeCommandSubmitRequest {
@@ -20,5 +22,7 @@ export declare namespace BridgeCommandSubmitRequest {
         type: BridgeCommandSubmitRequestType.Raw;
         args: JsonNode.Raw;
         timeout_seconds?: number | null;
+        hmac?: string | null;
+        sequence?: number | null;
     }
 }

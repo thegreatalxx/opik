@@ -15,6 +15,8 @@ export const BridgeCommandItem: core.serialization.ObjectSchema<
     args: JsonNode.optional(),
     timeoutSeconds: core.serialization.property("timeout_seconds", core.serialization.number().optional()),
     submittedAt: core.serialization.property("submitted_at", core.serialization.date().optional()),
+    hmac: core.serialization.string().optional(),
+    sequence: core.serialization.number().optional(),
 });
 
 export declare namespace BridgeCommandItem {
@@ -24,5 +26,7 @@ export declare namespace BridgeCommandItem {
         args?: JsonNode.Raw | null;
         timeout_seconds?: number | null;
         submitted_at?: string | null;
+        hmac?: string | null;
+        sequence?: number | null;
     }
 }

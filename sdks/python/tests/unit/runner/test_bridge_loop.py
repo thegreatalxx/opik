@@ -8,6 +8,7 @@ from opik.rest_api.types.bridge_command_batch_response import BridgeCommandBatch
 from opik.rest_api.types.bridge_command_item import BridgeCommandItem
 from opik.runner.bridge_handlers import CommandError
 from opik.runner.bridge_loop import BridgePollLoop
+from opik.runner.hmac_signer import CommandSigner, CommandVerifier
 
 
 def _make_cmd(
@@ -321,3 +322,110 @@ class TestBridgePollLoopReporting:
 
         # 409 should be swallowed, not retried
         assert api.runners.report_bridge_result.call_count == 1
+
+
+class TestBridgeCommandItemSignatureFields:
+    def test_bridge_command_item_has_hmac_and_sequence(self):
+        item = BridgeCommandItem(
+            command_id="cmd-1",
+            type="ReadFile",
+            args={"path": "/foo"},
+            timeout_seconds=30,
+            submitted_at=None,
+            hmac="abc123",
+            sequence=42,
+        )
+        assert item.hmac == "abc123"
+        assert item.sequence == 42
+
+
+class TestBridgePollLoopHmac:
+    def test_bad_hmac__silently_dropped__no_report(self):
+        key = b"test-key-for-hmac-verification!!"
+        verifier = CommandVerifier(key)
+        signer = CommandSigner(key)
+
+        handler = MagicMock()
+        handler.execute.return_value = {"ok": True}
+        shutdown = threading.Event()
+        api = MagicMock()
+
+        bad_cmd = _make_cmd(command_id="cmd-bad")
+        bad_cmd = BridgeCommandItem(
+            command_id="cmd-bad",
+            type="read_file",
+            args={"path": "test.py"},
+            timeout_seconds=30,
+            hmac="forged-hmac-value",
+        )
+        call_count = 0
+
+        def poll_side_effect(*a, **kw):
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                return _make_batch(bad_cmd)
+            shutdown.set()
+            return _empty_batch()
+
+        api.runners.next_bridge_commands.side_effect = poll_side_effect
+
+        loop = BridgePollLoop(
+            api,
+            "runner-1",
+            {"read_file": handler},
+            shutdown,
+            verifier=verifier,
+            signer=signer,
+        )
+        loop.run()
+
+        handler.execute.assert_not_called()
+        api.runners.report_bridge_result.assert_not_called()
+        assert verifier.tamper_count == 1
+
+    def test_valid_hmac__dispatched_and_reported(self):
+        key = b"test-key-for-hmac-verification!!"
+        verifier = CommandVerifier(key)
+        signer = CommandSigner(key)
+        browser_signer = CommandSigner(key)
+
+        handler = MagicMock()
+        handler.execute.return_value = {"ok": True}
+        shutdown = threading.Event()
+        api = MagicMock()
+
+        args = {"path": "test.py"}
+        hmac_val = browser_signer.sign("cmd-good", "read_file", args)
+        good_cmd = BridgeCommandItem(
+            command_id="cmd-good",
+            type="read_file",
+            args=args,
+            timeout_seconds=30,
+            hmac=hmac_val,
+        )
+        call_count = 0
+
+        def poll_side_effect(*a, **kw):
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                return _make_batch(good_cmd)
+            shutdown.set()
+            return _empty_batch()
+
+        api.runners.next_bridge_commands.side_effect = poll_side_effect
+
+        loop = BridgePollLoop(
+            api,
+            "runner-1",
+            {"read_file": handler},
+            shutdown,
+            verifier=verifier,
+            signer=signer,
+        )
+        loop.run()
+
+        handler.execute.assert_called_once()
+        api.runners.report_bridge_result.assert_called_once()
+        assert verifier.tamper_count == 0

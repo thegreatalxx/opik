@@ -9,6 +9,8 @@ import com.comet.opik.api.runner.BridgeCommandResultRequest;
 import com.comet.opik.api.runner.BridgeCommandSubmitRequest;
 import com.comet.opik.api.runner.BridgeCommandSubmitResponse;
 import com.comet.opik.api.runner.CreateLocalRunnerJobRequest;
+import com.comet.opik.api.runner.DaemonPairRegisterRequest;
+import com.comet.opik.api.runner.DaemonPairRegisterResponse;
 import com.comet.opik.api.runner.LocalRunner;
 import com.comet.opik.api.runner.LocalRunnerConnectRequest;
 import com.comet.opik.api.runner.LocalRunnerConnectResponse;
@@ -20,6 +22,9 @@ import com.comet.opik.api.runner.LocalRunnerLogEntry;
 import com.comet.opik.api.runner.LocalRunnerPairRequest;
 import com.comet.opik.api.runner.LocalRunnerPairResponse;
 import com.comet.opik.api.runner.LocalRunnerStatus;
+import com.comet.opik.api.runner.PairCompleteRequest;
+import com.comet.opik.api.runner.PakeMessageRequest;
+import com.comet.opik.api.runner.PakeMessageResponse;
 import com.comet.opik.domain.LocalRunnerService;
 import com.comet.opik.infrastructure.LocalRunnerConfig;
 import com.comet.opik.infrastructure.auth.RequestContext;
@@ -446,6 +451,87 @@ public class LocalRunnersResource {
                                 asyncResponse.resume(Response.serverError().build());
                             }
                         });
+    }
+
+    // --- PAKE pairing relay endpoints ---
+
+    @POST
+    @Path("/daemon-pairs")
+    @RateLimited
+    @Operation(operationId = "registerDaemonPair", summary = "Register daemon pairing session", description = "Daemon registers a pairing session for a project. The pairing code is generated locally by the daemon and never sent to the backend.", responses = {
+            @ApiResponse(responseCode = "201", description = "Pairing session registered", content = @Content(schema = @Schema(implementation = DaemonPairRegisterResponse.class)))})
+    public Response registerDaemonPair(
+            @RequestBody(content = @Content(schema = @Schema(implementation = DaemonPairRegisterRequest.class))) @NotNull @Valid DaemonPairRegisterRequest request) {
+        ensureEnabled();
+        String workspaceId = requestContext.get().getWorkspaceId();
+        String userName = requestContext.get().getUserName();
+        DaemonPairRegisterResponse response = runnerService.registerDaemonPair(workspaceId, userName, request);
+        return Response.status(Response.Status.CREATED).entity(response).build();
+    }
+
+    @POST
+    @Path("/pake/messages")
+    @RateLimited
+    @Operation(operationId = "postPakeMessage", summary = "Post PAKE message", description = "Post a PAKE exchange message for relay. Session is resolved from auth context + project_id.", responses = {
+            @ApiResponse(responseCode = "204", description = "Message posted"),
+            @ApiResponse(responseCode = "404", description = "No pairing session found", content = @Content(schema = @Schema(implementation = ErrorMessage.class))),
+            @ApiResponse(responseCode = "429", description = "Too many attempts", content = @Content(schema = @Schema(implementation = ErrorMessage.class)))})
+    public Response postPakeMessage(
+            @QueryParam("project_id") @NotNull UUID projectId,
+            @RequestBody(content = @Content(schema = @Schema(implementation = PakeMessageRequest.class))) @NotNull @Valid PakeMessageRequest request) {
+        ensureEnabled();
+        String workspaceId = requestContext.get().getWorkspaceId();
+        String userName = requestContext.get().getUserName();
+        runnerService.postPakeMessage(workspaceId, userName, projectId, request);
+        return Response.noContent().build();
+    }
+
+    @GET
+    @Path("/pake/messages")
+    @Operation(operationId = "getPakeMessages", summary = "Poll PAKE messages", description = "Long-poll for PAKE exchange messages from the other party. Session is resolved from auth context + project_id.", responses = {
+            @ApiResponse(responseCode = "200", description = "Messages", content = @Content(array = @ArraySchema(schema = @Schema(implementation = PakeMessageResponse.class)))),
+            @ApiResponse(responseCode = "404", description = "No pairing session found", content = @Content(schema = @Schema(implementation = ErrorMessage.class)))})
+    public void getPakeMessages(
+            @QueryParam("project_id") @NotNull UUID projectId,
+            @QueryParam("after_step") @DefaultValue("-1") int afterStep,
+            @QueryParam("role") @NotNull String forRole,
+            @Suspended AsyncResponse asyncResponse) {
+        ensureEnabled();
+        String workspaceId = requestContext.get().getWorkspaceId();
+        String userName = requestContext.get().getUserName();
+        long pollTimeoutSeconds = runnerConfig.getBridgePollTimeout().toSeconds();
+        long bufferSeconds = runnerConfig.getBridgeAsyncTimeoutBuffer().toSeconds();
+        asyncResponse.setTimeout(pollTimeoutSeconds + bufferSeconds, TimeUnit.SECONDS);
+        asyncResponse.setTimeoutHandler(
+                ar -> ar.resume(Response.ok(List.of()).build()));
+        runnerService.getPakeMessages(workspaceId, userName, projectId, afterStep, forRole)
+                .map(messages -> Response.ok(messages).build())
+                .subscribe(
+                        asyncResponse::resume,
+                        error -> {
+                            if (error instanceof WebApplicationException wae) {
+                                asyncResponse.resume(wae);
+                            } else {
+                                log.error("Error polling PAKE messages for project='{}' workspace='{}'",
+                                        projectId, workspaceId, error);
+                                asyncResponse.resume(Response.serverError().build());
+                            }
+                        });
+    }
+
+    @POST
+    @Path("/pake/complete")
+    @RateLimited
+    @Operation(operationId = "completePairing", summary = "Complete PAKE pairing", description = "Browser completes pairing after key confirmation, activating the runner", responses = {
+            @ApiResponse(responseCode = "201", description = "Pairing completed", content = @Content(schema = @Schema(implementation = LocalRunnerConnectResponse.class))),
+            @ApiResponse(responseCode = "404", description = "No pairing session found", content = @Content(schema = @Schema(implementation = ErrorMessage.class)))})
+    public Response completePairing(
+            @RequestBody(content = @Content(schema = @Schema(implementation = PairCompleteRequest.class))) @NotNull @Valid PairCompleteRequest request) {
+        ensureEnabled();
+        String workspaceId = requestContext.get().getWorkspaceId();
+        String userName = requestContext.get().getUserName();
+        LocalRunnerConnectResponse response = runnerService.completePairing(workspaceId, userName, request);
+        return Response.status(Response.Status.CREATED).entity(response).build();
     }
 
     private void ensureEnabled() {

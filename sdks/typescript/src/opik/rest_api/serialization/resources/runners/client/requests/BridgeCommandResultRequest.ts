@@ -14,6 +14,8 @@ export const BridgeCommandResultRequest: core.serialization.Schema<
     result: JsonNode.optional(),
     error: JsonNode.optional(),
     durationMs: core.serialization.property("duration_ms", core.serialization.number().optional()),
+    hmac: core.serialization.string().optional(),
+    sequence: core.serialization.number().optional(),
 });
 
 export declare namespace BridgeCommandResultRequest {
@@ -22,5 +24,7 @@ export declare namespace BridgeCommandResultRequest {
         result?: JsonNode.Raw | null;
         error?: JsonNode.Raw | null;
         duration_ms?: number | null;
+        hmac?: string | null;
+        sequence?: number | null;
     }
 }

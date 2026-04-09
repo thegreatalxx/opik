@@ -21,6 +21,8 @@ export const BridgeCommand: core.serialization.ObjectSchema<serializers.BridgeCo
         pickedUpAt: core.serialization.property("picked_up_at", core.serialization.date().optional()),
         completedAt: core.serialization.property("completed_at", core.serialization.date().optional()),
         durationMs: core.serialization.property("duration_ms", core.serialization.number().optional()),
+        hmac: core.serialization.string().optional(),
+        sequence: core.serialization.number().optional(),
     });
 
 export declare namespace BridgeCommand {
@@ -37,5 +39,7 @@ export declare namespace BridgeCommand {
         picked_up_at?: string | null;
         completed_at?: string | null;
         duration_ms?: number | null;
+        hmac?: string | null;
+        sequence?: number | null;
     }
 }

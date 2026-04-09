@@ -15,4 +15,6 @@ export interface BridgeCommand {
     pickedUpAt?: Date;
     completedAt?: Date;
     durationMs?: number;
+    hmac?: string;
+    sequence?: number;
 }

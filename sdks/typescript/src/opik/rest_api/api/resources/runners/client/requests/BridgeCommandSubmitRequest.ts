@@ -15,4 +15,6 @@ export interface BridgeCommandSubmitRequest {
     type: OpikApi.BridgeCommandSubmitRequestType;
     args: OpikApi.JsonNode;
     timeoutSeconds?: number;
+    hmac?: string;
+    sequence?: number;
 }

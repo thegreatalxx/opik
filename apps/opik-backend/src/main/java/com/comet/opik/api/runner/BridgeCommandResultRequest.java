@@ -14,5 +14,7 @@ public record BridgeCommandResultRequest(
         @NotNull BridgeCommandStatus status,
         JsonNode result,
         JsonNode error,
-        Long durationMs) {
+        Long durationMs,
+        String hmac,
+        Long sequence) {
 }

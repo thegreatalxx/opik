@@ -15,6 +15,8 @@ class BridgeCommandItem(UniversalBaseModel):
     args: typing.Optional[JsonNode] = None
     timeout_seconds: typing.Optional[int] = None
     submitted_at: typing.Optional[dt.datetime] = None
+    hmac: typing.Optional[str] = None
+    sequence: typing.Optional[int] = None
 
     if IS_PYDANTIC_V2:
         model_config: typing.ClassVar[pydantic.ConfigDict] = pydantic.ConfigDict(extra="allow", frozen=True)  # type: ignore # Pydantic v2

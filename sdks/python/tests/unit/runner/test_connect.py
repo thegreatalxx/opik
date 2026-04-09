@@ -4,111 +4,156 @@ import httpx
 from click.testing import CliRunner
 
 from opik.cli.main import cli
-from opik.rest_api.types.local_runner_connect_response import LocalRunnerConnectResponse
+from opik.rest_api.types.daemon_pair_register_response import DaemonPairRegisterResponse
+from opik.rest_api.types.pake_message_response import PakeMessageResponse
+
+
+def _mock_api(mock_opik_cls):
+    """Set up Opik mock with project lookup and runner API."""
+    client = MagicMock()
+    api = MagicMock()
+
+    project = MagicMock()
+    project.id = "proj-123"
+    api.projects.get_projects.return_value = MagicMock(content=[project])
+
+    api.runners.register_daemon_pair.return_value = DaemonPairRegisterResponse(
+        runner_id="r-abc",
+        expires_in_seconds=300,
+    )
+
+    client.rest_client = api
+    mock_opik_cls.return_value = client
+    return client, api
+
+
+def _mock_pake_messages(api):
+    """Set up poll responses for a successful PAKE exchange."""
+    api.runners.get_pake_messages.side_effect = [
+        [PakeMessageResponse(role="browser", step=0, payload="")],
+        [PakeMessageResponse(role="browser", step=1, payload="fake-confirm-B")],
+        [PakeMessageResponse(role="browser", step=2, payload="my-project")],
+    ]
 
 
 class TestConnect:
     @patch("opik.cli.connect.RunnerTUI")
     @patch("opik.cli.connect.Supervisor")
+    @patch("opik.cli.connect.PakeSession")
     @patch("opik.cli.connect.Opik")
-    def test_connect__with_pair_code__calls_connect_runner(
-        self, mock_opik_cls, mock_supervisor_cls, mock_tui_cls
+    def test_connect__pake_flow__creates_supervisor(
+        self, mock_opik_cls, mock_pake_cls, mock_supervisor_cls, mock_tui_cls
     ):
-        client = MagicMock()
-        api = MagicMock()
-        api.runners.connect_runner.return_value = LocalRunnerConnectResponse(
-            runner_id="r-abc",
-            workspace_id="ws-1",
-            project_id="p-1",
-            project_name="my-project",
-        )
-        client.rest_client = api
-        mock_opik_cls.return_value = client
+        client, api = _mock_api(mock_opik_cls)
+        _mock_pake_messages(api)
+
+        session = MagicMock()
+        session.start.return_value = b"spake2-msg-a"
+        session.finish.return_value = b"shared-key"
+        session.shared_key = b"shared-key"
+        session.confirmation.return_value = "confirm-A-hex"
+        session.verify_confirmation.return_value = True
+        mock_pake_cls.return_value = session
 
         runner = CliRunner()
-        result = runner.invoke(cli, ["connect", "--pair", "ABCD", "echo", "hello"])
-        assert result.exit_code == 0
-
-        call_kwargs = api.runners.connect_runner.call_args[1]
-        assert call_kwargs["pairing_code"] == "ABCD"
-
-    @patch("opik.cli.connect.RunnerTUI")
-    @patch("opik.cli.connect.Supervisor")
-    @patch("opik.cli.connect.Opik")
-    def test_connect__with_command__creates_supervisor(
-        self, mock_opik_cls, mock_supervisor_cls, mock_tui_cls
-    ):
-        client = MagicMock()
-        api = MagicMock()
-        api.runners.connect_runner.return_value = LocalRunnerConnectResponse(
-            runner_id="r-xyz",
-            project_name="proj",
+        result = runner.invoke(
+            cli, ["connect", "--project", "my-project", "echo", "hello"]
         )
-        client.rest_client = api
-        mock_opik_cls.return_value = client
+        assert result.exit_code == 0, result.output
 
-        runner = CliRunner()
-        result = runner.invoke(cli, ["connect", "--pair", "CODE", "python", "myapp.py"])
-        assert result.exit_code == 0
+        api.runners.register_daemon_pair.assert_called_once_with(
+            project_id="proj-123",
+            runner_name=api.runners.register_daemon_pair.call_args[1]["runner_name"],
+        )
 
         mock_supervisor_cls.assert_called_once()
         call_kwargs = mock_supervisor_cls.call_args[1]
-        assert call_kwargs["command"] == ["python", "myapp.py"]
-        assert call_kwargs["runner_id"] == "r-xyz"
-        env = call_kwargs["env"]
-        assert env["OPIK_RUNNER_MODE"] == "true"
-        assert env["OPIK_RUNNER_ID"] == "r-xyz"
-        assert env["OPIK_PROJECT_NAME"] == "proj"
-
-        mock_supervisor_cls.return_value.run.assert_called_once()
+        assert call_kwargs["command"] == ["echo", "hello"]
+        assert call_kwargs["shared_key"] == b"shared-key"
+        assert call_kwargs["env"]["OPIK_RUNNER_MODE"] == "true"
+        assert call_kwargs["env"]["OPIK_RUNNER_ID"] == "r-abc"
 
     @patch("opik.cli.connect.RunnerTUI")
     @patch("opik.cli.connect.Supervisor")
+    @patch("opik.cli.connect.PakeSession")
     @patch("opik.cli.connect.Opik")
     def test_connect__network_failure__shows_clean_error(
-        self, mock_opik_cls, mock_supervisor_cls, mock_tui_cls
+        self, mock_opik_cls, mock_pake_cls, mock_supervisor_cls, mock_tui_cls
     ):
-        client = MagicMock()
+        client, api = _mock_api(mock_opik_cls)
         config = MagicMock()
         config.url_override = "https://api.test"
         client.config = config
-        api = MagicMock()
-        api.runners.connect_runner.side_effect = httpx.ConnectError(
+
+        api.runners.register_daemon_pair.side_effect = httpx.ConnectError(
             "Connection refused"
         )
-        client.rest_client = api
-        mock_opik_cls.return_value = client
+
+        session = MagicMock()
+        session.start.return_value = b"msg"
+        mock_pake_cls.return_value = session
 
         runner = CliRunner()
-        result = runner.invoke(cli, ["connect", "--pair", "CODE", "echo", "hello"])
+        result = runner.invoke(
+            cli, ["connect", "--project", "my-project", "echo", "hello"]
+        )
         assert result.exit_code != 0
         assert "Could not connect to Opik at https://api.test" in result.output
 
     @patch("opik.cli.connect.RunnerTUI")
     @patch("opik.cli.connect.Supervisor")
+    @patch("opik.cli.connect.PakeSession")
     @patch("opik.cli.connect.Opik")
     def test_connect__no_command__standalone_mode(
-        self, mock_opik_cls, mock_supervisor_cls, mock_tui_cls
+        self, mock_opik_cls, mock_pake_cls, mock_supervisor_cls, mock_tui_cls
     ):
-        client = MagicMock()
-        api = MagicMock()
-        api.runners.connect_runner.return_value = LocalRunnerConnectResponse(
-            runner_id="r-standalone",
-            project_name="proj",
-        )
-        client.rest_client = api
-        mock_opik_cls.return_value = client
+        client, api = _mock_api(mock_opik_cls)
+        _mock_pake_messages(api)
+
+        session = MagicMock()
+        session.start.return_value = b"spake2-msg-a"
+        session.finish.return_value = b"shared-key"
+        session.shared_key = b"shared-key"
+        session.confirmation.return_value = "confirm-A-hex"
+        session.verify_confirmation.return_value = True
+        mock_pake_cls.return_value = session
 
         runner = CliRunner()
-        result = runner.invoke(cli, ["connect", "--pair", "CODE"])
-        assert result.exit_code == 0
+        result = runner.invoke(cli, ["connect", "--project", "my-project"])
+        assert result.exit_code == 0, result.output
 
         mock_supervisor_cls.assert_called_once()
-        call_kwargs = mock_supervisor_cls.call_args[1]
-        assert call_kwargs["command"] is None
+        assert mock_supervisor_cls.call_args[1]["command"] is None
 
-    def test_connect__no_pair_code__shows_error(self):
+    @patch("opik.cli.connect.RunnerTUI")
+    @patch("opik.cli.connect.PakeSession")
+    @patch("opik.cli.connect.Opik")
+    def test_connect__key_confirmation_fails__shows_error(
+        self, mock_opik_cls, mock_pake_cls, mock_tui_cls
+    ):
+        client, api = _mock_api(mock_opik_cls)
+        api.runners.get_pake_messages.side_effect = [
+            [PakeMessageResponse(role="browser", step=0, payload="")],
+            [PakeMessageResponse(role="browser", step=1, payload="bad-confirm")],
+        ]
+
+        session = MagicMock()
+        session.start.return_value = b"spake2-msg-a"
+        session.finish.return_value = b"shared-key"
+        session.shared_key = b"shared-key"
+        session.confirmation.return_value = "confirm-A-hex"
+        session.verify_confirmation.return_value = False
+        mock_pake_cls.return_value = session
+
+        runner = CliRunner()
+        result = runner.invoke(
+            cli, ["connect", "--project", "my-project", "echo", "hello"]
+        )
+        assert result.exit_code != 0
+        assert "Key confirmation failed" in result.output
+
+    def test_connect__no_project__shows_error(self):
         runner = CliRunner()
         result = runner.invoke(cli, ["connect", "echo", "hello"])
         assert result.exit_code == 2
-        assert "--pair" in result.output
+        assert "--project" in result.output

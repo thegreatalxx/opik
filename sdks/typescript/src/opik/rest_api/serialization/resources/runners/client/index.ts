@@ -1,5 +1,6 @@
 export * as appendJobLogs from "./appendJobLogs.js";
 export * as getJobLogs from "./getJobLogs.js";
+export * as getPakeMessages from "./getPakeMessages.js";
 export * as nextJob from "./nextJob.js";
 export * as patchChecklist from "./patchChecklist.js";
 export * as registerAgents from "./registerAgents.js";

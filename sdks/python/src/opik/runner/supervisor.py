@@ -20,6 +20,7 @@ from .bridge_handlers.search_files import SearchFilesHandler
 from .bridge_handlers.write_file import WriteFileHandler
 from .bridge_loop import BridgePollLoop
 from .file_watcher import FileWatcher
+from .hmac_signer import CommandSigner, CommandVerifier
 from .snapshot import build_checklist
 from .stability_guard import StabilityGuard
 
@@ -66,6 +67,8 @@ class Supervisor:
         on_command_start: Optional[Callable[[str, str, str], None]] = None,
         on_command_end: Optional[Callable[[str, bool, Optional[str]], None]] = None,
         watch: Optional[bool] = None,
+        shared_key: Optional[bytes] = None,
+        session_ttl: Optional[float] = None,
     ) -> None:
         self._command = command
         self._env = env
@@ -76,6 +79,8 @@ class Supervisor:
         self._on_child_restart = on_child_restart
         self._on_command_start = on_command_start
         self._on_command_end = on_command_end
+        self._shared_key = shared_key
+        self._session_deadline = time.monotonic() + session_ttl if session_ttl else None
         if command is None:
             self._watch = False
         elif watch is None:
@@ -110,6 +115,9 @@ class Supervisor:
             "SearchFiles": SearchFilesHandler(self._repo_root),
             "Exec": ExecHandler(self._repo_root, self._bg_tracker),
         }
+        verifier = CommandVerifier(self._shared_key) if self._shared_key else None
+        signer = CommandSigner(self._shared_key) if self._shared_key else None
+
         bridge_loop = BridgePollLoop(
             self._api,
             self._runner_id,
@@ -117,6 +125,8 @@ class Supervisor:
             self._shutdown_event,
             on_command_start=self._on_command_start,
             on_command_end=self._on_command_end,
+            verifier=verifier,
+            signer=signer,
         )
         bridge_thread = threading.Thread(
             target=bridge_loop.run, name="bridge-poll", daemon=True
@@ -355,6 +365,11 @@ class Supervisor:
 
     def _heartbeat_loop(self) -> None:
         while not self._shutdown_event.is_set():
+            if self._session_deadline and time.monotonic() >= self._session_deadline:
+                LOGGER.info("Session TTL expired, shutting down")
+                self._shutdown_event.set()
+                return
+
             try:
                 self._api.runners.heartbeat(
                     self._runner_id, capabilities=["jobs", "bridge"]
