@@ -294,9 +294,9 @@ class LocalRunnerServiceImpl implements LocalRunnerService {
     private static final int MAX_PAKE_ATTEMPTS = 5;
     private static final Duration PAKE_SESSION_TTL = Duration.ofMinutes(5);
 
-    private static final int PAKE_STEP_SPAKE2 = 0;
-    private static final int PAKE_STEP_CONFIRMATION = 1;
-    private static final int PAKE_STEP_COMPLETION = 2;
+    private static final int PAKE_STEP_SPAKE2 = PakeMessageRequest.STEP_SPAKE2;
+    private static final int PAKE_STEP_CONFIRMATION = PakeMessageRequest.STEP_CONFIRMATION;
+    private static final int PAKE_STEP_COMPLETION = PakeMessageRequest.STEP_COMPLETION;
 
     private final @NonNull StringRedisClient redisClient;
     private final @NonNull RedissonReactiveClient reactiveRedisClient;

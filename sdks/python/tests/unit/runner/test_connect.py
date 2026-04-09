@@ -70,8 +70,17 @@ class TestConnect:
         call_kwargs = mock_supervisor_cls.call_args[1]
         assert call_kwargs["command"] == ["echo", "hello"]
         assert call_kwargs["shared_key"] == b"shared-key"
-        assert call_kwargs["env"]["OPIK_RUNNER_MODE"] == "true"
-        assert call_kwargs["env"]["OPIK_RUNNER_ID"] == "r-abc"
+        assert call_kwargs["runner_id"] == "r-abc"
+        env = call_kwargs["env"]
+        assert env["OPIK_RUNNER_MODE"] == "true"
+        assert env["OPIK_RUNNER_ID"] == "r-abc"
+        assert env["OPIK_PROJECT_NAME"] == "my-project"
+
+        tui_instance = mock_tui_cls.return_value
+        assert call_kwargs["on_child_restart"] == tui_instance.child_restarted
+        assert call_kwargs["on_error"] == tui_instance.error
+
+        mock_supervisor_cls.return_value.run.assert_called_once()
 
     @patch("opik.cli.connect.RunnerTUI")
     @patch("opik.cli.connect.Supervisor")

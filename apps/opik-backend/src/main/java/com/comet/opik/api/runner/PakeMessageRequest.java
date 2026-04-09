@@ -14,6 +14,10 @@ import lombok.Builder;
 @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
 public record PakeMessageRequest(
         @NotNull PakeRole role,
-        @Min(0) @Max(2) int step,
+        @Min(STEP_SPAKE2) @Max(STEP_COMPLETION) int step,
         @NotBlank String payload) {
+
+    public static final int STEP_SPAKE2 = 0;
+    public static final int STEP_CONFIRMATION = 1;
+    public static final int STEP_COMPLETION = 2;
 }
