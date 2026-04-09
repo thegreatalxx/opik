@@ -109,20 +109,21 @@ const VirtualizedTreeViewer: React.FC<VirtualizedTreeViewerProps> = ({
     return info;
   }, [flattenedTree]);
 
-  const estimatedHeight = 38;
+  const hasDurationTimeline = config[TREE_DATABLOCK_TYPE.DURATION_TIMELINE];
 
   const rowVirtualizer = useVirtualizer({
     count: flattenedTree.length,
     getScrollElement: () => scrollRef.current,
     getItemKey: (index: number) => flattenedTree[index].id ?? index,
-    estimateSize: () => estimatedHeight,
+    estimateSize: () => 38,
     scrollPaddingEnd: 96,
     overscan: 5,
+    measureElement: (el) => el.getBoundingClientRect().height,
   });
 
   useEffect(() => {
-    rowVirtualizer?.measure();
-  }, [estimatedHeight, rowVirtualizer]);
+    rowVirtualizer.measure();
+  }, [hasDurationTimeline, hasOtherConfig, rowVirtualizer]);
 
   const selectRow = useCallback(
     (id: string) => {
@@ -250,7 +251,7 @@ const VirtualizedTreeViewer: React.FC<VirtualizedTreeViewerProps> = ({
         )}
         {config[TREE_DATABLOCK_TYPE.DURATION] && (
           <TooltipWrapper content={durationTooltip}>
-            <div className="comet-body-xs-accented flex items-center gap-1 text-muted-slate">
+            <div className="comet-body-xs flex items-center gap-1 text-muted-slate">
               <Clock className="size-3 shrink-0" /> {duration}
             </div>
           </TooltipWrapper>
@@ -259,7 +260,7 @@ const VirtualizedTreeViewer: React.FC<VirtualizedTreeViewerProps> = ({
           <TooltipWrapper
             content={`Model: ${model || "NA"}, Provider: ${provider || "NA"}`}
           >
-            <div className="comet-body-xs-accented flex items-center gap-1 text-muted-slate">
+            <div className="comet-body-xs flex items-center gap-1 text-muted-slate">
               <Brain className="size-3 shrink-0" />{" "}
               <div className="truncate">
                 {provider} {model}
@@ -274,7 +275,7 @@ const VirtualizedTreeViewer: React.FC<VirtualizedTreeViewerProps> = ({
                 modifier: "full",
               })}`}
             >
-              <div className="comet-body-xs-accented flex items-center gap-1 text-muted-slate">
+              <div className="comet-body-xs flex items-center gap-1 text-muted-slate">
                 <Coins className="size-3 shrink-0" />{" "}
                 {formatCost(estimatedCost)}
               </div>
@@ -282,7 +283,7 @@ const VirtualizedTreeViewer: React.FC<VirtualizedTreeViewerProps> = ({
           )}
         {config[TREE_DATABLOCK_TYPE.NUMBERS_OF_TOKENS] && isNumber(tokens) && (
           <TooltipWrapper content={`Total amount of tokens: ${tokens}`}>
-            <div className="comet-body-xs-accented flex items-center gap-1 text-muted-slate">
+            <div className="comet-body-xs flex items-center gap-1 text-muted-slate">
               <Hash className="size-3 shrink-0" /> {tokens}
             </div>
           </TooltipWrapper>
@@ -291,7 +292,7 @@ const VirtualizedTreeViewer: React.FC<VirtualizedTreeViewerProps> = ({
           isNumber(promptTokens) &&
           isNumber(completionTokens) && (
             <TooltipWrapper content={tokensBreakdownTooltip}>
-              <div className="comet-body-xs-accented flex items-center gap-1 text-muted-slate">
+              <div className="comet-body-xs flex items-center gap-1 text-muted-slate">
                 <ArrowRightLeft className="size-3 shrink-0" /> {promptTokens}/
                 {completionTokens}
               </div>
@@ -300,7 +301,7 @@ const VirtualizedTreeViewer: React.FC<VirtualizedTreeViewerProps> = ({
         {config[TREE_DATABLOCK_TYPE.NUMBER_OF_SCORES] &&
           Boolean(feedbackScores?.length) && (
             <FeedbackScoreHoverCard scores={feedbackScores!}>
-              <div className="comet-body-xs-accented flex items-center gap-1 text-muted-slate">
+              <div className="comet-body-xs flex items-center gap-1 text-muted-slate">
                 <PenLine className="size-3 shrink-0" /> {feedbackScores!.length}
               </div>
             </FeedbackScoreHoverCard>
@@ -309,7 +310,7 @@ const VirtualizedTreeViewer: React.FC<VirtualizedTreeViewerProps> = ({
           isTrace &&
           Boolean(spanFeedbackScores?.length) && (
             <FeedbackScoreHoverCard scores={spanFeedbackScores!}>
-              <div className="comet-body-xs-accented flex items-center gap-1 text-muted-slate">
+              <div className="comet-body-xs flex items-center gap-1 text-muted-slate">
                 <PenLine className="size-3 shrink-0" />{" "}
                 {spanFeedbackScores!.length} span
               </div>
@@ -318,7 +319,7 @@ const VirtualizedTreeViewer: React.FC<VirtualizedTreeViewerProps> = ({
         {config[TREE_DATABLOCK_TYPE.NUMBER_OF_COMMENTS] &&
           Boolean(comments?.length) && (
             <UserCommentHoverList commentsList={comments}>
-              <div className="comet-body-xs-accented flex items-center gap-1 text-muted-slate">
+              <div className="comet-body-xs flex items-center gap-1 text-muted-slate">
                 <MessageSquareMore className="size-3 shrink-0" />{" "}
                 {comments.length}
               </div>
@@ -326,8 +327,8 @@ const VirtualizedTreeViewer: React.FC<VirtualizedTreeViewerProps> = ({
           )}
         {config[TREE_DATABLOCK_TYPE.NUMBER_OF_TAGS] &&
           Boolean(tags?.length) && (
-            <TagsHoverCard tags={tags}>
-              <div className="comet-body-xs-accented flex items-center gap-1 text-muted-slate">
+            <TagsHoverCard tags={tags} tagVariant="gray">
+              <div className="comet-body-xs flex items-center gap-1 text-muted-slate">
                 <Tag className="size-3 shrink-0" /> {tags.length}
               </div>
             </TagsHoverCard>
@@ -356,8 +357,10 @@ const VirtualizedTreeViewer: React.FC<VirtualizedTreeViewerProps> = ({
           return (
             <div
               key={node.id}
+              ref={rowVirtualizer.measureElement}
+              data-index={virtualRow.index}
               className={cn(
-                "absolute left-0 flex h-[38px] w-full flex-col px-2 pt-1 cursor-pointer border-l-8 border-transparent",
+                "absolute left-0 flex w-full flex-col px-2 py-1 cursor-pointer border-l-8 border-transparent",
                 "hover:bg-[var(--row-bg)]",
                 {
                   "bg-[var(--row-bg)] border-[var(--row-color)]": isFocused,
@@ -391,7 +394,7 @@ const VirtualizedTreeViewer: React.FC<VirtualizedTreeViewerProps> = ({
                           hasContinuation ? (
                             <>
                               <div
-                                className="absolute w-px bg-muted-foreground/40"
+                                className="absolute w-px bg-light-slate/40"
                                 style={{
                                   left: parentIconCenterX,
                                   top: 0,
@@ -399,31 +402,29 @@ const VirtualizedTreeViewer: React.FC<VirtualizedTreeViewerProps> = ({
                                 }}
                               />
                               <div
-                                className="absolute border-b border-l border-muted-foreground/40 rounded-bl-md"
+                                className="absolute border-b border-l border-light-slate/40 rounded-bl-md"
                                 style={{
                                   left: parentIconCenterX,
                                   top: 6,
                                   height: 6,
-
                                   width: childIconLeft - parentIconCenterX,
                                 }}
                               />
                             </>
                           ) : (
                             <div
-                              className="absolute border-b border-l border-muted-foreground/40 rounded-bl-md"
+                              className="absolute border-b border-l border-light-slate/40 rounded-bl-md"
                               style={{
                                 left: parentIconCenterX,
                                 top: 0,
                                 height: 12,
-
                                 width: childIconLeft - parentIconCenterX,
                               }}
                             />
                           )
                         ) : (
                           <div
-                            className="absolute w-px bg-muted-foreground/40"
+                            className="absolute w-px bg-light-slate/40"
                             style={{
                               left: parentIconCenterX,
                               top: 0,
@@ -436,7 +437,7 @@ const VirtualizedTreeViewer: React.FC<VirtualizedTreeViewerProps> = ({
                   })}
                 {isExpandable && expandedTreeRows.has(node.id) && (
                   <div
-                    className="absolute w-px bg-muted-foreground/40"
+                    className="absolute w-px bg-light-slate/40"
                     style={{
                       left: 8 + node.depth * 24 + 8,
                       top: 20,
@@ -501,6 +502,35 @@ const VirtualizedTreeViewer: React.FC<VirtualizedTreeViewerProps> = ({
                   }}
                 >
                   {renderDetailsContainer(node)}
+                </div>
+              )}
+              {hasDurationTimeline && (
+                <div
+                  className="px-2"
+                  style={{ paddingLeft: node.depth * 24 + 24 }}
+                >
+                  <div className="relative h-1 w-full">
+                    <div className="absolute inset-x-0 top-[1.5px] h-px bg-border" />
+                    <div
+                      className="absolute top-0 h-1 rounded-full"
+                      style={{
+                        background: node.data.spanColor,
+                        width:
+                          Math.min(
+                            (node.data.duration / node.data.maxDuration) * 100,
+                            100,
+                          ) + "%",
+                        left:
+                          Math.max(
+                            ((node.data.startTimestamp -
+                              node.data.maxStartTime) /
+                              node.data.maxDuration) *
+                              100,
+                            0,
+                          ) + "%",
+                      }}
+                    />
+                  </div>
                 </div>
               )}
             </div>

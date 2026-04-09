@@ -20,6 +20,10 @@ const formatCounter = (
 };
 
 const configMap = {
+  [DetailsActionSection.Annotate]: {
+    icon: null,
+    tooltip: "Annotate",
+  },
   [DetailsActionSection.Annotations]: {
     icon: <PenLine className="size-3.5" />,
     tooltip: "Feedback scores",
@@ -42,6 +46,8 @@ type DetailsActionSectionToggleProps = {
   type: DetailsActionSectionValue;
   disabled?: boolean;
   tooltipContent?: string;
+  variant?: "outline" | "ghost";
+  hotkey?: string;
 };
 const DetailsActionSectionToggle: React.FC<DetailsActionSectionToggleProps> = ({
   activeSection,
@@ -51,6 +57,8 @@ const DetailsActionSectionToggle: React.FC<DetailsActionSectionToggleProps> = ({
   type,
   disabled,
   tooltipContent,
+  variant = "outline",
+  hotkey,
 }) => {
   const showFullActionLabel = isLargeLayout(layoutSize);
 
@@ -58,7 +66,7 @@ const DetailsActionSectionToggle: React.FC<DetailsActionSectionToggleProps> = ({
     <TooltipWrapper content={tooltipContent || configMap[type].tooltip}>
       <div>
         <Button
-          variant="outline"
+          variant={variant}
           size="sm"
           onClick={() => setActiveSection(type)}
           className={cn(
@@ -72,6 +80,11 @@ const DetailsActionSectionToggle: React.FC<DetailsActionSectionToggleProps> = ({
             <div className="pl-1">{configMap[type].tooltip}</div>
           )}
           {Boolean(count) && <div>{formatCounter(layoutSize, count)}</div>}
+          {hotkey && (
+            <kbd className="flex h-5 min-w-5 items-center justify-center rounded-sm border px-1 text-xs text-muted-foreground">
+              {hotkey}
+            </kbd>
+          )}
         </Button>
       </div>
     </TooltipWrapper>
