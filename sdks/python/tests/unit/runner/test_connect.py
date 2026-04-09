@@ -15,7 +15,7 @@ def _mock_api(mock_opik_cls):
 
     project = MagicMock()
     project.id = "proj-123"
-    api.projects.get_projects.return_value = MagicMock(content=[project])
+    api.projects.find_projects.return_value = MagicMock(content=[project])
 
     api.runners.register_daemon_pair.return_value = DaemonPairRegisterResponse(
         runner_id="r-abc",

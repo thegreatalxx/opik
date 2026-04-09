@@ -39,7 +39,7 @@ def _validate_command(command: Tuple[str, ...]) -> None:
 
 
 def _resolve_project_id(api: OpikApi, project_name: str) -> str:
-    resp = api.projects.get_projects(name=project_name)
+    resp = api.projects.find_projects(name=project_name)
     if resp.content:
         return str(resp.content[0].id)
     raise click.ClickException(f"Project '{project_name}' not found")
