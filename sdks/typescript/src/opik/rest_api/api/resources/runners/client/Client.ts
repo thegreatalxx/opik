@@ -923,7 +923,7 @@ export class RunnersClient {
      * @example
      *     await client.runners.getPakeMessages({
      *         projectId: "project_id",
-     *         role: "role"
+     *         role: "daemon"
      *     })
      */
     public getPakeMessages(
@@ -941,7 +941,10 @@ export class RunnersClient {
         const _queryParams: Record<string, unknown> = {
             project_id: projectId,
             after_step: afterStep,
-            role,
+            role: serializers.GetPakeMessagesRequestRole.jsonOrThrow(role, {
+                unrecognizedObjectKeys: "strip",
+                omitUndefined: true,
+            }),
         };
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             this._options?.headers,
@@ -1013,7 +1016,7 @@ export class RunnersClient {
      * @example
      *     await client.runners.postPakeMessage({
      *         projectId: "project_id",
-     *         role: "role",
+     *         role: "daemon",
      *         payload: "payload"
      *     })
      */

@@ -25,6 +25,7 @@ import com.comet.opik.api.runner.LocalRunnerStatus;
 import com.comet.opik.api.runner.PairCompleteRequest;
 import com.comet.opik.api.runner.PakeMessageRequest;
 import com.comet.opik.api.runner.PakeMessageResponse;
+import com.comet.opik.api.runner.PakeRole;
 import com.comet.opik.domain.LocalRunnerService;
 import com.comet.opik.infrastructure.LocalRunnerConfig;
 import com.comet.opik.infrastructure.auth.RequestContext;
@@ -494,7 +495,7 @@ public class LocalRunnersResource {
     public void getPakeMessages(
             @QueryParam("project_id") @NotNull UUID projectId,
             @QueryParam("after_step") @DefaultValue("-1") int afterStep,
-            @QueryParam("role") @NotNull String forRole,
+            @QueryParam("role") @NotNull PakeRole forRole,
             @Suspended AsyncResponse asyncResponse) {
         ensureEnabled();
         String workspaceId = requestContext.get().getWorkspaceId();

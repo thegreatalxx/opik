@@ -45,6 +45,34 @@ def _resolve_project_id(api: OpikApi, project_name: str) -> str:
     raise click.ClickException(f"Project '{project_name}' not found")
 
 
+def _wait_for_pake_step(
+    api: OpikApi,
+    project_id: str,
+    after_step: int,
+    expected_role: str,
+    expected_step: int,
+    failure_msg: str,
+    request_options: RequestOptions = _PAKE_POLL_OPTIONS,
+) -> str:
+    """Poll for a PAKE message matching role+step, raise ClickException on timeout or missing payload."""
+    messages = api.runners.get_pake_messages(
+        project_id=project_id,
+        role="daemon",
+        after_step=after_step,
+        request_options=request_options,
+    )
+    matches = [
+        m for m in messages if m.role == expected_role and m.step == expected_step
+    ]
+    if not matches:
+        raise click.ClickException(failure_msg)
+
+    payload = matches[0].payload
+    if not payload:
+        raise click.ClickException(f"{failure_msg} (empty payload)")
+    return payload
+
+
 def _run_pake_exchange(
     api: OpikApi, code: str, project_id: str, runner_name: str
 ) -> Tuple[str, str, bytes]:
@@ -65,19 +93,18 @@ def _run_pake_exchange(
         payload=base64.b64encode(outgoing_msg).decode("ascii"),
     )
 
-    messages = api.runners.get_pake_messages(
-        project_id=project_id,
-        role="daemon",
+    browser_payload_b64 = _wait_for_pake_step(
+        api,
+        project_id,
         after_step=-1,
-        request_options=_PAKE_POLL_OPTIONS,
+        expected_role="browser",
+        expected_step=0,
+        failure_msg="Pairing timed out. Check that the browser is connected and try again.",
     )
-    browser_msgs = [m for m in messages if m.role == "browser" and m.step == 0]
-    if not browser_msgs:
-        raise click.ClickException(
-            "Pairing timed out. Check that the browser is connected and try again."
-        )
-
-    browser_payload = base64.b64decode(browser_msgs[0].payload)
+    try:
+        browser_payload = base64.b64decode(browser_payload_b64)
+    except Exception:
+        raise click.ClickException("Invalid SPAKE2 message from browser (bad base64).")
     session.finish(browser_payload)
 
     api.runners.post_pake_message(
@@ -87,36 +114,28 @@ def _run_pake_exchange(
         payload=session.confirmation(),
     )
 
-    confirm_msgs = api.runners.get_pake_messages(
-        project_id=project_id,
-        role="daemon",
+    browser_confirm = _wait_for_pake_step(
+        api,
+        project_id,
         after_step=0,
-        request_options=_PAKE_POLL_OPTIONS,
+        expected_role="browser",
+        expected_step=1,
+        failure_msg="Key confirmation timed out. Check that the browser is connected and try again.",
     )
-    browser_confirms = [m for m in confirm_msgs if m.role == "browser" and m.step == 1]
-    if not browser_confirms:
-        raise click.ClickException(
-            "Key confirmation timed out. Check that the browser is connected and try again."
-        )
-
-    if not session.verify_confirmation(browser_confirms[0].payload):
+    if not session.verify_confirmation(browser_confirm):
         raise click.ClickException(
             "Key confirmation failed — possible man-in-the-middle attack. Aborting."
         )
 
-    complete_msgs = api.runners.get_pake_messages(
-        project_id=project_id,
-        role="daemon",
+    project_name = _wait_for_pake_step(
+        api,
+        project_id,
         after_step=1,
+        expected_role="browser",
+        expected_step=2,
+        failure_msg="Pairing completion timed out. Browser did not complete pairing.",
         request_options=_PAKE_COMPLETE_OPTIONS,
     )
-    complete_data = [m for m in complete_msgs if m.step == 2]
-    if not complete_data:
-        raise click.ClickException(
-            "Pairing completion timed out. Browser did not complete pairing."
-        )
-
-    project_name = complete_data[0].payload or ""
 
     return runner_id, project_name, session.shared_key
 

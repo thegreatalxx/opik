@@ -33,8 +33,10 @@ from ..types.local_runner_pair_response import LocalRunnerPairResponse
 from ..types.pake_message_response import PakeMessageResponse
 from .types.bridge_command_result_request_status import BridgeCommandResultRequestStatus
 from .types.bridge_command_submit_request_type import BridgeCommandSubmitRequestType
+from .types.get_pake_messages_request_role import GetPakeMessagesRequestRole
 from .types.list_runners_request_status import ListRunnersRequestStatus
 from .types.local_runner_job_result_request_status import LocalRunnerJobResultRequestStatus
+from .types.pake_message_request_role import PakeMessageRequestRole
 
 # this is used as the default value for optional parameters
 OMIT = typing.cast(typing.Any, ...)
@@ -690,7 +692,7 @@ class RawRunnersClient:
         self,
         *,
         project_id: str,
-        role: str,
+        role: GetPakeMessagesRequestRole,
         after_step: typing.Optional[int] = None,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> HttpResponse[typing.List[PakeMessageResponse]]:
@@ -701,7 +703,7 @@ class RawRunnersClient:
         ----------
         project_id : str
 
-        role : str
+        role : GetPakeMessagesRequestRole
 
         after_step : typing.Optional[int]
 
@@ -753,7 +755,7 @@ class RawRunnersClient:
         self,
         *,
         project_id: str,
-        role: str,
+        role: PakeMessageRequestRole,
         payload: str,
         step: typing.Optional[int] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
@@ -765,7 +767,7 @@ class RawRunnersClient:
         ----------
         project_id : str
 
-        role : str
+        role : PakeMessageRequestRole
 
         payload : str
 
@@ -2172,7 +2174,7 @@ class AsyncRawRunnersClient:
         self,
         *,
         project_id: str,
-        role: str,
+        role: GetPakeMessagesRequestRole,
         after_step: typing.Optional[int] = None,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> AsyncHttpResponse[typing.List[PakeMessageResponse]]:
@@ -2183,7 +2185,7 @@ class AsyncRawRunnersClient:
         ----------
         project_id : str
 
-        role : str
+        role : GetPakeMessagesRequestRole
 
         after_step : typing.Optional[int]
 
@@ -2235,7 +2237,7 @@ class AsyncRawRunnersClient:
         self,
         *,
         project_id: str,
-        role: str,
+        role: PakeMessageRequestRole,
         payload: str,
         step: typing.Optional[int] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
@@ -2247,7 +2249,7 @@ class AsyncRawRunnersClient:
         ----------
         project_id : str
 
-        role : str
+        role : PakeMessageRequestRole
 
         payload : str
 

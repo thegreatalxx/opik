@@ -22,8 +22,10 @@ from ..types.pake_message_response import PakeMessageResponse
 from .raw_client import AsyncRawRunnersClient, RawRunnersClient
 from .types.bridge_command_result_request_status import BridgeCommandResultRequestStatus
 from .types.bridge_command_submit_request_type import BridgeCommandSubmitRequestType
+from .types.get_pake_messages_request_role import GetPakeMessagesRequestRole
 from .types.list_runners_request_status import ListRunnersRequestStatus
 from .types.local_runner_job_result_request_status import LocalRunnerJobResultRequestStatus
+from .types.pake_message_request_role import PakeMessageRequestRole
 
 # this is used as the default value for optional parameters
 OMIT = typing.cast(typing.Any, ...)
@@ -395,7 +397,7 @@ class RunnersClient:
         self,
         *,
         project_id: str,
-        role: str,
+        role: GetPakeMessagesRequestRole,
         after_step: typing.Optional[int] = None,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> typing.List[PakeMessageResponse]:
@@ -406,7 +408,7 @@ class RunnersClient:
         ----------
         project_id : str
 
-        role : str
+        role : GetPakeMessagesRequestRole
 
         after_step : typing.Optional[int]
 
@@ -422,7 +424,7 @@ class RunnersClient:
         --------
         from Opik import OpikApi
         client = OpikApi(api_key="YOUR_API_KEY", workspace_name="YOUR_WORKSPACE_NAME", )
-        client.runners.get_pake_messages(project_id='project_id', role='role', )
+        client.runners.get_pake_messages(project_id='project_id', role="daemon", )
         """
         _response = self._raw_client.get_pake_messages(
             project_id=project_id, role=role, after_step=after_step, request_options=request_options
@@ -433,7 +435,7 @@ class RunnersClient:
         self,
         *,
         project_id: str,
-        role: str,
+        role: PakeMessageRequestRole,
         payload: str,
         step: typing.Optional[int] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
@@ -445,7 +447,7 @@ class RunnersClient:
         ----------
         project_id : str
 
-        role : str
+        role : PakeMessageRequestRole
 
         payload : str
 
@@ -462,7 +464,7 @@ class RunnersClient:
         --------
         from Opik import OpikApi
         client = OpikApi(api_key="YOUR_API_KEY", workspace_name="YOUR_WORKSPACE_NAME", )
-        client.runners.post_pake_message(project_id='project_id', role='role', payload='payload', )
+        client.runners.post_pake_message(project_id='project_id', role="daemon", payload='payload', )
         """
         _response = self._raw_client.post_pake_message(
             project_id=project_id, role=role, payload=payload, step=step, request_options=request_options
@@ -1268,7 +1270,7 @@ class AsyncRunnersClient:
         self,
         *,
         project_id: str,
-        role: str,
+        role: GetPakeMessagesRequestRole,
         after_step: typing.Optional[int] = None,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> typing.List[PakeMessageResponse]:
@@ -1279,7 +1281,7 @@ class AsyncRunnersClient:
         ----------
         project_id : str
 
-        role : str
+        role : GetPakeMessagesRequestRole
 
         after_step : typing.Optional[int]
 
@@ -1297,7 +1299,7 @@ class AsyncRunnersClient:
         import asyncio
         client = AsyncOpikApi(api_key="YOUR_API_KEY", workspace_name="YOUR_WORKSPACE_NAME", )
         async def main() -> None:
-            await client.runners.get_pake_messages(project_id='project_id', role='role', )
+            await client.runners.get_pake_messages(project_id='project_id', role="daemon", )
         asyncio.run(main())
         """
         _response = await self._raw_client.get_pake_messages(
@@ -1309,7 +1311,7 @@ class AsyncRunnersClient:
         self,
         *,
         project_id: str,
-        role: str,
+        role: PakeMessageRequestRole,
         payload: str,
         step: typing.Optional[int] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
@@ -1321,7 +1323,7 @@ class AsyncRunnersClient:
         ----------
         project_id : str
 
-        role : str
+        role : PakeMessageRequestRole
 
         payload : str
 
@@ -1340,7 +1342,7 @@ class AsyncRunnersClient:
         import asyncio
         client = AsyncOpikApi(api_key="YOUR_API_KEY", workspace_name="YOUR_WORKSPACE_NAME", )
         async def main() -> None:
-            await client.runners.post_pake_message(project_id='project_id', role='role', payload='payload', )
+            await client.runners.post_pake_message(project_id='project_id', role="daemon", payload='payload', )
         asyncio.run(main())
         """
         _response = await self._raw_client.post_pake_message(

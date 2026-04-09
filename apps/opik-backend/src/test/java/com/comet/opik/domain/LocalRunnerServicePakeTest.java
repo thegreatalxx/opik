@@ -3,6 +3,7 @@ package com.comet.opik.domain;
 import com.comet.opik.api.runner.DaemonPairRegisterRequest;
 import com.comet.opik.api.runner.DaemonPairRegisterResponse;
 import com.comet.opik.api.runner.PakeMessageRequest;
+import com.comet.opik.api.runner.PakeRole;
 import com.comet.opik.infrastructure.LocalRunnerConfig;
 import com.comet.opik.infrastructure.redis.StringRedisClient;
 import jakarta.ws.rs.ClientErrorException;
@@ -123,7 +124,7 @@ class LocalRunnerServicePakeTest {
             when(bucket.isExists()).thenReturn(false);
 
             PakeMessageRequest request = PakeMessageRequest.builder()
-                    .role("daemon").step(0).payload("data").build();
+                    .role(PakeRole.DAEMON).step(0).payload("data").build();
 
             assertThatThrownBy(() -> service.postPakeMessage(WORKSPACE_ID, USER_NAME, PROJECT_ID, request))
                     .isInstanceOf(NotFoundException.class);
@@ -145,7 +146,7 @@ class LocalRunnerServicePakeTest {
             doReturn(messages).when(redisClient).getList(messagesKey());
 
             PakeMessageRequest request = PakeMessageRequest.builder()
-                    .role("browser").step(0).payload("attack").build();
+                    .role(PakeRole.BROWSER).step(0).payload("attack").build();
 
             assertThatThrownBy(() -> service.postPakeMessage(WORKSPACE_ID, USER_NAME, PROJECT_ID, request))
                     .isInstanceOf(ClientErrorException.class);
@@ -171,7 +172,7 @@ class LocalRunnerServicePakeTest {
             doReturn(messages).when(redisClient).getList(messagesKey());
 
             PakeMessageRequest request = PakeMessageRequest.builder()
-                    .role("daemon").step(0).payload("spake2-msg").build();
+                    .role(PakeRole.DAEMON).step(0).payload("spake2-msg").build();
 
             service.postPakeMessage(WORKSPACE_ID, USER_NAME, PROJECT_ID, request);
 
@@ -191,7 +192,7 @@ class LocalRunnerServicePakeTest {
             doReturn(messages).when(redisClient).getList(messagesKey());
 
             PakeMessageRequest request = PakeMessageRequest.builder()
-                    .role("daemon").step(1).payload("confirm-A").build();
+                    .role(PakeRole.DAEMON).step(1).payload("confirm-A").build();
 
             service.postPakeMessage(WORKSPACE_ID, USER_NAME, PROJECT_ID, request);
 

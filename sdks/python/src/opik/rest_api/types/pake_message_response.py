@@ -4,10 +4,11 @@ import typing
 
 import pydantic
 from ..core.pydantic_utilities import IS_PYDANTIC_V2, UniversalBaseModel
+from .pake_message_response_role import PakeMessageResponseRole
 
 
 class PakeMessageResponse(UniversalBaseModel):
-    role: typing.Optional[str] = None
+    role: typing.Optional[PakeMessageResponseRole] = None
     step: typing.Optional[int] = None
     payload: typing.Optional[str] = None
 

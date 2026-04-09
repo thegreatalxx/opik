@@ -473,6 +473,7 @@ from .optimization_write import OptimizationWrite
 from .optimization_write_status import OptimizationWriteStatus
 from .page_columns import PageColumns
 from .pake_message_response import PakeMessageResponse
+from .pake_message_response_role import PakeMessageResponseRole
 from .param import Param
 from .percentage_value_stat_public import PercentageValueStatPublic
 from .percentage_values import PercentageValues
@@ -1098,6 +1099,7 @@ __all__ = [
     "OptimizationWriteStatus",
     "PageColumns",
     "PakeMessageResponse",
+    "PakeMessageResponseRole",
     "Param",
     "PercentageValueStatPublic",
     "PercentageValues",

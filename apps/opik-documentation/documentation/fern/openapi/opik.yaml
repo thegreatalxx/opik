@@ -4156,6 +4156,9 @@ paths:
         required: true
         schema:
           type: string
+          enum:
+          - daemon
+          - browser
       responses:
         "200":
           description: Messages
@@ -16223,6 +16226,9 @@ components:
       properties:
         role:
           type: string
+          enum:
+          - daemon
+          - browser
         step:
           type: integer
           format: int32
@@ -16385,9 +16391,10 @@ components:
       type: object
       properties:
         role:
-          minLength: 1
-          pattern: daemon|browser
           type: string
+          enum:
+          - daemon
+          - browser
         step:
           maximum: 2
           minimum: 0

@@ -381,6 +381,7 @@ export * from "./OptimizationWrite.js";
 export * from "./OptimizationWriteStatus.js";
 export * from "./PageColumns.js";
 export * from "./PakeMessageResponse.js";
+export * from "./PakeMessageResponseRole.js";
 export * from "./Param.js";
 export * from "./PercentageValueStatPublic.js";
 export * from "./PercentageValues.js";

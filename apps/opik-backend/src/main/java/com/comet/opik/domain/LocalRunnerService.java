@@ -24,6 +24,7 @@ import com.comet.opik.api.runner.LocalRunnerStatus;
 import com.comet.opik.api.runner.PairCompleteRequest;
 import com.comet.opik.api.runner.PakeMessageRequest;
 import com.comet.opik.api.runner.PakeMessageResponse;
+import com.comet.opik.api.runner.PakeRole;
 import com.comet.opik.infrastructure.LocalRunnerConfig;
 import com.comet.opik.infrastructure.redis.StringRedisClient;
 import com.comet.opik.utils.JsonUtils;
@@ -126,7 +127,7 @@ public interface LocalRunnerService {
     void postPakeMessage(String workspaceId, String userName, UUID projectId, PakeMessageRequest request);
 
     Mono<List<PakeMessageResponse>> getPakeMessages(String workspaceId, String userName, UUID projectId,
-            int afterStep, String forRole);
+            int afterStep, PakeRole forRole);
 
     LocalRunnerConnectResponse completePairing(String workspaceId, String userName, PairCompleteRequest request);
 }
@@ -288,7 +289,14 @@ class LocalRunnerServiceImpl implements LocalRunnerService {
     private static final String BRIDGE_FIELD_COMPLETED_FLAG = "completed_flag";
     private static final String BRIDGE_DONE_SENTINEL = "done";
 
+    // Security-critical: these MUST NOT be made configurable. Changing them
+    // weakens brute-force resistance or widens the attack window.
     private static final int MAX_PAKE_ATTEMPTS = 5;
+    private static final Duration PAKE_SESSION_TTL = Duration.ofMinutes(5);
+
+    private static final int PAKE_STEP_SPAKE2 = 0;
+    private static final int PAKE_STEP_CONFIRMATION = 1;
+    private static final int PAKE_STEP_COMPLETION = 2;
 
     private final @NonNull StringRedisClient redisClient;
     private final @NonNull RedissonReactiveClient reactiveRedisClient;
@@ -1380,6 +1388,14 @@ class LocalRunnerServiceImpl implements LocalRunnerService {
 
         int timeoutSeconds = resolveCommandTimeout(request.timeoutSeconds());
         UUID commandId = request.commandId() != null ? request.commandId() : idGenerator.generateId();
+        if (request.commandId() != null) {
+            RMap<String, String> existing = redisClient.getMap(bridgeCommandKey(commandId));
+            if (existing.isExists()) {
+                throw new ClientErrorException(Response.status(Response.Status.CONFLICT)
+                        .entity(new ErrorMessage(List.of("Command ID already exists: " + commandId)))
+                        .build());
+            }
+        }
         String now = Instant.now().toString();
 
         Map<String, String> commandFields = new HashMap<>();
@@ -1863,7 +1879,7 @@ class LocalRunnerServiceImpl implements LocalRunnerService {
             @NonNull DaemonPairRegisterRequest request) {
         UUID projectId = request.projectId();
         UUID runnerId = idGenerator.generateId();
-        Duration ttl = Duration.ofMinutes(5);
+        Duration ttl = PAKE_SESSION_TTL;
 
         // Clean up any stale session for this user+project (crash recovery)
         redisClient.getBucket(pakeSessionKey(workspaceId, userName, projectId)).delete();
@@ -1899,11 +1915,11 @@ class LocalRunnerServiceImpl implements LocalRunnerService {
             throw new NotFoundException("No pairing session found for this user/project");
         }
 
-        if (request.step() == 0) {
+        if (request.step() == PAKE_STEP_SPAKE2) {
             RAtomicLong attempts = redisClient.getAtomicLong(pakeAttemptsKey(workspaceId, userName, projectId));
             long count = attempts.incrementAndGet();
             if (count == 1) {
-                attempts.expire(Duration.ofMinutes(5));
+                attempts.expire(PAKE_SESSION_TTL);
             }
             if (count > MAX_PAKE_ATTEMPTS) {
                 sessionBucket.delete();
@@ -1924,13 +1940,18 @@ class LocalRunnerServiceImpl implements LocalRunnerService {
 
         RList<String> messages = redisClient.getList(pakeMessagesKey(workspaceId, userName, projectId));
         messages.add(messageJson);
-        messages.expire(Duration.ofMinutes(5));
+        messages.expire(PAKE_SESSION_TTL);
     }
 
     @Override
     public Mono<List<PakeMessageResponse>> getPakeMessages(@NonNull String workspaceId, @NonNull String userName,
-            @NonNull UUID projectId, int afterStep, @NonNull String forRole) {
-        String otherRole = "daemon".equals(forRole) ? "browser" : "daemon";
+            @NonNull UUID projectId, int afterStep, @NonNull PakeRole forRole) {
+        PakeRole otherRole = forRole == PakeRole.DAEMON ? PakeRole.BROWSER : PakeRole.DAEMON;
+
+        RBucket<String> sessionBucket = redisClient.getBucket(pakeSessionKey(workspaceId, userName, projectId));
+        if (!sessionBucket.isExists()) {
+            throw new NotFoundException("No pairing session found for this user/project");
+        }
 
         return Mono.fromCallable(() -> {
             long deadline = System.currentTimeMillis() + runnerConfig.getBridgePollTimeout().toSeconds() * 1000;
@@ -1941,7 +1962,7 @@ class LocalRunnerServiceImpl implements LocalRunnerService {
                 List<PakeMessageResponse> matching = new ArrayList<>();
                 for (String msgJson : allMessages) {
                     PakeMessageResponse msg = JsonUtils.readValue(msgJson, PakeMessageResponse.class);
-                    if (msg.role().equals(otherRole) && msg.step() > afterStep) {
+                    if (msg.role() == otherRole && msg.step() > afterStep) {
                         matching.add(msg);
                     }
                 }
@@ -1978,8 +1999,8 @@ class LocalRunnerServiceImpl implements LocalRunnerService {
 
         String completeMsg = JsonUtils.writeValueAsString(
                 PakeMessageResponse.builder()
-                        .role("browser")
-                        .step(2)
+                        .role(PakeRole.BROWSER)
+                        .step(PAKE_STEP_COMPLETION)
                         .payload(projectName)
                         .build());
         RList<String> messages = redisClient.getList(pakeMessagesKey(workspaceId, userName, projectId));

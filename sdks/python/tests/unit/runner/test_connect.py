@@ -30,7 +30,7 @@ def _mock_api(mock_opik_cls):
 def _mock_pake_messages(api):
     """Set up poll responses for a successful PAKE exchange."""
     api.runners.get_pake_messages.side_effect = [
-        [PakeMessageResponse(role="browser", step=0, payload="")],
+        [PakeMessageResponse(role="browser", step=0, payload="c3Bha2UyLW1zZy1i")],
         [PakeMessageResponse(role="browser", step=1, payload="fake-confirm-B")],
         [PakeMessageResponse(role="browser", step=2, payload="my-project")],
     ]
@@ -133,7 +133,7 @@ class TestConnect:
     ):
         client, api = _mock_api(mock_opik_cls)
         api.runners.get_pake_messages.side_effect = [
-            [PakeMessageResponse(role="browser", step=0, payload="")],
+            [PakeMessageResponse(role="browser", step=0, payload="c3Bha2UyLW1zZy1i")],
             [PakeMessageResponse(role="browser", step=1, payload="bad-confirm")],
         ]
 

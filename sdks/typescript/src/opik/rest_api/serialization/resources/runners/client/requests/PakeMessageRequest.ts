@@ -3,19 +3,20 @@
 import type * as OpikApi from "../../../../../api/index.js";
 import * as core from "../../../../../core/index.js";
 import type * as serializers from "../../../../index.js";
+import { PakeMessageRequestRole } from "../../types/PakeMessageRequestRole.js";
 
 export const PakeMessageRequest: core.serialization.Schema<
     serializers.PakeMessageRequest.Raw,
     Omit<OpikApi.PakeMessageRequest, "projectId">
 > = core.serialization.object({
-    role: core.serialization.string(),
+    role: PakeMessageRequestRole,
     step: core.serialization.number().optional(),
     payload: core.serialization.string(),
 });
 
 export declare namespace PakeMessageRequest {
     export interface Raw {
-        role: string;
+        role: PakeMessageRequestRole.Raw;
         step?: number | null;
         payload: string;
     }

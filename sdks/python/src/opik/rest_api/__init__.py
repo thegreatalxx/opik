@@ -431,6 +431,7 @@ from .types import (
     OptimizationWriteStatus,
     PageColumns,
     PakeMessageResponse,
+    PakeMessageResponseRole,
     Param,
     PercentageValueStatPublic,
     PercentageValues,
@@ -699,8 +700,10 @@ from .retention_rules import RetentionRuleWriteRetention
 from .runners import (
     BridgeCommandResultRequestStatus,
     BridgeCommandSubmitRequestType,
+    GetPakeMessagesRequestRole,
     ListRunnersRequestStatus,
     LocalRunnerJobResultRequestStatus,
+    PakeMessageRequestRole,
 )
 from .spans import (
     FindFeedbackScoreNames1RequestType,
@@ -1063,6 +1066,7 @@ __all__ = [
     "ForbiddenError",
     "Function",
     "FunctionCall",
+    "GetPakeMessagesRequestRole",
     "GetSpanStatsRequestType",
     "GetSpansByProjectRequestType",
     "GetWebhookExamplesRequestAlertType",
@@ -1170,7 +1174,9 @@ __all__ = [
     "OptimizationWrite",
     "OptimizationWriteStatus",
     "PageColumns",
+    "PakeMessageRequestRole",
     "PakeMessageResponse",
+    "PakeMessageResponseRole",
     "Param",
     "PercentageValueStatPublic",
     "PercentageValues",

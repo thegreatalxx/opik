@@ -4,12 +4,16 @@
 
 from .bridge_command_result_request_status import BridgeCommandResultRequestStatus
 from .bridge_command_submit_request_type import BridgeCommandSubmitRequestType
+from .get_pake_messages_request_role import GetPakeMessagesRequestRole
 from .list_runners_request_status import ListRunnersRequestStatus
 from .local_runner_job_result_request_status import LocalRunnerJobResultRequestStatus
+from .pake_message_request_role import PakeMessageRequestRole
 
 __all__ = [
     "BridgeCommandResultRequestStatus",
     "BridgeCommandSubmitRequestType",
+    "GetPakeMessagesRequestRole",
     "ListRunnersRequestStatus",
     "LocalRunnerJobResultRequestStatus",
+    "PakeMessageRequestRole",
 ]
