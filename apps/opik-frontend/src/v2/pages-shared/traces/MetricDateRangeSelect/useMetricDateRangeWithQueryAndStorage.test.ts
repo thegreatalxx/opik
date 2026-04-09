@@ -36,7 +36,7 @@ describe("useMetricDateRangeWithQueryAndStorage", () => {
       expect(result.current.dateRangeValue).toBe(DEFAULT_DATE_PRESET);
     });
 
-    it("should call setValue with DEFAULT_DATE_PRESET to sync URL/localStorage when excluded preset is stored", () => {
+    it("should not call setValue when excluded preset is stored (coercion is computed, not synced back)", () => {
       vi.mocked(useQueryParamAndLocalStorageState).mockReturnValue([
         DATE_RANGE_PRESET_ALLTIME,
         mockSetValue,
@@ -48,7 +48,7 @@ describe("useMetricDateRangeWithQueryAndStorage", () => {
         }),
       );
 
-      expect(mockSetValue).toHaveBeenCalledWith(DEFAULT_DATE_PRESET);
+      expect(mockSetValue).not.toHaveBeenCalled();
     });
 
     it("should preserve stored value when excludePresets is not provided", () => {

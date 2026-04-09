@@ -1,4 +1,3 @@
-import { useEffect } from "react";
 import { StringParam } from "use-query-params";
 import useQueryParamAndLocalStorageState from "@/hooks/useQueryParamAndLocalStorageState";
 import {
@@ -36,14 +35,9 @@ export const useMetricDateRangeWithQueryAndStorage = (
   });
 
   const rawValue = value ?? DEFAULT_DATE_PRESET;
-  const isExcluded = excludePresets?.includes(rawValue as DateRangePreset);
-  const dateRangeValue = isExcluded ? DEFAULT_DATE_PRESET : rawValue;
-
-  useEffect(() => {
-    if (isExcluded) {
-      setValue(DEFAULT_DATE_PRESET);
-    }
-  }, [isExcluded, setValue]);
+  const dateRangeValue = excludePresets?.includes(rawValue as DateRangePreset)
+    ? DEFAULT_DATE_PRESET
+    : rawValue;
 
   return {
     ...useMetricDateRangeCore({
