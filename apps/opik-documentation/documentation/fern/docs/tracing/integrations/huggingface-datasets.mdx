@@ -9,6 +9,10 @@ og:title: Integrate Hugging Face Datasets with Opik
 title: Observability for Hugging Face Datasets with Opik
 ---
 
+<Note>
+  In Opik 2.0, datasets and experiments are project-scoped. Make sure to specify a `project_name` when creating datasets and running experiments so they are associated with the correct project.
+</Note>
+
 [Hugging Face Datasets](https://huggingface.co/docs/datasets/) is a library that provides easy access to thousands of datasets for machine learning and natural language processing tasks.
 
 This guide explains how to integrate Opik with Hugging Face Datasets to convert and import datasets into Opik for model evaluation and optimization.
@@ -353,6 +357,7 @@ evaluation_results = evaluate(
     dataset=squad_opik,
     task=evaluation_task,
     scoring_metrics=[hallucination_metric],
+    project_name="my-project",
 )
 ```
 
