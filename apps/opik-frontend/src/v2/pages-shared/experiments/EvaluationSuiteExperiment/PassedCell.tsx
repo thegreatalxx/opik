@@ -1,4 +1,5 @@
 import React from "react";
+import { CheckCircle2, XCircle } from "lucide-react";
 import { CellContext } from "@tanstack/react-table";
 import CellWrapper from "@/shared/DataTableCells/CellWrapper";
 import VerticallySplitCellWrapper, {
@@ -21,7 +22,7 @@ const STATUS_DISPLAY: Record<
   { label: string; variant: TagProps["variant"] }
 > = {
   [ExperimentItemStatus.PASSED]: { label: "Passed", variant: "green" },
-  [ExperimentItemStatus.FAILED]: { label: "Failed", variant: "pink" },
+  [ExperimentItemStatus.FAILED]: { label: "Failed", variant: "red" },
   [ExperimentItemStatus.SKIPPED]: { label: "Skipped", variant: "gray" },
 };
 
@@ -124,21 +125,35 @@ export const StatusTag: React.FC<
   tagSize = "md",
   className,
 }) => {
-  const isMultiRun = totalCount > 1;
+  const hasAssertions =
+    assertionsByRun.length > 0 && assertionsByRun[0].length > 0;
 
   if (!status) {
     return <span className="text-muted-slate">{"\u2014"}</span>;
   }
+
+  const isSkipped = status === ExperimentItemStatus.SKIPPED;
+  const Icon = status === ExperimentItemStatus.PASSED ? CheckCircle2 : XCircle;
 
   return (
     <AssertionsBreakdownTooltip assertionsByRun={assertionsByRun}>
       <Tag
         variant={STATUS_DISPLAY[status].variant}
         size={tagSize}
-        className={cn("cursor-default", className)}
+        className={cn(
+          "inline-flex items-center gap-1",
+          hasAssertions ? "cursor-pointer" : "cursor-default",
+          className,
+        )}
       >
-        {STATUS_DISPLAY[status].label}
-        {isMultiRun && ` (${passedCount}/${totalCount})`}
+        {isSkipped ? (
+          STATUS_DISPLAY[status].label
+        ) : (
+          <>
+            <Icon className="size-3.5 shrink-0" />
+            {passedCount}/{totalCount}
+          </>
+        )}
       </Tag>
     </AssertionsBreakdownTooltip>
   );
