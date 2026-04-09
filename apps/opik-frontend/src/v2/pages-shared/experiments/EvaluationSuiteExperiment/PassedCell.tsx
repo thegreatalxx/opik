@@ -1,13 +1,12 @@
 import React from "react";
+import { CircleCheck, CircleX } from "lucide-react";
 import { CellContext } from "@tanstack/react-table";
 import CellWrapper from "@/shared/DataTableCells/CellWrapper";
 import VerticallySplitCellWrapper, {
   CustomMeta,
 } from "@/shared/DataTableCells/VerticallySplitCellWrapper";
 import AssertionsBreakdownTooltip from "./AssertionsBreakdownTooltip";
-import { Tag, TagProps } from "@/ui/tag";
 import { cn } from "@/lib/utils";
-import { getCellTagSize, TAG_SIZE_MAP } from "@/constants/shared";
 import {
   AssertionResult,
   ExperimentItem,
@@ -15,15 +14,6 @@ import {
 } from "@/types/datasets";
 import { ExperimentItemStatus } from "@/types/evaluation-suites";
 import { isAggregatedItem } from "@/lib/trials";
-
-const STATUS_DISPLAY: Record<
-  ExperimentItemStatus,
-  { label: string; variant: TagProps["variant"] }
-> = {
-  [ExperimentItemStatus.PASSED]: { label: "Passed", variant: "green" },
-  [ExperimentItemStatus.FAILED]: { label: "Failed", variant: "pink" },
-  [ExperimentItemStatus.SKIPPED]: { label: "Skipped", variant: "gray" },
-};
 
 type StatusInfo = {
   status: ExperimentItemStatus | undefined;
@@ -68,11 +58,11 @@ export function getStatusFromExperimentItems(
     status,
     assertionsByRun,
     passedCount,
-    totalCount: items.length,
+    totalCount: row.execution_policy?.runs_per_item ?? items.length,
   };
 }
 
-function getStatusInfoForExperiment(
+export function getStatusInfoForExperiment(
   row: ExperimentsCompare,
   experimentId: string,
   item: ExperimentItem | undefined,
@@ -109,37 +99,50 @@ function getStatusInfoForExperiment(
   return {
     status,
     assertionsByRun,
-    passedCount,
-    totalCount: expItems.length,
+    passedCount: summary?.passed_runs ?? passedCount,
+    // Fall back to 0 when no summary and no policy — status will be SKIPPED so count isn't rendered
+    totalCount: summary?.total_runs ?? row.execution_policy?.runs_per_item ?? 0,
   };
 }
 
-export const StatusTag: React.FC<
-  StatusInfo & { tagSize?: TagProps["size"]; className?: string }
-> = ({
+export const StatusTag: React.FC<StatusInfo & { className?: string }> = ({
   status,
   assertionsByRun,
   passedCount,
   totalCount,
-  tagSize = "md",
   className,
 }) => {
-  const isMultiRun = totalCount > 1;
-
   if (!status) {
     return <span className="text-muted-slate">{"\u2014"}</span>;
   }
 
+  const isSkipped = status === ExperimentItemStatus.SKIPPED;
+  const isPassed = status === ExperimentItemStatus.PASSED;
+  const Icon = isPassed ? CircleCheck : CircleX;
+
   return (
     <AssertionsBreakdownTooltip assertionsByRun={assertionsByRun}>
-      <Tag
-        variant={STATUS_DISPLAY[status].variant}
-        size={tagSize}
-        className={cn("cursor-default", className)}
+      <div
+        className={cn(
+          "inline-flex items-center gap-1 rounded-full border border-transparent px-2.5 py-0.5 font-mono text-xs font-semibold transition-colors",
+          isPassed
+            ? "bg-success/15 text-success"
+            : isSkipped
+              ? "bg-muted text-muted-foreground"
+              : "bg-destructive/15 text-destructive",
+          "cursor-default",
+          className,
+        )}
       >
-        {STATUS_DISPLAY[status].label}
-        {isMultiRun && ` (${passedCount}/${totalCount})`}
-      </Tag>
+        {isSkipped ? (
+          "Skipped"
+        ) : (
+          <>
+            <Icon className="size-3 shrink-0" />
+            {passedCount}/{totalCount}
+          </>
+        )}
+      </div>
     </AssertionsBreakdownTooltip>
   );
 };
@@ -150,15 +153,13 @@ const PassedCell: React.FC<CellContext<ExperimentsCompare, unknown>> = (
   const row = context.row.original;
   const { custom } = context.column.columnDef.meta ?? {};
   const { experimentsIds } = (custom ?? {}) as Partial<CustomMeta>;
-  const tagSize = getCellTagSize(context, TAG_SIZE_MAP);
-
   if (experimentsIds) {
     const renderContent = (
       item: ExperimentItem | undefined,
       experimentId: string,
     ) => {
       const statusInfo = getStatusInfoForExperiment(row, experimentId, item);
-      return <StatusTag {...statusInfo} tagSize={tagSize} />;
+      return <StatusTag {...statusInfo} />;
     };
 
     return (
@@ -179,7 +180,7 @@ const PassedCell: React.FC<CellContext<ExperimentsCompare, unknown>> = (
       metadata={context.column.columnDef.meta}
       tableMetadata={context.table.options.meta}
     >
-      <StatusTag {...statusInfo} tagSize={tagSize} />
+      <StatusTag {...statusInfo} />
     </CellWrapper>
   );
 };
