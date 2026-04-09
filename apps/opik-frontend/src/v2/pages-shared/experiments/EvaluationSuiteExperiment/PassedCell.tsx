@@ -1,14 +1,12 @@
 import React from "react";
-import { CheckCircle2, XCircle } from "lucide-react";
+import { CircleCheck, CircleX } from "lucide-react";
 import { CellContext } from "@tanstack/react-table";
 import CellWrapper from "@/shared/DataTableCells/CellWrapper";
 import VerticallySplitCellWrapper, {
   CustomMeta,
 } from "@/shared/DataTableCells/VerticallySplitCellWrapper";
 import AssertionsBreakdownTooltip from "./AssertionsBreakdownTooltip";
-import { Tag, TagProps } from "@/ui/tag";
 import { cn } from "@/lib/utils";
-import { getCellTagSize, TAG_SIZE_MAP } from "@/constants/shared";
 import {
   AssertionResult,
   ExperimentItem,
@@ -16,15 +14,6 @@ import {
 } from "@/types/datasets";
 import { ExperimentItemStatus } from "@/types/evaluation-suites";
 import { isAggregatedItem } from "@/lib/trials";
-
-const STATUS_DISPLAY: Record<
-  ExperimentItemStatus,
-  { label: string; variant: TagProps["variant"] }
-> = {
-  [ExperimentItemStatus.PASSED]: { label: "Passed", variant: "green" },
-  [ExperimentItemStatus.FAILED]: { label: "Failed", variant: "red" },
-  [ExperimentItemStatus.SKIPPED]: { label: "Skipped", variant: "gray" },
-};
 
 type StatusInfo = {
   status: ExperimentItemStatus | undefined;
@@ -116,15 +105,8 @@ function getStatusInfoForExperiment(
 }
 
 export const StatusTag: React.FC<
-  StatusInfo & { tagSize?: TagProps["size"]; className?: string }
-> = ({
-  status,
-  assertionsByRun,
-  passedCount,
-  totalCount,
-  tagSize = "md",
-  className,
-}) => {
+  StatusInfo & { className?: string }
+> = ({ status, assertionsByRun, passedCount, totalCount, className }) => {
   const hasAssertions =
     assertionsByRun.length > 0 && assertionsByRun[0].length > 0;
 
@@ -133,28 +115,32 @@ export const StatusTag: React.FC<
   }
 
   const isSkipped = status === ExperimentItemStatus.SKIPPED;
-  const Icon = status === ExperimentItemStatus.PASSED ? CheckCircle2 : XCircle;
+  const isPassed = status === ExperimentItemStatus.PASSED;
+  const Icon = isPassed ? CircleCheck : CircleX;
 
   return (
     <AssertionsBreakdownTooltip assertionsByRun={assertionsByRun}>
-      <Tag
-        variant={STATUS_DISPLAY[status].variant}
-        size={tagSize}
+      <div
         className={cn(
-          "inline-flex items-center gap-1",
+          "inline-flex items-center gap-1 rounded-full border border-transparent px-2.5 py-0.5 font-mono text-xs font-semibold transition-colors",
+          isPassed
+            ? "bg-success/15 text-success"
+            : isSkipped
+              ? "bg-muted text-muted-foreground"
+              : "bg-destructive/15 text-destructive",
           hasAssertions ? "cursor-pointer" : "cursor-default",
           className,
         )}
       >
         {isSkipped ? (
-          STATUS_DISPLAY[status].label
+          "Skipped"
         ) : (
           <>
-            <Icon className="size-3.5 shrink-0" />
+            <Icon className="size-3 shrink-0" />
             {passedCount}/{totalCount}
           </>
         )}
-      </Tag>
+      </div>
     </AssertionsBreakdownTooltip>
   );
 };
@@ -165,15 +151,13 @@ const PassedCell: React.FC<CellContext<ExperimentsCompare, unknown>> = (
   const row = context.row.original;
   const { custom } = context.column.columnDef.meta ?? {};
   const { experimentsIds } = (custom ?? {}) as Partial<CustomMeta>;
-  const tagSize = getCellTagSize(context, TAG_SIZE_MAP);
-
   if (experimentsIds) {
     const renderContent = (
       item: ExperimentItem | undefined,
       experimentId: string,
     ) => {
       const statusInfo = getStatusInfoForExperiment(row, experimentId, item);
-      return <StatusTag {...statusInfo} tagSize={tagSize} />;
+      return <StatusTag {...statusInfo} />;
     };
 
     return (
@@ -194,7 +178,7 @@ const PassedCell: React.FC<CellContext<ExperimentsCompare, unknown>> = (
       metadata={context.column.columnDef.meta}
       tableMetadata={context.table.options.meta}
     >
-      <StatusTag {...statusInfo} tagSize={tagSize} />
+      <StatusTag {...statusInfo} />
     </CellWrapper>
   );
 };

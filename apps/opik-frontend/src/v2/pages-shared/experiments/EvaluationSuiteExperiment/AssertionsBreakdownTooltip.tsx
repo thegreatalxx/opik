@@ -1,5 +1,5 @@
 import React, { type ReactNode } from "react";
-import { CheckCircle2, XCircle } from "lucide-react";
+import { CircleCheck, CircleX } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
@@ -58,16 +58,14 @@ export const AssertionsBreakdownTooltip: React.FC<
                       </span>
                       <div className="flex items-center gap-1">
                         {allPassed ? (
-                          <CheckCircle2 className="size-3.5 shrink-0 text-[var(--tag-green-text)]" />
+                          <CircleCheck className="size-3.5 shrink-0 text-success" />
                         ) : (
-                          <XCircle className="size-3.5 shrink-0 text-[var(--tag-red-text)]" />
+                          <CircleX className="size-3.5 shrink-0 text-destructive" />
                         )}
                         <span
                           className={cn(
                             "comet-body-xs",
-                            allPassed
-                              ? "text-[var(--tag-green-text)]"
-                              : "text-[var(--tag-red-text)]",
+                            allPassed ? "text-success" : "text-destructive",
                           )}
                         >
                           {passedCount}/{run.length} assertions passed
@@ -75,13 +73,13 @@ export const AssertionsBreakdownTooltip: React.FC<
                       </div>
                     </div>
                   </AccordionTrigger>
-                  <AccordionContent className="p-0">
+                  <AccordionContent className="bg-muted/50 p-0">
                     {run.map((assertion, aIdx) => (
                       <div key={aIdx} className="flex gap-2 px-3 py-2">
                         {assertion.passed ? (
-                          <CheckCircle2 className="mt-0.5 size-3.5 shrink-0 text-[var(--tag-green-text)]" />
+                          <CircleCheck className="mt-0.5 size-3.5 shrink-0 text-success" />
                         ) : (
-                          <XCircle className="mt-0.5 size-3.5 shrink-0 text-[var(--tag-red-text)]" />
+                          <CircleX className="mt-0.5 size-3.5 shrink-0 text-destructive" />
                         )}
                         <div className="flex flex-col gap-0.5">
                           <p className="comet-body-xs text-foreground">
