@@ -137,13 +137,12 @@ const AddToDatasetDialog: React.FunctionComponent<AddToDatasetDialogProps> = ({
     );
   }, [versionsData]);
 
-  // Sync form state with suite defaults when selected dataset changes
+  // Sync form state with suite defaults when selected dataset changes or version data loads
   useEffect(() => {
     if (!selectedDataset?.id) return;
     setRunsPerItem(suiteExecutionPolicy.runs_per_item);
     setPassThreshold(suiteExecutionPolicy.pass_threshold);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedDataset?.id]);
+  }, [selectedDataset?.id, suiteExecutionPolicy]);
 
   const { data, isPending } = useProjectDatasetsList(
     {
