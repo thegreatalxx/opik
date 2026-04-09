@@ -73,7 +73,7 @@ def _run(shutdown_event: threading.Event) -> None:
         LOGGER.error(
             "OPIK_RUNNER_ID is not set. "
             "Do not set OPIK_RUNNER_MODE manually — use 'opik connect' to launch your command: "
-            "opik connect --pair <code> python3 main.py"
+            "opik connect --project <name> python3 main.py"
         )
         return
 
