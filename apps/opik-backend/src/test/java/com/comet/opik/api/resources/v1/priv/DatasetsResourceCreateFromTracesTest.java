@@ -439,13 +439,7 @@ class DatasetsResourceCreateFromTracesTest {
         assertThat(item.evaluators().getFirst().name()).isEqualTo("llm_judge");
         assertThat(item.evaluators().getFirst().type()).isEqualTo(EvaluatorType.LLM_JUDGE);
 
-        if (executionPolicy != null) {
-            assertThat(item.executionPolicy()).isNotNull();
-            assertThat(item.executionPolicy().runsPerItem()).isEqualTo(executionPolicy.runsPerItem());
-            assertThat(item.executionPolicy().passThreshold()).isEqualTo(executionPolicy.passThreshold());
-        } else {
-            assertThat(item.executionPolicy()).isNull();
-        }
+        assertThat(item.executionPolicy()).isEqualTo(executionPolicy);
     }
 
     @Test

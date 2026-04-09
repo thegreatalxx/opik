@@ -130,11 +130,13 @@ const AddToDatasetDialog: React.FunctionComponent<AddToDatasetDialogProps> = ({
     );
   }, [versionsData]);
 
-  // Sync form state with suite defaults when version data loads
+  // Sync form state with suite defaults when selected dataset changes
   useEffect(() => {
+    if (!selectedDataset?.id) return;
     setRunsPerItem(suiteExecutionPolicy.runs_per_item);
     setPassThreshold(suiteExecutionPolicy.pass_threshold);
-  }, [suiteExecutionPolicy]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedDataset?.id]);
 
   const { data, isPending } = useProjectDatasetsList(
     {
@@ -363,7 +365,7 @@ const AddToDatasetDialog: React.FunctionComponent<AddToDatasetDialogProps> = ({
             isSelected && "bg-muted",
           )}
           onClick={() => {
-            if (noValidRows) return;
+            if (noValidRows || d.id === selectedDataset?.id) return;
             setSelectedDataset(d);
             setAssertions([]);
             setRunsPerItem(DEFAULT_EXECUTION_POLICY.runs_per_item);
