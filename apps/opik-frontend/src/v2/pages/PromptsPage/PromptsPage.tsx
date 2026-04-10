@@ -341,8 +341,8 @@ const PromptsPage: React.FunctionComponent = () => {
       <div className="mb-4 flex items-center justify-between">
         <h1 className="comet-title-xs truncate break-words">Prompt library</h1>
         <Button variant="default" size="xs" onClick={handleNewPromptClick}>
-          <PlusIcon className="mr-2 size-4" />
-          Create new prompt
+          <PlusIcon className="mr-1 size-4" />
+          Create prompt
         </Button>
       </div>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-x-8 gap-y-2">
@@ -393,7 +393,7 @@ const PromptsPage: React.FunctionComponent = () => {
           <DataTableNoData title={noDataText}>
             {noData && (
               <Button variant="link" onClick={handleNewPromptClick}>
-                Create new prompt
+                Create prompt
               </Button>
             )}
           </DataTableNoData>
