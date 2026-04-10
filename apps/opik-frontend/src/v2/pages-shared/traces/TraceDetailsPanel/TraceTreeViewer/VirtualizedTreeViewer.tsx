@@ -32,7 +32,11 @@ import { formatCost } from "@/lib/money";
 import FeedbackScoreHoverCard from "@/shared/FeedbackScoreTag/FeedbackScoreHoverCard";
 import UserCommentHoverList from "@/shared/UserComment/UserCommentHoverList";
 import TagsHoverCard from "@/shared/TagsHoverCard/TagsHoverCard";
-import { TRACE_TYPE_FOR_TREE, TRACE_TYPE_COLORS_MAP } from "@/constants/traces";
+import {
+  TRACE_TYPE_FOR_TREE,
+  TRACE_TYPE_COLORS_MAP,
+  TRACE_COLOR_TYPE,
+} from "@/constants/traces";
 
 const EXPAND_HOTKEYS = ["⏎"];
 const INDENT_PX = 24;
@@ -429,7 +433,8 @@ const VirtualizedTreeViewer: React.FC<VirtualizedTreeViewerProps> = ({
           const isOutOfSearch = node.data.isInSearch === false;
           const name = node.name || "NA";
 
-          const typeColors = TRACE_TYPE_COLORS_MAP[node.data.type];
+          const typeColors =
+            TRACE_TYPE_COLORS_MAP[node.data.type as TRACE_COLOR_TYPE];
 
           return (
             <div
@@ -519,7 +524,7 @@ const VirtualizedTreeViewer: React.FC<VirtualizedTreeViewerProps> = ({
               )}
               {hasDurationTimeline && node.data.maxDuration > 0 && (
                 <div
-                  className="px-2"
+                  className="px-2 py-1"
                   style={{ paddingLeft: node.depth * INDENT_PX + INDENT_PX }}
                 >
                   <div className="relative h-1 w-full">

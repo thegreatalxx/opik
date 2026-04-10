@@ -6,12 +6,8 @@ import isBoolean from "lodash/isBoolean";
 import isFunction from "lodash/isFunction";
 import useLocalStorageState from "use-local-storage-state";
 
-import { ChevronDown, Expand } from "lucide-react";
-
 import { OnChangeFn } from "@/types/shared";
-import { cn } from "@/lib/utils";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/ui/dialog";
-import TooltipWrapper from "@/shared/TooltipWrapper/TooltipWrapper";
 import ZoomPanContainer from "@/shared/ZoomPanContainer/ZoomPanContainer";
 import MermaidDiagram from "@/shared/MermaidDiagram/MermaidDiagram";
 import {
@@ -25,6 +21,7 @@ import TraceDataViewer from "./TraceDataViewer/TraceDataViewer";
 import TraceTreeViewer from "./TraceTreeViewer/TraceTreeViewer";
 import TraceAIViewer from "./TraceAIViewer/TraceAIViewer";
 import AnnotatePanel from "./AnnotatePanel/AnnotatePanel";
+import AgentGraphHeader from "./AgentGraphHeader";
 import AgentGraphTab from "./TraceDataViewer/AgentGraphTab";
 import NoData from "@/shared/NoData/NoData";
 import { BASE_TRACE_DATA_TYPE, Span } from "@/types/traces";
@@ -51,38 +48,6 @@ import {
 } from "@/constants/traces";
 
 const MAX_SPANS_LOAD_SIZE = 15000;
-
-const AgentGraphHeader: React.FC<{
-  isCollapsed: boolean;
-  onToggleCollapse: () => void;
-  onFullscreen: () => void;
-  border: "top" | "bottom";
-}> = ({ isCollapsed, onToggleCollapse, onFullscreen, border }) => (
-  <div
-    className={cn(
-      "flex h-10 shrink-0 items-center justify-between bg-muted/50 px-3",
-      border === "top" ? "border-t" : "border-b",
-    )}
-  >
-    <span className="comet-body-xs-accented">Agent graph</span>
-    <div className="flex items-center gap-1">
-      <TooltipWrapper content="Open in fullscreen">
-        <button
-          className="flex size-6 cursor-pointer items-center justify-center rounded-sm text-muted-foreground hover:bg-muted"
-          onClick={onFullscreen}
-        >
-          <Expand className="size-3.5" />
-        </button>
-      </TooltipWrapper>
-      <button
-        className="flex size-6 cursor-pointer items-center justify-center rounded-sm text-muted-foreground hover:bg-muted"
-        onClick={onToggleCollapse}
-      >
-        <ChevronDown className={cn("size-3.5", isCollapsed && "-rotate-90")} />
-      </button>
-    </div>
-  </div>
-);
 
 type TraceDetailsPanelProps = {
   projectId?: string;
@@ -116,7 +81,11 @@ const TraceDetailsPanel: React.FunctionComponent<TraceDetailsPanelProps> = ({
   const [activeSection, setActiveSection] =
     useDetailsActionSectionState("lastSection");
   const { flattenedTree } = useTreeDetailsStore();
-  const [isGraphCollapsed, setIsGraphCollapsed] = useState(false);
+  const [isGraphCollapsed = false, setIsGraphCollapsed] = useQueryParam(
+    `trace_panel_graph_collapsed`,
+    JsonParam,
+    { updateType: "replaceIn" },
+  );
   const [isGraphFullscreen, setIsGraphFullscreen] = useState(false);
 
   const [search = undefined, setSearch] = useQueryParam(

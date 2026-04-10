@@ -52,7 +52,7 @@ const BaseTraceDataTypeIcon: React.FunctionComponent<
   return (
     <div
       style={{ background: data.color }}
-      className="relative flex size-4 items-center justify-center rounded flex-shrink-0"
+      className="relative flex size-4 items-center justify-center rounded shrink-0"
     >
       <TooltipWrapper content={data.tooltip}>
         <data.icon className="size-2 text-white" />
