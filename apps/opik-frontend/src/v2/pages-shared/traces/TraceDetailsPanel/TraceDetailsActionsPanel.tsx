@@ -4,10 +4,10 @@ import FileSaver from "file-saver";
 import { json2csv } from "json-2-csv";
 import get from "lodash/get";
 import {
+  ArrowUpRight,
   ChevronsRight,
   Copy,
   Download,
-  ExternalLink,
   MoreHorizontal,
   Share,
   Sparkles,
@@ -104,13 +104,13 @@ const TraceDetailsActionsPanel: React.FunctionComponent<
     "j",
     () =>
       horizontalNavigation?.hasPrevious && horizontalNavigation.onChange(-1),
-    { enabled: Boolean(horizontalNavigation) },
+    { enabled: Boolean(horizontalNavigation), enableOnFormTags: false },
     [horizontalNavigation],
   );
   useHotkeys(
     "k",
     () => horizontalNavigation?.hasNext && horizontalNavigation.onChange(1),
-    { enabled: Boolean(horizontalNavigation) },
+    { enabled: Boolean(horizontalNavigation), enableOnFormTags: false },
     [horizontalNavigation],
   );
 
@@ -371,7 +371,7 @@ const TraceDetailsActionsPanel: React.FunctionComponent<
               onClick={() => setThreadId!(threadId)}
             >
               Thread
-              <ExternalLink className="ml-1 size-3.5" />
+              <ArrowUpRight className="ml-1 size-3.5" />
             </Button>
           </TooltipWrapper>
         )}
