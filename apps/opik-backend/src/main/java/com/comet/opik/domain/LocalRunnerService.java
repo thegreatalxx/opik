@@ -1949,13 +1949,17 @@ class LocalRunnerServiceImpl implements LocalRunnerService {
             @NonNull UUID projectId, int afterStep, @NonNull PakeRole forRole) {
         PakeRole otherRole = forRole == PakeRole.DAEMON ? PakeRole.BROWSER : PakeRole.DAEMON;
 
+        // Note: we do NOT require the session bucket to exist here. completePairing deletes the
+        // session bucket and then posts the step=COMPLETION marker to the messages list (TTL ~1min).
+        // The daemon's final poll for step=COMPLETION must still succeed in that window, so we treat
+        // the messages list as the source of truth and only 404 if it is also gone.
+        String messagesKey = pakeMessagesKey(workspaceId, userName, projectId);
         RBucket<String> sessionBucket = redisClient.getBucket(pakeSessionKey(workspaceId, userName, projectId));
-        if (!sessionBucket.isExists()) {
+        if (!sessionBucket.isExists() && !redisClient.getList(messagesKey).isExists()) {
             throw new NotFoundException("No pairing session found for this user/project");
         }
 
-        long maxAttempts = Math.max(1, runnerConfig.getBridgePollTimeout().toSeconds() * 1000 / PAKE_POLL_INTERVAL_MS);
-        String messagesKey = pakeMessagesKey(workspaceId, userName, projectId);
+        long maxAttempts = Math.max(1, runnerConfig.getPakePollTimeout().toSeconds() * 1000 / PAKE_POLL_INTERVAL_MS);
 
         return Mono.fromCallable(() -> pollPakeMessagesOnce(messagesKey, otherRole, afterStep))
                 .subscribeOn(Schedulers.boundedElastic())

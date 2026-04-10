@@ -500,7 +500,7 @@ public class LocalRunnersResource {
         ensureEnabled();
         String workspaceId = requestContext.get().getWorkspaceId();
         String userName = requestContext.get().getUserName();
-        long pollTimeoutSeconds = runnerConfig.getBridgePollTimeout().toSeconds();
+        long pollTimeoutSeconds = runnerConfig.getPakePollTimeout().toSeconds();
         long bufferSeconds = runnerConfig.getBridgeAsyncTimeoutBuffer().toSeconds();
         asyncResponse.setTimeout(pollTimeoutSeconds + bufferSeconds, TimeUnit.SECONDS);
         asyncResponse.setTimeoutHandler(

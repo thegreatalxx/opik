@@ -207,11 +207,11 @@ def runner_process(api_client, subprocess_env, project_id, request):
     connect_resp = api_client.runners.complete_pairing(project_id=project_id)
     runner_id = connect_resp.runner_id
 
-    # Wait for daemon to show runner ID (confirms it picked up completion)
-    runner_match = _wait_for_pattern(
-        output_lines, r"runner: (\S+)", time.monotonic() + PAKE_TIMEOUT
+    # Wait for daemon to show paired status (confirms it picked up completion)
+    paired_match = _wait_for_pattern(
+        output_lines, r"Paired", time.monotonic() + PAKE_TIMEOUT
     )
-    if runner_match is None:
+    if paired_match is None:
         proc.terminate()
         proc.wait(timeout=5)
         drain_thread.join(timeout=5)

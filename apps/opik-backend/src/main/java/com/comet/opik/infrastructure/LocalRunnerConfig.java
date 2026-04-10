@@ -87,6 +87,10 @@ public class LocalRunnerConfig {
 
     @Valid @NotNull @JsonProperty
     @MinDuration(value = 1, unit = TimeUnit.SECONDS)
+    private Duration pakePollTimeout = Duration.minutes(5);
+
+    @Valid @NotNull @JsonProperty
+    @MinDuration(value = 1, unit = TimeUnit.SECONDS)
     private Duration bridgeDefaultCommandTimeout = Duration.seconds(30);
 
     @Valid @NotNull @JsonProperty

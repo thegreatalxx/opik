@@ -11,6 +11,7 @@ import click
 import httpx
 
 from opik import Opik
+from opik.api_objects.rest_helpers import resolve_project_id_by_name
 from opik.rest_api.client import OpikApi
 from opik.rest_api.core.api_error import ApiError
 from opik.rest_api.core.request_options import RequestOptions
@@ -19,9 +20,9 @@ from opik.runner.supervisor import Supervisor
 from opik.runner.tui import RunnerTUI
 
 LOGGER = logging.getLogger(__name__)
-_PAKE_TIMEOUT = 30.0
+_PAKE_TIMEOUT = 300.0
 _PAKE_POLL_OPTIONS = RequestOptions(timeout_in_seconds=_PAKE_TIMEOUT + 10)
-_PAKE_COMPLETE_OPTIONS = RequestOptions(timeout_in_seconds=310)
+_PAKE_COMPLETE_OPTIONS = _PAKE_POLL_OPTIONS
 
 
 def _validate_command(command: Tuple[str, ...]) -> None:
@@ -36,13 +37,6 @@ def _validate_command(command: Tuple[str, ...]) -> None:
     if not os.access(resolved, os.X_OK):
         click.echo(f"Error: Command is not executable: '{executable}'", err=True)
         raise SystemExit(2)
-
-
-def _resolve_project_id(api: OpikApi, project_name: str) -> str:
-    resp = api.projects.find_projects(name=project_name)
-    if resp.content:
-        return str(resp.content[0].id)
-    raise click.ClickException(f"Project '{project_name}' not found")
 
 
 def _wait_for_pake_step(
@@ -73,16 +67,11 @@ def _wait_for_pake_step(
     return payload
 
 
-def _run_pake_exchange(
-    api: OpikApi, code: str, project_id: str, runner_name: str
-) -> Tuple[str, str, bytes]:
-    """Run the full PAKE exchange and return (runner_id, project_name, shared_key)."""
+def _run_pake_exchange(api: OpikApi, code: str, project_id: str) -> Tuple[str, bytes]:
+    """Run the PAKE exchange (session must already be registered).
 
-    result = api.runners.register_daemon_pair(
-        project_id=project_id, runner_name=runner_name
-    )
-    runner_id = result.runner_id
-
+    Returns (project_name, shared_key).
+    """
     session = PakeSession(code)
     outgoing_msg = session.start()
 
@@ -137,7 +126,7 @@ def _run_pake_exchange(
         request_options=_PAKE_COMPLETE_OPTIONS,
     )
 
-    return runner_id, project_name, session.shared_key
+    return project_name, session.shared_key
 
 
 _DEFAULT_SESSION_TTL = 24 * 3600
@@ -177,27 +166,36 @@ def connect(
     client = Opik(api_key=api_key, _show_misconfiguration_message=False)
     api = client.rest_client
 
+    tui: Optional[RunnerTUI] = None
     try:
         runner_name = name or f"{platform.node()}-{uuid.uuid4().hex[:6]}"
-        project_id = _resolve_project_id(api, project_name)
+        project_id = resolve_project_id_by_name(api, project_name)
         code = generate_code()
+
+        register_result = api.runners.register_daemon_pair(
+            project_id=project_id, runner_name=runner_name
+        )
+        runner_id = register_result.runner_id
 
         tui = RunnerTUI()
         tui.start()
-
-        click.echo(f"\n  Pairing code: {code}")
-        click.echo("  Enter this code in Ollie to start your session.")
-        click.echo("  Expires in 5 minutes.\n")
-
-        runner_id, resolved_project_name, shared_key = _run_pake_exchange(
-            api, code, project_id, runner_name
-        )
-
         tui.print_banner(
-            runner_id,
-            resolved_project_name or project_name,
+            project_name=project_name,
             url=client.config.url_override,
         )
+
+        tui.pairing_started(code, _PAKE_TIMEOUT)
+        try:
+            resolved_project_name, shared_key = _run_pake_exchange(
+                api, code, project_id
+            )
+        except KeyboardInterrupt:
+            tui.pairing_failed("interrupted")
+            raise
+        except Exception:
+            tui.pairing_failed()
+            raise
+        tui.pairing_completed()
 
         env = {
             **os.environ,
@@ -233,6 +231,10 @@ def connect(
             supervisor.run()
         finally:
             tui.stop()
+    except KeyboardInterrupt:
+        if tui is not None:
+            tui.stop()
+        raise SystemExit(130)
     except ApiError as e:
         click.echo(f"Error: {e.body}" if e.body else f"Error: {e.status_code}")
         raise SystemExit(1)

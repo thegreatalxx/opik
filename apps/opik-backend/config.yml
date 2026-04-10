@@ -1037,6 +1037,9 @@ localRunner:
   # Default: 30s
   # Description: How long the bridge nextCommands long-poll blocks before returning empty
   bridgePollTimeout: ${OPIK_RUNNER_BRIDGE_POLL_TIMEOUT:-30s}
+  # Default: 5m
+  # Description: How long the PAKE pairing message long-poll blocks before returning empty
+  pakePollTimeout: ${OPIK_RUNNER_PAKE_POLL_TIMEOUT:-5m}
   # Default: 30s
   # Description: Default timeout for bridge commands when not specified by caller
   bridgeDefaultCommandTimeout: ${OPIK_RUNNER_BRIDGE_DEFAULT_CMD_TIMEOUT:-30s}
