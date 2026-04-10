@@ -268,7 +268,7 @@ export const TraceDataToolbar: React.FC<TraceDataToolbarProps> = ({
 
   return (
     <div className="flex h-10 shrink-0 items-center gap-2 border-b bg-muted/50 px-4">
-      <span className="comet-body-xs whitespace-nowrap text-black">
+      <span className="comet-body-xs whitespace-nowrap text-foreground">
         Inspect:
       </span>
       <BaseTraceDataTypeIcon type={inspectType} />

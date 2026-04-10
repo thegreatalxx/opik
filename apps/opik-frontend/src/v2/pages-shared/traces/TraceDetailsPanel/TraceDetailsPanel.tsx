@@ -1,6 +1,6 @@
 import React, { useCallback, useMemo, useState } from "react";
 import { keepPreviousData } from "@tanstack/react-query";
-import { JsonParam, useQueryParam } from "use-query-params";
+import { BooleanParam, JsonParam, useQueryParam } from "use-query-params";
 import find from "lodash/find";
 import isBoolean from "lodash/isBoolean";
 import isFunction from "lodash/isFunction";
@@ -83,7 +83,7 @@ const TraceDetailsPanel: React.FunctionComponent<TraceDetailsPanelProps> = ({
   const { flattenedTree } = useTreeDetailsStore();
   const [isGraphCollapsed = false, setIsGraphCollapsed] = useQueryParam(
     `trace_panel_graph_collapsed`,
-    JsonParam,
+    BooleanParam,
     { updateType: "replaceIn" },
   );
   const [isGraphFullscreen, setIsGraphFullscreen] = useState(false);

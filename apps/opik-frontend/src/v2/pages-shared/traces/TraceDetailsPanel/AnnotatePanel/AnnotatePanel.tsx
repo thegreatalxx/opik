@@ -76,44 +76,45 @@ const AnnotatePanel: React.FC<AnnotatePanelProps> = ({
     [isTrace, spanId, filteredFeedbackScores, feedbackScoreDelete, traceId],
   );
 
-  const traceDeleteMutation = useTraceCommentsBatchDeleteMutation();
-  const spanDeleteMutation = useSpanCommentsBatchDeleteMutation();
-  const createSpanMutation = useCreateSpanCommentMutation();
-  const createTraceMutation = useCreateTraceCommentMutation();
-  const updateSpanMutation = useUpdateSpanCommentMutation();
-  const updateTraceMutation = useUpdateTraceCommentMutation();
+  const { mutate: deleteTraceComments } =
+    useTraceCommentsBatchDeleteMutation();
+  const { mutate: deleteSpanComments } = useSpanCommentsBatchDeleteMutation();
+  const { mutate: createSpanComment } = useCreateSpanCommentMutation();
+  const { mutate: createTraceComment } = useCreateTraceCommentMutation();
+  const { mutate: updateSpanComment } = useUpdateSpanCommentMutation();
+  const { mutate: updateTraceComment } = useUpdateTraceCommentMutation();
 
   const onCommentSubmit = useCallback(
     (text: string) => {
       if (!spanId) {
-        createTraceMutation.mutate({ text, traceId });
+        createTraceComment({ text, traceId });
         return;
       }
-      createSpanMutation.mutate({ text, spanId, projectId });
+      createSpanComment({ text, spanId, projectId });
     },
-    [spanId, traceId, projectId, createTraceMutation, createSpanMutation],
+    [spanId, traceId, projectId, createTraceComment, createSpanComment],
   );
 
   const onCommentEdit = useCallback(
     (commentId: string, text: string) => {
       if (!spanId) {
-        updateTraceMutation.mutate({ text, commentId, traceId });
+        updateTraceComment({ text, commentId, traceId });
         return;
       }
-      updateSpanMutation.mutate({ text, commentId, projectId });
+      updateSpanComment({ text, commentId, projectId });
     },
-    [spanId, traceId, projectId, updateTraceMutation, updateSpanMutation],
+    [spanId, traceId, projectId, updateTraceComment, updateSpanComment],
   );
 
   const onCommentDelete = useCallback(
     (commentId: string) => {
       if (!spanId) {
-        traceDeleteMutation.mutate({ ids: [commentId], traceId });
+        deleteTraceComments({ ids: [commentId], traceId });
         return;
       }
-      spanDeleteMutation.mutate({ ids: [commentId], projectId });
+      deleteSpanComments({ ids: [commentId], projectId });
     },
-    [spanId, traceId, projectId, traceDeleteMutation, spanDeleteMutation],
+    [spanId, traceId, projectId, deleteTraceComments, deleteSpanComments],
   );
 
   return (

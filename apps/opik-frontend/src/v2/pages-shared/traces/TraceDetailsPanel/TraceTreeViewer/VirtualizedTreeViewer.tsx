@@ -11,8 +11,8 @@ import {
   MessageSquareMore,
   PenLine,
   Tag,
-  TriangleAlert,
 } from "lucide-react";
+import ErrorTriangle from "@/icons/error-triangle.svg?react";
 
 import useTreeDetailsStore, {
   TREE_DATABLOCK_TYPE,
@@ -486,12 +486,12 @@ const VirtualizedTreeViewer: React.FC<VirtualizedTreeViewerProps> = ({
                   <TooltipWrapper
                     content={node.data.error_info?.message ?? "Has error"}
                   >
-                    <div className="flex size-5 items-center justify-center rounded-sm bg-[var(--error-indicator-background)]">
-                      <TriangleAlert className="size-3 text-[var(--error-indicator-text)]" />
-                    </div>
+                    <span className="flex shrink-0 items-center">
+                      <ErrorTriangle width={12} height={12} />
+                    </span>
                   </TooltipWrapper>
                 )}
-                {isExpandable && (
+                {isExpandable ? (
                   <TooltipWrapper
                     content="Expand/Collapse"
                     hotkeys={EXPAND_HOTKEYS}
@@ -511,6 +511,8 @@ const VirtualizedTreeViewer: React.FC<VirtualizedTreeViewerProps> = ({
                       />
                     </Button>
                   </TooltipWrapper>
+                ) : (
+                  <div className="size-4 shrink-0" />
                 )}
               </div>
               {nodeHasDetails(node) && (
