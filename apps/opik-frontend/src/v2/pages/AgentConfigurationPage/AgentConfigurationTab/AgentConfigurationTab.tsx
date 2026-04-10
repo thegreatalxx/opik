@@ -7,6 +7,7 @@ import {
   FilePen,
   History,
   Settings2,
+  User,
 } from "lucide-react";
 import { StringParam, useQueryParam } from "use-query-params";
 
@@ -98,16 +99,26 @@ const HistoryPopover: React.FC<HistoryPopoverProps> = ({
               <div className="mt-1 flex flex-col gap-1 pl-[18px]">
                 <p className="comet-body-xs flex min-w-0 items-center gap-1 text-light-slate">
                   <FilePen className="size-3 shrink-0" />
-                  <span className="truncate">
-                    {item.description ||
-                      generateBlueprintDescription(item.values)}
-                  </span>
+                  <TooltipWrapper
+                    content={
+                      item.description ||
+                      generateBlueprintDescription(item.values)
+                    }
+                  >
+                    <span className="w-fit max-w-full truncate">
+                      {item.description ||
+                        generateBlueprintDescription(item.values)}
+                    </span>
+                  </TooltipWrapper>
                 </p>
                 <div className="comet-body-xs flex items-center gap-1 text-light-slate">
                   <Clock className="size-3 shrink-0" />
                   <span>{getTimeFromNow(item.created_at)}</span>
                   {item.created_by && (
-                    <span className="ml-1">· {item.created_by}</span>
+                    <span className="ml-1 flex items-center gap-1">
+                      <User className="size-3 shrink-0" />
+                      {item.created_by}
+                    </span>
                   )}
                 </div>
               </div>
