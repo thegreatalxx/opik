@@ -70,7 +70,7 @@ const SpanDetailsButton: React.FC<SpanDetailsButtonProps> = ({
 
   return (
     <DropdownMenu>
-      <TooltipWrapper content="Span details">
+      <TooltipWrapper content="More options">
         <DropdownMenuTrigger asChild>
           <Button variant="ghost" size="icon-2xs">
             <MoreVertical className="size-3" />
@@ -106,7 +106,7 @@ const SpanDetailsButton: React.FC<SpanDetailsButtonProps> = ({
               }))
             }
           >
-            Duration timeline
+            Timeline
           </DropdownMenuCustomCheckboxItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={() => toggleColumns(true)}>
