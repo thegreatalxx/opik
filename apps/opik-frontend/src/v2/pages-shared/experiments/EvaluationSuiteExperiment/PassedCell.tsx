@@ -126,10 +126,10 @@ export const StatusTag: React.FC<StatusInfo & { className?: string }> = ({
         className={cn(
           "inline-flex items-center gap-1 rounded-full border border-transparent px-2.5 py-0.5 font-mono text-xs font-semibold transition-colors",
           isPassed
-            ? "bg-success/15 text-success"
+            ? "bg-[var(--tag-green-bg)] text-[var(--tag-green-text)]"
             : isSkipped
               ? "bg-muted text-muted-foreground"
-              : "bg-destructive/15 text-destructive",
+              : "bg-[var(--tag-red-bg)] text-[var(--tag-red-text)]",
           "cursor-default",
           className,
         )}

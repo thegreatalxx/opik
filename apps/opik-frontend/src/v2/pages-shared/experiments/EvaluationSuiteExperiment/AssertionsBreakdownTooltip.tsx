@@ -156,8 +156,8 @@ export const AssertionsBreakdownTooltip: React.FC<
                           className={cn(
                             "inline-flex items-center gap-1 rounded-full border border-transparent px-2 py-0.5 font-mono text-xs font-normal",
                             allPassed
-                              ? "bg-success/15 text-success"
-                              : "bg-destructive/15 text-destructive",
+                              ? "bg-[var(--tag-green-bg)] text-[var(--tag-green-text)]"
+                              : "bg-[var(--tag-red-bg)] text-[var(--tag-red-text)]",
                           )}
                         >
                           {allPassed ? (
