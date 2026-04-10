@@ -1,4 +1,10 @@
-import React, { type ReactNode, useCallback, useMemo, useRef } from "react";
+import React, {
+  type ReactNode,
+  useCallback,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import * as AccordionPrimitive from "@radix-ui/react-accordion";
 import { ChevronDown, CircleCheck, CircleX } from "lucide-react";
 
@@ -6,6 +12,11 @@ import { cn } from "@/lib/utils";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/ui/hover-card";
 import { Accordion, AccordionContent, AccordionItem } from "@/ui/accordion";
 import { AssertionResult } from "@/types/datasets";
+
+type Side = "top" | "bottom" | "left" | "right";
+
+// max-h-96 (384px) + sideOffset (4px) + collisionPadding (16px)
+const MAX_TOOLTIP_HEIGHT = 404;
 
 type AssertionsBreakdownTooltipProps = {
   children: ReactNode;
@@ -16,6 +27,21 @@ export const AssertionsBreakdownTooltip: React.FC<
   AssertionsBreakdownTooltipProps
 > = ({ children, assertionsByRun }) => {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLSpanElement>(null);
+  const [preferredSide, setPreferredSide] = useState<Side>("bottom");
+
+  // Prevent side flipping while accordion items expand/collapse by making the opposite
+  // side appear to always overflow. Horizontal padding stays at 16 so the tooltip still
+  // nudges left/right to stay inside the viewport.
+  const activeCollisionPadding = useMemo(() => {
+    const LOCK_PADDING = 99999;
+    return {
+      top: preferredSide === "bottom" ? LOCK_PADDING : 16,
+      bottom: preferredSide === "top" ? LOCK_PADDING : 16,
+      left: preferredSide === "right" ? LOCK_PADDING : 16,
+      right: preferredSide === "left" ? LOCK_PADDING : 16,
+    };
+  }, [preferredSide]);
 
   const scrollToRun = useCallback((idx: number) => {
     requestAnimationFrame(() => {
@@ -61,8 +87,18 @@ export const AssertionsBreakdownTooltip: React.FC<
 
   const handleOpenChange = useCallback(
     (open: boolean) => {
-      if (open)
+      if (open) {
+        // Compute side from trigger position — no async DOM sync needed
+        if (triggerRef.current) {
+          const { bottom } = triggerRef.current.getBoundingClientRect();
+          setPreferredSide(
+            window.innerHeight - bottom < MAX_TOOLTIP_HEIGHT ? "top" : "bottom",
+          );
+        }
         scrollToFirstFailedAssertion(defaultOpenIdx >= 0 ? defaultOpenIdx : 0);
+      } else {
+        setPreferredSide("bottom");
+      }
     },
     [defaultOpenIdx, scrollToFirstFailedAssertion],
   );
@@ -83,11 +119,13 @@ export const AssertionsBreakdownTooltip: React.FC<
 
   return (
     <HoverCard openDelay={200} closeDelay={500} onOpenChange={handleOpenChange}>
-      <HoverCardTrigger asChild>{children}</HoverCardTrigger>
+      <HoverCardTrigger asChild>
+        <span ref={triggerRef}>{children}</span>
+      </HoverCardTrigger>
       <HoverCardContent
-        side="bottom"
+        side={preferredSide}
         align="start"
-        collisionPadding={16}
+        collisionPadding={activeCollisionPadding}
         className="w-80 p-0"
         onClick={(e) => e.stopPropagation()}
       >
