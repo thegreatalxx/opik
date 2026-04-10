@@ -124,7 +124,7 @@ export const StatusTag: React.FC<StatusInfo & { className?: string }> = ({
     <AssertionsBreakdownTooltip assertionsByRun={assertionsByRun}>
       <div
         className={cn(
-          "inline-flex h-5 items-center gap-1 rounded-sm border border-transparent px-2 font-mono text-xs font-semibold transition-colors",
+          "inline-flex h-5 items-center gap-1 rounded-md border border-transparent px-2 font-mono text-xs font-semibold transition-colors",
           isPassed
             ? "bg-[var(--tag-green-bg)] text-[var(--tag-green-text)]"
             : isSkipped
