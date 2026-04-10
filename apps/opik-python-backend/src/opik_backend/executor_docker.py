@@ -368,6 +368,8 @@ class DockerExecutor(CodeExecutorBase):
 
                 # Remove the container
                 container.remove(force=True)
+                executor_cpu_cores_gauge.set(0.0, {"container_id": short_id})
+                executor_memory_bytes_gauge.set(0.0, {"container_id": short_id})
 
                 # Calculate and record the latency
                 latency = self._calculate_latency_ms(start_time)
@@ -379,10 +381,12 @@ class DockerExecutor(CodeExecutorBase):
                 logger.error(f"Container {container.id} failed to be removed, queuing for retry: {e}")
                 container_remove_failure_counter.add(1, {"container_id": short_id, "error": "api_error"})
                 self._pending_removal_queue.put(container.id)
+                pending_removal_queue_size_gauge.set(self._pending_removal_queue.qsize())
             except Exception as e:
                 logger.error(f"Failed to stop container {container.id}, queuing for retry: {e}")
                 container_remove_failure_counter.add(1, {"container_id": short_id, "error": type(e).__name__})
                 self._pending_removal_queue.put(container.id)
+                pending_removal_queue_size_gauge.set(self._pending_removal_queue.qsize())
 
     def _retry_pending_removals(self):
         """Retry removal of containers that previously failed to be removed."""
@@ -390,6 +394,7 @@ class DockerExecutor(CodeExecutorBase):
             return schedule.CancelJob
 
         if self._pending_removal_queue.empty():
+            pending_removal_queue_size_gauge.set(0)
             return None
 
         pending_removal_queue_size_gauge.set(self._pending_removal_queue.qsize())
@@ -402,18 +407,24 @@ class DockerExecutor(CodeExecutorBase):
                 break
 
         for container_id in retry_ids:
-            try:
-                container = self.client.containers.get(container_id)
-                container.remove(force=True)
-                logger.debug(f"Successfully removed container {container_id} on retry")
-            except docker.errors.NotFound:
-                logger.debug(f"Container {container_id} already gone, skipping retry")
-            except Exception as e:
-                logger.warning(f"Retry removal failed for container {container_id}: {e}, will retry again")
-                self._pending_removal_queue.put(container_id)
+            self.releaser_executor.submit(self._remove_container_by_id, container_id)
 
-        pending_removal_queue_size_gauge.set(self._pending_removal_queue.qsize())
         return None
+
+    def _remove_container_by_id(self, container_id: str):
+        """Remove a single container by ID, re-enqueuing on failure."""
+        try:
+            container = self.client.containers.get(container_id)
+            container.remove(force=True)
+            executor_cpu_cores_gauge.set(0.0, {"container_id": container.short_id})
+            executor_memory_bytes_gauge.set(0.0, {"container_id": container.short_id})
+            logger.debug(f"Successfully removed container {container_id} on retry")
+        except docker.errors.NotFound:
+            logger.debug(f"Container {container_id} already gone, skipping retry")
+        except Exception as e:
+            logger.warning(f"Retry removal failed for container {container_id}: {e}, will retry again")
+            self._pending_removal_queue.put(container_id)
+            pending_removal_queue_size_gauge.set(self._pending_removal_queue.qsize())
 
     def get_container(self):
         with self.tracer.start_as_current_span("get_container"):
