@@ -328,7 +328,9 @@ const TraceDetailsPanel: React.FunctionComponent<TraceDetailsPanelProps> = ({
                 defaultSize={40}
                 minSize={30}
               >
-                {activeSection === DetailsActionSection.Annotate && (
+                {(activeSection === DetailsActionSection.Annotate ||
+                  activeSection === DetailsActionSection.Annotations ||
+                  activeSection === DetailsActionSection.Comments) && (
                   <AnnotatePanel
                     data={dataToView}
                     spanId={spanId}
