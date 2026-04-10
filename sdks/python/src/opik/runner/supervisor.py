@@ -62,15 +62,20 @@ class Supervisor:
         repo_root: Path,
         runner_id: str,
         api: Any,
+        *,
+        shared_key: bytes,
         on_child_output: Optional[Callable[[str, str], None]] = None,
         on_child_restart: Optional[Callable[[str], None]] = None,
         on_error: Optional[Callable[[str], None]] = None,
         on_command_start: Optional[Callable[[str, str, str], None]] = None,
         on_command_end: Optional[Callable[[str, bool, Optional[str]], None]] = None,
         watch: Optional[bool] = None,
-        shared_key: Optional[bytes] = None,
         session_ttl: Optional[float] = None,
     ) -> None:
+        if not shared_key:
+            raise ValueError(
+                "shared_key is required: daemon must complete PAKE pairing before running"
+            )
         self._command = command
         self._env = env
         self._repo_root = repo_root
@@ -117,18 +122,18 @@ class Supervisor:
             "SearchFiles": SearchFilesHandler(self._repo_root),
             "Exec": ExecHandler(self._repo_root, self._bg_tracker),
         }
-        verifier = CommandVerifier(self._shared_key) if self._shared_key else None
-        signer = CommandSigner(self._shared_key) if self._shared_key else None
+        verifier = CommandVerifier(self._shared_key)
+        signer = CommandSigner(self._shared_key)
 
         bridge_loop = BridgePollLoop(
             self._api,
             self._runner_id,
             handlers,
             self._shutdown_event,
-            on_command_start=self._on_command_start,
-            on_command_end=self._on_command_end,
             verifier=verifier,
             signer=signer,
+            on_command_start=self._on_command_start,
+            on_command_end=self._on_command_end,
         )
         bridge_thread = threading.Thread(
             target=bridge_loop.run, name="bridge-poll", daemon=True

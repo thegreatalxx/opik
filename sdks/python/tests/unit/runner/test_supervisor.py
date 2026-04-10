@@ -41,6 +41,7 @@ def _make_supervisor(
         repo_root=repo_root,
         runner_id=runner_id,
         api=api,
+        shared_key=b"test-shared-key-32-bytes-long!!!",
         watch=watch,
     )
 

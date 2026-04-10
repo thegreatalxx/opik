@@ -11,17 +11,37 @@ from opik.runner.bridge_loop import BridgePollLoop
 from opik.runner.hmac_signer import CommandSigner, CommandVerifier
 
 
+_TEST_KEY = b"test-shared-key-32-bytes-long!!!"
+_TEST_SIGNER = CommandSigner(_TEST_KEY)
+
+
 def _make_cmd(
     command_id: str = "cmd-1",
     cmd_type: str = "read_file",
     args: Optional[Dict] = None,
     timeout_seconds: int = 30,
 ) -> BridgeCommandItem:
+    args_dict = args if args is not None else {"path": "test.py"}
+    hmac_val = _TEST_SIGNER.sign(command_id, cmd_type, args_dict)
     return BridgeCommandItem(
         command_id=command_id,
         type=cmd_type,
-        args=args or {"path": "test.py"},
+        args=args_dict,
         timeout_seconds=timeout_seconds,
+        hmac=hmac_val,
+    )
+
+
+def _make_loop(
+    api, runner_id: str, handlers: Dict, shutdown: threading.Event
+) -> BridgePollLoop:
+    return BridgePollLoop(
+        api,
+        runner_id,
+        handlers,
+        shutdown,
+        verifier=CommandVerifier(_TEST_KEY),
+        signer=CommandSigner(_TEST_KEY),
     )
 
 
@@ -48,7 +68,7 @@ class TestBridgePollLoopPolling:
 
         api.runners.next_bridge_commands.side_effect = poll_side_effect
 
-        loop = BridgePollLoop(api, "runner-1", {}, shutdown)
+        loop = _make_loop(api, "runner-1", {}, shutdown)
         loop.run()
 
         assert call_count >= 3
@@ -72,7 +92,7 @@ class TestBridgePollLoopPolling:
 
         api.runners.next_bridge_commands.side_effect = poll_side_effect
 
-        loop = BridgePollLoop(api, "runner-1", {"read_file": handler}, shutdown)
+        loop = _make_loop(api, "runner-1", {"read_file": handler}, shutdown)
         loop.run()
 
         handler.execute.assert_called_once_with({"path": "test.py"}, 30.0)
@@ -101,7 +121,7 @@ class TestBridgePollLoopPolling:
 
         api.runners.next_bridge_commands.side_effect = poll_side_effect
 
-        loop = BridgePollLoop(api, "runner-1", {"read_file": handler}, shutdown)
+        loop = _make_loop(api, "runner-1", {"read_file": handler}, shutdown)
         loop.run()
 
         assert handler.execute.call_count == 3
@@ -122,7 +142,7 @@ class TestBridgePollLoopPolling:
 
         api.runners.next_bridge_commands.side_effect = poll_side_effect
 
-        loop = BridgePollLoop(api, "runner-1", {}, shutdown)
+        loop = _make_loop(api, "runner-1", {}, shutdown)
         loop.run()
 
         assert call_count >= 3
@@ -134,7 +154,7 @@ class TestBridgePollLoopPolling:
             status_code=410, body=None
         )
 
-        loop = BridgePollLoop(api, "runner-1", {}, shutdown)
+        loop = _make_loop(api, "runner-1", {}, shutdown)
         loop.run()
 
         assert shutdown.is_set()
@@ -153,7 +173,7 @@ class TestBridgePollLoopPolling:
 
         api.runners.next_bridge_commands.side_effect = poll_side_effect
 
-        loop = BridgePollLoop(api, "runner-1", {}, shutdown)
+        loop = _make_loop(api, "runner-1", {}, shutdown)
         loop.run()
 
         assert shutdown.is_set()
@@ -178,7 +198,7 @@ class TestBridgePollLoopDispatch:
 
         api.runners.next_bridge_commands.side_effect = poll_side_effect
 
-        loop = BridgePollLoop(api, "runner-1", {"read_file": handler}, shutdown)
+        loop = _make_loop(api, "runner-1", {"read_file": handler}, shutdown)
         loop.run()
 
         report_call = api.runners.report_bridge_result.call_args
@@ -201,7 +221,7 @@ class TestBridgePollLoopDispatch:
 
         api.runners.next_bridge_commands.side_effect = poll_side_effect
 
-        loop = BridgePollLoop(api, "runner-1", {}, shutdown)
+        loop = _make_loop(api, "runner-1", {}, shutdown)
         loop.run()
 
         report_call = api.runners.report_bridge_result.call_args
@@ -228,7 +248,7 @@ class TestBridgePollLoopReporting:
 
         api.runners.next_bridge_commands.side_effect = poll_side_effect
 
-        loop = BridgePollLoop(api, "runner-1", {"read_file": handler}, shutdown)
+        loop = _make_loop(api, "runner-1", {"read_file": handler}, shutdown)
         loop.run()
 
         api.runners.report_bridge_result.assert_called_once()
@@ -265,7 +285,7 @@ class TestBridgePollLoopReporting:
 
         api.runners.next_bridge_commands.side_effect = poll_side_effect
 
-        loop = BridgePollLoop(api, "runner-1", {"read_file": handler}, shutdown)
+        loop = _make_loop(api, "runner-1", {"read_file": handler}, shutdown)
         loop.run()
 
         assert report_call_count == 2
@@ -290,7 +310,7 @@ class TestBridgePollLoopReporting:
 
         api.runners.next_bridge_commands.side_effect = poll_side_effect
 
-        loop = BridgePollLoop(api, "runner-1", {"read_file": handler}, shutdown)
+        loop = _make_loop(api, "runner-1", {"read_file": handler}, shutdown)
         loop.run()
 
         assert api.runners.report_bridge_result.call_count == 3
@@ -317,7 +337,7 @@ class TestBridgePollLoopReporting:
 
         api.runners.next_bridge_commands.side_effect = poll_side_effect
 
-        loop = BridgePollLoop(api, "runner-1", {"read_file": handler}, shutdown)
+        loop = _make_loop(api, "runner-1", {"read_file": handler}, shutdown)
         loop.run()
 
         # 409 should be swallowed, not retried

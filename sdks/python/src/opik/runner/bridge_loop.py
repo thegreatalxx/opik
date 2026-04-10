@@ -60,10 +60,10 @@ class BridgePollLoop:
         runner_id: str,
         handlers: Dict[str, BaseHandler],
         shutdown_event: threading.Event,
+        verifier: CommandVerifier,
+        signer: CommandSigner,
         on_command_start: Optional[Callable[[str, str, str], None]] = None,
         on_command_end: Optional[Callable[[str, bool, Optional[str]], None]] = None,
-        verifier: Optional[CommandVerifier] = None,
-        signer: Optional[CommandSigner] = None,
     ) -> None:
         self._api = api
         self._runner_id = runner_id
@@ -145,17 +145,16 @@ class BridgePollLoop:
         return (resp.commands or [])[:_MAX_BATCH_SIZE]
 
     def _execute_and_report(self, cmd: BridgeCommandItem) -> None:
-        if self._verifier:
-            args_dict = dict(cmd.args) if cmd.args else {}
-            if not self._verifier.verify(
-                cmd.command_id or "", cmd.type or "", args_dict, cmd.hmac
-            ):
-                LOGGER.debug(
-                    "HMAC verification failed for command %s, dropping silently",
-                    cmd.command_id,
-                )
-                self._check_tamper_burst()
-                return
+        args_dict = dict(cmd.args) if cmd.args else {}
+        if not self._verifier.verify(
+            cmd.command_id or "", cmd.type or "", args_dict, cmd.hmac
+        ):
+            LOGGER.debug(
+                "HMAC verification failed for command %s, dropping silently",
+                cmd.command_id,
+            )
+            self._check_tamper_burst()
+            return
 
         summary = _build_op_summary(cmd)
         if self._on_command_start:
@@ -172,8 +171,6 @@ class BridgePollLoop:
             )
 
     def _check_tamper_burst(self) -> None:
-        if not self._verifier:
-            return
         now = time.monotonic()
         new_count = self._verifier.tamper_count - self._tamper_count_at_last_warning
         if (
@@ -243,10 +240,8 @@ class BridgePollLoop:
         error: Optional[Dict],
         duration_ms: Optional[int],
     ) -> None:
-        hmac_val = None
-        if self._signer:
-            payload = result if result is not None else error
-            hmac_val = self._signer.sign(command_id, status, payload)
+        payload = result if result is not None else error
+        hmac_val = self._signer.sign(command_id, status, payload)
 
         for attempt in range(_REPORT_MAX_RETRIES):
             try:
