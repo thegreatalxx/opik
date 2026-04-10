@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any, Optional, List, Dict, Set, Tuple
 
 import click
+from rich.console import Console
 from rich.progress import (
     Progress,
     SpinnerColumn,
@@ -21,7 +22,6 @@ import opik
 from opik import exceptions
 from opik.cli.export_manifest import ExportManifest
 from .utils import (
-    console,
     create_experiment_data_structure,
     debug_print,
     extract_trace_id_from_filename,
@@ -37,6 +37,8 @@ from .prompt import (
     export_related_prompts_by_name,
     export_prompts_by_ids,
 )
+
+console = Console()
 
 # Batch size for parallel trace fetching
 BATCH_SIZE = 100

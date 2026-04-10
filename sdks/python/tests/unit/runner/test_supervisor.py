@@ -23,7 +23,6 @@ def _make_supervisor(
     repo_root=None,
     runner_id="runner-1",
     api=None,
-    watch=None,
 ) -> Supervisor:
     if command is _SENTINEL:
         command = [sys.executable, "-c", "import time; time.sleep(60)"]
@@ -41,8 +40,6 @@ def _make_supervisor(
         repo_root=repo_root,
         runner_id=runner_id,
         api=api,
-        shared_key=b"test-shared-key-32-bytes-long!!!",
-        watch=watch,
     )
 
 
@@ -145,101 +142,67 @@ class TestRestart:
 
 
 class TestChildExit:
-    def test_restarts_on_nonzero_exit_if_stable(self) -> None:
-        sup = _make_supervisor()
-        sup._on_child_restart = MagicMock()
-        sup._on_error = MagicMock()
+    def test_restarts_if_stable(self) -> None:
+        api = MagicMock()
+        api.runners.heartbeat.return_value = LocalRunnerHeartbeatResponse()
 
-        # Guard stable, call _handle_child_exit with exit code 1
-        # (Guard tracks crashes in this method)
-        should_restart = sup._handle_child_exit(exit_code=1)
+        sup = _make_supervisor(
+            command=[sys.executable, "-c", "import sys; sys.exit(1)"],
+            api=api,
+        )
 
-        assert should_restart is True
-        sup._on_child_restart.assert_called_once_with("agent process has failed")
-        sup._on_error.assert_not_called()
+        restart_count = 0
+        original_start = sup._start_child
 
-    def test_triggers_error_on_crash_loop(self) -> None:
-        sup = _make_supervisor()
-        sup._on_child_restart = MagicMock()
-        sup._on_error = MagicMock()
+        def counting_start():
+            nonlocal restart_count
+            restart_count += 1
+            if restart_count >= 3:
+                sup._shutdown_event.set()
+            return original_start()
+
+        sup._start_child = counting_start
+
+        t = threading.Thread(target=sup.run, daemon=True)
+        t.start()
+        t.join(timeout=10)
+
+        assert restart_count >= 2
+
+    def test_waits_if_unstable(self) -> None:
+        sup = _make_supervisor(
+            command=[sys.executable, "-c", "import sys; sys.exit(1)"],
+        )
         sup._guard._max_crashes = 2
         sup._guard._window_seconds = 60.0
 
-        # Pre-record 2 crashes to make guard unstable
-        sup._guard.record_crash()
-        sup._guard.record_crash()
-        assert not sup._guard.is_stable()
+        t = threading.Thread(target=sup.run, daemon=True)
+        t.start()
 
-        # Call _handle_child_exit — should trigger error, not restart
-        should_restart = sup._handle_child_exit(exit_code=1)
+        time.sleep(3)
 
-        assert should_restart is False
-        sup._on_error.assert_called_once()
-        sup._on_child_restart.assert_not_called()
+        # Should be idle with no child, not shut down
+        assert sup._child is None
+        assert not sup._shutdown_event.is_set()
 
+        sup._shutdown_event.set()
+        t.join(timeout=10)
 
-class TestErrorCallback:
-    def test_on_error_called_on_crash_loop(self) -> None:
-        error_messages = []
+    def test_exit_0__no_restart(self) -> None:
         sup = _make_supervisor(
-            command=[sys.executable, "-c", "import sys; sys.exit(1)"],
+            command=[sys.executable, "-c", "pass"],
         )
-        sup._on_error = lambda msg: error_messages.append(msg)
-        sup._guard._max_crashes = 1
-        sup._guard._window_seconds = 60.0
 
-        # Exhaust stability guard so next crash triggers crash-loop
-        sup._guard.record_crash()
+        t = threading.Thread(target=sup.run, daemon=True)
+        t.start()
+        t.join(timeout=10)
 
-        # Record another crash — guard should now be unstable
-        sup._guard.record_crash()
-        assert not sup._guard.is_stable()
-
-        # Simulate the on_error path directly
-        if not sup._guard.is_stable():
-            if sup._on_error:
-                sup._on_error("Crash loop detected — waiting for file change to retry")
-
-        assert len(error_messages) == 1
-        assert "Crash loop" in error_messages[0]
-
-    def test_on_child_restart_called_on_crash_restart(self) -> None:
-        restart_reasons = []
-        sup = _make_supervisor(
-            command=[sys.executable, "-c", "import sys; sys.exit(1)"],
-        )
-        sup._on_child_restart = lambda reason: restart_reasons.append(reason)
-
-        # Guard is stable — should trigger on_child_restart
-        assert sup._guard.is_stable()
-
-        if sup._on_child_restart:
-            sup._on_child_restart("agent process has failed")
-
-        assert len(restart_reasons) == 1
-        assert "agent process has failed" in restart_reasons[0]
-
-    def test_on_error_not_called_when_stable(self) -> None:
-        error_messages = []
-        sup = _make_supervisor(
-            command=[sys.executable, "-c", "import sys; sys.exit(1)"],
-        )
-        sup._on_error = lambda msg: error_messages.append(msg)
-
-        # Guard is stable — on_error should not fire
-        sup._guard.record_crash()
-        assert sup._guard.is_stable()
-
-        if not sup._guard.is_stable():
-            if sup._on_error:
-                sup._on_error("should not happen")
-
-        assert len(error_messages) == 0
+        assert sup._shutdown_event.is_set()
 
 
 class TestShutdown:
     def test_stops_all(self) -> None:
-        sup = _make_supervisor(watch=False)
+        sup = _make_supervisor()
 
         t = threading.Thread(target=sup.run, daemon=True)
         t.start()
@@ -251,7 +214,7 @@ class TestShutdown:
         assert sup._child is None
 
     def test_waits_for_child(self) -> None:
-        sup = _make_supervisor(watch=False)
+        sup = _make_supervisor()
 
         t = threading.Thread(target=sup.run, daemon=True)
         t.start()
@@ -299,7 +262,7 @@ class TestStandaloneMode:
         api = MagicMock()
         api.runners.heartbeat.return_value = LocalRunnerHeartbeatResponse()
 
-        sup = _make_supervisor(command=None, api=api, watch=False)
+        sup = _make_supervisor(command=None, api=api)
 
         t = threading.Thread(target=sup.run, daemon=True)
         t.start()
@@ -315,7 +278,7 @@ class TestStandaloneMode:
         api = MagicMock()
         api.runners.heartbeat.return_value = LocalRunnerHeartbeatResponse()
 
-        sup = _make_supervisor(command=None, api=api, watch=False)
+        sup = _make_supervisor(command=None, api=api)
 
         t = threading.Thread(target=sup.run, daemon=True)
         t.start()
@@ -333,7 +296,7 @@ class TestStandaloneMode:
 
 class TestBridgeIntegration:
     def test_bridge_loop_runs(self) -> None:
-        sup = _make_supervisor(watch=False)
+        sup = _make_supervisor()
 
         t = threading.Thread(target=sup.run, daemon=True)
         t.start()

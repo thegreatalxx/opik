@@ -10,26 +10,23 @@ import com.comet.opik.api.runner.BridgeCommandSubmitRequest;
 import com.comet.opik.api.runner.BridgeCommandSubmitResponse;
 import com.comet.opik.api.runner.CreateLocalRunnerJobRequest;
 import com.comet.opik.api.runner.DaemonPairRegisterRequest;
-import com.comet.opik.api.runner.DaemonPairRegisterResponse;
 import com.comet.opik.api.runner.LocalRunner;
-import com.comet.opik.api.runner.LocalRunnerConnectRequest;
 import com.comet.opik.api.runner.LocalRunnerConnectResponse;
 import com.comet.opik.api.runner.LocalRunnerHeartbeatRequest;
 import com.comet.opik.api.runner.LocalRunnerHeartbeatResponse;
 import com.comet.opik.api.runner.LocalRunnerJob;
 import com.comet.opik.api.runner.LocalRunnerJobResultRequest;
 import com.comet.opik.api.runner.LocalRunnerLogEntry;
-import com.comet.opik.api.runner.LocalRunnerPairRequest;
-import com.comet.opik.api.runner.LocalRunnerPairResponse;
 import com.comet.opik.api.runner.LocalRunnerStatus;
-import com.comet.opik.api.runner.PairCompleteRequest;
+import com.comet.opik.api.runner.PakeMessagePage;
 import com.comet.opik.api.runner.PakeMessageRequest;
-import com.comet.opik.api.runner.PakeMessageResponse;
 import com.comet.opik.api.runner.PakeRole;
+import com.comet.opik.api.runner.PakeStep;
 import com.comet.opik.domain.LocalRunnerService;
 import com.comet.opik.infrastructure.LocalRunnerConfig;
 import com.comet.opik.infrastructure.auth.RequestContext;
 import com.comet.opik.infrastructure.ratelimit.RateLimited;
+import com.comet.opik.infrastructure.web.AsyncResponseSupport;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.NullNode;
 import io.swagger.v3.oas.annotations.Operation;
@@ -83,46 +80,6 @@ public class LocalRunnersResource {
     private final @NonNull Provider<RequestContext> requestContext;
     private final @NonNull LocalRunnerService runnerService;
     private final @NonNull LocalRunnerConfig runnerConfig;
-
-    @POST
-    @Path("/pairs")
-    @RateLimited
-    @Operation(operationId = "generatePairingCode", summary = "Generate a pairing code", description = "Generate a pairing code for a local runner in the current workspace", responses = {
-            @ApiResponse(responseCode = "201", description = "Pairing code generated", headers = @Header(name = "Location", description = "URI of the runner"), content = @Content(schema = @Schema(implementation = LocalRunnerPairResponse.class))),
-            @ApiResponse(responseCode = "404", description = "Not found", content = @Content(schema = @Schema(implementation = ErrorMessage.class)))})
-    public Response generatePairingCode(
-            @RequestBody(content = @Content(schema = @Schema(implementation = LocalRunnerPairRequest.class))) @NotNull @Valid LocalRunnerPairRequest request,
-            @Context UriInfo uriInfo) {
-        ensureEnabled();
-        String workspaceId = requestContext.get().getWorkspaceId();
-        String userName = requestContext.get().getUserName();
-        LocalRunnerPairResponse response = runnerService.generatePairingCode(workspaceId, userName,
-                request.projectId());
-        var uri = uriInfo.getBaseUriBuilder()
-                .path("v1/private/local-runners/{runnerId}")
-                .build(response.runnerId());
-        return Response.created(uri).entity(response).build();
-    }
-
-    @POST
-    @Path("/connections")
-    @RateLimited
-    @Operation(operationId = "connectRunner", summary = "Connect a local runner", description = "Exchange a pairing code or API key for local runner credentials", responses = {
-            @ApiResponse(responseCode = "201", description = "Runner connected", headers = @Header(name = "Location", description = "URI of the runner"), content = @Content(schema = @Schema(implementation = LocalRunnerConnectResponse.class))),
-            @ApiResponse(responseCode = "400", description = "Bad request", content = @Content(schema = @Schema(implementation = ErrorMessage.class))),
-            @ApiResponse(responseCode = "404", description = "Not found", content = @Content(schema = @Schema(implementation = ErrorMessage.class)))})
-    public Response connect(
-            @RequestBody(content = @Content(schema = @Schema(implementation = LocalRunnerConnectRequest.class))) @NotNull @Valid LocalRunnerConnectRequest request,
-            @Context UriInfo uriInfo) {
-        ensureEnabled();
-        String workspaceId = requestContext.get().getWorkspaceId();
-        String userName = requestContext.get().getUserName();
-        LocalRunnerConnectResponse connectResponse = runnerService.connect(workspaceId, userName, request);
-        var uri = uriInfo.getBaseUriBuilder()
-                .path("v1/private/local-runners/{runnerId}")
-                .build(connectResponse.runnerId());
-        return Response.created(uri).entity(connectResponse).build();
-    }
 
     @GET
     @Operation(operationId = "listRunners", summary = "List local runners", description = "List local runners owned by the current user in the workspace", responses = {
@@ -434,24 +391,15 @@ public class LocalRunnersResource {
         int maxTimeout = (int) runnerConfig.getBridgeMaxCommandTimeout().toSeconds();
         int clampedTimeout = Math.min(Math.max(timeout, 1), maxTimeout);
         long bufferSeconds = runnerConfig.getBridgeAsyncTimeoutBuffer().toSeconds();
-        asyncResponse.setTimeout(clampedTimeout + bufferSeconds, TimeUnit.SECONDS);
-        asyncResponse.setTimeoutHandler(
-                ar -> ar.resume(Response.status(Response.Status.REQUEST_TIMEOUT).build()));
 
-        runnerService.awaitBridgeCommand(runnerId, workspaceId, userName, commandId, clampedTimeout)
-                .map(cmd -> Response.ok(cmd).build())
-                .subscribe(
-                        asyncResponse::resume,
-                        error -> {
-                            if (error instanceof WebApplicationException wae) {
-                                asyncResponse.resume(wae);
-                            } else {
-                                log.error("Error awaiting bridge command='{}' runner='{}' workspace='{}'",
-                                        commandId,
-                                        runnerId, workspaceId, error);
-                                asyncResponse.resume(Response.serverError().build());
-                            }
-                        });
+        AsyncResponseSupport.resume(
+                asyncResponse,
+                runnerService.awaitBridgeCommand(runnerId, workspaceId, userName, commandId, clampedTimeout),
+                clampedTimeout + bufferSeconds,
+                cmd -> Response.ok(cmd).build(),
+                Response.status(Response.Status.REQUEST_TIMEOUT).build(),
+                "Error awaiting bridge command='{}' runner='{}' workspace='{}'",
+                commandId, runnerId, workspaceId);
     }
 
     // --- PAKE pairing relay endpoints ---
@@ -459,80 +407,82 @@ public class LocalRunnersResource {
     @POST
     @Path("/daemon-pairs")
     @RateLimited
-    @Operation(operationId = "registerDaemonPair", summary = "Register daemon pairing session", description = "Daemon registers a pairing session for a project. The pairing code is generated locally by the daemon and never sent to the backend.", responses = {
-            @ApiResponse(responseCode = "201", description = "Pairing session registered", content = @Content(schema = @Schema(implementation = DaemonPairRegisterResponse.class)))})
+    @Operation(operationId = "registerDaemonPair", summary = "Register daemon pairing session", description = "Daemon registers a pairing session for a project. The pairing code is generated locally by the daemon and never sent to the backend. On success, the response has no body — the daemon parses the runnerId from the Location header and follows up with GET /local-runners/{runnerId} for details.", responses = {
+            @ApiResponse(responseCode = "201", description = "Pairing session registered", headers = @Header(name = "Location", description = "URI of the runner"))})
     public Response registerDaemonPair(
-            @RequestBody(content = @Content(schema = @Schema(implementation = DaemonPairRegisterRequest.class))) @NotNull @Valid DaemonPairRegisterRequest request) {
+            @RequestBody(content = @Content(schema = @Schema(implementation = DaemonPairRegisterRequest.class))) @NotNull @Valid DaemonPairRegisterRequest request,
+            @Context UriInfo uriInfo) {
         ensureEnabled();
         String workspaceId = requestContext.get().getWorkspaceId();
         String userName = requestContext.get().getUserName();
-        DaemonPairRegisterResponse response = runnerService.registerDaemonPair(workspaceId, userName, request);
-        return Response.status(Response.Status.CREATED).entity(response).build();
+        UUID runnerId = runnerService.registerDaemonPair(workspaceId, userName, request);
+        var uri = uriInfo.getBaseUriBuilder()
+                .path("v1/private/local-runners/{runnerId}")
+                .build(runnerId);
+        return Response.created(uri).build();
     }
 
     @POST
-    @Path("/pake/messages")
+    @Path("/pake/messages/{projectId}/{targetRole}")
     @RateLimited
-    @Operation(operationId = "postPakeMessage", summary = "Post PAKE message", description = "Post a PAKE exchange message for relay. Session is resolved from auth context + project_id.", responses = {
+    @Operation(operationId = "postPakeMessage", summary = "Post PAKE message", description = "Post a PAKE exchange message into the target inbox. target_role is the side that will read this message (daemon posts to BROWSER inbox; browser posts to DAEMON inbox). Session is resolved from auth context + projectId.", responses = {
             @ApiResponse(responseCode = "204", description = "Message posted"),
             @ApiResponse(responseCode = "404", description = "No pairing session found", content = @Content(schema = @Schema(implementation = ErrorMessage.class))),
             @ApiResponse(responseCode = "429", description = "Too many attempts", content = @Content(schema = @Schema(implementation = ErrorMessage.class)))})
     public Response postPakeMessage(
-            @QueryParam("project_id") @NotNull UUID projectId,
+            @PathParam("projectId") UUID projectId,
+            @PathParam("targetRole") PakeRole targetRole,
             @RequestBody(content = @Content(schema = @Schema(implementation = PakeMessageRequest.class))) @NotNull @Valid PakeMessageRequest request) {
         ensureEnabled();
         String workspaceId = requestContext.get().getWorkspaceId();
         String userName = requestContext.get().getUserName();
-        runnerService.postPakeMessage(workspaceId, userName, projectId, request);
+        runnerService.postPakeMessage(workspaceId, userName, projectId, targetRole, request);
         return Response.noContent().build();
     }
 
     @GET
-    @Path("/pake/messages")
-    @Operation(operationId = "getPakeMessages", summary = "Poll PAKE messages", description = "Long-poll for PAKE exchange messages from the other party. Session is resolved from auth context + project_id.", responses = {
-            @ApiResponse(responseCode = "200", description = "Messages", content = @Content(array = @ArraySchema(schema = @Schema(implementation = PakeMessageResponse.class)))),
+    @Path("/pake/messages/{projectId}/{targetRole}")
+    @Operation(operationId = "getPakeMessages", summary = "Poll PAKE messages", description = "Long-poll the target inbox for the next PAKE exchange message at the specified step. Returns a PakeMessagePage envelope with zero or one messages.", responses = {
+            @ApiResponse(responseCode = "200", description = "Messages envelope", content = @Content(schema = @Schema(implementation = PakeMessagePage.class))),
             @ApiResponse(responseCode = "404", description = "No pairing session found", content = @Content(schema = @Schema(implementation = ErrorMessage.class)))})
     public void getPakeMessages(
-            @QueryParam("project_id") @NotNull UUID projectId,
-            @QueryParam("after_step") @DefaultValue("-1") int afterStep,
-            @QueryParam("role") @NotNull PakeRole forRole,
+            @PathParam("projectId") UUID projectId,
+            @PathParam("targetRole") PakeRole targetRole,
+            @QueryParam("target_step") @DefaultValue("spake2") PakeStep targetStep,
             @Suspended AsyncResponse asyncResponse) {
         ensureEnabled();
         String workspaceId = requestContext.get().getWorkspaceId();
         String userName = requestContext.get().getUserName();
         long pollTimeoutSeconds = runnerConfig.getPakePollTimeout().toSeconds();
         long bufferSeconds = runnerConfig.getBridgeAsyncTimeoutBuffer().toSeconds();
-        asyncResponse.setTimeout(pollTimeoutSeconds + bufferSeconds, TimeUnit.SECONDS);
-        asyncResponse.setTimeoutHandler(
-                ar -> ar.resume(Response.ok(List.of()).build()));
-        runnerService.getPakeMessages(workspaceId, userName, projectId, afterStep, forRole)
-                .map(messages -> Response.ok(messages).build())
-                .subscribe(
-                        asyncResponse::resume,
-                        error -> {
-                            if (error instanceof WebApplicationException wae) {
-                                asyncResponse.resume(wae);
-                            } else {
-                                log.error("Error polling PAKE messages for project='{}' workspace='{}'",
-                                        projectId, workspaceId, error);
-                                asyncResponse.resume(Response.serverError().build());
-                            }
-                        });
+
+        AsyncResponseSupport.resume(
+                asyncResponse,
+                runnerService.getPakeMessages(workspaceId, userName, projectId, targetRole, targetStep),
+                pollTimeoutSeconds + bufferSeconds,
+                page -> Response.ok(page).build(),
+                Response.ok(PakeMessagePage.builder().messages(List.of()).build()).build(),
+                "Error polling PAKE messages for project='{}' workspace='{}' targetRole='{}' targetStep='{}'",
+                projectId, workspaceId, targetRole, targetStep);
     }
 
     @POST
-    @Path("/pake/complete")
+    @Path("/pake/complete/{projectId}")
     @RateLimited
-    @Operation(operationId = "completePairing", summary = "Complete PAKE pairing", description = "Browser completes pairing after key confirmation, activating the runner", responses = {
-            @ApiResponse(responseCode = "201", description = "Pairing completed", content = @Content(schema = @Schema(implementation = LocalRunnerConnectResponse.class))),
+    @Operation(operationId = "completePairing", summary = "Complete PAKE pairing", description = "Browser completes pairing after key confirmation, activating the runner. On success, the response has no body — the browser parses the runnerId from the Location header and follows up with GET /local-runners/{runnerId} for the project details.", responses = {
+            @ApiResponse(responseCode = "201", description = "Pairing completed", headers = @Header(name = "Location", description = "URI of the runner")),
             @ApiResponse(responseCode = "404", description = "No pairing session found", content = @Content(schema = @Schema(implementation = ErrorMessage.class)))})
     public Response completePairing(
-            @RequestBody(content = @Content(schema = @Schema(implementation = PairCompleteRequest.class))) @NotNull @Valid PairCompleteRequest request) {
+            @PathParam("projectId") UUID projectId,
+            @Context UriInfo uriInfo) {
         ensureEnabled();
         String workspaceId = requestContext.get().getWorkspaceId();
         String userName = requestContext.get().getUserName();
-        LocalRunnerConnectResponse response = runnerService.completePairing(workspaceId, userName, request);
-        return Response.status(Response.Status.CREATED).entity(response).build();
+        LocalRunnerConnectResponse response = runnerService.completePairing(workspaceId, userName, projectId);
+        var uri = uriInfo.getBaseUriBuilder()
+                .path("v1/private/local-runners/{runnerId}")
+                .build(response.runnerId());
+        return Response.created(uri).build();
     }
 
     private void ensureEnabled() {

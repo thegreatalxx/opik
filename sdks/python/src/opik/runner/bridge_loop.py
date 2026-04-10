@@ -11,12 +11,8 @@ from ..rest_api.core.request_options import RequestOptions
 from ..rest_api.types.bridge_command_item import BridgeCommandItem
 from .bridge_handlers import BaseHandler, CommandError
 from .bridge_handlers import common
-from .hmac_signer import CommandSigner, CommandVerifier
 
 LOGGER = logging.getLogger(__name__)
-
-_TAMPER_BURST_THRESHOLD = 12
-_TAMPER_BURST_WINDOW = 60
 
 _POLL_TIMEOUT_SECONDS = 45
 _MAX_WORKERS = 10
@@ -60,8 +56,6 @@ class BridgePollLoop:
         runner_id: str,
         handlers: Dict[str, BaseHandler],
         shutdown_event: threading.Event,
-        verifier: CommandVerifier,
-        signer: CommandSigner,
         on_command_start: Optional[Callable[[str, str, str], None]] = None,
         on_command_end: Optional[Callable[[str, bool, Optional[str]], None]] = None,
     ) -> None:
@@ -71,10 +65,6 @@ class BridgePollLoop:
         self._shutdown_event = shutdown_event
         self._on_command_start = on_command_start
         self._on_command_end = on_command_end
-        self._verifier = verifier
-        self._signer = signer
-        self._last_tamper_warning = 0.0
-        self._tamper_count_at_last_warning = 0
 
     def run(self) -> None:
         backoff = 1.0
@@ -145,17 +135,6 @@ class BridgePollLoop:
         return (resp.commands or [])[:_MAX_BATCH_SIZE]
 
     def _execute_and_report(self, cmd: BridgeCommandItem) -> None:
-        args_dict = dict(cmd.args) if cmd.args else {}
-        if not self._verifier.verify(
-            cmd.command_id or "", cmd.type or "", args_dict, cmd.hmac
-        ):
-            LOGGER.debug(
-                "HMAC verification failed for command %s, dropping silently",
-                cmd.command_id,
-            )
-            self._check_tamper_burst()
-            return
-
         summary = _build_op_summary(cmd)
         if self._on_command_start:
             self._on_command_start(cmd.command_id or "", cmd.type or "", summary)
@@ -169,20 +148,6 @@ class BridgePollLoop:
                 status == "completed",
                 error.get("code") if error else None,
             )
-
-    def _check_tamper_burst(self) -> None:
-        now = time.monotonic()
-        new_count = self._verifier.tamper_count - self._tamper_count_at_last_warning
-        if (
-            new_count >= _TAMPER_BURST_THRESHOLD
-            and (now - self._last_tamper_warning) >= _TAMPER_BURST_WINDOW
-        ):
-            LOGGER.warning(
-                "%d tampered commands rejected. Someone may be attempting to inject commands.",
-                new_count,
-            )
-            self._last_tamper_warning = now
-            self._tamper_count_at_last_warning = self._verifier.tamper_count
 
     def _execute_command(
         self, cmd: BridgeCommandItem
@@ -240,9 +205,6 @@ class BridgePollLoop:
         error: Optional[Dict],
         duration_ms: Optional[int],
     ) -> None:
-        payload = result if result is not None else error
-        hmac_val = self._signer.sign(command_id, status, payload)
-
         for attempt in range(_REPORT_MAX_RETRIES):
             try:
                 self._api.runners.report_bridge_result(
@@ -252,7 +214,6 @@ class BridgePollLoop:
                     result=result,
                     error=error,
                     duration_ms=duration_ms,
-                    hmac=hmac_val,
                 )
                 return
             except ApiError as e:

@@ -3003,27 +3003,6 @@ paths:
       responses:
         "204":
           description: No content
-  /v1/private/experiments/execute:
-    post:
-      tags:
-      - Experiments
-      summary: Create and execute experiment
-      description: Creates experiments for each prompt variant and asynchronously
-        processes all dataset items
-      operationId: executeExperiment
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/ExperimentExecutionRequest"
-        required: true
-      responses:
-        "202":
-          description: Experiments created and processing started
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ExperimentExecutionResponse"
   /v1/private/experiments/items/bulk:
     put:
       tags:
@@ -3890,32 +3869,6 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorMessage"
-  /v1/private/local-runners/pake/complete:
-    post:
-      tags:
-      - Runners
-      summary: Complete PAKE pairing
-      description: "Browser completes pairing after key confirmation, activating the\
-        \ runner"
-      operationId: completePairing
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/PairCompleteRequest"
-      responses:
-        "201":
-          description: Pairing completed
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/LocalRunnerConnectResponse"
-        "404":
-          description: No pairing session found
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorMessage"
   /v1/private/local-runners/connections:
     post:
       tags:
@@ -4126,84 +4079,6 @@ paths:
                 $ref: "#/components/schemas/LocalRunnerJob"
         "404":
           description: Not found
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorMessage"
-  /v1/private/local-runners/pake/messages:
-    get:
-      tags:
-      - Runners
-      summary: Poll PAKE messages
-      description: Long-poll for PAKE exchange messages from the other party. Session
-        is resolved from auth context + project_id.
-      operationId: getPakeMessages
-      parameters:
-      - name: project_id
-        in: query
-        required: true
-        schema:
-          type: string
-          format: uuid
-      - name: after_step
-        in: query
-        schema:
-          type: integer
-          format: int32
-          default: -1
-      - name: role
-        in: query
-        required: true
-        schema:
-          type: string
-          enum:
-          - daemon
-          - browser
-      responses:
-        "200":
-          description: Messages
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/PakeMessageResponse"
-        "404":
-          description: No pairing session found
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorMessage"
-    post:
-      tags:
-      - Runners
-      summary: Post PAKE message
-      description: Post a PAKE exchange message for relay. Session is resolved from
-        auth context + project_id.
-      operationId: postPakeMessage
-      parameters:
-      - name: project_id
-        in: query
-        required: true
-        schema:
-          type: string
-          format: uuid
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/PakeMessageRequest"
-      responses:
-        "204":
-          description: Message posted
-        "404":
-          description: No pairing session found
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorMessage"
-        "429":
-          description: Too many attempts
           content:
             application/json:
               schema:
@@ -4492,26 +4367,6 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorMessage"
-  /v1/private/local-runners/daemon-pairs:
-    post:
-      tags:
-      - Runners
-      summary: Register daemon pairing session
-      description: Daemon registers a pairing session for a project. The pairing code
-        is generated locally by the daemon and never sent to the backend.
-      operationId: registerDaemonPair
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/DaemonPairRegisterRequest"
-      responses:
-        "201":
-          description: Pairing session registered
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/DaemonPairRegisterResponse"
   /v1/private/local-runners/{runnerId}/bridge/commands/{commandId}/results:
     post:
       tags:
@@ -9608,10 +9463,6 @@ components:
         last_updated_by:
           type: string
           readOnly: true
-        action:
-          type: string
-          enum:
-          - evaluator
         type:
           type: string
           enum:
@@ -9621,6 +9472,10 @@ components:
           - trace_thread_user_defined_metric_python
           - span_llm_as_judge
           - span_user_defined_metric_python
+        action:
+          type: string
+          enum:
+          - evaluator
       discriminator:
         propertyName: type
         mapping:
@@ -10140,10 +9995,6 @@ components:
           format: float
         enabled:
           type: boolean
-        action:
-          type: string
-          enum:
-          - evaluator
         type:
           type: string
           enum:
@@ -10153,6 +10004,10 @@ components:
           - trace_thread_user_defined_metric_python
           - span_llm_as_judge
           - span_user_defined_metric_python
+        action:
+          type: string
+          enum:
+          - evaluator
       discriminator:
         propertyName: type
         mapping:
@@ -10490,10 +10345,6 @@ components:
         last_updated_by:
           type: string
           readOnly: true
-        action:
-          type: string
-          enum:
-          - evaluator
         type:
           type: string
           enum:
@@ -10503,6 +10354,10 @@ components:
           - trace_thread_user_defined_metric_python
           - span_llm_as_judge
           - span_user_defined_metric_python
+        action:
+          type: string
+          enum:
+          - evaluator
       discriminator:
         propertyName: type
         mapping:
@@ -10936,10 +10791,6 @@ components:
         last_updated_by:
           type: string
           readOnly: true
-        action:
-          type: string
-          enum:
-          - evaluator
         type:
           type: string
           enum:
@@ -10949,6 +10800,10 @@ components:
           - trace_thread_user_defined_metric_python
           - span_llm_as_judge
           - span_user_defined_metric_python
+        action:
+          type: string
+          enum:
+          - evaluator
       discriminator:
         propertyName: type
         mapping:
@@ -11030,10 +10885,6 @@ components:
             type: string
             description: Multiple project IDs (new field for multi-project support)
             format: uuid
-        action:
-          type: string
-          enum:
-          - evaluator
         type:
           type: string
           enum:
@@ -11043,6 +10894,10 @@ components:
           - trace_thread_user_defined_metric_python
           - span_llm_as_judge
           - span_user_defined_metric_python
+        action:
+          type: string
+          enum:
+          - evaluator
       discriminator:
         propertyName: type
         mapping:
@@ -11368,16 +11223,7 @@ components:
           additionalProperties:
             type: object
     Message:
-      required:
-      - content
-      - role
       type: object
-      properties:
-        role:
-          minLength: 1
-          type: string
-        content:
-          $ref: "#/components/schemas/JsonNode"
     ResponseFormat:
       type: object
       properties:
@@ -14010,76 +13856,6 @@ components:
           items:
             type: string
             format: uuid
-    ExperimentExecutionResponse:
-      type: object
-      properties:
-        experiments:
-          type: array
-          items:
-            $ref: "#/components/schemas/ExperimentInfo"
-        total_items:
-          type: integer
-          format: int32
-    ExperimentInfo:
-      type: object
-      properties:
-        experiment_id:
-          type: string
-          format: uuid
-        prompt_index:
-          type: integer
-          format: int32
-    ExperimentExecutionRequest:
-      required:
-      - dataset_id
-      - dataset_name
-      - prompts
-      type: object
-      properties:
-        dataset_name:
-          minLength: 1
-          type: string
-        dataset_version_id:
-          type: string
-          format: uuid
-        prompts:
-          minItems: 1
-          type: array
-          items:
-            $ref: "#/components/schemas/PromptVariant"
-        project_name:
-          type: string
-        dataset_id:
-          type: string
-          format: uuid
-        version_hash:
-          type: string
-        prompt_versions:
-          type: array
-          items:
-            $ref: "#/components/schemas/PromptVersionLink"
-    PromptVariant:
-      required:
-      - messages
-      - model
-      type: object
-      properties:
-        model:
-          minLength: 1
-          type: string
-        messages:
-          minItems: 1
-          type: array
-          items:
-            $ref: "#/components/schemas/Message"
-        configs:
-          type: object
-          additionalProperties:
-            $ref: "#/components/schemas/JsonNode"
-        prompt_versions:
-          type: array
-          items:
-            $ref: "#/components/schemas/PromptVersionLink"
     Check:
       type: object
       properties:
@@ -16014,17 +15790,6 @@ components:
           format: uuid
         project_name:
           type: string
-        expires_at:
-          type: string
-          format: date-time
-    PairCompleteRequest:
-      required:
-      - project_id
-      type: object
-      properties:
-        project_id:
-          type: string
-          format: uuid
     LocalRunnerConnectRequest:
       required:
       - pairing_code
@@ -16049,9 +15814,6 @@ components:
       - type
       type: object
       properties:
-        command_id:
-          type: string
-          format: uuid
         type:
           type: string
           enum:
@@ -16066,11 +15828,6 @@ components:
         timeout_seconds:
           type: integer
           format: int32
-        hmac:
-          type: string
-        sequence:
-          type: integer
-          format: int64
     CreateLocalRunnerJobRequest:
       required:
       - agent_name
@@ -16171,11 +15928,6 @@ components:
         duration_ms:
           type: integer
           format: int64
-        hmac:
-          type: string
-        sequence:
-          type: integer
-          format: int64
     LocalRunnerJob:
       type: object
       properties:
@@ -16224,19 +15976,6 @@ components:
         completed_at:
           type: string
           format: date-time
-    PakeMessageResponse:
-      type: object
-      properties:
-        role:
-          type: string
-          enum:
-          - daemon
-          - browser
-        step:
-          type: integer
-          format: int32
-        payload:
-          type: string
     Agent:
       type: object
       properties:
@@ -16376,61 +16115,12 @@ components:
         submitted_at:
           type: string
           format: date-time
-        hmac:
-          type: string
-        sequence:
-          type: integer
-          format: int64
     BridgeCommandNextRequest:
       type: object
       properties:
         max_commands:
           type: integer
           format: int32
-    PakeMessageRequest:
-      required:
-      - payload
-      - role
-      type: object
-      properties:
-        role:
-          type: string
-          enum:
-          - daemon
-          - browser
-        step:
-          maximum: 2
-          minimum: 0
-          type: integer
-          format: int32
-        payload:
-          minLength: 1
-          type: string
-    DaemonPairRegisterResponse:
-      type: object
-      properties:
-        runner_id:
-          type: string
-          format: uuid
-        expires_in_seconds:
-          type: integer
-          format: int32
-    DaemonPairRegisterRequest:
-      required:
-      - project_id
-      - runner_name
-      type: object
-      properties:
-        project_id:
-          type: string
-          format: uuid
-        runner_name:
-          minLength: 1
-          type: string
-        session_ttl_seconds:
-          minimum: 1
-          type: integer
-          format: int64
     BridgeCommandResultRequest:
       required:
       - status
@@ -16449,11 +16139,6 @@ components:
         error:
           $ref: "#/components/schemas/JsonNode"
         duration_ms:
-          type: integer
-          format: int64
-        hmac:
-          type: string
-        sequence:
           type: integer
           format: int64
     LocalRunnerJobResultRequest:
@@ -17144,10 +16829,10 @@ components:
           type: string
           description: "Template structure type: 'text' or 'chat'. Immutable after\
             \ creation."
+          default: text
           enum:
           - text
           - chat
-          default: text
         tags:
           uniqueItems: true
           type: array
@@ -17750,15 +17435,14 @@ components:
           enum:
           - mustache
           - jinja2
-          - python
         template_structure:
           type: string
           description: "Template structure type: 'text' or 'chat'. Immutable after\
             \ creation."
+          default: text
           enum:
           - text
           - chat
-          default: text
         tags:
           uniqueItems: true
           type: array
@@ -17814,7 +17498,6 @@ components:
           enum:
           - mustache
           - jinja2
-          - python
         change_description:
           type: string
         tags:
@@ -17884,15 +17567,14 @@ components:
           enum:
           - mustache
           - jinja2
-          - python
         template_structure:
           type: string
           description: "Template structure type: 'text' or 'chat'. Immutable after\
             \ creation."
+          default: text
           enum:
           - text
           - chat
-          default: text
         tags:
           uniqueItems: true
           type: array
@@ -17928,7 +17610,6 @@ components:
           enum:
           - mustache
           - jinja2
-          - python
         change_description:
           type: string
         tags:
@@ -17985,10 +17666,10 @@ components:
             \ the given name already exists, this field is ignored and the existing\
             \ prompt's template structure is used. Template structure is immutable\
             \ after prompt creation."
+          default: text
           enum:
           - text
           - chat
-          default: text
         exclude_blueprint_update_for_projects:
           uniqueItems: true
           type: array
@@ -18034,10 +17715,10 @@ components:
           type: string
           description: "Template structure type: 'text' or 'chat'. Immutable after\
             \ creation."
+          default: text
           enum:
           - text
           - chat
-          default: text
         tags:
           uniqueItems: true
           type: array
@@ -18113,7 +17794,6 @@ components:
           enum:
           - mustache
           - jinja2
-          - python
         change_description:
           type: string
         tags:

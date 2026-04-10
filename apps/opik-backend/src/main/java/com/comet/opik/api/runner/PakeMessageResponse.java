@@ -9,7 +9,6 @@ import lombok.Builder;
 @JsonIgnoreProperties(ignoreUnknown = true)
 @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
 public record PakeMessageResponse(
-        PakeRole role,
-        int step,
+        PakeStep step,
         String payload) {
 }

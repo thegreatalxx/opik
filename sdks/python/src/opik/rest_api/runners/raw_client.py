@@ -18,7 +18,6 @@ from ..errors.too_many_requests_error import TooManyRequestsError
 from ..types.bridge_command import BridgeCommand
 from ..types.bridge_command_batch_response import BridgeCommandBatchResponse
 from ..types.bridge_command_submit_response import BridgeCommandSubmitResponse
-from ..types.daemon_pair_register_response import DaemonPairRegisterResponse
 from ..types.error_message import ErrorMessage
 from ..types.json_node import JsonNode
 from ..types.local_runner import LocalRunner
@@ -30,13 +29,10 @@ from ..types.local_runner_job_page import LocalRunnerJobPage
 from ..types.local_runner_log_entry import LocalRunnerLogEntry
 from ..types.local_runner_page import LocalRunnerPage
 from ..types.local_runner_pair_response import LocalRunnerPairResponse
-from ..types.pake_message_response import PakeMessageResponse
 from .types.bridge_command_result_request_status import BridgeCommandResultRequestStatus
 from .types.bridge_command_submit_request_type import BridgeCommandSubmitRequestType
-from .types.get_pake_messages_request_role import GetPakeMessagesRequestRole
 from .types.list_runners_request_status import ListRunnersRequestStatus
 from .types.local_runner_job_result_request_status import LocalRunnerJobResultRequestStatus
-from .types.pake_message_request_role import PakeMessageRequestRole
 
 # this is used as the default value for optional parameters
 OMIT = typing.cast(typing.Any, ...)
@@ -208,62 +204,6 @@ class RawRunnersClient:
             raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
         raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
 
-    def complete_pairing(
-        self, *, project_id: str, request_options: typing.Optional[RequestOptions] = None
-    ) -> HttpResponse[LocalRunnerConnectResponse]:
-        """
-        Browser completes pairing after key confirmation, activating the runner
-
-        Parameters
-        ----------
-        project_id : str
-
-        request_options : typing.Optional[RequestOptions]
-            Request-specific configuration.
-
-        Returns
-        -------
-        HttpResponse[LocalRunnerConnectResponse]
-            Pairing completed
-        """
-        _response = self._client_wrapper.httpx_client.request(
-            "v1/private/local-runners/pake/complete",
-            method="POST",
-            json={
-                "project_id": project_id,
-            },
-            headers={
-                "content-type": "application/json",
-            },
-            request_options=request_options,
-            omit=OMIT,
-        )
-        try:
-            if 200 <= _response.status_code < 300:
-                _data = typing.cast(
-                    LocalRunnerConnectResponse,
-                    parse_obj_as(
-                        type_=LocalRunnerConnectResponse,  # type: ignore
-                        object_=_response.json(),
-                    ),
-                )
-                return HttpResponse(response=_response, data=_data)
-            if _response.status_code == 404:
-                raise NotFoundError(
-                    headers=dict(_response.headers),
-                    body=typing.cast(
-                        typing.Optional[typing.Any],
-                        parse_obj_as(
-                            type_=typing.Optional[typing.Any],  # type: ignore
-                            object_=_response.json(),
-                        ),
-                    ),
-                )
-            _response_json = _response.json()
-        except JSONDecodeError:
-            raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
-        raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
-
     def connect_runner(
         self, *, pairing_code: str, runner_name: str, request_options: typing.Optional[RequestOptions] = None
     ) -> HttpResponse[LocalRunnerConnectResponse]:
@@ -340,10 +280,7 @@ class RawRunnersClient:
         *,
         type: BridgeCommandSubmitRequestType,
         args: JsonNode,
-        command_id: typing.Optional[str] = OMIT,
         timeout_seconds: typing.Optional[int] = OMIT,
-        hmac: typing.Optional[str] = OMIT,
-        sequence: typing.Optional[int] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> HttpResponse[BridgeCommandSubmitResponse]:
         """
@@ -357,13 +294,7 @@ class RawRunnersClient:
 
         args : JsonNode
 
-        command_id : typing.Optional[str]
-
         timeout_seconds : typing.Optional[int]
-
-        hmac : typing.Optional[str]
-
-        sequence : typing.Optional[int]
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -377,12 +308,9 @@ class RawRunnersClient:
             f"v1/private/local-runners/{jsonable_encoder(runner_id)}/bridge/commands",
             method="POST",
             json={
-                "command_id": command_id,
                 "type": type,
                 "args": args,
                 "timeout_seconds": timeout_seconds,
-                "hmac": hmac,
-                "sequence": sequence,
             },
             headers={
                 "content-type": "application/json",
@@ -679,145 +607,6 @@ class RawRunnersClient:
                         typing.Optional[typing.Any],
                         parse_obj_as(
                             type_=typing.Optional[typing.Any],  # type: ignore
-                            object_=_response.json(),
-                        ),
-                    ),
-                )
-            _response_json = _response.json()
-        except JSONDecodeError:
-            raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
-        raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
-
-    def get_pake_messages(
-        self,
-        *,
-        project_id: str,
-        role: GetPakeMessagesRequestRole,
-        after_step: typing.Optional[int] = None,
-        request_options: typing.Optional[RequestOptions] = None,
-    ) -> HttpResponse[typing.List[PakeMessageResponse]]:
-        """
-        Long-poll for PAKE exchange messages from the other party. Session is resolved from auth context + project_id.
-
-        Parameters
-        ----------
-        project_id : str
-
-        role : GetPakeMessagesRequestRole
-
-        after_step : typing.Optional[int]
-
-        request_options : typing.Optional[RequestOptions]
-            Request-specific configuration.
-
-        Returns
-        -------
-        HttpResponse[typing.List[PakeMessageResponse]]
-            Messages
-        """
-        _response = self._client_wrapper.httpx_client.request(
-            "v1/private/local-runners/pake/messages",
-            method="GET",
-            params={
-                "project_id": project_id,
-                "after_step": after_step,
-                "role": role,
-            },
-            request_options=request_options,
-        )
-        try:
-            if 200 <= _response.status_code < 300:
-                _data = typing.cast(
-                    typing.List[PakeMessageResponse],
-                    parse_obj_as(
-                        type_=typing.List[PakeMessageResponse],  # type: ignore
-                        object_=_response.json(),
-                    ),
-                )
-                return HttpResponse(response=_response, data=_data)
-            if _response.status_code == 404:
-                raise NotFoundError(
-                    headers=dict(_response.headers),
-                    body=typing.cast(
-                        typing.Optional[typing.Any],
-                        parse_obj_as(
-                            type_=typing.Optional[typing.Any],  # type: ignore
-                            object_=_response.json(),
-                        ),
-                    ),
-                )
-            _response_json = _response.json()
-        except JSONDecodeError:
-            raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
-        raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
-
-    def post_pake_message(
-        self,
-        *,
-        project_id: str,
-        role: PakeMessageRequestRole,
-        payload: str,
-        step: typing.Optional[int] = OMIT,
-        request_options: typing.Optional[RequestOptions] = None,
-    ) -> HttpResponse[None]:
-        """
-        Post a PAKE exchange message for relay. Session is resolved from auth context + project_id.
-
-        Parameters
-        ----------
-        project_id : str
-
-        role : PakeMessageRequestRole
-
-        payload : str
-
-        step : typing.Optional[int]
-
-        request_options : typing.Optional[RequestOptions]
-            Request-specific configuration.
-
-        Returns
-        -------
-        HttpResponse[None]
-        """
-        _response = self._client_wrapper.httpx_client.request(
-            "v1/private/local-runners/pake/messages",
-            method="POST",
-            params={
-                "project_id": project_id,
-            },
-            json={
-                "role": role,
-                "step": step,
-                "payload": payload,
-            },
-            headers={
-                "content-type": "application/json",
-            },
-            request_options=request_options,
-            omit=OMIT,
-        )
-        try:
-            if 200 <= _response.status_code < 300:
-                return HttpResponse(response=_response, data=None)
-            if _response.status_code == 404:
-                raise NotFoundError(
-                    headers=dict(_response.headers),
-                    body=typing.cast(
-                        typing.Optional[typing.Any],
-                        parse_obj_as(
-                            type_=typing.Optional[typing.Any],  # type: ignore
-                            object_=_response.json(),
-                        ),
-                    ),
-                )
-            if _response.status_code == 429:
-                raise TooManyRequestsError(
-                    headers=dict(_response.headers),
-                    body=typing.cast(
-                        ErrorMessage,
-                        parse_obj_as(
-                            type_=ErrorMessage,  # type: ignore
                             object_=_response.json(),
                         ),
                     ),
@@ -1308,62 +1097,6 @@ class RawRunnersClient:
             raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
         raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
 
-    def register_daemon_pair(
-        self,
-        *,
-        project_id: str,
-        runner_name: str,
-        session_ttl_seconds: typing.Optional[int] = OMIT,
-        request_options: typing.Optional[RequestOptions] = None,
-    ) -> HttpResponse[DaemonPairRegisterResponse]:
-        """
-        Daemon registers a pairing session for a project. The pairing code is generated locally by the daemon and never sent to the backend.
-
-        Parameters
-        ----------
-        project_id : str
-
-        runner_name : str
-
-        session_ttl_seconds : typing.Optional[int]
-
-        request_options : typing.Optional[RequestOptions]
-            Request-specific configuration.
-
-        Returns
-        -------
-        HttpResponse[DaemonPairRegisterResponse]
-            Pairing session registered
-        """
-        _response = self._client_wrapper.httpx_client.request(
-            "v1/private/local-runners/daemon-pairs",
-            method="POST",
-            json={
-                "project_id": project_id,
-                "runner_name": runner_name,
-                "session_ttl_seconds": session_ttl_seconds,
-            },
-            headers={
-                "content-type": "application/json",
-            },
-            request_options=request_options,
-            omit=OMIT,
-        )
-        try:
-            if 200 <= _response.status_code < 300:
-                _data = typing.cast(
-                    DaemonPairRegisterResponse,
-                    parse_obj_as(
-                        type_=DaemonPairRegisterResponse,  # type: ignore
-                        object_=_response.json(),
-                    ),
-                )
-                return HttpResponse(response=_response, data=_data)
-            _response_json = _response.json()
-        except JSONDecodeError:
-            raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
-        raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
-
     def report_bridge_result(
         self,
         runner_id: str,
@@ -1373,8 +1106,6 @@ class RawRunnersClient:
         result: typing.Optional[JsonNode] = OMIT,
         error: typing.Optional[JsonNode] = OMIT,
         duration_ms: typing.Optional[int] = OMIT,
-        hmac: typing.Optional[str] = OMIT,
-        sequence: typing.Optional[int] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> HttpResponse[None]:
         """
@@ -1394,10 +1125,6 @@ class RawRunnersClient:
 
         duration_ms : typing.Optional[int]
 
-        hmac : typing.Optional[str]
-
-        sequence : typing.Optional[int]
-
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
 
@@ -1413,8 +1140,6 @@ class RawRunnersClient:
                 "result": result,
                 "error": error,
                 "duration_ms": duration_ms,
-                "hmac": hmac,
-                "sequence": sequence,
             },
             headers={
                 "content-type": "application/json",
@@ -1698,62 +1423,6 @@ class AsyncRawRunnersClient:
             raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
         raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
 
-    async def complete_pairing(
-        self, *, project_id: str, request_options: typing.Optional[RequestOptions] = None
-    ) -> AsyncHttpResponse[LocalRunnerConnectResponse]:
-        """
-        Browser completes pairing after key confirmation, activating the runner
-
-        Parameters
-        ----------
-        project_id : str
-
-        request_options : typing.Optional[RequestOptions]
-            Request-specific configuration.
-
-        Returns
-        -------
-        AsyncHttpResponse[LocalRunnerConnectResponse]
-            Pairing completed
-        """
-        _response = await self._client_wrapper.httpx_client.request(
-            "v1/private/local-runners/pake/complete",
-            method="POST",
-            json={
-                "project_id": project_id,
-            },
-            headers={
-                "content-type": "application/json",
-            },
-            request_options=request_options,
-            omit=OMIT,
-        )
-        try:
-            if 200 <= _response.status_code < 300:
-                _data = typing.cast(
-                    LocalRunnerConnectResponse,
-                    parse_obj_as(
-                        type_=LocalRunnerConnectResponse,  # type: ignore
-                        object_=_response.json(),
-                    ),
-                )
-                return AsyncHttpResponse(response=_response, data=_data)
-            if _response.status_code == 404:
-                raise NotFoundError(
-                    headers=dict(_response.headers),
-                    body=typing.cast(
-                        typing.Optional[typing.Any],
-                        parse_obj_as(
-                            type_=typing.Optional[typing.Any],  # type: ignore
-                            object_=_response.json(),
-                        ),
-                    ),
-                )
-            _response_json = _response.json()
-        except JSONDecodeError:
-            raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
-        raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
-
     async def connect_runner(
         self, *, pairing_code: str, runner_name: str, request_options: typing.Optional[RequestOptions] = None
     ) -> AsyncHttpResponse[LocalRunnerConnectResponse]:
@@ -1830,10 +1499,7 @@ class AsyncRawRunnersClient:
         *,
         type: BridgeCommandSubmitRequestType,
         args: JsonNode,
-        command_id: typing.Optional[str] = OMIT,
         timeout_seconds: typing.Optional[int] = OMIT,
-        hmac: typing.Optional[str] = OMIT,
-        sequence: typing.Optional[int] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> AsyncHttpResponse[BridgeCommandSubmitResponse]:
         """
@@ -1847,13 +1513,7 @@ class AsyncRawRunnersClient:
 
         args : JsonNode
 
-        command_id : typing.Optional[str]
-
         timeout_seconds : typing.Optional[int]
-
-        hmac : typing.Optional[str]
-
-        sequence : typing.Optional[int]
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -1867,12 +1527,9 @@ class AsyncRawRunnersClient:
             f"v1/private/local-runners/{jsonable_encoder(runner_id)}/bridge/commands",
             method="POST",
             json={
-                "command_id": command_id,
                 "type": type,
                 "args": args,
                 "timeout_seconds": timeout_seconds,
-                "hmac": hmac,
-                "sequence": sequence,
             },
             headers={
                 "content-type": "application/json",
@@ -2169,145 +1826,6 @@ class AsyncRawRunnersClient:
                         typing.Optional[typing.Any],
                         parse_obj_as(
                             type_=typing.Optional[typing.Any],  # type: ignore
-                            object_=_response.json(),
-                        ),
-                    ),
-                )
-            _response_json = _response.json()
-        except JSONDecodeError:
-            raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
-        raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
-
-    async def get_pake_messages(
-        self,
-        *,
-        project_id: str,
-        role: GetPakeMessagesRequestRole,
-        after_step: typing.Optional[int] = None,
-        request_options: typing.Optional[RequestOptions] = None,
-    ) -> AsyncHttpResponse[typing.List[PakeMessageResponse]]:
-        """
-        Long-poll for PAKE exchange messages from the other party. Session is resolved from auth context + project_id.
-
-        Parameters
-        ----------
-        project_id : str
-
-        role : GetPakeMessagesRequestRole
-
-        after_step : typing.Optional[int]
-
-        request_options : typing.Optional[RequestOptions]
-            Request-specific configuration.
-
-        Returns
-        -------
-        AsyncHttpResponse[typing.List[PakeMessageResponse]]
-            Messages
-        """
-        _response = await self._client_wrapper.httpx_client.request(
-            "v1/private/local-runners/pake/messages",
-            method="GET",
-            params={
-                "project_id": project_id,
-                "after_step": after_step,
-                "role": role,
-            },
-            request_options=request_options,
-        )
-        try:
-            if 200 <= _response.status_code < 300:
-                _data = typing.cast(
-                    typing.List[PakeMessageResponse],
-                    parse_obj_as(
-                        type_=typing.List[PakeMessageResponse],  # type: ignore
-                        object_=_response.json(),
-                    ),
-                )
-                return AsyncHttpResponse(response=_response, data=_data)
-            if _response.status_code == 404:
-                raise NotFoundError(
-                    headers=dict(_response.headers),
-                    body=typing.cast(
-                        typing.Optional[typing.Any],
-                        parse_obj_as(
-                            type_=typing.Optional[typing.Any],  # type: ignore
-                            object_=_response.json(),
-                        ),
-                    ),
-                )
-            _response_json = _response.json()
-        except JSONDecodeError:
-            raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
-        raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
-
-    async def post_pake_message(
-        self,
-        *,
-        project_id: str,
-        role: PakeMessageRequestRole,
-        payload: str,
-        step: typing.Optional[int] = OMIT,
-        request_options: typing.Optional[RequestOptions] = None,
-    ) -> AsyncHttpResponse[None]:
-        """
-        Post a PAKE exchange message for relay. Session is resolved from auth context + project_id.
-
-        Parameters
-        ----------
-        project_id : str
-
-        role : PakeMessageRequestRole
-
-        payload : str
-
-        step : typing.Optional[int]
-
-        request_options : typing.Optional[RequestOptions]
-            Request-specific configuration.
-
-        Returns
-        -------
-        AsyncHttpResponse[None]
-        """
-        _response = await self._client_wrapper.httpx_client.request(
-            "v1/private/local-runners/pake/messages",
-            method="POST",
-            params={
-                "project_id": project_id,
-            },
-            json={
-                "role": role,
-                "step": step,
-                "payload": payload,
-            },
-            headers={
-                "content-type": "application/json",
-            },
-            request_options=request_options,
-            omit=OMIT,
-        )
-        try:
-            if 200 <= _response.status_code < 300:
-                return AsyncHttpResponse(response=_response, data=None)
-            if _response.status_code == 404:
-                raise NotFoundError(
-                    headers=dict(_response.headers),
-                    body=typing.cast(
-                        typing.Optional[typing.Any],
-                        parse_obj_as(
-                            type_=typing.Optional[typing.Any],  # type: ignore
-                            object_=_response.json(),
-                        ),
-                    ),
-                )
-            if _response.status_code == 429:
-                raise TooManyRequestsError(
-                    headers=dict(_response.headers),
-                    body=typing.cast(
-                        ErrorMessage,
-                        parse_obj_as(
-                            type_=ErrorMessage,  # type: ignore
                             object_=_response.json(),
                         ),
                     ),
@@ -2798,62 +2316,6 @@ class AsyncRawRunnersClient:
             raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
         raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
 
-    async def register_daemon_pair(
-        self,
-        *,
-        project_id: str,
-        runner_name: str,
-        session_ttl_seconds: typing.Optional[int] = OMIT,
-        request_options: typing.Optional[RequestOptions] = None,
-    ) -> AsyncHttpResponse[DaemonPairRegisterResponse]:
-        """
-        Daemon registers a pairing session for a project. The pairing code is generated locally by the daemon and never sent to the backend.
-
-        Parameters
-        ----------
-        project_id : str
-
-        runner_name : str
-
-        session_ttl_seconds : typing.Optional[int]
-
-        request_options : typing.Optional[RequestOptions]
-            Request-specific configuration.
-
-        Returns
-        -------
-        AsyncHttpResponse[DaemonPairRegisterResponse]
-            Pairing session registered
-        """
-        _response = await self._client_wrapper.httpx_client.request(
-            "v1/private/local-runners/daemon-pairs",
-            method="POST",
-            json={
-                "project_id": project_id,
-                "runner_name": runner_name,
-                "session_ttl_seconds": session_ttl_seconds,
-            },
-            headers={
-                "content-type": "application/json",
-            },
-            request_options=request_options,
-            omit=OMIT,
-        )
-        try:
-            if 200 <= _response.status_code < 300:
-                _data = typing.cast(
-                    DaemonPairRegisterResponse,
-                    parse_obj_as(
-                        type_=DaemonPairRegisterResponse,  # type: ignore
-                        object_=_response.json(),
-                    ),
-                )
-                return AsyncHttpResponse(response=_response, data=_data)
-            _response_json = _response.json()
-        except JSONDecodeError:
-            raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response.text)
-        raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
-
     async def report_bridge_result(
         self,
         runner_id: str,
@@ -2863,8 +2325,6 @@ class AsyncRawRunnersClient:
         result: typing.Optional[JsonNode] = OMIT,
         error: typing.Optional[JsonNode] = OMIT,
         duration_ms: typing.Optional[int] = OMIT,
-        hmac: typing.Optional[str] = OMIT,
-        sequence: typing.Optional[int] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> AsyncHttpResponse[None]:
         """
@@ -2884,10 +2344,6 @@ class AsyncRawRunnersClient:
 
         duration_ms : typing.Optional[int]
 
-        hmac : typing.Optional[str]
-
-        sequence : typing.Optional[int]
-
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
 
@@ -2903,8 +2359,6 @@ class AsyncRawRunnersClient:
                 "result": result,
                 "error": error,
                 "duration_ms": duration_ms,
-                "hmac": hmac,
-                "sequence": sequence,
             },
             headers={
                 "content-type": "application/json",

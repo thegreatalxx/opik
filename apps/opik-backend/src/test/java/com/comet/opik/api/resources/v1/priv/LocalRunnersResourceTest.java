@@ -23,7 +23,6 @@ import com.comet.opik.api.runner.BridgeCommandSubmitResponse;
 import com.comet.opik.api.runner.BridgeCommandType;
 import com.comet.opik.api.runner.CreateLocalRunnerJobRequest;
 import com.comet.opik.api.runner.LocalRunner;
-import com.comet.opik.api.runner.LocalRunnerConnectRequest;
 import com.comet.opik.api.runner.LocalRunnerConnectResponse;
 import com.comet.opik.api.runner.LocalRunnerHeartbeatResponse;
 import com.comet.opik.api.runner.LocalRunnerJob;
@@ -31,8 +30,10 @@ import com.comet.opik.api.runner.LocalRunnerJobMetadata;
 import com.comet.opik.api.runner.LocalRunnerJobResultRequest;
 import com.comet.opik.api.runner.LocalRunnerJobStatus;
 import com.comet.opik.api.runner.LocalRunnerLogEntry;
-import com.comet.opik.api.runner.LocalRunnerPairResponse;
 import com.comet.opik.api.runner.LocalRunnerStatus;
+import com.comet.opik.api.runner.PakeMessagePage;
+import com.comet.opik.api.runner.PakeRole;
+import com.comet.opik.api.runner.PakeStep;
 import com.comet.opik.extensions.DropwizardAppExtensionProvider;
 import com.comet.opik.extensions.RegisterApp;
 import com.comet.opik.podam.PodamFactoryUtils;
@@ -155,12 +156,8 @@ class LocalRunnersResourceTest {
     }
 
     private UUID connectRunnerWithPairing(String name, UUID projectId, String apiKey, String workspace) {
-        LocalRunnerPairResponse pair = runnersClient.generatePairingCode(projectId, apiKey, workspace);
-        LocalRunnerConnectRequest req = LocalRunnerConnectRequest.builder()
-                .pairingCode(pair.pairingCode())
-                .runnerName(name)
-                .build();
-        LocalRunnerConnectResponse resp = runnersClient.connect(req, apiKey, workspace);
+        runnersClient.registerDaemonPair(projectId, name, apiKey, workspace);
+        LocalRunnerConnectResponse resp = runnersClient.completePairing(projectId, apiKey, workspace);
         LocalRunner.Agent agent = LocalRunner.Agent.builder()
                 .name(AGENT_NAME)
                 .build();
@@ -190,18 +187,9 @@ class LocalRunnersResourceTest {
     void happyPath() {
         UUID projectId = createProject(API_KEY, TEST_WORKSPACE);
 
-        LocalRunnerPairResponse pairResponse = runnersClient.generatePairingCode(projectId, API_KEY, TEST_WORKSPACE);
-        assertThat(pairResponse.pairingCode()).isNotBlank();
-        assertThat(pairResponse.runnerId()).isNotNull();
-        assertThat(pairResponse.expiresInSeconds()).isPositive();
-
-        LocalRunnerConnectRequest connectRequest = LocalRunnerConnectRequest.builder()
-                .pairingCode(pairResponse.pairingCode())
-                .runnerName("test-runner")
-                .build();
-        LocalRunnerConnectResponse connectResp = runnersClient.connect(connectRequest, API_KEY, TEST_WORKSPACE);
+        runnersClient.registerDaemonPair(projectId, "test-runner", API_KEY, TEST_WORKSPACE);
+        LocalRunnerConnectResponse connectResp = runnersClient.completePairing(projectId, API_KEY, TEST_WORKSPACE);
         UUID runnerId = connectResp.runnerId();
-        assertThat(runnerId).isEqualTo(pairResponse.runnerId());
         assertThat(connectResp.projectId()).isEqualTo(projectId);
 
         LocalRunner.LocalRunnerPage runnerPage = runnersClient.listRunners(projectId, API_KEY, TEST_WORKSPACE);
@@ -309,65 +297,6 @@ class LocalRunnersResourceTest {
     }
 
     @Nested
-    @DisplayName("Generate Pairing Code")
-    class GeneratePairingCode {
-
-        @Test
-        void createsValidCode() {
-            UUID projectId = createProject(API_KEY, TEST_WORKSPACE);
-            LocalRunnerPairResponse resp = runnersClient.generatePairingCode(projectId, API_KEY, TEST_WORKSPACE);
-
-            assertThat(resp.pairingCode()).hasSize(6);
-            assertThat(resp.pairingCode()).matches("[ABCDEFGHJKMNPQRSTUVWXYZ23456789]{6}");
-            assertThat(resp.runnerId()).isNotNull();
-            assertThat(resp.expiresInSeconds()).isEqualTo(3600);
-        }
-    }
-
-    @Nested
-    @DisplayName("Connect")
-    class Connect {
-
-        @Test
-        void withExpiredPairingCode_returns400() {
-            LocalRunnerConnectRequest req = LocalRunnerConnectRequest.builder()
-                    .pairingCode("ZZZZZZ")
-                    .runnerName("runner")
-                    .build();
-
-            try (var response = runnersClient.callConnect(req, API_KEY, TEST_WORKSPACE)) {
-                assertThat(response.getStatus()).isEqualTo(400);
-            }
-        }
-
-        @Test
-        void withPairingCodeFromDifferentWorkspace_returns400() {
-            UUID projectId = createProject(API_KEY, TEST_WORKSPACE);
-            LocalRunnerPairResponse pair = runnersClient.generatePairingCode(projectId, API_KEY, TEST_WORKSPACE);
-
-            LocalRunnerConnectRequest req = LocalRunnerConnectRequest.builder()
-                    .pairingCode(pair.pairingCode())
-                    .runnerName("runner")
-                    .build();
-
-            try (var response = runnersClient.callConnect(req, OTHER_API_KEY, OTHER_WORKSPACE)) {
-                assertThat(response.getStatus()).isEqualTo(400);
-            }
-        }
-
-        @Test
-        void withoutPairingCode_returns422() {
-            LocalRunnerConnectRequest req = LocalRunnerConnectRequest.builder()
-                    .runnerName("runner")
-                    .build();
-
-            try (var response = runnersClient.callConnect(req, API_KEY, TEST_WORKSPACE)) {
-                assertThat(response.getStatus()).isEqualTo(422);
-            }
-        }
-    }
-
-    @Nested
     @DisplayName("List Runners")
     class ListRunners {
 
@@ -467,8 +396,8 @@ class LocalRunnersResourceTest {
 
             UUID connectedRunner = connectRunnerWithPairing("connected-runner", projectId, ctx.apiKey, ctx.workspace);
 
-            LocalRunnerPairResponse pair = runnersClient.generatePairingCode(projectId, ctx.apiKey, ctx.workspace);
-            UUID pairingRunner = pair.runnerId();
+            UUID pairingRunner = runnersClient
+                    .registerDaemonPair(projectId, "pairing-runner", ctx.apiKey, ctx.workspace);
 
             LocalRunner.LocalRunnerPage pairingPage = runnersClient.listRunners(projectId,
                     LocalRunnerStatus.PAIRING, 0, 25, ctx.apiKey, ctx.workspace);
@@ -1524,6 +1453,152 @@ class LocalRunnersResourceTest {
 
             LocalRunner runner = runnersClient.getRunner(runnerId, ctx.apiKey, ctx.workspace);
             assertThat(runner.capabilities()).containsExactly("jobs");
+        }
+    }
+
+    @Nested
+    @DisplayName("PAKE Messaging")
+    class PakeMessaging {
+
+        // These tests target the Phase B redesigned API shape:
+        //   POST /v1/private/local-runners/pake/messages/{project_id}/{target_role}
+        //   GET  /v1/private/local-runners/pake/messages/{project_id}/{target_role}?target_step=SPAKE2
+        //
+        // Semantics:
+        //   target_role  = which inbox to read from / post into
+        //   target_step  = filter applied after dequeue
+        //
+        // Browser posts into DAEMON inbox (messages the daemon will poll for).
+        // Daemon posts into BROWSER inbox (messages the browser will poll for).
+        //
+        // Both sides use the same auth context in tests because the BE is a dumb relay —
+        // workspaceId+userName+projectId identifies the session, not the role.
+
+        @Test
+        @DisplayName("Post SPAKE2 into DAEMON inbox, poll from DAEMON inbox, round-trip payload")
+        void postThenPoll_roundTrip() {
+            var ctx = createIsolatedWorkspace();
+            UUID projectId = createProject(ctx.apiKey, ctx.workspace);
+            runnersClient.registerDaemonPair(projectId, "pake-roundtrip", ctx.apiKey, ctx.workspace);
+
+            runnersClient.postPakeMessage(projectId, PakeRole.DAEMON, PakeStep.SPAKE2,
+                    "browser-spake2-msg", ctx.apiKey, ctx.workspace);
+
+            PakeMessagePage page = runnersClient.getPakeMessages(projectId, PakeRole.DAEMON, PakeStep.SPAKE2,
+                    ctx.apiKey, ctx.workspace);
+
+            assertThat(page.messages()).hasSize(1);
+            assertThat(page.messages().getFirst().payload()).isEqualTo("browser-spake2-msg");
+            assertThat(page.messages().getFirst().step()).isEqualTo(PakeStep.SPAKE2);
+        }
+
+        @Test
+        @DisplayName("Two inboxes are independent — messages posted to DAEMON do not appear in BROWSER")
+        void inboxIsolation() {
+            var ctx = createIsolatedWorkspace();
+            UUID projectId = createProject(ctx.apiKey, ctx.workspace);
+            runnersClient.registerDaemonPair(projectId, "pake-isolation", ctx.apiKey, ctx.workspace);
+
+            runnersClient.postPakeMessage(projectId, PakeRole.DAEMON, PakeStep.SPAKE2,
+                    "msg-for-daemon", ctx.apiKey, ctx.workspace);
+
+            try (var resp = runnersClient.callGetPakeMessages(projectId, PakeRole.BROWSER, PakeStep.SPAKE2,
+                    ctx.apiKey, ctx.workspace)) {
+                assertThat(resp.getStatus()).isEqualTo(200);
+                PakeMessagePage browserInbox = resp.readEntity(PakeMessagePage.class);
+                assertThat(browserInbox.messages()).isEmpty();
+            }
+        }
+
+        @Test
+        @DisplayName("target_step filters messages by step within the inbox")
+        void targetStepFilter() {
+            var ctx = createIsolatedWorkspace();
+            UUID projectId = createProject(ctx.apiKey, ctx.workspace);
+            runnersClient.registerDaemonPair(projectId, "pake-filter", ctx.apiKey, ctx.workspace);
+
+            runnersClient.postPakeMessage(projectId, PakeRole.DAEMON, PakeStep.SPAKE2,
+                    "spake-blob", ctx.apiKey, ctx.workspace);
+            runnersClient.postPakeMessage(projectId, PakeRole.DAEMON, PakeStep.CONFIRMATION,
+                    "confirm-blob", ctx.apiKey, ctx.workspace);
+
+            PakeMessagePage spakePage = runnersClient.getPakeMessages(projectId, PakeRole.DAEMON,
+                    PakeStep.SPAKE2, ctx.apiKey, ctx.workspace);
+            assertThat(spakePage.messages()).hasSize(1);
+            assertThat(spakePage.messages().getFirst().payload()).isEqualTo("spake-blob");
+
+            PakeMessagePage confirmPage = runnersClient.getPakeMessages(projectId, PakeRole.DAEMON,
+                    PakeStep.CONFIRMATION, ctx.apiKey, ctx.workspace);
+            assertThat(confirmPage.messages()).hasSize(1);
+            assertThat(confirmPage.messages().getFirst().payload()).isEqualTo("confirm-blob");
+        }
+
+        @Test
+        @DisplayName("POST to a non-existent session returns 404")
+        void postToMissingSession_returns404() {
+            var ctx = createIsolatedWorkspace();
+            UUID projectId = createProject(ctx.apiKey, ctx.workspace);
+            // No registerDaemonPair — no session exists for this project
+
+            try (var resp = runnersClient.callPostPakeMessage(projectId, PakeRole.DAEMON, PakeStep.SPAKE2,
+                    "orphan", ctx.apiKey, ctx.workspace)) {
+                assertThat(resp.getStatus()).isEqualTo(404);
+            }
+        }
+
+        @Test
+        @DisplayName("GET on empty inbox long-polls until timeout, then returns empty page")
+        void getEmptyInbox_longPollsThenEmpty() {
+            var ctx = createIsolatedWorkspace();
+            UUID projectId = createProject(ctx.apiKey, ctx.workspace);
+            runnersClient.registerDaemonPair(projectId, "pake-timeout", ctx.apiKey, ctx.workspace);
+
+            long start = System.currentTimeMillis();
+            PakeMessagePage page = runnersClient.getPakeMessages(projectId, PakeRole.DAEMON, PakeStep.SPAKE2,
+                    ctx.apiKey, ctx.workspace);
+            long elapsed = System.currentTimeMillis() - start;
+
+            assertThat(page.messages()).isEmpty();
+            // config-test.yml sets pakePollTimeout: 2s — expect long-poll to hold for approximately that duration
+            assertThat(elapsed).isGreaterThanOrEqualTo(1500L);
+        }
+
+        @Test
+        @DisplayName("GET returns envelope (PakeMessagePage), not a bare array")
+        void responseIsEnvelope() {
+            var ctx = createIsolatedWorkspace();
+            UUID projectId = createProject(ctx.apiKey, ctx.workspace);
+            runnersClient.registerDaemonPair(projectId, "pake-envelope", ctx.apiKey, ctx.workspace);
+
+            runnersClient.postPakeMessage(projectId, PakeRole.DAEMON, PakeStep.SPAKE2,
+                    "payload", ctx.apiKey, ctx.workspace);
+
+            try (var resp = runnersClient.callGetPakeMessages(projectId, PakeRole.DAEMON, PakeStep.SPAKE2,
+                    ctx.apiKey, ctx.workspace)) {
+                assertThat(resp.getStatus()).isEqualTo(200);
+                // Envelope must deserialize cleanly — a bare array would fail here
+                PakeMessagePage page = resp.readEntity(PakeMessagePage.class);
+                assertThat(page).isNotNull();
+                assertThat(page.messages()).isNotNull();
+            }
+        }
+
+        @Test
+        @DisplayName("Cross-workspace isolation — another workspace cannot read this session's messages")
+        void crossWorkspaceIsolation() {
+            var ctxA = createIsolatedWorkspace();
+            var ctxB = createIsolatedWorkspace();
+            UUID projectA = createProject(ctxA.apiKey, ctxA.workspace);
+            runnersClient.registerDaemonPair(projectA, "iso-A", ctxA.apiKey, ctxA.workspace);
+
+            runnersClient.postPakeMessage(projectA, PakeRole.DAEMON, PakeStep.SPAKE2,
+                    "secret", ctxA.apiKey, ctxA.workspace);
+
+            // Workspace B tries to read workspace A's session for the same projectId — should 404
+            try (var resp = runnersClient.callGetPakeMessages(projectA, PakeRole.DAEMON, PakeStep.SPAKE2,
+                    ctxB.apiKey, ctxB.workspace)) {
+                assertThat(resp.getStatus()).isEqualTo(404);
+            }
         }
     }
 }

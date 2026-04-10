@@ -9,9 +9,7 @@ import com.comet.opik.api.runner.BridgeCommandSubmitRequest;
 import com.comet.opik.api.runner.BridgeCommandType;
 import com.comet.opik.api.runner.CreateLocalRunnerJobRequest;
 import com.comet.opik.api.runner.DaemonPairRegisterRequest;
-import com.comet.opik.api.runner.DaemonPairRegisterResponse;
 import com.comet.opik.api.runner.LocalRunner;
-import com.comet.opik.api.runner.LocalRunnerConnectRequest;
 import com.comet.opik.api.runner.LocalRunnerConnectResponse;
 import com.comet.opik.api.runner.LocalRunnerHeartbeatResponse;
 import com.comet.opik.api.runner.LocalRunnerJob;
@@ -19,18 +17,16 @@ import com.comet.opik.api.runner.LocalRunnerJobMetadata;
 import com.comet.opik.api.runner.LocalRunnerJobResultRequest;
 import com.comet.opik.api.runner.LocalRunnerJobStatus;
 import com.comet.opik.api.runner.LocalRunnerLogEntry;
-import com.comet.opik.api.runner.LocalRunnerPairResponse;
 import com.comet.opik.api.runner.LocalRunnerStatus;
-import com.comet.opik.api.runner.PairCompleteRequest;
+import com.comet.opik.api.runner.PakeMessagePage;
 import com.comet.opik.api.runner.PakeMessageRequest;
 import com.comet.opik.api.runner.PakeMessageResponse;
 import com.comet.opik.api.runner.PakeRole;
+import com.comet.opik.api.runner.PakeStep;
 import com.comet.opik.infrastructure.LocalRunnerConfig;
 import com.comet.opik.infrastructure.redis.StringRedisClient;
 import com.comet.opik.utils.JsonUtils;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.PropertyNamingStrategies;
-import com.fasterxml.jackson.databind.annotation.JsonNaming;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.inject.ImplementedBy;
 import jakarta.inject.Inject;
@@ -41,7 +37,6 @@ import jakarta.ws.rs.core.Response;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.lang3.RandomUtils;
 import org.redisson.api.BatchResult;
 import org.redisson.api.RAtomicLong;
 import org.redisson.api.RBatch;
@@ -72,10 +67,6 @@ import java.util.concurrent.TimeUnit;
 
 @ImplementedBy(LocalRunnerServiceImpl.class)
 public interface LocalRunnerService {
-
-    LocalRunnerPairResponse generatePairingCode(String workspaceId, String userName, UUID projectId);
-
-    LocalRunnerConnectResponse connect(String workspaceId, String userName, LocalRunnerConnectRequest request);
 
     LocalRunner.LocalRunnerPage listRunners(String workspaceId, String userName, UUID projectId,
             LocalRunnerStatus status, int page, int size);
@@ -121,15 +112,15 @@ public interface LocalRunnerService {
 
     void reapDeadRunners();
 
-    DaemonPairRegisterResponse registerDaemonPair(String workspaceId, String userName,
-            DaemonPairRegisterRequest request);
+    UUID registerDaemonPair(String workspaceId, String userName, DaemonPairRegisterRequest request);
 
-    void postPakeMessage(String workspaceId, String userName, UUID projectId, PakeMessageRequest request);
+    void postPakeMessage(String workspaceId, String userName, UUID projectId, PakeRole targetRole,
+            PakeMessageRequest request);
 
-    Mono<List<PakeMessageResponse>> getPakeMessages(String workspaceId, String userName, UUID projectId,
-            int afterStep, PakeRole forRole);
+    Mono<PakeMessagePage> getPakeMessages(String workspaceId, String userName, UUID projectId,
+            PakeRole targetRole, PakeStep targetStep);
 
-    LocalRunnerConnectResponse completePairing(String workspaceId, String userName, PairCompleteRequest request);
+    LocalRunnerConnectResponse completePairing(String workspaceId, String userName, UUID projectId);
 }
 
 @Slf4j
@@ -137,15 +128,9 @@ public interface LocalRunnerService {
 @RequiredArgsConstructor(onConstructor_ = @Inject)
 class LocalRunnerServiceImpl implements LocalRunnerService {
 
-    private static final String PAIRING_CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
-    private static final int PAIRING_CODE_LENGTH = 6;
     private static final java.util.regex.Pattern CAPABILITY_PATTERN = java.util.regex.Pattern.compile("[a-z_]+");
 
     private static final String WORKSPACES_WITH_RUNNERS_KEY = "opik:runners:workspaces:with_runners";
-
-    private static String pairKey(String code) {
-        return "opik:runners:pair:" + code;
-    }
 
     private static String runnerKey(UUID runnerId) {
         return "opik:runners:runner:" + runnerId;
@@ -223,18 +208,6 @@ class LocalRunnerServiceImpl implements LocalRunnerService {
         return "opik:runners:bridge:" + runnerId + ":write_rate:" + minute;
     }
 
-    private static String pakeSessionKey(String workspaceId, String userName, UUID projectId) {
-        return "opik:runners:pake-session:" + workspaceId + ":" + userName + ":" + projectId;
-    }
-
-    private static String pakeMessagesKey(String workspaceId, String userName, UUID projectId) {
-        return "opik:runners:pake-messages:" + workspaceId + ":" + userName + ":" + projectId;
-    }
-
-    private static String pakeAttemptsKey(String workspaceId, String userName, UUID projectId) {
-        return "opik:runners:pake-attempts:" + workspaceId + ":" + userName + ":" + projectId;
-    }
-
     private static final Set<LocalRunnerJobStatus> TERMINAL_JOB_STATUSES = Set.of(LocalRunnerJobStatus.COMPLETED,
             LocalRunnerJobStatus.FAILED);
     private static final Set<LocalRunnerJobStatus> REPORTABLE_JOB_STATUSES = Set.of(LocalRunnerJobStatus.RUNNING,
@@ -294,72 +267,14 @@ class LocalRunnerServiceImpl implements LocalRunnerService {
     private static final int MAX_PAKE_ATTEMPTS = 5;
     private static final Duration PAKE_SESSION_TTL = Duration.ofMinutes(5);
 
-    private static final long PAKE_POLL_INTERVAL_MS = 500L;
-    private static final int PAKE_STEP_SPAKE2 = PakeMessageRequest.STEP_SPAKE2;
-    private static final int PAKE_STEP_CONFIRMATION = PakeMessageRequest.STEP_CONFIRMATION;
-    private static final int PAKE_STEP_COMPLETION = PakeMessageRequest.STEP_COMPLETION;
-
     private final @NonNull StringRedisClient redisClient;
     private final @NonNull RedissonReactiveClient reactiveRedisClient;
     private final @NonNull LocalRunnerConfig runnerConfig;
     private final @NonNull IdGenerator idGenerator;
     private final @NonNull ProjectService projectService;
 
-    @Override
-    public LocalRunnerPairResponse generatePairingCode(@NonNull String workspaceId, @NonNull String userName,
-            @NonNull UUID projectId) {
-        String projectName = projectService.get(projectId, workspaceId).name();
-
-        String code = generatePairingCodeString();
-        UUID runnerId = idGenerator.generateId();
-
-        String pairPayload = JsonUtils.writeValueAsString(
-                new PairingCodePayload(runnerId, workspaceId, projectId, projectName));
-
-        RBucket<String> pairBucket = redisClient.getBucket(pairKey(code));
-        boolean claimed = pairBucket.setIfAbsent(pairPayload,
-                runnerConfig.getPairingCodeTtl().toJavaDuration());
-        if (!claimed) {
-            throw new ClientErrorException(Response.status(Response.Status.CONFLICT)
-                    .entity(new ErrorMessage(List.of("Pairing code collision. Please try again.")))
-                    .build());
-        }
-
-        RMap<String, String> runnerMap = redisClient.getMap(runnerKey(runnerId));
-        runnerMap.putAll(Map.of(
-                FIELD_NAME, "",
-                FIELD_STATUS, LocalRunnerStatus.PAIRING.getValue(),
-                FIELD_WORKSPACE_ID, workspaceId,
-                FIELD_USER_NAME, userName,
-                FIELD_PROJECT_ID, projectId.toString()));
-        runnerMap.expire(runnerConfig.getDeadRunnerPurgeTime().toJavaDuration().multipliedBy(2));
-
-        registerRunnerInSets(workspaceId, userName, projectId, runnerId);
-
-        return LocalRunnerPairResponse.builder()
-                .pairingCode(code)
-                .runnerId(runnerId)
-                .expiresInSeconds((int) runnerConfig.getPairingCodeTtl().toSeconds())
-                .build();
-    }
-
-    @Override
-    public LocalRunnerConnectResponse connect(@NonNull String workspaceId, @NonNull String userName,
-            @NonNull LocalRunnerConnectRequest request) {
-        PairingCodePayload payload = claimPairingCode(request.pairingCode(), workspaceId);
-        UUID runnerId = payload.runnerId();
-        UUID projectId = payload.projectId();
-
-        evictExistingRunner(workspaceId, projectId, userName, runnerId);
-        setUserRunner(workspaceId, projectId, userName, runnerId);
-        activateRunner(runnerId, workspaceId, projectId, userName, request.runnerName());
-
-        return LocalRunnerConnectResponse.builder()
-                .runnerId(runnerId)
-                .workspaceId(workspaceId)
-                .projectId(projectId)
-                .projectName(payload.projectName())
-                .build();
+    private PakeSessionRedis pakeSession() {
+        return new PakeSessionRedis(redisClient);
     }
 
     @Override
@@ -990,39 +905,6 @@ class LocalRunnerServiceImpl implements LocalRunnerService {
                 userRunnerBucket.delete();
             }
         }
-    }
-
-    private String generatePairingCodeString() {
-        StringBuilder sb = new StringBuilder(PAIRING_CODE_LENGTH);
-        for (int i = 0; i < PAIRING_CODE_LENGTH; i++) {
-            sb.append(PAIRING_CODE_ALPHABET
-                    .charAt(RandomUtils.secure().randomInt(0, PAIRING_CODE_ALPHABET.length())));
-        }
-        return sb.toString();
-    }
-
-    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
-    private record PairingCodePayload(UUID runnerId, String workspaceId, UUID projectId, String projectName) {
-    }
-
-    private PairingCodePayload claimPairingCode(String code, String workspaceId) {
-        RBucket<String> pairBucket = redisClient.getBucket(pairKey(code));
-        String value = pairBucket.getAndDelete();
-        if (value == null) {
-            throw new ClientErrorException(Response.status(Response.Status.BAD_REQUEST)
-                    .entity(new ErrorMessage(List.of("Invalid or expired pairing code")))
-                    .build());
-        }
-
-        PairingCodePayload payload = JsonUtils.readValue(value, PairingCodePayload.class);
-
-        if (!workspaceId.equals(payload.workspaceId())) {
-            throw new ClientErrorException(Response.status(Response.Status.BAD_REQUEST)
-                    .entity(new ErrorMessage(List.of("Pairing code belongs to a different workspace")))
-                    .build());
-        }
-
-        return payload;
     }
 
     private void evictExistingRunner(String workspaceId, UUID projectId, String userName, UUID newRunnerId) {
@@ -1871,29 +1753,22 @@ class LocalRunnerServiceImpl implements LocalRunnerService {
 
     // --- PAKE relay methods ---
 
-    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
-    private record DaemonPairPayload(UUID runnerId, String workspaceId, String userName, String runnerName,
-            Long sessionTtlSeconds) {
-    }
-
     @Override
-    public DaemonPairRegisterResponse registerDaemonPair(@NonNull String workspaceId, @NonNull String userName,
+    public UUID registerDaemonPair(@NonNull String workspaceId, @NonNull String userName,
             @NonNull DaemonPairRegisterRequest request) {
         UUID projectId = request.projectId();
         UUID runnerId = idGenerator.generateId();
         Duration ttl = PAKE_SESSION_TTL;
 
-        // Clean up any stale session for this user+project (crash recovery)
-        redisClient.getBucket(pakeSessionKey(workspaceId, userName, projectId)).delete();
-        redisClient.getList(pakeMessagesKey(workspaceId, userName, projectId)).delete();
-        redisClient.getAtomicLong(pakeAttemptsKey(workspaceId, userName, projectId)).delete();
+        DaemonPairPayload payload = DaemonPairPayload.builder()
+                .runnerId(runnerId)
+                .workspaceId(workspaceId)
+                .userName(userName)
+                .runnerName(request.runnerName())
+                .sessionTtlSeconds(request.sessionTtlSeconds())
+                .build();
 
-        String payload = JsonUtils.writeValueAsString(
-                new DaemonPairPayload(runnerId, workspaceId, userName, request.runnerName(),
-                        request.sessionTtlSeconds()));
-
-        RBucket<String> sessionBucket = redisClient.getBucket(pakeSessionKey(workspaceId, userName, projectId));
-        sessionBucket.set(payload, ttl);
+        pakeSession().createSession(projectId, workspaceId, userName, payload, ttl);
 
         RMap<String, String> runnerMap = redisClient.getMap(runnerKey(runnerId));
         runnerMap.putAll(Map.of(
@@ -1904,102 +1779,74 @@ class LocalRunnerServiceImpl implements LocalRunnerService {
                 FIELD_PROJECT_ID, projectId.toString()));
         runnerMap.expire(ttl.multipliedBy(2));
 
-        return DaemonPairRegisterResponse.builder()
-                .runnerId(runnerId)
-                .expiresInSeconds((int) ttl.toSeconds())
-                .build();
+        return runnerId;
     }
 
     @Override
     public void postPakeMessage(@NonNull String workspaceId, @NonNull String userName, @NonNull UUID projectId,
-            @NonNull PakeMessageRequest request) {
-        RBucket<String> sessionBucket = redisClient.getBucket(pakeSessionKey(workspaceId, userName, projectId));
-        if (!sessionBucket.isExists()) {
-            throw new NotFoundException("No pairing session found for this user/project");
+            @NonNull PakeRole targetRole, @NonNull PakeMessageRequest request) {
+        PakeSessionRedis sessions = pakeSession();
+        if (!sessions.sessionExists(projectId, workspaceId, userName)) {
+            throw new NotFoundException("No pairing session found for workspace='" + workspaceId
+                    + "' project='" + projectId + "'");
         }
 
-        if (request.step() == PAKE_STEP_SPAKE2) {
-            RAtomicLong attempts = redisClient.getAtomicLong(pakeAttemptsKey(workspaceId, userName, projectId));
-            long count = attempts.incrementAndGet();
-            if (count == 1) {
-                attempts.expire(PAKE_SESSION_TTL);
-            }
+        if (request.step() == PakeStep.SPAKE2) {
+            long count = sessions.incrementAttempts(projectId, workspaceId, userName, PAKE_SESSION_TTL);
             if (count > MAX_PAKE_ATTEMPTS) {
-                sessionBucket.delete();
-                redisClient.getList(pakeMessagesKey(workspaceId, userName, projectId)).delete();
-                attempts.delete();
+                sessions.deleteSession(projectId, workspaceId, userName);
                 throw new ClientErrorException(Response.status(Response.Status.TOO_MANY_REQUESTS)
-                        .entity(new ErrorMessage(List.of("Too many pairing attempts. Session has been invalidated.")))
+                        .entity(new ErrorMessage(List.of(
+                                "Too many pairing attempts for project='" + projectId
+                                        + "'. Session has been invalidated.")))
                         .build());
             }
         }
 
-        String messageJson = JsonUtils.writeValueAsString(
-                PakeMessageResponse.builder()
-                        .role(request.role())
-                        .step(request.step())
-                        .payload(request.payload())
-                        .build());
-
-        RList<String> messages = redisClient.getList(pakeMessagesKey(workspaceId, userName, projectId));
-        messages.add(messageJson);
-        messages.expire(PAKE_SESSION_TTL);
+        sessions.postMessage(projectId, workspaceId, userName, targetRole, request.step(),
+                request.payload(), PAKE_SESSION_TTL);
     }
 
     @Override
-    public Mono<List<PakeMessageResponse>> getPakeMessages(@NonNull String workspaceId, @NonNull String userName,
-            @NonNull UUID projectId, int afterStep, @NonNull PakeRole forRole) {
-        PakeRole otherRole = forRole == PakeRole.DAEMON ? PakeRole.BROWSER : PakeRole.DAEMON;
-
-        // Note: we do NOT require the session bucket to exist here. completePairing deletes the
-        // session bucket and then posts the step=COMPLETION marker to the messages list (TTL ~1min).
-        // The daemon's final poll for step=COMPLETION must still succeed in that window, so we treat
-        // the messages list as the source of truth and only 404 if it is also gone.
-        String messagesKey = pakeMessagesKey(workspaceId, userName, projectId);
-        RBucket<String> sessionBucket = redisClient.getBucket(pakeSessionKey(workspaceId, userName, projectId));
-        if (!sessionBucket.isExists() && !redisClient.getList(messagesKey).isExists()) {
-            throw new NotFoundException("No pairing session found for this user/project");
+    public Mono<PakeMessagePage> getPakeMessages(@NonNull String workspaceId, @NonNull String userName,
+            @NonNull UUID projectId, @NonNull PakeRole targetRole, @NonNull PakeStep targetStep) {
+        PakeSessionRedis sessions = pakeSession();
+        // For step=COMPLETION the session bucket is already gone (completePairing deletes it before
+        // posting the completion marker). In that case the inbox deque is the source of truth —
+        // the daemon's final poll must still succeed while the deque TTL is in force.
+        if (targetStep != PakeStep.COMPLETION
+                && !sessions.sessionExists(projectId, workspaceId, userName)) {
+            throw new NotFoundException("No pairing session found for workspace='" + workspaceId
+                    + "' project='" + projectId + "'");
         }
 
-        long maxAttempts = Math.max(1, runnerConfig.getPakePollTimeout().toSeconds() * 1000 / PAKE_POLL_INTERVAL_MS);
+        Duration pollTimeout = runnerConfig.getPakePollTimeout().toJavaDuration();
 
-        return Mono.fromCallable(() -> pollPakeMessagesOnce(messagesKey, otherRole, afterStep))
+        // Redis-native blocking pop moves the wait into the Redis call rather than
+        // delay-elements polling. subscribeOn(boundedElastic) is still required because
+        // RBlockingDeque.poll itself is blocking and cannot run on a Reactor event loop.
+        return Mono.fromCallable(() -> sessions.awaitMessage(
+                projectId, workspaceId, userName, targetRole, targetStep, pollTimeout))
                 .subscribeOn(Schedulers.boundedElastic())
-                .filter(matching -> !matching.isEmpty())
-                .repeatWhenEmpty(
-                        Math.toIntExact(maxAttempts),
-                        flux -> flux.delayElements(Duration.ofMillis(PAKE_POLL_INTERVAL_MS)))
-                .defaultIfEmpty(List.of());
-    }
-
-    private List<PakeMessageResponse> pollPakeMessagesOnce(String messagesKey, PakeRole otherRole, int afterStep) {
-        RList<String> messages = redisClient.getList(messagesKey);
-        List<String> allMessages = messages.readAll();
-
-        List<PakeMessageResponse> matching = new ArrayList<>();
-        for (String msgJson : allMessages) {
-            PakeMessageResponse msg = JsonUtils.readValue(msgJson, PakeMessageResponse.class);
-            if (msg.role() == otherRole && msg.step() > afterStep) {
-                matching.add(msg);
-            }
-        }
-        return matching;
+                .map(opt -> opt
+                        .map(payload -> PakeMessagePage.builder()
+                                .messages(List.of(PakeMessageResponse.builder()
+                                        .step(targetStep)
+                                        .payload(payload)
+                                        .build()))
+                                .build())
+                        .orElse(PakeMessagePage.builder().messages(List.of()).build()));
     }
 
     @Override
     public LocalRunnerConnectResponse completePairing(@NonNull String workspaceId, @NonNull String userName,
-            @NonNull PairCompleteRequest request) {
-        UUID projectId = request.projectId();
+            @NonNull UUID projectId) {
+        PakeSessionRedis sessions = pakeSession();
+        DaemonPairPayload payload = sessions.takeSession(projectId, workspaceId, userName)
+                .orElseThrow(() -> new NotFoundException("No pairing session found for workspace='"
+                        + workspaceId + "' project='" + projectId + "'"));
 
-        RBucket<String> sessionBucket = redisClient.getBucket(pakeSessionKey(workspaceId, userName, projectId));
-        String payloadJson = sessionBucket.getAndDelete();
-        if (payloadJson == null) {
-            throw new NotFoundException("No pairing session found for this user/project");
-        }
-
-        DaemonPairPayload payload = JsonUtils.readValue(payloadJson, DaemonPairPayload.class);
         UUID runnerId = payload.runnerId();
-
         String projectName = projectService.get(projectId, workspaceId).name();
 
         evictExistingRunner(workspaceId, projectId, userName, runnerId);
@@ -2007,18 +1854,11 @@ class LocalRunnerServiceImpl implements LocalRunnerService {
         setUserRunner(workspaceId, projectId, userName, runnerId);
         activateRunner(runnerId, workspaceId, projectId, userName, payload.runnerName());
 
-        String completeMsg = JsonUtils.writeValueAsString(
-                PakeMessageResponse.builder()
-                        .role(PakeRole.BROWSER)
-                        .step(PAKE_STEP_COMPLETION)
-                        .payload(projectName)
-                        .build());
-        RList<String> messages = redisClient.getList(pakeMessagesKey(workspaceId, userName, projectId));
-        messages.add(completeMsg);
-        // Keep the completion marker around at least as long as the daemon's longest possible poll,
-        // plus a buffer, so a daemon poll that started right before completePairing can still see it.
-        messages.expire(runnerConfig.getPakePollTimeout().toJavaDuration().plusMinutes(1));
-        redisClient.getAtomicLong(pakeAttemptsKey(workspaceId, userName, projectId)).delete();
+        // Post the completion marker into the daemon's inbox so its final long-poll for
+        // target_step=COMPLETION returns the project name. TTL covers one poll cycle + buffer.
+        Duration completionTtl = runnerConfig.getPakePollTimeout().toJavaDuration().plusMinutes(1);
+        sessions.postMessage(projectId, workspaceId, userName, PakeRole.DAEMON, PakeStep.COMPLETION,
+                projectName, completionTtl);
 
         Instant expiresAt = payload.sessionTtlSeconds() != null
                 ? Instant.now().plusSeconds(payload.sessionTtlSeconds())

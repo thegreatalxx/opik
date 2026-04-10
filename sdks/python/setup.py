@@ -55,7 +55,6 @@ setup(
         "pytest",
         "rich",
         "sentry_sdk>=2.0.0",
-        "spake2>=0.9",
         "tenacity",
         "tqdm",
         "uuid6",

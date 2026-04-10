@@ -55,6 +55,7 @@ from .. import (
     httpx_client,
     id_helpers,
     llm_usage,
+    logging_messages,
     rest_client_configurator,
     url_helpers,
 )
@@ -411,7 +412,6 @@ class Opik:
             project_name=project_name,
             url_override=self._config.url_override,
             source=source,
-            config=self._config,
         )
 
     def copy_traces(
@@ -640,7 +640,6 @@ class Opik:
             total_cost=total_cost,
             attachments=attachments,
             source=source,
-            config=self._config,
         )
 
     def update_span(
@@ -704,11 +703,11 @@ class Opik:
         Returns:
             None
         """
-        helpers.warn_if_batching_update(
-            use_batching=self._use_batching,
-            suppress_warning=self._config.suppress_batching_update_warning,
-            method_name="Opik.update_span()",
-        )
+        if self._use_batching:
+            LOGGER.warning(
+                logging_messages.BATCHING_UPDATE_DATA_LOSS_WARNING,
+                "Opik.update_span()",
+            )
 
         span_module.span_client.update_span(
             id=id,
@@ -774,11 +773,11 @@ class Opik:
         Returns:
             None
         """
-        helpers.warn_if_batching_update(
-            use_batching=self._use_batching,
-            suppress_warning=self._config.suppress_batching_update_warning,
-            method_name="Opik.update_trace()",
-        )
+        if self._use_batching:
+            LOGGER.warning(
+                logging_messages.BATCHING_UPDATE_DATA_LOSS_WARNING,
+                "Opik.update_trace()",
+            )
 
         if not trace_id or not project_name:
             raise ValueError(

@@ -7,7 +7,6 @@ from ..core.request_options import RequestOptions
 from ..types.bridge_command import BridgeCommand
 from ..types.bridge_command_batch_response import BridgeCommandBatchResponse
 from ..types.bridge_command_submit_response import BridgeCommandSubmitResponse
-from ..types.daemon_pair_register_response import DaemonPairRegisterResponse
 from ..types.json_node import JsonNode
 from ..types.local_runner import LocalRunner
 from ..types.local_runner_connect_response import LocalRunnerConnectResponse
@@ -18,14 +17,11 @@ from ..types.local_runner_job_page import LocalRunnerJobPage
 from ..types.local_runner_log_entry import LocalRunnerLogEntry
 from ..types.local_runner_page import LocalRunnerPage
 from ..types.local_runner_pair_response import LocalRunnerPairResponse
-from ..types.pake_message_response import PakeMessageResponse
 from .raw_client import AsyncRawRunnersClient, RawRunnersClient
 from .types.bridge_command_result_request_status import BridgeCommandResultRequestStatus
 from .types.bridge_command_submit_request_type import BridgeCommandSubmitRequestType
-from .types.get_pake_messages_request_role import GetPakeMessagesRequestRole
 from .types.list_runners_request_status import ListRunnersRequestStatus
 from .types.local_runner_job_result_request_status import LocalRunnerJobResultRequestStatus
-from .types.pake_message_request_role import PakeMessageRequestRole
 
 # this is used as the default value for optional parameters
 OMIT = typing.cast(typing.Any, ...)
@@ -136,33 +132,6 @@ class RunnersClient:
         _response = self._raw_client.cancel_job(job_id, request_options=request_options)
         return _response.data
 
-    def complete_pairing(
-        self, *, project_id: str, request_options: typing.Optional[RequestOptions] = None
-    ) -> LocalRunnerConnectResponse:
-        """
-        Browser completes pairing after key confirmation, activating the runner
-
-        Parameters
-        ----------
-        project_id : str
-
-        request_options : typing.Optional[RequestOptions]
-            Request-specific configuration.
-
-        Returns
-        -------
-        LocalRunnerConnectResponse
-            Pairing completed
-
-        Examples
-        --------
-        from Opik import OpikApi
-        client = OpikApi(api_key="YOUR_API_KEY", workspace_name="YOUR_WORKSPACE_NAME", )
-        client.runners.complete_pairing(project_id='project_id', )
-        """
-        _response = self._raw_client.complete_pairing(project_id=project_id, request_options=request_options)
-        return _response.data
-
     def connect_runner(
         self, *, pairing_code: str, runner_name: str, request_options: typing.Optional[RequestOptions] = None
     ) -> LocalRunnerConnectResponse:
@@ -200,10 +169,7 @@ class RunnersClient:
         *,
         type: BridgeCommandSubmitRequestType,
         args: JsonNode,
-        command_id: typing.Optional[str] = OMIT,
         timeout_seconds: typing.Optional[int] = OMIT,
-        hmac: typing.Optional[str] = OMIT,
-        sequence: typing.Optional[int] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> BridgeCommandSubmitResponse:
         """
@@ -217,13 +183,7 @@ class RunnersClient:
 
         args : JsonNode
 
-        command_id : typing.Optional[str]
-
         timeout_seconds : typing.Optional[int]
-
-        hmac : typing.Optional[str]
-
-        sequence : typing.Optional[int]
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -241,14 +201,7 @@ class RunnersClient:
         }, )
         """
         _response = self._raw_client.create_bridge_command(
-            runner_id,
-            type=type,
-            args=args,
-            command_id=command_id,
-            timeout_seconds=timeout_seconds,
-            hmac=hmac,
-            sequence=sequence,
-            request_options=request_options,
+            runner_id, type=type, args=args, timeout_seconds=timeout_seconds, request_options=request_options
         )
         return _response.data
 
@@ -391,84 +344,6 @@ class RunnersClient:
         client.runners.get_job(job_id='jobId', )
         """
         _response = self._raw_client.get_job(job_id, request_options=request_options)
-        return _response.data
-
-    def get_pake_messages(
-        self,
-        *,
-        project_id: str,
-        role: GetPakeMessagesRequestRole,
-        after_step: typing.Optional[int] = None,
-        request_options: typing.Optional[RequestOptions] = None,
-    ) -> typing.List[PakeMessageResponse]:
-        """
-        Long-poll for PAKE exchange messages from the other party. Session is resolved from auth context + project_id.
-
-        Parameters
-        ----------
-        project_id : str
-
-        role : GetPakeMessagesRequestRole
-
-        after_step : typing.Optional[int]
-
-        request_options : typing.Optional[RequestOptions]
-            Request-specific configuration.
-
-        Returns
-        -------
-        typing.List[PakeMessageResponse]
-            Messages
-
-        Examples
-        --------
-        from Opik import OpikApi
-        client = OpikApi(api_key="YOUR_API_KEY", workspace_name="YOUR_WORKSPACE_NAME", )
-        client.runners.get_pake_messages(project_id='project_id', role="daemon", )
-        """
-        _response = self._raw_client.get_pake_messages(
-            project_id=project_id, role=role, after_step=after_step, request_options=request_options
-        )
-        return _response.data
-
-    def post_pake_message(
-        self,
-        *,
-        project_id: str,
-        role: PakeMessageRequestRole,
-        payload: str,
-        step: typing.Optional[int] = OMIT,
-        request_options: typing.Optional[RequestOptions] = None,
-    ) -> None:
-        """
-        Post a PAKE exchange message for relay. Session is resolved from auth context + project_id.
-
-        Parameters
-        ----------
-        project_id : str
-
-        role : PakeMessageRequestRole
-
-        payload : str
-
-        step : typing.Optional[int]
-
-        request_options : typing.Optional[RequestOptions]
-            Request-specific configuration.
-
-        Returns
-        -------
-        None
-
-        Examples
-        --------
-        from Opik import OpikApi
-        client = OpikApi(api_key="YOUR_API_KEY", workspace_name="YOUR_WORKSPACE_NAME", )
-        client.runners.post_pake_message(project_id='project_id', role="daemon", payload='payload', )
-        """
-        _response = self._raw_client.post_pake_message(
-            project_id=project_id, role=role, payload=payload, step=step, request_options=request_options
-        )
         return _response.data
 
     def get_runner(self, runner_id: str, *, request_options: typing.Optional[RequestOptions] = None) -> LocalRunner:
@@ -739,47 +614,6 @@ class RunnersClient:
         _response = self._raw_client.register_agents(runner_id, request=request, request_options=request_options)
         return _response.data
 
-    def register_daemon_pair(
-        self,
-        *,
-        project_id: str,
-        runner_name: str,
-        session_ttl_seconds: typing.Optional[int] = OMIT,
-        request_options: typing.Optional[RequestOptions] = None,
-    ) -> DaemonPairRegisterResponse:
-        """
-        Daemon registers a pairing session for a project. The pairing code is generated locally by the daemon and never sent to the backend.
-
-        Parameters
-        ----------
-        project_id : str
-
-        runner_name : str
-
-        session_ttl_seconds : typing.Optional[int]
-
-        request_options : typing.Optional[RequestOptions]
-            Request-specific configuration.
-
-        Returns
-        -------
-        DaemonPairRegisterResponse
-            Pairing session registered
-
-        Examples
-        --------
-        from Opik import OpikApi
-        client = OpikApi(api_key="YOUR_API_KEY", workspace_name="YOUR_WORKSPACE_NAME", )
-        client.runners.register_daemon_pair(project_id='project_id', runner_name='runner_name', )
-        """
-        _response = self._raw_client.register_daemon_pair(
-            project_id=project_id,
-            runner_name=runner_name,
-            session_ttl_seconds=session_ttl_seconds,
-            request_options=request_options,
-        )
-        return _response.data
-
     def report_bridge_result(
         self,
         runner_id: str,
@@ -789,8 +623,6 @@ class RunnersClient:
         result: typing.Optional[JsonNode] = OMIT,
         error: typing.Optional[JsonNode] = OMIT,
         duration_ms: typing.Optional[int] = OMIT,
-        hmac: typing.Optional[str] = OMIT,
-        sequence: typing.Optional[int] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> None:
         """
@@ -809,10 +641,6 @@ class RunnersClient:
         error : typing.Optional[JsonNode]
 
         duration_ms : typing.Optional[int]
-
-        hmac : typing.Optional[str]
-
-        sequence : typing.Optional[int]
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -834,8 +662,6 @@ class RunnersClient:
             result=result,
             error=error,
             duration_ms=duration_ms,
-            hmac=hmac,
-            sequence=sequence,
             request_options=request_options,
         )
         return _response.data
@@ -998,36 +824,6 @@ class AsyncRunnersClient:
         _response = await self._raw_client.cancel_job(job_id, request_options=request_options)
         return _response.data
 
-    async def complete_pairing(
-        self, *, project_id: str, request_options: typing.Optional[RequestOptions] = None
-    ) -> LocalRunnerConnectResponse:
-        """
-        Browser completes pairing after key confirmation, activating the runner
-
-        Parameters
-        ----------
-        project_id : str
-
-        request_options : typing.Optional[RequestOptions]
-            Request-specific configuration.
-
-        Returns
-        -------
-        LocalRunnerConnectResponse
-            Pairing completed
-
-        Examples
-        --------
-        from Opik import AsyncOpikApi
-        import asyncio
-        client = AsyncOpikApi(api_key="YOUR_API_KEY", workspace_name="YOUR_WORKSPACE_NAME", )
-        async def main() -> None:
-            await client.runners.complete_pairing(project_id='project_id', )
-        asyncio.run(main())
-        """
-        _response = await self._raw_client.complete_pairing(project_id=project_id, request_options=request_options)
-        return _response.data
-
     async def connect_runner(
         self, *, pairing_code: str, runner_name: str, request_options: typing.Optional[RequestOptions] = None
     ) -> LocalRunnerConnectResponse:
@@ -1068,10 +864,7 @@ class AsyncRunnersClient:
         *,
         type: BridgeCommandSubmitRequestType,
         args: JsonNode,
-        command_id: typing.Optional[str] = OMIT,
         timeout_seconds: typing.Optional[int] = OMIT,
-        hmac: typing.Optional[str] = OMIT,
-        sequence: typing.Optional[int] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> BridgeCommandSubmitResponse:
         """
@@ -1085,13 +878,7 @@ class AsyncRunnersClient:
 
         args : JsonNode
 
-        command_id : typing.Optional[str]
-
         timeout_seconds : typing.Optional[int]
-
-        hmac : typing.Optional[str]
-
-        sequence : typing.Optional[int]
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -1112,14 +899,7 @@ class AsyncRunnersClient:
         asyncio.run(main())
         """
         _response = await self._raw_client.create_bridge_command(
-            runner_id,
-            type=type,
-            args=args,
-            command_id=command_id,
-            timeout_seconds=timeout_seconds,
-            hmac=hmac,
-            sequence=sequence,
-            request_options=request_options,
+            runner_id, type=type, args=args, timeout_seconds=timeout_seconds, request_options=request_options
         )
         return _response.data
 
@@ -1274,90 +1054,6 @@ class AsyncRunnersClient:
         asyncio.run(main())
         """
         _response = await self._raw_client.get_job(job_id, request_options=request_options)
-        return _response.data
-
-    async def get_pake_messages(
-        self,
-        *,
-        project_id: str,
-        role: GetPakeMessagesRequestRole,
-        after_step: typing.Optional[int] = None,
-        request_options: typing.Optional[RequestOptions] = None,
-    ) -> typing.List[PakeMessageResponse]:
-        """
-        Long-poll for PAKE exchange messages from the other party. Session is resolved from auth context + project_id.
-
-        Parameters
-        ----------
-        project_id : str
-
-        role : GetPakeMessagesRequestRole
-
-        after_step : typing.Optional[int]
-
-        request_options : typing.Optional[RequestOptions]
-            Request-specific configuration.
-
-        Returns
-        -------
-        typing.List[PakeMessageResponse]
-            Messages
-
-        Examples
-        --------
-        from Opik import AsyncOpikApi
-        import asyncio
-        client = AsyncOpikApi(api_key="YOUR_API_KEY", workspace_name="YOUR_WORKSPACE_NAME", )
-        async def main() -> None:
-            await client.runners.get_pake_messages(project_id='project_id', role="daemon", )
-        asyncio.run(main())
-        """
-        _response = await self._raw_client.get_pake_messages(
-            project_id=project_id, role=role, after_step=after_step, request_options=request_options
-        )
-        return _response.data
-
-    async def post_pake_message(
-        self,
-        *,
-        project_id: str,
-        role: PakeMessageRequestRole,
-        payload: str,
-        step: typing.Optional[int] = OMIT,
-        request_options: typing.Optional[RequestOptions] = None,
-    ) -> None:
-        """
-        Post a PAKE exchange message for relay. Session is resolved from auth context + project_id.
-
-        Parameters
-        ----------
-        project_id : str
-
-        role : PakeMessageRequestRole
-
-        payload : str
-
-        step : typing.Optional[int]
-
-        request_options : typing.Optional[RequestOptions]
-            Request-specific configuration.
-
-        Returns
-        -------
-        None
-
-        Examples
-        --------
-        from Opik import AsyncOpikApi
-        import asyncio
-        client = AsyncOpikApi(api_key="YOUR_API_KEY", workspace_name="YOUR_WORKSPACE_NAME", )
-        async def main() -> None:
-            await client.runners.post_pake_message(project_id='project_id', role="daemon", payload='payload', )
-        asyncio.run(main())
-        """
-        _response = await self._raw_client.post_pake_message(
-            project_id=project_id, role=role, payload=payload, step=step, request_options=request_options
-        )
         return _response.data
 
     async def get_runner(
@@ -1656,50 +1352,6 @@ class AsyncRunnersClient:
         _response = await self._raw_client.register_agents(runner_id, request=request, request_options=request_options)
         return _response.data
 
-    async def register_daemon_pair(
-        self,
-        *,
-        project_id: str,
-        runner_name: str,
-        session_ttl_seconds: typing.Optional[int] = OMIT,
-        request_options: typing.Optional[RequestOptions] = None,
-    ) -> DaemonPairRegisterResponse:
-        """
-        Daemon registers a pairing session for a project. The pairing code is generated locally by the daemon and never sent to the backend.
-
-        Parameters
-        ----------
-        project_id : str
-
-        runner_name : str
-
-        session_ttl_seconds : typing.Optional[int]
-
-        request_options : typing.Optional[RequestOptions]
-            Request-specific configuration.
-
-        Returns
-        -------
-        DaemonPairRegisterResponse
-            Pairing session registered
-
-        Examples
-        --------
-        from Opik import AsyncOpikApi
-        import asyncio
-        client = AsyncOpikApi(api_key="YOUR_API_KEY", workspace_name="YOUR_WORKSPACE_NAME", )
-        async def main() -> None:
-            await client.runners.register_daemon_pair(project_id='project_id', runner_name='runner_name', )
-        asyncio.run(main())
-        """
-        _response = await self._raw_client.register_daemon_pair(
-            project_id=project_id,
-            runner_name=runner_name,
-            session_ttl_seconds=session_ttl_seconds,
-            request_options=request_options,
-        )
-        return _response.data
-
     async def report_bridge_result(
         self,
         runner_id: str,
@@ -1709,8 +1361,6 @@ class AsyncRunnersClient:
         result: typing.Optional[JsonNode] = OMIT,
         error: typing.Optional[JsonNode] = OMIT,
         duration_ms: typing.Optional[int] = OMIT,
-        hmac: typing.Optional[str] = OMIT,
-        sequence: typing.Optional[int] = OMIT,
         request_options: typing.Optional[RequestOptions] = None,
     ) -> None:
         """
@@ -1729,10 +1379,6 @@ class AsyncRunnersClient:
         error : typing.Optional[JsonNode]
 
         duration_ms : typing.Optional[int]
-
-        hmac : typing.Optional[str]
-
-        sequence : typing.Optional[int]
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -1757,8 +1403,6 @@ class AsyncRunnersClient:
             result=result,
             error=error,
             duration_ms=duration_ms,
-            hmac=hmac,
-            sequence=sequence,
             request_options=request_options,
         )
         return _response.data

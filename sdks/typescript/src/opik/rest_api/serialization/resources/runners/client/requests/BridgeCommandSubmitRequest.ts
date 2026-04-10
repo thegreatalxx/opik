@@ -10,21 +10,15 @@ export const BridgeCommandSubmitRequest: core.serialization.Schema<
     serializers.BridgeCommandSubmitRequest.Raw,
     OpikApi.BridgeCommandSubmitRequest
 > = core.serialization.object({
-    commandId: core.serialization.property("command_id", core.serialization.string().optional()),
     type: BridgeCommandSubmitRequestType,
     args: JsonNode,
     timeoutSeconds: core.serialization.property("timeout_seconds", core.serialization.number().optional()),
-    hmac: core.serialization.string().optional(),
-    sequence: core.serialization.number().optional(),
 });
 
 export declare namespace BridgeCommandSubmitRequest {
     export interface Raw {
-        command_id?: string | null;
         type: BridgeCommandSubmitRequestType.Raw;
         args: JsonNode.Raw;
         timeout_seconds?: number | null;
-        hmac?: string | null;
-        sequence?: number | null;
     }
 }

@@ -20,7 +20,6 @@ from .bridge_handlers.search_files import SearchFilesHandler
 from .bridge_handlers.write_file import WriteFileHandler
 from .bridge_loop import BridgePollLoop
 from .file_watcher import FileWatcher
-from .hmac_signer import CommandSigner, CommandVerifier
 from .snapshot import build_checklist
 from .stability_guard import StabilityGuard
 
@@ -62,20 +61,12 @@ class Supervisor:
         repo_root: Path,
         runner_id: str,
         api: Any,
-        *,
-        shared_key: bytes,
         on_child_output: Optional[Callable[[str, str], None]] = None,
         on_child_restart: Optional[Callable[[str], None]] = None,
-        on_error: Optional[Callable[[str], None]] = None,
         on_command_start: Optional[Callable[[str, str, str], None]] = None,
         on_command_end: Optional[Callable[[str, bool, Optional[str]], None]] = None,
         watch: Optional[bool] = None,
-        session_ttl: Optional[float] = None,
     ) -> None:
-        if not shared_key:
-            raise ValueError(
-                "shared_key is required: daemon must complete PAKE pairing before running"
-            )
         self._command = command
         self._env = env
         self._repo_root = repo_root
@@ -83,11 +74,8 @@ class Supervisor:
         self._api = api
         self._on_child_output = on_child_output or self._default_output_callback
         self._on_child_restart = on_child_restart
-        self._on_error = on_error
         self._on_command_start = on_command_start
         self._on_command_end = on_command_end
-        self._shared_key = shared_key
-        self._session_deadline = time.monotonic() + session_ttl if session_ttl else None
         if command is None:
             self._watch = False
         elif watch is None:
@@ -122,16 +110,11 @@ class Supervisor:
             "SearchFiles": SearchFilesHandler(self._repo_root),
             "Exec": ExecHandler(self._repo_root, self._bg_tracker),
         }
-        verifier = CommandVerifier(self._shared_key)
-        signer = CommandSigner(self._shared_key)
-
         bridge_loop = BridgePollLoop(
             self._api,
             self._runner_id,
             handlers,
             self._shutdown_event,
-            verifier=verifier,
-            signer=signer,
             on_command_start=self._on_command_start,
             on_command_end=self._on_command_end,
         )
@@ -198,8 +181,13 @@ class Supervisor:
                 self._shutdown_event.set()
                 break
 
-            should_restart = self._handle_child_exit(exit_code)
-            if not should_restart:
+            LOGGER.warning("Child exited with code %d", exit_code)
+            stderr_tail = self._get_stderr_tail()
+            self._guard.record_crash()
+
+            if not self._guard.is_stable():
+                LOGGER.error("Child crash-looping — waiting for file change to retry")
+                self._patch_crash_info(exit_code, stderr_tail)
                 continue
 
             with self._child_lock:
@@ -296,24 +284,6 @@ class Supervisor:
 
         return child.returncode
 
-    def _handle_child_exit(self, exit_code: int) -> bool:
-        """Handle a child process exit. Returns True if child should be restarted."""
-        LOGGER.warning("Child exited with code %d", exit_code)
-        stderr_tail = self._get_stderr_tail()
-        self._guard.record_crash()
-
-        if not self._guard.is_stable():
-            LOGGER.error("Child crash-looping — waiting for file change to retry")
-            if self._on_error:
-                self._on_error("Crash loop detected — waiting for file change to retry")
-            self._patch_crash_info(exit_code, stderr_tail)
-            return False
-
-        if self._on_child_restart:
-            self._on_child_restart("agent process has failed")
-
-        return True
-
     def _restart_child(self, reason: str) -> None:
         with self._child_lock:
             now = time.monotonic()
@@ -385,11 +355,6 @@ class Supervisor:
 
     def _heartbeat_loop(self) -> None:
         while not self._shutdown_event.is_set():
-            if self._session_deadline and time.monotonic() >= self._session_deadline:
-                LOGGER.info("Session TTL expired, shutting down")
-                self._shutdown_event.set()
-                return
-
             try:
                 self._api.runners.heartbeat(
                     self._runner_id, capabilities=["jobs", "bridge"]

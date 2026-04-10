@@ -8,6 +8,4 @@ export interface BridgeCommandItem {
     args?: OpikApi.JsonNode;
     timeoutSeconds?: number;
     submittedAt?: Date;
-    hmac?: string;
-    sequence?: number;
 }

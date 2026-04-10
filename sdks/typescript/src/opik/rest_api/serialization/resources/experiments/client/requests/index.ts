@@ -1,5 +1,4 @@
 export { ExperimentBatchUpdate } from "./ExperimentBatchUpdate.js";
-export { ExperimentExecutionRequest } from "./ExperimentExecutionRequest.js";
 export { ExperimentItemBulkUploadExperimentItemBulkWriteView } from "./ExperimentItemBulkUploadExperimentItemBulkWriteView.js";
 export { ExperimentItemStreamRequest } from "./ExperimentItemStreamRequest.js";
 export { ExperimentItemsBatch } from "./ExperimentItemsBatch.js";

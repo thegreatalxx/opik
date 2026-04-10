@@ -554,6 +554,7 @@ localRunner:
   reaperLockDuration: 10s
   reaperLockWait: 2s
   nextJobAsyncTimeoutBuffer: 2s
+  pakePollTimeout: 2s
 
 # Trace Thread configuration
 traceThreadConfig:

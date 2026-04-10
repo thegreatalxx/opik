@@ -2,37 +2,25 @@
 
 Exec tests: echo, nonzero exit, background process.
 File operation flow: write → list → search → edit → read, all via the API.
-All commands are HMAC-signed with the PAKE shared key.
 """
 
 import time
-import uuid
 
-from opik.rest_api.core.request_options import RequestOptions
 from opik.rest_api.errors.conflict_error import ConflictError
 
-from .conftest import RunnerInfo, sign_command
+from .conftest import RunnerInfo
 
 _BRIDGE_READY_TIMEOUT = 15
 
 
-def _submit_and_wait(api_client, runner_info, cmd_type, args):
-    command_id = str(uuid.uuid4())
-    hmac_sig = sign_command(runner_info.shared_key, command_id, cmd_type, args)
-
+def _submit_and_wait(api_client, runner_id, cmd_type, args):
     deadline = time.monotonic() + _BRIDGE_READY_TIMEOUT
     while True:
         try:
             resp = api_client.runners.create_bridge_command(
-                runner_info.runner_id,
+                runner_id,
                 type=cmd_type,
                 args=args,
-                request_options=RequestOptions(
-                    additional_body_parameters={
-                        "command_id": command_id,
-                        "hmac": hmac_sig,
-                    }
-                ),
             )
             break
         except ConflictError:
@@ -41,7 +29,7 @@ def _submit_and_wait(api_client, runner_info, cmd_type, args):
             time.sleep(1)
 
     return api_client.runners.get_bridge_command(
-        runner_info.runner_id,
+        runner_id,
         resp.command_id,
         wait=True,
         timeout=15,
@@ -59,7 +47,7 @@ def test_bridge_exec_echo(api_client, runner_process: RunnerInfo):
 
     cmd = _submit_and_wait(
         api_client,
-        runner_process,
+        runner_process.runner_id,
         "Exec",
         {"command": f"echo {marker}"},
     )
@@ -67,14 +55,13 @@ def test_bridge_exec_echo(api_client, runner_process: RunnerInfo):
     assert cmd.status == "completed"
     assert marker in cmd.result["stdout"]
     assert cmd.result["exit_code"] == 0
-    assert cmd.hmac is not None
 
 
 def test_bridge_exec_nonzero_exit(api_client, runner_process: RunnerInfo):
     """Verify non-zero exit codes are returned correctly."""
     cmd = _submit_and_wait(
         api_client,
-        runner_process,
+        runner_process.runner_id,
         "Exec",
         {"command": "exit 42"},
     )
@@ -87,7 +74,7 @@ def test_bridge_exec_background(api_client, runner_process: RunnerInfo):
     """Submit a background command, verify PID is returned."""
     cmd = _submit_and_wait(
         api_client,
-        runner_process,
+        runner_process.runner_id,
         "Exec",
         {"command": "sleep 30", "background": True},
     )
@@ -104,6 +91,7 @@ def test_bridge_exec_background(api_client, runner_process: RunnerInfo):
 
 def test_bridge_file_operations(api_client, runner_process: RunnerInfo):
     """Write a file, find it with list/search, edit it, and read back."""
+    rid = runner_process.runner_id
     marker = f"xyzzy_{int(time.time())}"
     filename = f"bridge_e2e_{int(time.time())}.py"
     original_content = f"# {marker}\n"
@@ -111,7 +99,7 @@ def test_bridge_file_operations(api_client, runner_process: RunnerInfo):
     # 1. Write
     cmd = _submit_and_wait(
         api_client,
-        runner_process,
+        rid,
         "WriteFile",
         {"path": filename, "content": original_content},
     )
@@ -121,7 +109,7 @@ def test_bridge_file_operations(api_client, runner_process: RunnerInfo):
     # 2. ListFiles — new file should appear
     cmd = _submit_and_wait(
         api_client,
-        runner_process,
+        rid,
         "ListFiles",
         {"pattern": f"**/{filename}"},
     )
@@ -133,7 +121,7 @@ def test_bridge_file_operations(api_client, runner_process: RunnerInfo):
     # 3. EditFile — replace content
     cmd = _submit_and_wait(
         api_client,
-        runner_process,
+        rid,
         "EditFile",
         {
             "path": filename,
@@ -146,7 +134,7 @@ def test_bridge_file_operations(api_client, runner_process: RunnerInfo):
     # 5. ReadFile — verify the edit took effect
     cmd = _submit_and_wait(
         api_client,
-        runner_process,
+        rid,
         "ReadFile",
         {"path": filename},
     )
@@ -156,7 +144,7 @@ def test_bridge_file_operations(api_client, runner_process: RunnerInfo):
     # 6. Cleanup via Exec
     _submit_and_wait(
         api_client,
-        runner_process,
+        rid,
         "Exec",
         {"command": f"rm {filename}"},
     )

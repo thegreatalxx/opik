@@ -12,7 +12,6 @@ export const LocalRunnerConnectResponse: core.serialization.ObjectSchema<
     workspaceId: core.serialization.property("workspace_id", core.serialization.string().optional()),
     projectId: core.serialization.property("project_id", core.serialization.string().optional()),
     projectName: core.serialization.property("project_name", core.serialization.string().optional()),
-    expiresAt: core.serialization.property("expires_at", core.serialization.date().optional()),
 });
 
 export declare namespace LocalRunnerConnectResponse {
@@ -21,6 +20,5 @@ export declare namespace LocalRunnerConnectResponse {
         workspace_id?: string | null;
         project_id?: string | null;
         project_name?: string | null;
-        expires_at?: string | null;
     }
 }

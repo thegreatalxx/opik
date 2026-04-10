@@ -1,4 +1,3 @@
-import base64
 import logging
 import os
 import platform
@@ -11,18 +10,10 @@ import click
 import httpx
 
 from opik import Opik
-from opik.api_objects.rest_helpers import resolve_project_id_by_name
 from opik.rest_api.client import OpikApi
 from opik.rest_api.core.api_error import ApiError
-from opik.rest_api.core.request_options import RequestOptions
-from opik.runner.pake import PakeSession, generate_code
 from opik.runner.supervisor import Supervisor
 from opik.runner.tui import RunnerTUI
-
-LOGGER = logging.getLogger(__name__)
-_PAKE_TIMEOUT = 300.0
-_PAKE_POLL_OPTIONS = RequestOptions(timeout_in_seconds=_PAKE_TIMEOUT + 10)
-_PAKE_COMPLETE_OPTIONS = _PAKE_POLL_OPTIONS
 
 
 def _validate_command(command: Tuple[str, ...]) -> None:
@@ -39,111 +30,26 @@ def _validate_command(command: Tuple[str, ...]) -> None:
         raise SystemExit(2)
 
 
-def _wait_for_pake_step(
-    api: OpikApi,
-    project_id: str,
-    after_step: int,
-    expected_role: str,
-    expected_step: int,
-    failure_msg: str,
-    request_options: RequestOptions = _PAKE_POLL_OPTIONS,
-) -> str:
-    """Poll for a PAKE message matching role+step, raise ClickException on timeout or missing payload."""
-    messages = api.runners.get_pake_messages(
-        project_id=project_id,
-        role="daemon",
-        after_step=after_step,
-        request_options=request_options,
+def _register_runner(
+    api: OpikApi, name: Optional[str], pair_code: str
+) -> Tuple[str, str]:
+    runner_name = name or f"{platform.node()}-{uuid.uuid4().hex[:6]}"
+    resp = api.runners.connect_runner(
+        runner_name=runner_name,
+        pairing_code=pair_code,
     )
-    matches = [
-        m for m in messages if m.role == expected_role and m.step == expected_step
-    ]
-    if not matches:
-        raise click.ClickException(failure_msg)
-
-    payload = matches[0].payload
-    if not payload:
-        raise click.ClickException(f"{failure_msg} (empty payload)")
-    return payload
-
-
-def _run_pake_exchange(api: OpikApi, code: str, project_id: str) -> Tuple[str, bytes]:
-    """Run the PAKE exchange (session must already be registered).
-
-    Returns (project_name, shared_key).
-    """
-    session = PakeSession(code)
-    outgoing_msg = session.start()
-
-    api.runners.post_pake_message(
-        project_id=project_id,
-        role="daemon",
-        step=0,
-        payload=base64.b64encode(outgoing_msg).decode("ascii"),
-    )
-
-    browser_payload_b64 = _wait_for_pake_step(
-        api,
-        project_id,
-        after_step=-1,
-        expected_role="browser",
-        expected_step=0,
-        failure_msg="Pairing timed out. Check that the browser is connected and try again.",
-    )
-    try:
-        browser_payload = base64.b64decode(browser_payload_b64)
-    except Exception:
-        raise click.ClickException("Invalid SPAKE2 message from browser (bad base64).")
-    session.finish(browser_payload)
-
-    api.runners.post_pake_message(
-        project_id=project_id,
-        role="daemon",
-        step=1,
-        payload=session.confirmation(),
-    )
-
-    browser_confirm = _wait_for_pake_step(
-        api,
-        project_id,
-        after_step=0,
-        expected_role="browser",
-        expected_step=1,
-        failure_msg="Key confirmation timed out. Check that the browser is connected and try again.",
-    )
-    if not session.verify_confirmation(browser_confirm):
-        raise click.ClickException(
-            "Key confirmation failed — possible man-in-the-middle attack. Aborting."
-        )
-
-    project_name = _wait_for_pake_step(
-        api,
-        project_id,
-        after_step=1,
-        expected_role="browser",
-        expected_step=2,
-        failure_msg="Pairing completion timed out. Browser did not complete pairing.",
-        request_options=_PAKE_COMPLETE_OPTIONS,
-    )
-
-    return project_name, session.shared_key
-
-
-_DEFAULT_SESSION_TTL = 24 * 3600
+    if not resp.runner_id:
+        click.echo("Error: server did not return a runner_id")
+        raise SystemExit(1)
+    if not resp.project_name:
+        click.echo("Error: server did not return a project_name")
+        raise SystemExit(1)
+    return resp.runner_id, resp.project_name
 
 
 @click.command(context_settings={"ignore_unknown_options": True})
-@click.option(
-    "--project", "project_name", required=True, help="Project name to connect to."
-)
+@click.option("--pair", "pair_code", required=True, help="Pairing code for the runner.")
 @click.option("--name", default=None, help="Runner name.")
-@click.option(
-    "--ttl",
-    "session_ttl",
-    default=_DEFAULT_SESSION_TTL,
-    type=int,
-    help="Session TTL in seconds. Daemon shuts down after this duration. Default: 24h.",
-)
 @click.option(
     "--watch/--no-watch",
     default=None,
@@ -153,9 +59,8 @@ _DEFAULT_SESSION_TTL = 24 * 3600
 @click.pass_context
 def connect(
     ctx: click.Context,
-    project_name: str,
+    pair_code: str,
     name: Optional[str],
-    session_ttl: int,
     watch: Optional[bool],
     command: Tuple[str, ...],
 ) -> None:
@@ -166,46 +71,21 @@ def connect(
     client = Opik(api_key=api_key, _show_misconfiguration_message=False)
     api = client.rest_client
 
-    tui: Optional[RunnerTUI] = None
     try:
-        runner_name = name or f"{platform.node()}-{uuid.uuid4().hex[:6]}"
-        project_id = resolve_project_id_by_name(api, project_name)
-        code = generate_code()
-
-        register_result = api.runners.register_daemon_pair(
-            project_id=project_id,
-            runner_name=runner_name,
-            session_ttl_seconds=session_ttl,
-        )
-        runner_id = register_result.runner_id
-
-        tui = RunnerTUI()
-        tui.start()
-        tui.print_banner(
-            project_name=project_name,
-            url=client.config.url_override,
-        )
-
-        tui.pairing_started(code, _PAKE_TIMEOUT)
-        try:
-            resolved_project_name, shared_key = _run_pake_exchange(
-                api, code, project_id
-            )
-        except KeyboardInterrupt:
-            tui.pairing_failed("interrupted")
-            raise
-        except Exception:
-            tui.pairing_failed()
-            raise
-        tui.pairing_completed()
+        runner_id, project_name = _register_runner(api, name, pair_code)
 
         env = {
             **os.environ,
             "OPIK_RUNNER_MODE": "true",
             "OPIK_RUNNER_ID": runner_id,
-            "OPIK_PROJECT_NAME": resolved_project_name or project_name,
+            "OPIK_PROJECT_NAME": project_name,
         }
 
+        tui = RunnerTUI()
+        tui.start()
+        tui.print_banner(runner_id, project_name, url=client.config.url_override)
+
+        # Suppress OPIK log lines from leaking into the TUI
         opik_logger = logging.getLogger("opik")
         opik_logger.handlers = [
             h
@@ -222,16 +102,14 @@ def connect(
             api=api,
             on_child_output=tui.app_line,
             on_child_restart=tui.child_restarted,
-            on_error=tui.error,
             on_command_start=tui.op_start,
             on_command_end=tui.op_end,
             watch=watch,
-            shared_key=shared_key,
-            session_ttl=float(session_ttl),
         )
-        supervisor.run()
-    except KeyboardInterrupt:
-        raise SystemExit(130)
+        try:
+            supervisor.run()
+        finally:
+            tui.stop()
     except ApiError as e:
         click.echo(f"Error: {e.body}" if e.body else f"Error: {e.status_code}")
         raise SystemExit(1)
@@ -246,6 +124,4 @@ def connect(
         click.echo(f"Error: Could not execute command '{cmd_name}': {e}")
         raise SystemExit(1)
     finally:
-        if tui is not None:
-            tui.stop()
         client.end()
