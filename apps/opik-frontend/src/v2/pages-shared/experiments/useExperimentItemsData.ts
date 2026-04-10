@@ -146,18 +146,14 @@ const useExperimentItemsData = ({
   }, [data]);
 
   const dynamicOutputColumns = useMemo(() => {
-    const datasetColumnNames = new Set(
-      dynamicDatasetColumns.map((c) => c.label),
-    );
     return (experimentsOutputData?.columns ?? [])
-      .filter((c) => !datasetColumnNames.has(c.name))
       .sort((c1, c2) => c1.name.localeCompare(c2.name))
       .map<DynamicColumn>((c) => ({
         id: `${EXPERIMENT_ITEM_OUTPUT_PREFIX}.${c.name}`,
         label: c.name,
         columnType: mapDynamicColumnTypesToColumnType(c.types),
       }));
-  }, [experimentsOutputData, dynamicDatasetColumns]);
+  }, [experimentsOutputData]);
 
   const dynamicScoresColumns = useMemo(() => {
     return (feedbackScoresData?.scores ?? [])

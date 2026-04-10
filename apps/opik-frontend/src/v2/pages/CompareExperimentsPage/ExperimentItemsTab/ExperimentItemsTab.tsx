@@ -273,24 +273,31 @@ const ExperimentItemsTab: React.FunctionComponent<ExperimentItemsTabProps> = ({
     ];
   }, [dynamicDatasetColumns, experimentsCount, sortableColumns]);
 
+  const datasetColumnLabels = useMemo(
+    () => new Set(dynamicDatasetColumns.map((c) => c.label)),
+    [dynamicDatasetColumns],
+  );
+
   const outputColumnsData = useMemo(() => {
     return [
-      ...dynamicOutputColumns.map(
-        ({ label, id, columnType }) =>
-          ({
-            id,
-            label,
-            type: columnType,
-            cell: CompareExperimentsOutputCell as never,
-            customMeta: {
-              experiments,
-              experimentsIds,
-              outputKey: label,
-              openTrace: setTraceId,
-            },
-            ...(columnType === COLUMN_TYPE.dictionary && { size: 400 }),
-          }) as ColumnData<ExperimentsCompare>,
-      ),
+      ...dynamicOutputColumns
+        .filter((c) => !datasetColumnLabels.has(c.label))
+        .map(
+          ({ label, id, columnType }) =>
+            ({
+              id,
+              label,
+              type: columnType,
+              cell: CompareExperimentsOutputCell as never,
+              customMeta: {
+                experiments,
+                experimentsIds,
+                outputKey: label,
+                openTrace: setTraceId,
+              },
+              ...(columnType === COLUMN_TYPE.dictionary && { size: 400 }),
+            }) as ColumnData<ExperimentsCompare>,
+        ),
       {
         id: COLUMN_DURATION_ID,
         label: "Duration",
@@ -343,6 +350,7 @@ const ExperimentItemsTab: React.FunctionComponent<ExperimentItemsTabProps> = ({
       } as ColumnData<ExperimentsCompare>,
     ];
   }, [
+    datasetColumnLabels,
     dynamicOutputColumns,
     experiments,
     experimentsIds,
