@@ -74,10 +74,17 @@ export const AssertionsBreakdownTooltip: React.FC<
         const firstFailed = runItem.querySelector(
           '[data-assertion-passed="false"]',
         ) as HTMLElement | null;
-        const target = firstFailed ?? runItem;
+        // When all assertions pass there is nothing to scroll to — leave the
+        // container at the top so Run 1 content is not clipped.
+        if (!firstFailed) return;
+        // Offset by the sticky header height so the failed assertion lands
+        // below the header rather than hidden behind it.
+        const headerHeight =
+          (runItem.firstElementChild as HTMLElement | null)?.getBoundingClientRect()
+            .height ?? 0;
         const containerTop = container.getBoundingClientRect().top;
-        const targetTop = target.getBoundingClientRect().top;
-        container.scrollTop += targetTop - containerTop;
+        const targetTop = firstFailed.getBoundingClientRect().top;
+        container.scrollTop += targetTop - containerTop - headerHeight;
       });
     });
   }, []);

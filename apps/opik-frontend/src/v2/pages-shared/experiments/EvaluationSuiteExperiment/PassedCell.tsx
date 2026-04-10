@@ -122,7 +122,7 @@ export const StatusTag: React.FC<StatusInfo & { className?: string }> = ({
 
   return (
     <AssertionsBreakdownTooltip assertionsByRun={assertionsByRun}>
-      <div
+      <span
         className={cn(
           "inline-flex h-5 items-center gap-1 rounded-md border border-transparent px-2 font-mono text-xs font-semibold transition-colors",
           isPassed
@@ -142,7 +142,7 @@ export const StatusTag: React.FC<StatusInfo & { className?: string }> = ({
             {passedCount}/{totalCount}
           </>
         )}
-      </div>
+      </span>
     </AssertionsBreakdownTooltip>
   );
 };
