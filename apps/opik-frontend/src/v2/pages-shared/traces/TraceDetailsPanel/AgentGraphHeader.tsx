@@ -26,14 +26,18 @@ const AgentGraphHeader: React.FC<AgentGraphHeaderProps> = ({
   >
     <span className="comet-body-xs-accented">Agent graph</span>
     <div className="flex items-center gap-1">
-      <TooltipWrapper content="Open in fullscreen">
+      <TooltipWrapper content="Full size">
         <Button variant="ghost" size="icon-2xs" onClick={onFullscreen}>
           <Expand className="size-3.5" />
         </Button>
       </TooltipWrapper>
-      <Button variant="ghost" size="icon-2xs" onClick={onToggleCollapse}>
-        <ChevronDown className={cn("size-3.5", isCollapsed && "-rotate-90")} />
-      </Button>
+      <TooltipWrapper content={isCollapsed ? "Expand graph" : "Collapse graph"}>
+        <Button variant="ghost" size="icon-2xs" onClick={onToggleCollapse}>
+          <ChevronDown
+            className={cn("size-3.5", isCollapsed && "-rotate-90")}
+          />
+        </Button>
+      </TooltipWrapper>
     </div>
   </div>
 );

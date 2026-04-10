@@ -309,7 +309,6 @@ const TraceDetailsPanel: React.FunctionComponent<TraceDetailsPanelProps> = ({
                   projectId={projectId}
                   spanId={spanId}
                   traceId={traceId}
-                  activeSection={activeSection}
                   setActiveSection={setActiveSection}
                   isSpansLazyLoading={isSpansLazyLoading}
                   search={search}
@@ -350,7 +349,7 @@ const TraceDetailsPanel: React.FunctionComponent<TraceDetailsPanelProps> = ({
         {agentGraphData && (
           <Dialog open={isGraphFullscreen} onOpenChange={setIsGraphFullscreen}>
             <DialogContent
-              className="max-w-[90vw] max-h-[90vh] w-full h-full"
+              className="size-full max-h-[90vh] max-w-[90vw]"
               onEscapeKeyDown={(e) => e.stopPropagation()}
               onOpenAutoFocus={(e) => e.preventDefault()}
             >

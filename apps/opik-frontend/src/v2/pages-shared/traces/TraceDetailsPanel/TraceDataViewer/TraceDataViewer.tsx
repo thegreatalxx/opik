@@ -43,7 +43,6 @@ type TraceDataViewerProps = {
   projectId: string;
   traceId: string;
   spanId?: string;
-  activeSection: DetailsActionSectionValue | null;
   setActiveSection: (v: DetailsActionSectionValue) => void;
   isSpansLazyLoading: boolean;
   search?: string;
@@ -55,7 +54,6 @@ const TraceDataViewer: React.FunctionComponent<TraceDataViewerProps> = ({
   projectId,
   traceId,
   spanId,
-  activeSection,
   setActiveSection,
   isSpansLazyLoading,
   search,
