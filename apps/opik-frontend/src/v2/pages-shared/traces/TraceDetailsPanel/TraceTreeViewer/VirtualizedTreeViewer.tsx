@@ -163,9 +163,6 @@ const VirtualizedTreeViewer: React.FC<VirtualizedTreeViewerProps> = ({
     measureElement: (el) => el.getBoundingClientRect().height,
   });
 
-  useEffect(() => {
-    rowVirtualizer.measure();
-  }, [hasDurationTimeline, config, rowVirtualizer]);
 
   const selectRow = useCallback(
     (id: string) => {
