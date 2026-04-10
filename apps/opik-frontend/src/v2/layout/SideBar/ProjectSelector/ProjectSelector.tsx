@@ -168,8 +168,11 @@ const ProjectSelector: React.FC<ProjectSelectorProps> = ({
       <PopoverContent
         align="start"
         side="bottom"
-        className="w-[320px] p-1"
+        className="flex w-[320px] flex-col overflow-hidden p-1"
         sideOffset={4}
+        style={{
+          maxHeight: "var(--radix-popover-content-available-height)",
+        }}
       >
         <div className="px-3 py-2">
           <span className="comet-body-s-accented text-foreground">
@@ -186,7 +189,7 @@ const ProjectSelector: React.FC<ProjectSelectorProps> = ({
           />
         </div>
         <Separator className="my-1" />
-        <div className="max-h-[300px] overflow-auto">
+        <div className="min-h-0 flex-1 overflow-auto">
           {projectsData?.content?.map((project) => (
             <ProjectItem
               key={project.id}
