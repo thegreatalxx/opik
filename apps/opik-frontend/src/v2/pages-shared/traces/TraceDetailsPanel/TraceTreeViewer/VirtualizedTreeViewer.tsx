@@ -82,7 +82,7 @@ const TreeConnectors: React.FC<{
               <VerticalLine left={parentCenterX} height="100%" />
             )}
             <div
-              className="absolute border-b border-l border-light-slate/40 rounded-bl-md"
+              className="absolute rounded-bl-md border-b border-l border-light-slate/40"
               style={{
                 left: parentCenterX,
                 top: hasContinuation ? 6 : 0,

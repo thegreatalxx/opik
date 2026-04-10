@@ -187,13 +187,14 @@ export const TraceTreeToolbar: React.FC<TraceTreeToolbarProps> = ({
       <span className="comet-body-xs-accented whitespace-nowrap text-muted-foreground">
         Spans ({spanCount})
       </span>
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-1 text-muted-foreground">
         <ExpandableSearchInput
           value={search}
           placeholder="Search by all fields"
           onChange={setSearch}
           disabled={isSpansLazyLoading}
           buttonVariant="ghost"
+          tooltip="Search spans"
         />
         <FiltersButton
           columns={filtersColumnData}
@@ -204,6 +205,7 @@ export const TraceTreeToolbar: React.FC<TraceTreeToolbarProps> = ({
           variant="ghost"
           disabled={isSpansLazyLoading}
           align="start"
+          tooltip="Filter spans"
         />
         <Separator orientation="vertical" className="mx-0.5 h-3" />
         {!hasSearchOrFilter ? (

@@ -76,8 +76,7 @@ const AnnotatePanel: React.FC<AnnotatePanelProps> = ({
     [isTrace, spanId, filteredFeedbackScores, feedbackScoreDelete, traceId],
   );
 
-  const { mutate: deleteTraceComments } =
-    useTraceCommentsBatchDeleteMutation();
+  const { mutate: deleteTraceComments } = useTraceCommentsBatchDeleteMutation();
   const { mutate: deleteSpanComments } = useSpanCommentsBatchDeleteMutation();
   const { mutate: createSpanComment } = useCreateSpanCommentMutation();
   const { mutate: createTraceComment } = useCreateTraceCommentMutation();
