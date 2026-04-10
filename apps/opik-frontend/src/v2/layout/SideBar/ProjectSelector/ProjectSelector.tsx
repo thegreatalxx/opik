@@ -155,7 +155,7 @@ const ProjectSelector: React.FC<ProjectSelectorProps> = ({
                 {isLoading ? (
                   <Spinner size="xs" />
                 ) : (
-                  <ProjectIcon index={activeIconIndex} />
+                  <ProjectIcon index={activeIconIndex} size="md" />
                 )}
               </button>
             )}

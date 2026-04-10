@@ -15,6 +15,7 @@ const OWLS = [Owl1, Owl2, Owl3, Owl4, Owl5, Owl6, Owl7, Owl8, Owl9, Owl10];
 
 const SIZE_CLASS = {
   sm: "shrink-0 size-4",
+  md: "shrink-0 size-7",
   lg: "shrink-0 size-8",
 } as const;
 
