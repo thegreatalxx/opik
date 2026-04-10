@@ -44,7 +44,9 @@ export const AssertionsBreakdownTooltip: React.FC<
   }, [preferredSide]);
 
   const scrollToRun = useCallback((idx: number) => {
-    requestAnimationFrame(() => {
+    // Wait for the 0.2s accordion animation to settle before measuring positions,
+    // otherwise the collapsing-run layout shift causes the scroll to land mid-content.
+    setTimeout(() => {
       const container = scrollContainerRef.current;
       if (!container) return;
       const item = container.querySelector(
@@ -55,7 +57,7 @@ export const AssertionsBreakdownTooltip: React.FC<
         const itemTop = item.getBoundingClientRect().top;
         container.scrollTop += itemTop - containerTop;
       }
-    });
+    }, 200);
   }, []);
 
   const scrollToFirstFailedAssertion = useCallback((runIdx: number) => {
@@ -96,9 +98,10 @@ export const AssertionsBreakdownTooltip: React.FC<
           );
         }
         scrollToFirstFailedAssertion(defaultOpenIdx >= 0 ? defaultOpenIdx : 0);
-      } else {
-        setPreferredSide("bottom");
       }
+      // No reset on close: resetting collisionPadding mid-animation causes Radix
+      // to re-evaluate position and flip the tooltip, producing a visible jump.
+      // preferredSide is always recomputed fresh on the next open.
     },
     [defaultOpenIdx, scrollToFirstFailedAssertion],
   );
@@ -126,7 +129,7 @@ export const AssertionsBreakdownTooltip: React.FC<
         side={preferredSide}
         align="start"
         collisionPadding={activeCollisionPadding}
-        className="w-80 p-0"
+        className="w-[30rem] overflow-hidden p-0"
         onClick={(e) => e.stopPropagation()}
       >
         <Accordion
@@ -154,7 +157,7 @@ export const AssertionsBreakdownTooltip: React.FC<
                         </span>
                         <div
                           className={cn(
-                            "inline-flex items-center gap-1 rounded-full border border-transparent px-2 py-0.5 font-mono text-xs font-normal",
+                            "inline-flex h-5 items-center gap-1 rounded-sm px-2 font-mono text-xs font-normal",
                             allPassed
                               ? "bg-[var(--tag-green-bg)] text-[var(--tag-green-text)]"
                               : "bg-[var(--tag-red-bg)] text-[var(--tag-red-text)]",
@@ -168,7 +171,7 @@ export const AssertionsBreakdownTooltip: React.FC<
                           {passedCount}/{run.length} assertions passed
                         </div>
                       </div>
-                      <ChevronDown className="size-4 shrink-0 transition-transform duration-200" />
+                      <ChevronDown className="size-3 shrink-0 transition-transform duration-200" />
                     </AccordionPrimitive.Trigger>
                   </AccordionPrimitive.Header>
                   <AccordionContent className="p-0">
