@@ -2,6 +2,7 @@ package com.comet.opik.domain;
 
 import com.comet.opik.api.runner.DaemonPairRegisterRequest;
 import com.comet.opik.api.runner.DaemonPairRegisterResponse;
+import com.comet.opik.api.runner.PairCompleteRequest;
 import com.comet.opik.api.runner.PakeMessageRequest;
 import com.comet.opik.api.runner.PakeRole;
 import com.comet.opik.infrastructure.LocalRunnerConfig;
@@ -197,6 +198,27 @@ class LocalRunnerServicePakeTest {
             service.postPakeMessage(WORKSPACE_ID, USER_NAME, PROJECT_ID, request);
 
             verify(messages).add(anyString());
+        }
+    }
+
+    @Nested
+    @DisplayName("completePairing")
+    class CompletePairing {
+
+        @Test
+        @DisplayName("throws NotFoundException when no session exists")
+        @SuppressWarnings("unchecked")
+        void throwsWhenNoSession() {
+            RBucket<String> bucket = mock(RBucket.class);
+            when(redisClient.getBucket(sessionKey())).thenReturn(bucket);
+            when(bucket.getAndDelete()).thenReturn(null);
+
+            PairCompleteRequest request = PairCompleteRequest.builder()
+                    .projectId(PROJECT_ID)
+                    .build();
+
+            assertThatThrownBy(() -> service.completePairing(WORKSPACE_ID, USER_NAME, request))
+                    .isInstanceOf(NotFoundException.class);
         }
     }
 }

@@ -294,6 +294,7 @@ class LocalRunnerServiceImpl implements LocalRunnerService {
     private static final int MAX_PAKE_ATTEMPTS = 5;
     private static final Duration PAKE_SESSION_TTL = Duration.ofMinutes(5);
 
+    private static final long PAKE_POLL_INTERVAL_MS = 500L;
     private static final int PAKE_STEP_SPAKE2 = PakeMessageRequest.STEP_SPAKE2;
     private static final int PAKE_STEP_CONFIRMATION = PakeMessageRequest.STEP_CONFIRMATION;
     private static final int PAKE_STEP_COMPLETION = PakeMessageRequest.STEP_COMPLETION;
@@ -1953,27 +1954,30 @@ class LocalRunnerServiceImpl implements LocalRunnerService {
             throw new NotFoundException("No pairing session found for this user/project");
         }
 
-        return Mono.fromCallable(() -> {
-            long deadline = System.currentTimeMillis() + runnerConfig.getBridgePollTimeout().toSeconds() * 1000;
-            while (System.currentTimeMillis() < deadline) {
-                RList<String> messages = redisClient.getList(pakeMessagesKey(workspaceId, userName, projectId));
-                List<String> allMessages = messages.readAll();
+        long maxAttempts = Math.max(1, runnerConfig.getBridgePollTimeout().toSeconds() * 1000 / PAKE_POLL_INTERVAL_MS);
+        String messagesKey = pakeMessagesKey(workspaceId, userName, projectId);
 
-                List<PakeMessageResponse> matching = new ArrayList<>();
-                for (String msgJson : allMessages) {
-                    PakeMessageResponse msg = JsonUtils.readValue(msgJson, PakeMessageResponse.class);
-                    if (msg.role() == otherRole && msg.step() > afterStep) {
-                        matching.add(msg);
-                    }
-                }
-                if (!matching.isEmpty()) {
-                    return matching;
-                }
+        return Mono.fromCallable(() -> pollPakeMessagesOnce(messagesKey, otherRole, afterStep))
+                .subscribeOn(Schedulers.boundedElastic())
+                .filter(matching -> !matching.isEmpty())
+                .repeatWhenEmpty(
+                        Math.toIntExact(maxAttempts),
+                        flux -> flux.delayElements(Duration.ofMillis(PAKE_POLL_INTERVAL_MS)))
+                .defaultIfEmpty(List.of());
+    }
 
-                Thread.sleep(500);
+    private List<PakeMessageResponse> pollPakeMessagesOnce(String messagesKey, PakeRole otherRole, int afterStep) {
+        RList<String> messages = redisClient.getList(messagesKey);
+        List<String> allMessages = messages.readAll();
+
+        List<PakeMessageResponse> matching = new ArrayList<>();
+        for (String msgJson : allMessages) {
+            PakeMessageResponse msg = JsonUtils.readValue(msgJson, PakeMessageResponse.class);
+            if (msg.role() == otherRole && msg.step() > afterStep) {
+                matching.add(msg);
             }
-            return List.<PakeMessageResponse>of();
-        }).subscribeOn(Schedulers.boundedElastic());
+        }
+        return matching;
     }
 
     @Override
