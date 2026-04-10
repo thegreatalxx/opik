@@ -90,6 +90,23 @@ executor_memory_bytes_gauge = meter.create_gauge(
     unit="bytes",
 )
 
+container_startup_failure_counter = meter.create_counter(
+    name="container_startup_failure",
+    description="Count of containers that exited immediately after creation (broken image or OOM at init)",
+    unit="1",
+)
+
+container_remove_failure_counter = meter.create_counter(
+    name="container_remove_failure",
+    description="Count of container removal failures queued for retry",
+    unit="1",
+)
+
+pending_removal_queue_size_gauge = meter.create_gauge(
+    name="container_pending_removal_queue_size",
+    description="Number of containers queued for removal retry",
+)
+
 class DockerExecutor(CodeExecutorBase):
     def __init__(self):
         super().__init__()
@@ -108,6 +125,7 @@ class DockerExecutor(CodeExecutorBase):
         self.instance_id = str(uuid7())
         self.container_labels = {"managed_by": self.instance_id}
         self.container_pool = Queue()
+        self._pending_removal_queue = Queue()
         self.pool_lock = Lock()
         self.releaser_executor = concurrent.futures.ThreadPoolExecutor()
         self.scoring_executor = concurrent.futures.ThreadPoolExecutor(max_workers=self.max_parallel)
@@ -147,7 +165,6 @@ class DockerExecutor(CodeExecutorBase):
 
     @staticmethod
     def _parse_metrics_interval():
-        """Parse PYTHON_CODE_EXECUTOR_METRICS_INTERVAL_IN_SECONDS env var, defaulting to 60."""
         default = 60
         try:
             val = os.getenv("PYTHON_CODE_EXECUTOR_METRICS_INTERVAL_IN_SECONDS", str(default))
@@ -168,8 +185,10 @@ class DockerExecutor(CodeExecutorBase):
         schedule.every(self.pool_check_interval).seconds.do(self._check_pool)
 
         # Schedule executor container resource metrics collection
-        logger.debug(f"Starting executor resource metrics collection with {self.metrics_interval}s interval")
         schedule.every(self.metrics_interval).seconds.do(self._collect_executor_resource_metrics)
+
+        # Schedule retry of failed container removals
+        schedule.every(self.pool_check_interval).seconds.do(self._retry_pending_removals)
 
         # Start a background thread to run the scheduler
         self.releaser_executor.submit(self._run_scheduler)
@@ -235,16 +254,10 @@ class DockerExecutor(CodeExecutorBase):
         return pool_size
 
     def _collect_executor_resource_metrics(self):
-        """Submit metrics collection to a background thread to avoid blocking the scheduler.
-
-        container.stats(stream=False) takes ~1-2s per container, so collecting stats for all
-        containers sequentially can block the scheduler thread for 17-34s, starving _check_pool.
-        """
         if self.stop_event.is_set():
             return schedule.CancelJob
-
         self.releaser_executor.submit(self._do_collect_executor_resource_metrics)
-        return None  # Continue the job
+        return None
 
     def _do_collect_executor_resource_metrics(self):
         """Collect CPU and memory metrics from executor containers via Docker stats API."""
@@ -257,8 +270,6 @@ class DockerExecutor(CodeExecutorBase):
                     stats = container.stats(stream=False)
                     short_id = container.short_id
 
-                    # Calculate CPU usage in fractional cores
-                    # precpu_stats can be empty on the first sample (Docker marks it omitempty)
                     precpu = stats.get("precpu_stats", {})
                     cpu_stats = stats.get("cpu_stats", {})
                     cur_usage = cpu_stats.get("cpu_usage", {}).get("total_usage", 0)
@@ -270,17 +281,14 @@ class DockerExecutor(CodeExecutorBase):
                     cpu_delta = cur_usage - pre_usage
                     system_delta = cur_system - pre_system
 
-                    if system_delta > 0 and cpu_delta >= 0:
-                        cpu_cores = (cpu_delta / system_delta) * num_cpus
-                    else:
-                        cpu_cores = 0.0
-
-                    # Memory usage in bytes
+                    cpu_cores = (cpu_delta / system_delta) * num_cpus if system_delta > 0 and cpu_delta >= 0 else 0.0
                     memory_bytes = stats.get("memory_stats", {}).get("usage", 0)
 
                     executor_cpu_cores_gauge.set(cpu_cores, {"container_id": short_id})
                     executor_memory_bytes_gauge.set(memory_bytes, {"container_id": short_id})
 
+                except docker.errors.NotFound:
+                    pass  # container removed between list and stats call, normal race
                 except Exception as e:
                     logger.warning(f"Failed to collect stats for container {container.short_id}: {e}")
         except Exception as e:
@@ -308,6 +316,18 @@ class DockerExecutor(CodeExecutorBase):
                 run_kwargs["nano_cpus"] = self.nano_cpus
 
             new_container = self.client.containers.run(**run_kwargs)
+
+            # Validate the container actually started — a broken image exits immediately
+            new_container.reload()
+            if new_container.status != "running":
+                container_startup_failure_counter.add(1, {
+                    "image": f"{self.docker_image}:{self.docker_tag}",
+                    "status": new_container.status,
+                })
+                self._pending_removal_queue.put(new_container.id)
+                raise RuntimeError(
+                    f"Container {new_container.short_id} exited immediately with status '{new_container.status}'"
+                )
 
             # Add the container to the pool
             self.container_pool.put(new_container)
@@ -349,10 +369,6 @@ class DockerExecutor(CodeExecutorBase):
                 # Remove the container
                 container.remove(force=True)
 
-                # Zero out resource metrics for the removed container
-                executor_cpu_cores_gauge.set(0, {"container_id": short_id})
-                executor_memory_bytes_gauge.set(0, {"container_id": short_id})
-
                 # Calculate and record the latency
                 latency = self._calculate_latency_ms(start_time)
                 container_stop_histogram.record(latency, attributes={"method": "stop_container"})
@@ -360,9 +376,44 @@ class DockerExecutor(CodeExecutorBase):
                 logger.debug(f"Stopped container {container.id} in {latency:.3f} milliseconds")
 
             except docker.errors.APIError as e:
-                logger.error(f"Container {container.id} failed to be removed")
+                logger.error(f"Container {container.id} failed to be removed, queuing for retry: {e}")
+                container_remove_failure_counter.add(1, {"container_id": short_id, "error": "api_error"})
+                self._pending_removal_queue.put(container.id)
             except Exception as e:
-                logger.error(f"Failed to stop container {container.id}: {e}")
+                logger.error(f"Failed to stop container {container.id}, queuing for retry: {e}")
+                container_remove_failure_counter.add(1, {"container_id": short_id, "error": type(e).__name__})
+                self._pending_removal_queue.put(container.id)
+
+    def _retry_pending_removals(self):
+        """Retry removal of containers that previously failed to be removed."""
+        if self.stop_event.is_set():
+            return schedule.CancelJob
+
+        if self._pending_removal_queue.empty():
+            return None
+
+        pending_removal_queue_size_gauge.set(self._pending_removal_queue.qsize())
+
+        retry_ids = []
+        while not self._pending_removal_queue.empty():
+            try:
+                retry_ids.append(self._pending_removal_queue.get_nowait())
+            except Exception:
+                break
+
+        for container_id in retry_ids:
+            try:
+                container = self.client.containers.get(container_id)
+                container.remove(force=True)
+                logger.debug(f"Successfully removed container {container_id} on retry")
+            except docker.errors.NotFound:
+                logger.debug(f"Container {container_id} already gone, skipping retry")
+            except Exception as e:
+                logger.warning(f"Retry removal failed for container {container_id}: {e}, will retry again")
+                self._pending_removal_queue.put(container_id)
+
+        pending_removal_queue_size_gauge.set(self._pending_removal_queue.qsize())
+        return None
 
     def get_container(self):
         with self.tracer.start_as_current_span("get_container"):
@@ -488,6 +539,17 @@ class DockerExecutor(CodeExecutorBase):
         for container in self.get_managed_containers():
             logger.debug(f"Cleaning up untracked container {container.id}")
             self._stopContainer(container)
+
+        while not self._pending_removal_queue.empty():
+            try:
+                container_id = self._pending_removal_queue.get_nowait()
+                container = self.client.containers.get(container_id)
+                container.remove(force=True)
+                logger.debug(f"Removed pending container {container_id} during cleanup")
+            except docker.errors.NotFound:
+                pass
+            except Exception as e:
+                logger.warning(f"Could not remove pending container during cleanup: {e}")
 
         # Shutdown the executor
         logger.debug("Shutting down executor")
