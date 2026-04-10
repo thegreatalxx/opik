@@ -2,6 +2,15 @@ import { BASE_TRACE_DATA_TYPE, SPAN_TYPE } from "@/types/traces";
 
 export const TRACE_TYPE_FOR_TREE = "trace";
 
+// Extends BASE_TRACE_DATA_TYPE with additional span subtypes used in the tree color map
+export type TRACE_COLOR_TYPE =
+  | BASE_TRACE_DATA_TYPE
+  | "thread"
+  | "system"
+  | "function"
+  | "user"
+  | "assistant";
+
 export enum TRACE_DATA_TYPE {
   traces = "traces",
   spans = "spans",
@@ -32,7 +41,7 @@ export const SPANS_COLORS_MAP: Record<BASE_TRACE_DATA_TYPE, string> = {
 };
 
 export const TRACE_TYPE_COLORS_MAP: Record<
-  string,
+  TRACE_COLOR_TYPE,
   { color: string; bg: string }
 > = {
   [TRACE_TYPE_FOR_TREE]: {
