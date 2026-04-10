@@ -18,6 +18,7 @@ import {
   COLUMN_TYPE,
   COLUMN_USAGE_ID,
   ColumnData,
+  DynamicColumn,
   OnChangeFn,
   ROW_HEIGHT,
 } from "@/types/shared";
@@ -85,6 +86,7 @@ const COLUMN_EXPERIMENT_NAME_ID = "experiment_name";
 const COLUMN_PASSED_ID = "passed";
 const STORAGE_PREFIX = "compare-experiments";
 const DYNAMIC_COLUMNS_KEY = "compare-experiments-dynamic-columns";
+const EVAL_SUITE_ECHOED_OUTPUT_KEY = "input";
 
 function getFilterColumns(
   isEvalSuite: boolean,
@@ -273,14 +275,13 @@ const ExperimentItemsTab: React.FunctionComponent<ExperimentItemsTabProps> = ({
     ];
   }, [dynamicDatasetColumns, experimentsCount, sortableColumns]);
 
-  const visibleOutputColumns = useMemo(() => {
-    const datasetColumnLabels = new Set(
-      dynamicDatasetColumns.map((c) => c.label),
-    );
-    return dynamicOutputColumns.filter(
-      (c) => !datasetColumnLabels.has(c.label),
-    );
-  }, [dynamicOutputColumns, dynamicDatasetColumns]);
+  const visibleOutputColumns = useMemo(
+    () =>
+      isEvalSuite
+        ? dynamicOutputColumns.filter((c: DynamicColumn) => c.label !== EVAL_SUITE_ECHOED_OUTPUT_KEY)
+        : dynamicOutputColumns,
+    [dynamicOutputColumns, isEvalSuite],
+  );
 
   const outputColumnsData = useMemo(() => {
     return [
