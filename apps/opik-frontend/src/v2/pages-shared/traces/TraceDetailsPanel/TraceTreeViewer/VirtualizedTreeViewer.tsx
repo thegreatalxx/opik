@@ -163,7 +163,6 @@ const VirtualizedTreeViewer: React.FC<VirtualizedTreeViewerProps> = ({
     measureElement: (el) => el.getBoundingClientRect().height,
   });
 
-
   const selectRow = useCallback(
     (id: string) => {
       if (id !== selectedRowRef.current.current) {
