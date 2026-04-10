@@ -221,7 +221,7 @@ const ProjectSelector: React.FC<ProjectSelectorProps> = ({
             >
               <Plus className="size-3.5 shrink-0 text-foreground" />
               <span className="comet-body-s text-foreground">
-                Create new project
+                New project
               </span>
             </button>
           </>
