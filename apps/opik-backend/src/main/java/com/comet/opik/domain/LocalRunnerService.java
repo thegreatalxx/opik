@@ -2013,7 +2013,9 @@ class LocalRunnerServiceImpl implements LocalRunnerService {
                         .build());
         RList<String> messages = redisClient.getList(pakeMessagesKey(workspaceId, userName, projectId));
         messages.add(completeMsg);
-        messages.expire(Duration.ofMinutes(1));
+        // Keep the completion marker around at least as long as the daemon's longest possible poll,
+        // plus a buffer, so a daemon poll that started right before completePairing can still see it.
+        messages.expire(runnerConfig.getPakePollTimeout().toJavaDuration().plusMinutes(1));
         redisClient.getAtomicLong(pakeAttemptsKey(workspaceId, userName, projectId)).delete();
 
         return LocalRunnerConnectResponse.builder()

@@ -227,13 +227,8 @@ def connect(
             shared_key=shared_key,
             session_ttl=float(session_ttl),
         )
-        try:
-            supervisor.run()
-        finally:
-            tui.stop()
+        supervisor.run()
     except KeyboardInterrupt:
-        if tui is not None:
-            tui.stop()
         raise SystemExit(130)
     except ApiError as e:
         click.echo(f"Error: {e.body}" if e.body else f"Error: {e.status_code}")
@@ -249,4 +244,6 @@ def connect(
         click.echo(f"Error: Could not execute command '{cmd_name}': {e}")
         raise SystemExit(1)
     finally:
+        if tui is not None:
+            tui.stop()
         client.end()
