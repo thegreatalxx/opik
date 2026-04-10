@@ -27,6 +27,10 @@ _BLOCKLIST = [
     re.compile(r"\bsudo\b"),
     re.compile(r"\bsu\b"),
     re.compile(r"\bdoas\b"),
+    re.compile(r"\bpkexec\b"),
+    re.compile(r"\bnewgrp\b"),
+    re.compile(r"\brunuser\b"),
+    re.compile(r"\bchroot\b"),
     re.compile(r"(?:^|[;&|]\s*)nohup\b"),
     re.compile(r"(?:^|[;&|]\s*)disown\b"),
     re.compile(
@@ -36,13 +40,22 @@ _BLOCKLIST = [
         r"\brm\b[^|;]*-[a-zA-Z]*f[a-zA-Z]*[^|;]*-[a-zA-Z]*r[a-zA-Z]*[^|;]*\s+[/~*]"
     ),
     re.compile(r"\brm\s+-[a-zA-Z]*rf[a-zA-Z]*\s+[/~*]"),
+    re.compile(r"\brm\b.*--recursive.*--force.*\s+[/~*]"),
+    re.compile(r"\brm\b.*--force.*--recursive.*\s+[/~*]"),
     re.compile(r":\(\)\s*\{.*:\|:.*\}"),
     re.compile(r"\bdd\s+if="),
     re.compile(r"\bmkfs\b"),
     re.compile(r"\bshred\b"),
-    re.compile(r"\bcurl\b.*\|\s*\b(bash|sh|zsh|fish|python[23]?)\b"),
-    re.compile(r"\bwget\b.*\|\s*\b(bash|sh|zsh|fish|python[23]?)\b"),
+    re.compile(
+        r"\bcurl\b.*\|\s*\b(bash|sh|zsh|fish|python[23]?|node|npx|tsx|perl|ruby)\b"
+    ),
+    re.compile(
+        r"\bwget\b.*\|\s*\b(bash|sh|zsh|fish|python[23]?|node|npx|tsx|perl|ruby)\b"
+    ),
+    re.compile(r"\beval\s+.*\bcurl\b"),
+    re.compile(r"\b(bash|sh|zsh|fish)\s+<\(\s*curl\b"),
     re.compile(r"\bchmod\s+777\s+/"),
+    re.compile(r"\bchmod\s+[a-z]*\+[a-z]*rwx[a-z]*\s+/"),
     re.compile(r">\s*/dev/(sd[a-z]|nvme\d|vd[a-z]|xvd[a-z]|hd[a-z])"),
 ]
 
