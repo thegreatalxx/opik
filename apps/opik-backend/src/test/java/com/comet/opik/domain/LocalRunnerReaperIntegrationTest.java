@@ -3,12 +3,11 @@ package com.comet.opik.domain;
 import com.comet.opik.api.Project;
 import com.comet.opik.api.resources.utils.RedisContainerUtils;
 import com.comet.opik.api.runner.CreateLocalRunnerJobRequest;
+import com.comet.opik.api.runner.DaemonPairRegisterRequest;
 import com.comet.opik.api.runner.LocalRunner;
-import com.comet.opik.api.runner.LocalRunnerConnectRequest;
 import com.comet.opik.api.runner.LocalRunnerConnectResponse;
 import com.comet.opik.api.runner.LocalRunnerJobResultRequest;
 import com.comet.opik.api.runner.LocalRunnerJobStatus;
-import com.comet.opik.api.runner.LocalRunnerPairResponse;
 import com.comet.opik.infrastructure.LocalRunnerConfig;
 import com.comet.opik.infrastructure.redis.StringRedisClient;
 import com.redis.testcontainers.RedisContainer;
@@ -114,12 +113,13 @@ class LocalRunnerReaperIntegrationTest {
 
     private UUID pairAndConnect(String workspaceId, String userName, String runnerName) {
         stubNextId();
-        LocalRunnerPairResponse pair = runnerService.generatePairingCode(workspaceId, userName, PROJECT_ID);
-        LocalRunnerConnectRequest req = LocalRunnerConnectRequest.builder()
-                .pairingCode(pair.pairingCode())
-                .runnerName(runnerName)
-                .build();
-        LocalRunnerConnectResponse resp = runnerService.connect(workspaceId, userName, req);
+        runnerService.registerDaemonPair(workspaceId, userName,
+                DaemonPairRegisterRequest.builder()
+                        .projectId(PROJECT_ID)
+                        .runnerName(runnerName)
+                        .connectionTtlSeconds(86400L)
+                        .build());
+        LocalRunnerConnectResponse resp = runnerService.completePairing(workspaceId, userName, PROJECT_ID);
         LocalRunner.Agent agent = LocalRunner.Agent.builder()
                 .name(AGENT_NAME)
                 .build();

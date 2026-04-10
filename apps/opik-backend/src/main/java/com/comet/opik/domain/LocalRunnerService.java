@@ -8,6 +8,7 @@ import com.comet.opik.api.runner.BridgeCommandStatus;
 import com.comet.opik.api.runner.BridgeCommandSubmitRequest;
 import com.comet.opik.api.runner.BridgeCommandType;
 import com.comet.opik.api.runner.CreateLocalRunnerJobRequest;
+import com.comet.opik.api.runner.DaemonPairRegisterRequest;
 import com.comet.opik.api.runner.LocalRunner;
 import com.comet.opik.api.runner.LocalRunnerConnectRequest;
 import com.comet.opik.api.runner.LocalRunnerConnectResponse;
@@ -19,6 +20,11 @@ import com.comet.opik.api.runner.LocalRunnerJobStatus;
 import com.comet.opik.api.runner.LocalRunnerLogEntry;
 import com.comet.opik.api.runner.LocalRunnerPairResponse;
 import com.comet.opik.api.runner.LocalRunnerStatus;
+import com.comet.opik.api.runner.PakeMessagePage;
+import com.comet.opik.api.runner.PakeMessageRequest;
+import com.comet.opik.api.runner.PakeMessageResponse;
+import com.comet.opik.api.runner.PakeRole;
+import com.comet.opik.api.runner.PakeStep;
 import com.comet.opik.infrastructure.LocalRunnerConfig;
 import com.comet.opik.infrastructure.redis.StringRedisClient;
 import com.comet.opik.utils.JsonUtils;
@@ -33,7 +39,6 @@ import jakarta.ws.rs.ClientErrorException;
 import jakarta.ws.rs.NotFoundException;
 import jakarta.ws.rs.core.Response;
 import lombok.NonNull;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.RandomUtils;
 import org.redisson.api.BatchResult;
@@ -114,11 +119,20 @@ public interface LocalRunnerService {
     void patchChecklist(UUID runnerId, String workspaceId, String userName, JsonNode updates);
 
     void reapDeadRunners();
+
+    UUID registerDaemonPair(String workspaceId, String userName, DaemonPairRegisterRequest request);
+
+    void postPakeMessage(String workspaceId, String userName, UUID projectId, PakeRole targetRole,
+            PakeMessageRequest request);
+
+    Mono<PakeMessagePage> getPakeMessages(String workspaceId, String userName, UUID projectId,
+            PakeRole targetRole, PakeStep targetStep);
+
+    LocalRunnerConnectResponse completePairing(String workspaceId, String userName, UUID projectId);
 }
 
 @Slf4j
 @Singleton
-@RequiredArgsConstructor(onConstructor_ = @Inject)
 class LocalRunnerServiceImpl implements LocalRunnerService {
 
     private static final String PAIRING_CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
@@ -255,16 +269,41 @@ class LocalRunnerServiceImpl implements LocalRunnerService {
     private static final String BRIDGE_FIELD_COMPLETED_AT = "completed_at";
     private static final String BRIDGE_FIELD_DURATION_MS = "duration_ms";
     private static final String BRIDGE_FIELD_WORKSPACE_ID = "workspace_id";
+    private static final String BRIDGE_FIELD_HMAC = "hmac";
+    private static final String BRIDGE_FIELD_SEQUENCE = "sequence";
 
     private static final List<String> DEFAULT_CAPABILITIES = List.of("jobs");
     private static final String BRIDGE_FIELD_COMPLETED_FLAG = "completed_flag";
     private static final String BRIDGE_DONE_SENTINEL = "done";
+
+    // Security-critical: these MUST NOT be made configurable. Changing them
+    // weakens brute-force resistance or widens the attack window.
+    private static final int MAX_PAKE_ATTEMPTS = 5;
+    private static final Duration PAKE_SESSION_TTL = Duration.ofMinutes(5);
+
+    // Bounds how long the completion marker (carrying the project name) survives in
+    // the daemon's inbox after completePairing. A daemon that misses this window
+    // recovers via the runner GET endpoint, which also returns project info.
+    private static final Duration COMPLETION_MARKER_TTL = Duration.ofMinutes(5);
 
     private final @NonNull StringRedisClient redisClient;
     private final @NonNull RedissonReactiveClient reactiveRedisClient;
     private final @NonNull LocalRunnerConfig runnerConfig;
     private final @NonNull IdGenerator idGenerator;
     private final @NonNull ProjectService projectService;
+
+    @Inject
+    LocalRunnerServiceImpl(StringRedisClient redisClient, RedissonReactiveClient reactiveRedisClient,
+            LocalRunnerConfig runnerConfig, IdGenerator idGenerator, ProjectService projectService) {
+        this.redisClient = redisClient;
+        this.reactiveRedisClient = reactiveRedisClient;
+        this.runnerConfig = runnerConfig;
+        this.idGenerator = idGenerator;
+        this.projectService = projectService;
+        this.pakeSession = new PakeSessionRedis(redisClient);
+    }
+
+    private final PakeSessionRedis pakeSession;
 
     @Override
     public LocalRunnerPairResponse generatePairingCode(@NonNull String workspaceId, @NonNull String userName,
@@ -339,12 +378,16 @@ class LocalRunnerServiceImpl implements LocalRunnerService {
             if (!projectIds.contains(runnerIdStr)) {
                 continue;
             }
+            UUID runnerId = UUID.fromString(runnerIdStr);
+            LocalRunnerStatus resolvedStatus = resolveStatus(runnerId);
             if (status != null) {
-                UUID runnerId = UUID.fromString(runnerIdStr);
-                LocalRunnerStatus resolvedStatus = resolveStatus(runnerId);
                 if (resolvedStatus != status) {
                     continue;
                 }
+            } else if (resolvedStatus == LocalRunnerStatus.PAIRING) {
+                // Hide half-paired runners from the default listing — they only show
+                // up when the caller explicitly asks for status=PAIRING.
+                continue;
             }
             matchedIds.add(runnerIdStr);
         }
@@ -1353,8 +1396,20 @@ class LocalRunnerServiceImpl implements LocalRunnerService {
         String argsJson = validateAndSerializePayload(request.args(), "args");
 
         int timeoutSeconds = resolveCommandTimeout(request.timeoutSeconds());
-        UUID commandId = idGenerator.generateId();
+        UUID commandId = request.commandId() != null ? request.commandId() : idGenerator.generateId();
+        Duration commandTtl = Duration.ofSeconds(timeoutSeconds * 2L + 60L);
+
         String now = Instant.now().toString();
+
+        // Reserve the command id atomically — collisions return 409 (no idempotent
+        // retries; see BridgeCommandSubmitRequest#commandId).
+        RMap<String, String> commandMap = redisClient.getMap(bridgeCommandKey(commandId));
+        if (!commandMap.fastPutIfAbsent(BRIDGE_FIELD_COMMAND_ID, commandId.toString())) {
+            throw new ClientErrorException(Response.status(Response.Status.CONFLICT)
+                    .entity(new ErrorMessage(List.of("Command ID already exists: " + commandId)))
+                    .build());
+        }
+        commandMap.expire(commandTtl);
 
         Map<String, String> commandFields = new HashMap<>();
         commandFields.put(BRIDGE_FIELD_COMMAND_ID, commandId.toString());
@@ -1365,12 +1420,13 @@ class LocalRunnerServiceImpl implements LocalRunnerService {
         commandFields.put(BRIDGE_FIELD_TIMEOUT_SECONDS, String.valueOf(timeoutSeconds));
         commandFields.put(BRIDGE_FIELD_SUBMITTED_AT, now);
         commandFields.put(BRIDGE_FIELD_WORKSPACE_ID, workspaceId);
+        putBridgeSignatureFields(commandFields, request.hmac(), request.sequence());
 
         RBatch batch = redisClient.createBatch();
         batch.<String, String>getMap(bridgeCommandKey(commandId), StringCodec.INSTANCE)
                 .putAllAsync(commandFields);
         batch.<String, String>getMap(bridgeCommandKey(commandId), StringCodec.INSTANCE)
-                .expireAsync(Duration.ofSeconds(timeoutSeconds * 2 + 60));
+                .expireAsync(commandTtl);
         batch.<String>getList(bridgePendingKey(runnerId), StringCodec.INSTANCE)
                 .addAsync(commandId.toString());
         batch.execute();
@@ -1506,6 +1562,7 @@ class LocalRunnerServiceImpl implements LocalRunnerService {
         if (request.durationMs() != null) {
             updates.put(BRIDGE_FIELD_DURATION_MS, request.durationMs().toString());
         }
+        putBridgeSignatureFields(updates, request.hmac(), request.sequence());
 
         RBatch resultBatch = redisClient.createBatch();
         resultBatch.<String, String>getMap(bridgeCommandKey(commandId), StringCodec.INSTANCE)
@@ -1755,6 +1812,8 @@ class LocalRunnerServiceImpl implements LocalRunnerService {
                 .args(parseJsonNode(fields.get(BRIDGE_FIELD_ARGS)))
                 .timeoutSeconds(parseIntValue(fields.get(BRIDGE_FIELD_TIMEOUT_SECONDS)))
                 .submittedAt(parseInstant(fields.get(BRIDGE_FIELD_SUBMITTED_AT)))
+                .hmac(fields.get(BRIDGE_FIELD_HMAC))
+                .sequence(parseLong(fields.get(BRIDGE_FIELD_SEQUENCE)))
                 .build();
     }
 
@@ -1772,6 +1831,8 @@ class LocalRunnerServiceImpl implements LocalRunnerService {
                 .pickedUpAt(parseInstant(fields.get(BRIDGE_FIELD_PICKED_UP_AT)))
                 .completedAt(parseInstant(fields.get(BRIDGE_FIELD_COMPLETED_AT)))
                 .durationMs(parseLong(fields.get(BRIDGE_FIELD_DURATION_MS)))
+                .hmac(fields.get(BRIDGE_FIELD_HMAC))
+                .sequence(parseLong(fields.get(BRIDGE_FIELD_SEQUENCE)))
                 .build();
     }
 
@@ -1808,6 +1869,155 @@ class LocalRunnerServiceImpl implements LocalRunnerService {
         } catch (NumberFormatException e) {
             return null;
         }
+    }
+
+    /**
+     * Writes the optional HMAC + sequence fields shared by bridge command submit and
+     * result requests into the given Redis field map. Null values are skipped so the
+     * BE stores absent fields as absent rather than the literal string "null".
+     */
+    private static void putBridgeSignatureFields(Map<String, String> target, String hmac, Long sequence) {
+        if (hmac != null) {
+            target.put(BRIDGE_FIELD_HMAC, hmac);
+        }
+        if (sequence != null) {
+            target.put(BRIDGE_FIELD_SEQUENCE, sequence.toString());
+        }
+    }
+
+    // --- PAKE relay methods ---
+
+    @Override
+    public UUID registerDaemonPair(@NonNull String workspaceId, @NonNull String userName,
+            @NonNull DaemonPairRegisterRequest request) {
+        UUID projectId = request.projectId();
+        UUID runnerId = idGenerator.generateId();
+        Duration ttl = PAKE_SESSION_TTL;
+
+        DaemonPairPayload payload = DaemonPairPayload.builder()
+                .runnerId(runnerId)
+                .workspaceId(workspaceId)
+                .userName(userName)
+                .runnerName(request.runnerName())
+                .connectionTtlSeconds(request.connectionTtlSeconds())
+                .build();
+
+        // Drop any prior runner row for this (workspace, project, user) so a re-pair
+        // doesn't leave the previous runnerId orphaned in the user's listing.
+        evictExistingRunner(workspaceId, projectId, userName, runnerId);
+        pakeSession.createSession(projectId, workspaceId, userName, payload, ttl);
+
+        RMap<String, String> runnerMap = redisClient.getMap(runnerKey(runnerId));
+        runnerMap.putAll(Map.of(
+                FIELD_NAME, request.runnerName(),
+                FIELD_STATUS, LocalRunnerStatus.PAIRING.getValue(),
+                FIELD_WORKSPACE_ID, workspaceId,
+                FIELD_USER_NAME, userName,
+                FIELD_PROJECT_ID, projectId.toString()));
+        runnerMap.expire(ttl.multipliedBy(2));
+
+        registerRunnerInSets(workspaceId, userName, projectId, runnerId);
+
+        return runnerId;
+    }
+
+    @Override
+    public void postPakeMessage(@NonNull String workspaceId, @NonNull String userName, @NonNull UUID projectId,
+            @NonNull PakeRole targetRole, @NonNull PakeMessageRequest request) {
+        PakeSessionRedis sessions = pakeSession;
+        if (!sessions.isSessionActive(projectId, workspaceId, userName)) {
+            throw new NotFoundException("No pairing session found for workspace='" + workspaceId
+                    + "' project='" + projectId + "'");
+        }
+
+        if (request.step() == PakeStep.SPAKE2) {
+            long count = sessions.incrementAttempts(projectId, workspaceId, userName, PAKE_SESSION_TTL);
+            if (count > MAX_PAKE_ATTEMPTS) {
+                sessions.deleteSession(projectId, workspaceId, userName);
+                throw new ClientErrorException(Response.status(Response.Status.TOO_MANY_REQUESTS)
+                        .entity(new ErrorMessage(List.of(
+                                "Too many pairing attempts for project='" + projectId
+                                        + "'. Session has been invalidated.")))
+                        .build());
+            }
+        }
+
+        boolean accepted = sessions.postMessageIfFirst(projectId, workspaceId, userName,
+                targetRole, request.step(), request.payload(), PAKE_SESSION_TTL);
+        if (!accepted) {
+            throw new ClientErrorException(Response.status(Response.Status.CONFLICT)
+                    .entity(new ErrorMessage(List.of(
+                            "PAKE message already posted for targetRole='" + targetRole
+                                    + "' step='" + request.step() + "' project='" + projectId + "'")))
+                    .build());
+        }
+    }
+
+    @Override
+    public Mono<PakeMessagePage> getPakeMessages(@NonNull String workspaceId, @NonNull String userName,
+            @NonNull UUID projectId, @NonNull PakeRole targetRole, @NonNull PakeStep targetStep) {
+        PakeSessionRedis sessions = pakeSession;
+        if (!sessions.sessionExists(projectId, workspaceId, userName)) {
+            throw new NotFoundException("No pairing session found for workspace='" + workspaceId
+                    + "' project='" + projectId + "'");
+        }
+
+        Duration pollTimeout = runnerConfig.getPakePollTimeout().toJavaDuration();
+
+        // Redisson's pollAsync returns a CompletionStage that the client fulfils when
+        // either a message arrives or the Redis-side timeout fires. Subscription
+        // cancellation (AsyncResponse timeout, client disconnect) propagates through
+        // the Mono chain, so an orphaned poll no longer blocks a boundedElastic thread
+        // or steals the next-arriving message from a retrying caller.
+        return sessions.awaitMessage(projectId, workspaceId, userName, targetRole, targetStep, pollTimeout)
+                .map(opt -> opt
+                        .map(payload -> PakeMessagePage.builder()
+                                .messages(List.of(PakeMessageResponse.builder()
+                                        .step(targetStep)
+                                        .payload(payload)
+                                        .build()))
+                                .build())
+                        .orElseGet(PakeMessagePage::empty));
+    }
+
+    @Override
+    public LocalRunnerConnectResponse completePairing(@NonNull String workspaceId, @NonNull String userName,
+            @NonNull UUID projectId) {
+        PakeSessionRedis sessions = pakeSession;
+        DaemonPairPayload payload = sessions.consumeSession(projectId, workspaceId, userName, COMPLETION_MARKER_TTL)
+                .orElseThrow(() -> new NotFoundException("No pairing session found for workspace='"
+                        + workspaceId + "' project='" + projectId + "'"));
+
+        UUID runnerId = payload.runnerId();
+        String projectName = projectService.get(projectId, workspaceId).name();
+
+        evictExistingRunner(workspaceId, projectId, userName, runnerId);
+        registerRunnerInSets(workspaceId, userName, projectId, runnerId);
+        setUserRunner(workspaceId, projectId, userName, runnerId);
+        activateRunner(runnerId, workspaceId, projectId, userName, payload.runnerName());
+
+        // Post the completion marker into the daemon's inbox so its final long-poll
+        // for target_step=COMPLETION returns the project name. takeSession above is
+        // atomic, so this method runs at most once per session — a duplicate here
+        // would mean an upstream invariant broke and we want it loud.
+        boolean accepted = sessions.postMessageIfFirst(projectId, workspaceId, userName,
+                PakeRole.DAEMON, PakeStep.COMPLETION, projectName, COMPLETION_MARKER_TTL);
+        if (!accepted) {
+            throw new IllegalStateException("Completion marker already posted for project='"
+                    + projectId + "' workspace='" + workspaceId + "'");
+        }
+
+        Instant expiresAt = payload.connectionTtlSeconds() != null
+                ? Instant.now().plusSeconds(payload.connectionTtlSeconds())
+                : null;
+
+        return LocalRunnerConnectResponse.builder()
+                .runnerId(runnerId)
+                .workspaceId(workspaceId)
+                .projectId(projectId)
+                .projectName(projectName)
+                .expiresAt(expiresAt)
+                .build();
     }
 
 }

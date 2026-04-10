@@ -7,17 +7,19 @@ import com.comet.opik.api.runner.BridgeCommandResultRequest;
 import com.comet.opik.api.runner.BridgeCommandSubmitRequest;
 import com.comet.opik.api.runner.BridgeCommandSubmitResponse;
 import com.comet.opik.api.runner.CreateLocalRunnerJobRequest;
+import com.comet.opik.api.runner.DaemonPairRegisterRequest;
 import com.comet.opik.api.runner.LocalRunner;
-import com.comet.opik.api.runner.LocalRunnerConnectRequest;
 import com.comet.opik.api.runner.LocalRunnerConnectResponse;
 import com.comet.opik.api.runner.LocalRunnerHeartbeatRequest;
 import com.comet.opik.api.runner.LocalRunnerHeartbeatResponse;
 import com.comet.opik.api.runner.LocalRunnerJob;
 import com.comet.opik.api.runner.LocalRunnerJobResultRequest;
 import com.comet.opik.api.runner.LocalRunnerLogEntry;
-import com.comet.opik.api.runner.LocalRunnerPairRequest;
-import com.comet.opik.api.runner.LocalRunnerPairResponse;
 import com.comet.opik.api.runner.LocalRunnerStatus;
+import com.comet.opik.api.runner.PakeMessagePage;
+import com.comet.opik.api.runner.PakeMessageRequest;
+import com.comet.opik.api.runner.PakeRole;
+import com.comet.opik.api.runner.PakeStep;
 import jakarta.ws.rs.client.Entity;
 import jakarta.ws.rs.core.GenericType;
 import jakarta.ws.rs.core.HttpHeaders;
@@ -41,30 +43,70 @@ public class LocalRunnersResourceClient {
     private final ClientSupport client;
     private final String baseURI;
 
-    public LocalRunnerPairResponse generatePairingCode(UUID projectId, String apiKey, String workspaceName) {
-        LocalRunnerPairRequest request = LocalRunnerPairRequest.builder().projectId(projectId).build();
-        try (var response = client.target(RESOURCE_PATH.formatted(baseURI))
-                .path("pairs")
-                .request()
-                .header(HttpHeaders.AUTHORIZATION, apiKey)
-                .header(WORKSPACE_HEADER, workspaceName)
-                .post(Entity.json(request))) {
+    private static final long DEFAULT_CONNECTION_TTL_SECONDS = 24 * 60 * 60L;
+
+    /**
+     * POST /daemon-pairs → 201 + Location (no entity). Parses the runnerId out
+     * of the Location header for convenience.
+     */
+    public UUID registerDaemonPair(UUID projectId, String runnerName, String apiKey, String workspaceName) {
+        try (var response = callRegisterDaemonPair(projectId, runnerName, DEFAULT_CONNECTION_TTL_SECONDS,
+                apiKey, workspaceName)) {
             assertThat(response.getStatus()).isEqualTo(HttpStatus.SC_CREATED);
-            return response.readEntity(LocalRunnerPairResponse.class);
+            assertThat(response.getLocation()).isNotNull();
+            return runnerIdFromLocation(response.getLocation().toString());
         }
     }
 
-    public LocalRunnerConnectResponse connect(LocalRunnerConnectRequest request, String apiKey,
-            String workspaceName) {
-        try (var response = client.target(RESOURCE_PATH.formatted(baseURI))
-                .path("connections")
+    /**
+     * Raw POST /daemon-pairs without status assertion. Useful for testing validation
+     * paths (e.g. asserting an over-large connection TTL is rejected with 422).
+     */
+    public Response callRegisterDaemonPair(UUID projectId, String runnerName, long connectionTtlSeconds,
+            String apiKey, String workspaceName) {
+        DaemonPairRegisterRequest request = DaemonPairRegisterRequest.builder()
+                .projectId(projectId)
+                .runnerName(runnerName)
+                .connectionTtlSeconds(connectionTtlSeconds)
+                .build();
+        return client.target(RESOURCE_PATH.formatted(baseURI))
+                .path("daemon-pairs")
                 .request()
                 .header(HttpHeaders.AUTHORIZATION, apiKey)
                 .header(WORKSPACE_HEADER, workspaceName)
-                .post(Entity.json(request))) {
+                .post(Entity.json(request));
+    }
+
+    /**
+     * POST /pake/complete/{projectId} → 201 + Location (no entity). Follows up with
+     * a GET /local-runners/{runnerId} to hydrate the response shape expected by
+     * existing tests. Real callers would do the follow-up GET themselves.
+     */
+    public LocalRunnerConnectResponse completePairing(UUID projectId, String apiKey, String workspaceName) {
+        UUID runnerId;
+        try (var response = client.target(RESOURCE_PATH.formatted(baseURI))
+                .path("pake")
+                .path("complete")
+                .path(projectId.toString())
+                .request()
+                .header(HttpHeaders.AUTHORIZATION, apiKey)
+                .header(WORKSPACE_HEADER, workspaceName)
+                .post(Entity.json(""))) {
             assertThat(response.getStatus()).isEqualTo(HttpStatus.SC_CREATED);
-            return response.readEntity(LocalRunnerConnectResponse.class);
+            assertThat(response.getLocation()).isNotNull();
+            runnerId = runnerIdFromLocation(response.getLocation().toString());
         }
+        LocalRunner runner = getRunner(runnerId, apiKey, workspaceName);
+        return LocalRunnerConnectResponse.builder()
+                .runnerId(runner.id())
+                .projectId(runner.projectId())
+                .build();
+    }
+
+    private static UUID runnerIdFromLocation(String location) {
+        int slash = location.lastIndexOf('/');
+        String id = slash >= 0 ? location.substring(slash + 1) : location;
+        return UUID.fromString(id);
     }
 
     public LocalRunner.LocalRunnerPage listRunners(UUID projectId, String apiKey, String workspaceName) {
@@ -231,15 +273,6 @@ public class LocalRunnersResourceClient {
                 .post(Entity.json(""))) {
             assertThat(response.getStatus()).isEqualTo(HttpStatus.SC_NO_CONTENT);
         }
-    }
-
-    public Response callConnect(LocalRunnerConnectRequest request, String apiKey, String workspaceName) {
-        return client.target(RESOURCE_PATH.formatted(baseURI))
-                .path("connections")
-                .request()
-                .header(HttpHeaders.AUTHORIZATION, apiKey)
-                .header(WORKSPACE_HEADER, workspaceName)
-                .post(Entity.json(request));
     }
 
     public Response callGetRunner(UUID runnerId, String apiKey, String workspaceName) {
@@ -457,5 +490,55 @@ public class LocalRunnersResourceClient {
                 .header(HttpHeaders.AUTHORIZATION, apiKey)
                 .header(WORKSPACE_HEADER, workspaceName)
                 .get();
+    }
+
+    // --- PAKE message relay (new path-param API shape) ---
+
+    public Response callPostPakeMessage(UUID projectId, PakeRole targetRole, PakeStep step, String payload,
+            String apiKey, String workspaceName) {
+        PakeMessageRequest request = PakeMessageRequest.builder()
+                .step(step)
+                .payload(payload)
+                .build();
+        return client.target(RESOURCE_PATH.formatted(baseURI))
+                .path("pake")
+                .path("messages")
+                .path(projectId.toString())
+                .path(targetRole.getValue())
+                .request()
+                .header(HttpHeaders.AUTHORIZATION, apiKey)
+                .header(WORKSPACE_HEADER, workspaceName)
+                .post(Entity.json(request));
+    }
+
+    public void postPakeMessage(UUID projectId, PakeRole targetRole, PakeStep step, String payload,
+            String apiKey, String workspaceName) {
+        try (var response = callPostPakeMessage(projectId, targetRole, step, payload, apiKey, workspaceName)) {
+            assertThat(response.getStatus()).isEqualTo(HttpStatus.SC_NO_CONTENT);
+        }
+    }
+
+    public Response callGetPakeMessages(UUID projectId, PakeRole targetRole, PakeStep targetStep,
+            String apiKey, String workspaceName) {
+        var target = client.target(RESOURCE_PATH.formatted(baseURI))
+                .path("pake")
+                .path("messages")
+                .path(projectId.toString())
+                .path(targetRole.getValue());
+        if (targetStep != null) {
+            target = target.queryParam("target_step", targetStep.getValue());
+        }
+        return target.request()
+                .header(HttpHeaders.AUTHORIZATION, apiKey)
+                .header(WORKSPACE_HEADER, workspaceName)
+                .get();
+    }
+
+    public PakeMessagePage getPakeMessages(UUID projectId, PakeRole targetRole, PakeStep targetStep,
+            String apiKey, String workspaceName) {
+        try (var response = callGetPakeMessages(projectId, targetRole, targetStep, apiKey, workspaceName)) {
+            assertThat(response.getStatus()).isEqualTo(HttpStatus.SC_OK);
+            return response.readEntity(PakeMessagePage.class);
+        }
     }
 }

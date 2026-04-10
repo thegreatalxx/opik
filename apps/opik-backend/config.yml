@@ -1044,6 +1044,16 @@ localRunner:
   # Description: How long the bridge nextCommands long-poll blocks before returning empty
   bridgePollTimeout: ${OPIK_RUNNER_BRIDGE_POLL_TIMEOUT:-30s}
   # Default: 30s
+  # Description: How long the PAKE pairing message long-poll blocks before returning empty.
+  # Clients should retry on empty responses; keeping this short limits the number of
+  # concurrently held HTTP connections and bounded-elastic threads under load.
+  pakePollTimeout: ${OPIK_RUNNER_PAKE_POLL_TIMEOUT:-30s}
+  # Default: 5s
+  # Description: Extra buffer added to async response timeout beyond pakePollTimeout.
+  # Lets the Redis-side poll fire and return cleanly before the JAX-RS container's
+  # AsyncResponse timeout fallback resumes with an empty page.
+  pakeAsyncTimeoutBuffer: ${OPIK_RUNNER_PAKE_ASYNC_TIMEOUT_BUFFER:-5s}
+  # Default: 30s
   # Description: Default timeout for bridge commands when not specified by caller
   bridgeDefaultCommandTimeout: ${OPIK_RUNNER_BRIDGE_DEFAULT_CMD_TIMEOUT:-30s}
   # Default: 120s

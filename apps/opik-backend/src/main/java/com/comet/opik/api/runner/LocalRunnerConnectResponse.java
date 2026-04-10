@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.PropertyNamingStrategies;
 import com.fasterxml.jackson.databind.annotation.JsonNaming;
 import lombok.Builder;
 
+import java.time.Instant;
 import java.util.UUID;
 
 @Builder(toBuilder = true)
@@ -14,5 +15,6 @@ public record LocalRunnerConnectResponse(
         UUID runnerId,
         String workspaceId,
         UUID projectId,
-        String projectName) {
+        String projectName,
+        Instant expiresAt) {
 }

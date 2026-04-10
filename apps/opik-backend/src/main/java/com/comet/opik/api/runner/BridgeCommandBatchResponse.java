@@ -24,6 +24,8 @@ public record BridgeCommandBatchResponse(
             BridgeCommandType type,
             JsonNode args,
             int timeoutSeconds,
-            Instant submittedAt) {
+            Instant submittedAt,
+            String hmac,
+            Long sequence) {
     }
 }

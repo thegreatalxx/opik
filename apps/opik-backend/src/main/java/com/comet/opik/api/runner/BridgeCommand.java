@@ -24,5 +24,7 @@ public record BridgeCommand(
         Instant submittedAt,
         Instant pickedUpAt,
         Instant completedAt,
-        Long durationMs) {
+        Long durationMs,
+        String hmac,
+        Long sequence) {
 }
