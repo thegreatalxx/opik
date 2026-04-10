@@ -5,6 +5,7 @@ import {
   ChevronUp,
   MoreHorizontal,
   Pencil,
+  Plus,
   Trash,
 } from "lucide-react";
 import { Link, useNavigate } from "@tanstack/react-router";
@@ -49,9 +50,14 @@ const ProjectSelector: React.FC<ProjectSelectorProps> = ({
 }) => {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
+  const [openCreateDialog, setOpenCreateDialog] = useState(false);
   const activeProjectId = useActiveProjectId();
   const workspaceName = useAppStore((state) => state.activeWorkspaceName);
   const navigate = useNavigate();
+
+  const {
+    permissions: { canCreateProjects },
+  } = usePermissions();
 
   const { data: activeProject, isPending: isProjectPending } = useProjectById(
     { projectId: activeProjectId! },
@@ -85,6 +91,7 @@ const ProjectSelector: React.FC<ProjectSelectorProps> = ({
   );
 
   return (
+    <>
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverAnchor asChild>
         <PopoverTrigger asChild>
@@ -202,8 +209,30 @@ const ProjectSelector: React.FC<ProjectSelectorProps> = ({
             />
           ))}
         </div>
+        {canCreateProjects && (
+          <>
+            <Separator className="my-1" />
+            <button
+              className="flex w-full items-center gap-2 rounded-md px-3 py-2 hover:bg-primary-foreground"
+              onClick={() => {
+                setOpen(false);
+                setOpenCreateDialog(true);
+              }}
+            >
+              <Plus className="size-3.5 shrink-0 text-foreground" />
+              <span className="comet-body-s text-foreground">
+                Create new project
+              </span>
+            </button>
+          </>
+        )}
       </PopoverContent>
     </Popover>
+    <AddEditProjectDialog
+      open={openCreateDialog}
+      setOpen={setOpenCreateDialog}
+    />
+    </>
   );
 };
 
