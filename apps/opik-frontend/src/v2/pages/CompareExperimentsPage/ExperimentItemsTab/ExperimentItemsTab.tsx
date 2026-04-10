@@ -273,16 +273,18 @@ const ExperimentItemsTab: React.FunctionComponent<ExperimentItemsTabProps> = ({
     ];
   }, [dynamicDatasetColumns, experimentsCount, sortableColumns]);
 
-  const datasetColumnLabels = useMemo(
-    () => new Set(dynamicDatasetColumns.map((c) => c.label)),
-    [dynamicDatasetColumns],
-  );
+  const visibleOutputColumns = useMemo(() => {
+    const datasetColumnLabels = new Set(
+      dynamicDatasetColumns.map((c) => c.label),
+    );
+    return dynamicOutputColumns.filter(
+      (c) => !datasetColumnLabels.has(c.label),
+    );
+  }, [dynamicOutputColumns, dynamicDatasetColumns]);
 
   const outputColumnsData = useMemo(() => {
     return [
-      ...dynamicOutputColumns
-        .filter((c) => !datasetColumnLabels.has(c.label))
-        .map(
+      ...visibleOutputColumns.map(
           ({ label, id, columnType }) =>
             ({
               id,
@@ -350,8 +352,7 @@ const ExperimentItemsTab: React.FunctionComponent<ExperimentItemsTabProps> = ({
       } as ColumnData<ExperimentsCompare>,
     ];
   }, [
-    datasetColumnLabels,
-    dynamicOutputColumns,
+    visibleOutputColumns,
     experiments,
     experimentsIds,
     setTraceId,
@@ -556,14 +557,14 @@ const ExperimentItemsTab: React.FunctionComponent<ExperimentItemsTabProps> = ({
           type: columnType,
         }),
       ),
-      ...sortBy(dynamicOutputColumns, "label").map(({ id, label }) => ({
+      ...sortBy(visibleOutputColumns, "label").map(({ id, label }) => ({
         id,
         label: `${label} (Output)`,
         type: COLUMN_TYPE.string,
       })),
       ...getFilterColumns(!!isEvalSuite),
     ];
-  }, [dynamicDatasetColumns, dynamicOutputColumns, isEvalSuite]);
+  }, [dynamicDatasetColumns, visibleOutputColumns, isEvalSuite]);
 
   const resizeConfig = useMemo(
     () => ({
