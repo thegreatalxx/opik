@@ -2,6 +2,7 @@ import React from "react";
 import { ChevronDown, Expand } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import { Button } from "@/ui/button";
 import TooltipWrapper from "@/shared/TooltipWrapper/TooltipWrapper";
 
 type AgentGraphHeaderProps = {
@@ -26,19 +27,13 @@ const AgentGraphHeader: React.FC<AgentGraphHeaderProps> = ({
     <span className="comet-body-xs-accented">Agent graph</span>
     <div className="flex items-center gap-1">
       <TooltipWrapper content="Open in fullscreen">
-        <button
-          className="flex size-6 cursor-pointer items-center justify-center rounded-sm text-muted-foreground hover:bg-muted"
-          onClick={onFullscreen}
-        >
+        <Button variant="ghost" size="icon-2xs" onClick={onFullscreen}>
           <Expand className="size-3.5" />
-        </button>
+        </Button>
       </TooltipWrapper>
-      <button
-        className="flex size-6 cursor-pointer items-center justify-center rounded-sm text-muted-foreground hover:bg-muted"
-        onClick={onToggleCollapse}
-      >
+      <Button variant="ghost" size="icon-2xs" onClick={onToggleCollapse}>
         <ChevronDown className={cn("size-3.5", isCollapsed && "-rotate-90")} />
-      </button>
+      </Button>
     </div>
   </div>
 );
