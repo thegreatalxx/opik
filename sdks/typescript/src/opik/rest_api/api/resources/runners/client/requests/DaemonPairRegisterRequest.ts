@@ -10,4 +10,5 @@
 export interface DaemonPairRegisterRequest {
     projectId: string;
     runnerName: string;
+    sessionTtlSeconds?: number;
 }

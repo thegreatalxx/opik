@@ -61,10 +61,13 @@ class TestConnect:
         )
         assert result.exit_code == 0, result.output
 
+        call_kwargs_register = api.runners.register_daemon_pair.call_args[1]
         api.runners.register_daemon_pair.assert_called_once_with(
             project_id="proj-123",
-            runner_name=api.runners.register_daemon_pair.call_args[1]["runner_name"],
+            runner_name=call_kwargs_register["runner_name"],
+            session_ttl_seconds=call_kwargs_register["session_ttl_seconds"],
         )
+        assert call_kwargs_register["session_ttl_seconds"] == 24 * 3600
 
         mock_supervisor_cls.assert_called_once()
         call_kwargs = mock_supervisor_cls.call_args[1]

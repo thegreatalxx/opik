@@ -10,11 +10,13 @@ export const DaemonPairRegisterRequest: core.serialization.Schema<
 > = core.serialization.object({
     projectId: core.serialization.property("project_id", core.serialization.string()),
     runnerName: core.serialization.property("runner_name", core.serialization.string()),
+    sessionTtlSeconds: core.serialization.property("session_ttl_seconds", core.serialization.number().optional()),
 });
 
 export declare namespace DaemonPairRegisterRequest {
     export interface Raw {
         project_id: string;
         runner_name: string;
+        session_ttl_seconds?: number | null;
     }
 }

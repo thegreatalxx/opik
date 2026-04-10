@@ -173,7 +173,9 @@ def connect(
         code = generate_code()
 
         register_result = api.runners.register_daemon_pair(
-            project_id=project_id, runner_name=runner_name
+            project_id=project_id,
+            runner_name=runner_name,
+            session_ttl_seconds=session_ttl,
         )
         runner_id = register_result.runner_id
 

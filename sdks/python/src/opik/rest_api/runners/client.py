@@ -740,7 +740,12 @@ class RunnersClient:
         return _response.data
 
     def register_daemon_pair(
-        self, *, project_id: str, runner_name: str, request_options: typing.Optional[RequestOptions] = None
+        self,
+        *,
+        project_id: str,
+        runner_name: str,
+        session_ttl_seconds: typing.Optional[int] = OMIT,
+        request_options: typing.Optional[RequestOptions] = None,
     ) -> DaemonPairRegisterResponse:
         """
         Daemon registers a pairing session for a project. The pairing code is generated locally by the daemon and never sent to the backend.
@@ -750,6 +755,8 @@ class RunnersClient:
         project_id : str
 
         runner_name : str
+
+        session_ttl_seconds : typing.Optional[int]
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -766,7 +773,10 @@ class RunnersClient:
         client.runners.register_daemon_pair(project_id='project_id', runner_name='runner_name', )
         """
         _response = self._raw_client.register_daemon_pair(
-            project_id=project_id, runner_name=runner_name, request_options=request_options
+            project_id=project_id,
+            runner_name=runner_name,
+            session_ttl_seconds=session_ttl_seconds,
+            request_options=request_options,
         )
         return _response.data
 
@@ -1647,7 +1657,12 @@ class AsyncRunnersClient:
         return _response.data
 
     async def register_daemon_pair(
-        self, *, project_id: str, runner_name: str, request_options: typing.Optional[RequestOptions] = None
+        self,
+        *,
+        project_id: str,
+        runner_name: str,
+        session_ttl_seconds: typing.Optional[int] = OMIT,
+        request_options: typing.Optional[RequestOptions] = None,
     ) -> DaemonPairRegisterResponse:
         """
         Daemon registers a pairing session for a project. The pairing code is generated locally by the daemon and never sent to the backend.
@@ -1657,6 +1672,8 @@ class AsyncRunnersClient:
         project_id : str
 
         runner_name : str
+
+        session_ttl_seconds : typing.Optional[int]
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -1676,7 +1693,10 @@ class AsyncRunnersClient:
         asyncio.run(main())
         """
         _response = await self._raw_client.register_daemon_pair(
-            project_id=project_id, runner_name=runner_name, request_options=request_options
+            project_id=project_id,
+            runner_name=runner_name,
+            session_ttl_seconds=session_ttl_seconds,
+            request_options=request_options,
         )
         return _response.data
 

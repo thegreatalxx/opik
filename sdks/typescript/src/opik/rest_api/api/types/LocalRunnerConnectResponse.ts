@@ -5,4 +5,5 @@ export interface LocalRunnerConnectResponse {
     workspaceId?: string;
     projectId?: string;
     projectName?: string;
+    expiresAt?: Date;
 }

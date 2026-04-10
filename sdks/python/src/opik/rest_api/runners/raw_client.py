@@ -1309,7 +1309,12 @@ class RawRunnersClient:
         raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
 
     def register_daemon_pair(
-        self, *, project_id: str, runner_name: str, request_options: typing.Optional[RequestOptions] = None
+        self,
+        *,
+        project_id: str,
+        runner_name: str,
+        session_ttl_seconds: typing.Optional[int] = OMIT,
+        request_options: typing.Optional[RequestOptions] = None,
     ) -> HttpResponse[DaemonPairRegisterResponse]:
         """
         Daemon registers a pairing session for a project. The pairing code is generated locally by the daemon and never sent to the backend.
@@ -1319,6 +1324,8 @@ class RawRunnersClient:
         project_id : str
 
         runner_name : str
+
+        session_ttl_seconds : typing.Optional[int]
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -1334,6 +1341,7 @@ class RawRunnersClient:
             json={
                 "project_id": project_id,
                 "runner_name": runner_name,
+                "session_ttl_seconds": session_ttl_seconds,
             },
             headers={
                 "content-type": "application/json",
@@ -2791,7 +2799,12 @@ class AsyncRawRunnersClient:
         raise ApiError(status_code=_response.status_code, headers=dict(_response.headers), body=_response_json)
 
     async def register_daemon_pair(
-        self, *, project_id: str, runner_name: str, request_options: typing.Optional[RequestOptions] = None
+        self,
+        *,
+        project_id: str,
+        runner_name: str,
+        session_ttl_seconds: typing.Optional[int] = OMIT,
+        request_options: typing.Optional[RequestOptions] = None,
     ) -> AsyncHttpResponse[DaemonPairRegisterResponse]:
         """
         Daemon registers a pairing session for a project. The pairing code is generated locally by the daemon and never sent to the backend.
@@ -2801,6 +2814,8 @@ class AsyncRawRunnersClient:
         project_id : str
 
         runner_name : str
+
+        session_ttl_seconds : typing.Optional[int]
 
         request_options : typing.Optional[RequestOptions]
             Request-specific configuration.
@@ -2816,6 +2831,7 @@ class AsyncRawRunnersClient:
             json={
                 "project_id": project_id,
                 "runner_name": runner_name,
+                "session_ttl_seconds": session_ttl_seconds,
             },
             headers={
                 "content-type": "application/json",

@@ -1872,7 +1872,8 @@ class LocalRunnerServiceImpl implements LocalRunnerService {
     // --- PAKE relay methods ---
 
     @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
-    private record DaemonPairPayload(UUID runnerId, String workspaceId, String userName, String runnerName) {
+    private record DaemonPairPayload(UUID runnerId, String workspaceId, String userName, String runnerName,
+            Long sessionTtlSeconds) {
     }
 
     @Override
@@ -1888,7 +1889,8 @@ class LocalRunnerServiceImpl implements LocalRunnerService {
         redisClient.getAtomicLong(pakeAttemptsKey(workspaceId, userName, projectId)).delete();
 
         String payload = JsonUtils.writeValueAsString(
-                new DaemonPairPayload(runnerId, workspaceId, userName, request.runnerName()));
+                new DaemonPairPayload(runnerId, workspaceId, userName, request.runnerName(),
+                        request.sessionTtlSeconds()));
 
         RBucket<String> sessionBucket = redisClient.getBucket(pakeSessionKey(workspaceId, userName, projectId));
         sessionBucket.set(payload, ttl);
@@ -2018,11 +2020,16 @@ class LocalRunnerServiceImpl implements LocalRunnerService {
         messages.expire(runnerConfig.getPakePollTimeout().toJavaDuration().plusMinutes(1));
         redisClient.getAtomicLong(pakeAttemptsKey(workspaceId, userName, projectId)).delete();
 
+        Instant expiresAt = payload.sessionTtlSeconds() != null
+                ? Instant.now().plusSeconds(payload.sessionTtlSeconds())
+                : null;
+
         return LocalRunnerConnectResponse.builder()
                 .runnerId(runnerId)
                 .workspaceId(workspaceId)
                 .projectId(projectId)
                 .projectName(projectName)
+                .expiresAt(expiresAt)
                 .build();
     }
 

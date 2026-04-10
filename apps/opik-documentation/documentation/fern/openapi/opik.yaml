@@ -16014,6 +16014,9 @@ components:
           format: uuid
         project_name:
           type: string
+        expires_at:
+          type: string
+          format: date-time
     PairCompleteRequest:
       required:
       - project_id
@@ -16424,6 +16427,10 @@ components:
         runner_name:
           minLength: 1
           type: string
+        session_ttl_seconds:
+          minimum: 1
+          type: integer
+          format: int64
     BridgeCommandResultRequest:
       required:
       - status
