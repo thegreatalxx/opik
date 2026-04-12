@@ -11,7 +11,7 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public enum EvaluationMethod {
     DATASET("dataset"),
-    EVALUATION_SUITE("evaluation_suite");
+    TEST_SUITE("test_suite");
 
     public static final String UNKNOWN_VALUE = "unknown";
 

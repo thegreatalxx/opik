@@ -2,6 +2,6 @@
 
 export const DatasetType = {
     Dataset: "dataset",
-    EvaluationSuite: "evaluation_suite",
+    TestSuite: "test_suite",
 } as const;
 export type DatasetType = (typeof DatasetType)[keyof typeof DatasetType];

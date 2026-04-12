@@ -2,6 +2,6 @@
 
 export const DatasetWriteType = {
     Dataset: "dataset",
-    EvaluationSuite: "evaluation_suite",
+    TestSuite: "test_suite",
 } as const;
 export type DatasetWriteType = (typeof DatasetWriteType)[keyof typeof DatasetWriteType];

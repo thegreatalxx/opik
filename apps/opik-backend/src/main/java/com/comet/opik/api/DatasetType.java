@@ -11,7 +11,7 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public enum DatasetType {
     DATASET("dataset"),
-    EVALUATION_SUITE("evaluation_suite");
+    TEST_SUITE("test_suite");
 
     @JsonValue
     private final String value;

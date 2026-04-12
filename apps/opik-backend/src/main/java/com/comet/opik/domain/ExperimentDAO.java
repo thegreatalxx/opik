@@ -610,7 +610,7 @@ public class ExperimentDAO {
                         FROM experiment_items_final ei
                         INNER JOIN experiments_final ef
                             ON ei.experiment_id = ef.id
-                            AND ef.evaluation_method = 'evaluation_suite'
+                            AND ef.evaluation_method = 'test_suite'
                         LEFT JOIN assertion_results_final ar ON ar.entity_id = ei.trace_id
                         GROUP BY ei.experiment_id, ei.dataset_item_id, ei.trace_id,
                                  item_pass_threshold, suite_pass_threshold
@@ -1449,7 +1449,7 @@ public class ExperimentDAO {
                         FROM experiment_items_final ei
                         INNER JOIN experiments_final ef
                             ON ei.experiment_id = ef.id
-                            AND ef.evaluation_method = 'evaluation_suite'
+                            AND ef.evaluation_method = 'test_suite'
                         LEFT JOIN assertion_results_final ar ON ar.entity_id = ei.trace_id
                         GROUP BY ei.experiment_id, ei.dataset_item_id, ei.trace_id,
                                  item_pass_threshold, suite_pass_threshold

@@ -6,7 +6,7 @@ import {
   UsageData,
 } from "@/types/shared";
 import { CommentItems } from "./comment";
-import { ExperimentItemStatus, ExecutionPolicy } from "./evaluation-suites";
+import { ExperimentItemStatus, ExecutionPolicy } from "./test-suites";
 
 export type { ExecutionPolicy };
 export type RunStatus = "passed" | "failed";
@@ -56,7 +56,7 @@ export interface DatasetVersion {
 
 export enum DATASET_TYPE {
   DATASET = "dataset",
-  EVALUATION_SUITE = "evaluation_suite",
+  TEST_SUITE = "test_suite",
 }
 
 export enum DATASET_STATUS {
@@ -138,7 +138,7 @@ export enum EXPERIMENT_STATUS {
 
 export enum EVALUATION_METHOD {
   DATASET = "dataset",
-  EVALUATION_SUITE = "evaluation_suite",
+  TEST_SUITE = "test_suite",
 }
 
 export interface Experiment {
@@ -176,8 +176,8 @@ export interface Experiment {
   comments?: CommentItems;
 }
 
-export interface EvalSuiteExperiment extends Experiment {
-  evaluation_method: EVALUATION_METHOD.EVALUATION_SUITE;
+export interface TestSuiteExperiment extends Experiment {
+  evaluation_method: EVALUATION_METHOD.TEST_SUITE;
   pass_rate: number;
   passed_count: number;
   total_count: number;
