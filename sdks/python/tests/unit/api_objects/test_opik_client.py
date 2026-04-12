@@ -594,9 +594,7 @@ class TestOpikClientCreateTestSuite:
     def test_create_test_suite__with_execution_policy__passes_policy_to_api(self):
         """Verify a valid execution policy is forwarded via apply_dataset_item_changes."""
         policy = {"runs_per_item": 3, "pass_threshold": 2}
-        self.opik_client_.create_test_suite(
-            name="my-suite", execution_policy=policy
-        )
+        self.opik_client_.create_test_suite(name="my-suite", execution_policy=policy)
 
         apply_request = self.mock_apply_changes.call_args[1]["request"]
         assert apply_request["execution_policy"] == {
@@ -798,9 +796,7 @@ class TestOpikClientGetTestSuite:
 
     def test_get_test_suite__explicit_project_name__uses_given_project(self):
         """Verify get_test_suite passes the explicit project_name to get_dataset_by_identifier."""
-        self.opik_client_.get_test_suite(
-            name="my-suite", project_name="custom-project"
-        )
+        self.opik_client_.get_test_suite(name="my-suite", project_name="custom-project")
 
         self.mock_get_by_identifier.assert_called_once_with(
             dataset_name="my-suite",

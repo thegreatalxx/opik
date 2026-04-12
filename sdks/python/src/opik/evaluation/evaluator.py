@@ -150,9 +150,7 @@ def _compute_experiment_scores(
 
 
 def evaluate(
-    dataset: Union[
-        dataset.Dataset, dataset.DatasetVersion, test_suite.TestSuite
-    ],
+    dataset: Union[dataset.Dataset, dataset.DatasetVersion, test_suite.TestSuite],
     task: LLMTask,
     scoring_metrics: Optional[List[base_metric.BaseMetric]] = None,
     scoring_functions: Optional[List[scorer_function.ScorerFunction]] = None,
@@ -777,9 +775,7 @@ def _build_prompt_evaluation_task(
 
 
 def evaluate_prompt(
-    dataset: Union[
-        dataset.Dataset, dataset.DatasetVersion, test_suite.TestSuite
-    ],
+    dataset: Union[dataset.Dataset, dataset.DatasetVersion, test_suite.TestSuite],
     messages: List[Dict[str, Any]],
     model: Optional[Union[str, base_model.OpikBaseModel]] = None,
     scoring_metrics: Optional[List[base_metric.BaseMetric]] = None,
@@ -1001,9 +997,7 @@ def evaluate_prompt(
 
 def evaluate_optimization_trial(
     optimization_id: str,
-    dataset: Union[
-        dataset.Dataset, dataset.DatasetVersion, test_suite.TestSuite
-    ],
+    dataset: Union[dataset.Dataset, dataset.DatasetVersion, test_suite.TestSuite],
     task: LLMTask,
     scoring_metrics: Optional[List[base_metric.BaseMetric]] = None,
     scoring_functions: Optional[List[scorer_function.ScorerFunction]] = None,
