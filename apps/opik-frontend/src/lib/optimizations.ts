@@ -62,9 +62,9 @@ export const extractMetricNameFromCode = (code: string): string => {
 };
 
 export const getObjectiveLabel = (
-  isEvaluationSuite?: boolean,
+  isTestSuite?: boolean,
   objectiveName?: string,
-): string => (isEvaluationSuite ? "Pass rate" : objectiveName ?? "Accuracy");
+): string => (isTestSuite ? "Pass rate" : objectiveName ?? "Accuracy");
 
 export const MAX_EXPERIMENTS_LOADED = 1000;
 
@@ -188,8 +188,8 @@ export const getOptimizationDefaultConfigByProvider = (
   return {};
 };
 
-export const checkIsEvaluationSuite = (experiments: Experiment[]): boolean => {
-  return experiments.some((e) => e.evaluation_method === "evaluation_suite");
+export const checkIsTestSuite = (experiments: Experiment[]): boolean => {
+  return experiments.some((e) => e.evaluation_method === "test_suite");
 };
 
 export const getOptimizationMetadata = (
