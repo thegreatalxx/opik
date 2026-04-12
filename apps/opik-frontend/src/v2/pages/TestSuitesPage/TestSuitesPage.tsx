@@ -361,8 +361,8 @@ const TestSuitesPage: React.FunctionComponent = () => {
         <h1 className="comet-title-l truncate break-words">Test suites</h1>
       </div>
       <div className="comet-body-s mb-4 text-muted-slate">
-        An test suite is a collection of inputs, expected outputs, and
-        evaluation criteria used to evaluate your LLM application.{" "}
+        A test suite is a collection of inputs, expected outputs, and evaluation
+        criteria used to evaluate your LLM application.{" "}
         <a
           href={buildDocsUrl("/evaluation/manage_datasets")}
           target="_blank"

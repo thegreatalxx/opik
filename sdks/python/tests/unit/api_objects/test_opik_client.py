@@ -521,7 +521,7 @@ class TestOpikClientCreateTestSuite:
             yield
 
     def test_create_test_suite__minimal__returns_suite(self):
-        """Verify create_test_suite returns an TestSuite with the given name."""
+        """Verify create_test_suite returns a TestSuite with the given name."""
         result = self.opik_client_.create_test_suite(name="my-suite")
 
         assert isinstance(result, TestSuite)
@@ -778,7 +778,7 @@ class TestOpikClientGetTestSuite:
             yield
 
     def test_get_test_suite__returns_test_suite(self):
-        """Verify get_test_suite returns an TestSuite with the correct name and dataset."""
+        """Verify get_test_suite returns a TestSuite with the correct name and dataset."""
         result = self.opik_client_.get_test_suite(name="my-suite")
 
         assert isinstance(result, TestSuite)

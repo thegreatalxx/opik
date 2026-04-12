@@ -57,7 +57,7 @@ function groupByTrialId(
 }
 
 /**
- * Builds an TestSuiteResult from an EvaluationResult and execution policies.
+ * Builds a TestSuiteResult from an EvaluationResult and execution policies.
  *
  * Pass/fail logic (matching Python exactly):
  * - Group test results by datasetItemId

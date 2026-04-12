@@ -1,5 +1,5 @@
 /**
- * Example: Running an TestSuite with projectName.
+ * Example: Running a TestSuite with projectName.
  *
  * Creates a suite with assertions and execution policy,
  * adds test items, runs an evaluation task, and prints results.

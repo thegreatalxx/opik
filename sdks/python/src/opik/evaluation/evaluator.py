@@ -333,7 +333,7 @@ def evaluate_test_suite(
     experiment_type: Optional[str],
 ) -> "suite_types.TestSuiteResult":
     """
-    Run evaluation on a dataset configured as an test suite.
+    Run evaluation on a dataset configured as a test suite.
 
     This function is designed for test suites where evaluators and execution
     policies are stored in the dataset itself. Unlike the general `evaluate` function,

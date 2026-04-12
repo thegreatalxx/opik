@@ -19,7 +19,7 @@ def save_report(
     suite_result: _result_mod.TestSuiteResult,
     output_path: Optional[str] = None,
 ) -> str:
-    """Save an test suite result as a structured JSON report file.
+    """Save a test suite result as a structured JSON report file.
 
     Args:
         suite_result: The test suite result to serialize.

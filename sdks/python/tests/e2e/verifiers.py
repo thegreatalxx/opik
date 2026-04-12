@@ -812,7 +812,7 @@ def verify_test_suite_result(
     project_name: Optional[str] = None,
 ):
     """
-    Verify an TestSuiteResult — both in-memory properties and persisted
+    Verify a TestSuiteResult — both in-memory properties and persisted
     experiment data from the backend.
 
     Args:

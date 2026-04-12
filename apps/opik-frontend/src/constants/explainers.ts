@@ -165,7 +165,7 @@ export const EXPLAINERS_MAP: Record<EXPLAINER_ID, Explainer> = {
   [EXPLAINER_ID.why_would_i_want_to_add_traces_to_an_test_suite]: {
     id: EXPLAINER_ID.why_would_i_want_to_add_traces_to_an_test_suite,
     description:
-      "Add traces to an test suite to evaluate and benchmark LLM outputs using real production data. You can then use these test suites in experiments to track how your LLM app's performance evolves over time.",
+      "Add traces to a test suite to evaluate and benchmark LLM outputs using real production data. You can then use these test suites in experiments to track how your LLM app's performance evolves over time.",
   },
   [EXPLAINER_ID.hows_the_cost_estimated]: {
     id: EXPLAINER_ID.hows_the_cost_estimated,
@@ -246,7 +246,7 @@ export const EXPLAINERS_MAP: Record<EXPLAINER_ID, Explainer> = {
   [EXPLAINER_ID.what_are_experiment_items]: {
     id: EXPLAINER_ID.what_are_experiment_items,
     description:
-      "Experiment items are individual evaluations that connect an test suite sample with its LLM output, feedback scores, and trace.",
+      "Experiment items are individual evaluations that connect a test suite sample with its LLM output, feedback scores, and trace.",
     docLink: "/evaluation/overview",
     docHash: "#analyzing-evaluation-results",
   },
@@ -276,7 +276,7 @@ export const EXPLAINERS_MAP: Record<EXPLAINER_ID, Explainer> = {
   [EXPLAINER_ID.whats_an_test_suite]: {
     id: EXPLAINER_ID.whats_an_test_suite,
     description:
-      "An test suite is a collection of input-output examples used to evaluate your LLM application's performance.",
+      "A test suite is a collection of input-output examples used to evaluate your LLM application's performance.",
     docLink: "/evaluation/concepts",
     docHash: "#test-suites",
   },

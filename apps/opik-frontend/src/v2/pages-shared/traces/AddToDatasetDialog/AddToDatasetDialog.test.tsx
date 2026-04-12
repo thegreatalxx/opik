@@ -143,7 +143,7 @@ describe("AddToDatasetDialog", () => {
   it("should render the dialog when open", () => {
     render(<AddToDatasetDialog {...defaultProps} />, { wrapper });
 
-    expect(screen.getByText("Select an test suite")).toBeInTheDocument();
+    expect(screen.getByText("Select a test suite")).toBeInTheDocument();
     expect(screen.getByText("Test Dataset 1")).toBeInTheDocument();
   });
 

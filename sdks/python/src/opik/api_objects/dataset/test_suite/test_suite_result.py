@@ -45,7 +45,7 @@ class ItemResult:
 
 class TestSuiteResult:
     """
-    Result of running an test suite.
+    Result of running a test suite.
 
     Contains pass/fail status for each item based on execution policy,
     as well as overall suite pass/fail status.

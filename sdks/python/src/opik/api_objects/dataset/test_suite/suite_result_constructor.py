@@ -21,7 +21,7 @@ def build_suite_result(
     total_time: Optional[float] = None,
 ) -> suite_types.TestSuiteResult:
     """
-    Build an TestSuiteResult from an EvaluationResult.
+    Build a TestSuiteResult from an EvaluationResult.
 
     Groups test results by dataset item and computes pass/fail status
     based on execution policies stored in each item.

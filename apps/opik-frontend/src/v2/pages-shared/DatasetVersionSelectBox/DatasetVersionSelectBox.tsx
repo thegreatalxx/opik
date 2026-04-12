@@ -59,7 +59,7 @@ function DatasetEmptyState() {
         No test suites available
       </div>
       <div className="comet-body-s text-muted-slate">
-        Create an test suite with examples to evaluate your prompt on.
+        Create a test suite with examples to evaluate your prompt on.
       </div>
     </div>
   );
@@ -305,7 +305,7 @@ function DatasetVersionSelectBox({
           open={isSelectOpen}
           disabled={disabled}
         >
-          <TooltipWrapper content={displayValue ?? "Select an test suite"}>
+          <TooltipWrapper content={displayValue ?? "Select a test suite"}>
             <SelectTrigger
               className={cn(
                 "size-full w-[220px] data-[placeholder]:text-light-slate h-[32px] py-0 [&>span]:min-w-0 [&>span]:flex-1",
@@ -320,7 +320,7 @@ function DatasetVersionSelectBox({
                   <div className="flex w-full items-center text-light-slate">
                     <Database className="mr-2 size-4 text-[#b8e54a]" />
                     <span className="truncate font-normal">
-                      Select an test suite
+                      Select a test suite
                     </span>
                   </div>
                 }

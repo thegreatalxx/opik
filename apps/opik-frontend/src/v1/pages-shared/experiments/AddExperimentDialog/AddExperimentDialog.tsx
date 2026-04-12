@@ -216,7 +216,7 @@ const AddExperimentDialog: React.FunctionComponent<
   );
   const isTestSuite = selectedDataset?.type === DATASET_TYPE.TEST_SUITE;
 
-  // When the selected dataset is an test suite, evaluators are defined
+  // When the selected dataset is a test suite, evaluators are defined
   // on the suite itself — skip metrics in the generated code.
   const effectiveModels = isTestSuite ? [] : models;
 
@@ -506,7 +506,7 @@ eval_results = evaluate(
         <div className="pb-8">
           <SheetTitle>Create a new experiment</SheetTitle>
           <div className="comet-body-s mx-auto mt-4 max-w-[468px] text-center text-muted-slate">
-            Select an test suite, assign the relevant evaluators, and follow the
+            Select a test suite, assign the relevant evaluators, and follow the
             instructions to track and compare your training runs
           </div>
         </div>
@@ -518,7 +518,7 @@ eval_results = evaluate(
               <LoadableSelectBox
                 options={options}
                 value={datasetName}
-                placeholder="Select an test suite"
+                placeholder="Select a test suite"
                 onChange={setDatasetName}
                 onLoadMore={
                   total > DEFAULT_LOADED_DATASET_ITEMS && !isLoadedMore
