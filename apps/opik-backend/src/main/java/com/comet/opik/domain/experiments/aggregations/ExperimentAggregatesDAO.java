@@ -442,7 +442,7 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
                 FROM experiments FINAL
                 WHERE workspace_id = :workspace_id
                 AND id = :experiment_id
-                AND evaluation_method = 'evaluation_suite'
+                AND evaluation_method = 'test_suite'
             ), assertion_results_final AS (
                 SELECT
                     entity_id,
