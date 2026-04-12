@@ -1,5 +1,5 @@
 """Unit tests for evaluate_suite function — specifically that it passes
-evaluation_method='evaluation_suite' when creating the experiment."""
+evaluation_method='test_suite' when creating the experiment."""
 
 import threading
 import unittest.mock as mock
@@ -7,7 +7,7 @@ import unittest.mock as mock
 from opik import url_helpers
 from opik.api_objects import opik_client
 from opik.api_objects.dataset import dataset_item
-from opik.api_objects.dataset.evaluation_suite import evaluation_suite
+from opik.api_objects.dataset.test_suite import test_suite
 from opik.evaluation import evaluator as evaluator_module
 
 from ...testlib import ANY_BUT_NONE, SpanModel, assert_equal
@@ -30,7 +30,7 @@ def _create_mock_dataset(name="test-dataset", items=None):
     return mock_dataset
 
 
-def test_evaluate_suite__creates_experiment_with_evaluation_method_evaluation_suite():
+def test_evaluate_suite__creates_experiment_with_evaluation_method_test_suite():
     mock_dataset = _create_mock_dataset()
     mock_experiment = mock.MagicMock()
     mock_experiment.id = "exp-123"
@@ -72,11 +72,11 @@ def test_evaluate_suite__creates_experiment_with_evaluation_method_evaluation_su
 
     mock_client.create_experiment.assert_called_once()
     call_kwargs = mock_client.create_experiment.call_args[1]
-    assert call_kwargs["evaluation_method"] == "evaluation_suite"
+    assert call_kwargs["evaluation_method"] == "test_suite"
 
 
 def test_evaluate_suite__passes_evaluation_method_not_dataset():
-    """Verify it's specifically 'evaluation_suite', not 'dataset'."""
+    """Verify it's specifically 'test_suite', not 'dataset'."""
     mock_dataset = _create_mock_dataset()
     mock_experiment = mock.MagicMock()
     mock_experiment.id = "exp-456"
@@ -118,7 +118,7 @@ def test_evaluate_suite__passes_evaluation_method_not_dataset():
 
     call_kwargs = mock_client.create_experiment.call_args[1]
     assert call_kwargs["evaluation_method"] != "dataset"
-    assert call_kwargs["evaluation_method"] == "evaluation_suite"
+    assert call_kwargs["evaluation_method"] == "test_suite"
 
 
 def _call_evaluate_suite(optimization_id, items):
@@ -296,12 +296,12 @@ def test_evaluate_suite__explicit_client__used_for_experiment_creation():
     explicit_client.create_experiment.assert_called_once()
 
 
-def test_evaluation_suite_run__propagates_stored_client():
-    """EvaluationSuite.run() passes its stored client to evaluate_suite."""
+def test_test_suite_run__propagates_stored_client():
+    """TestSuite.run() passes its stored client to evaluate_suite."""
     mock_dataset = _create_mock_dataset()
     explicit_client = mock.MagicMock(spec=opik_client.Opik)
 
-    suite = evaluation_suite.EvaluationSuite(
+    suite = test_suite.TestSuite(
         name="test-suite",
         dataset_=mock_dataset,
         client=explicit_client,

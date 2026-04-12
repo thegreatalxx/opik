@@ -1,8 +1,8 @@
 """
-LLMJudge evaluator for evaluation suites.
+LLMJudge evaluator for test suites.
 
 This module provides an LLM-as-a-judge evaluator that can be stored
-in the backend and used with evaluation suites. The evaluator can
+in the backend and used with test suites. The evaluator can
 evaluate one or more assertions/criteria against the agent's output.
 """
 
@@ -88,7 +88,7 @@ def _generate_prompt(
 
 class LLMJudge(base.BaseSuiteEvaluator):
     """
-    LLM-as-a-judge evaluator for evaluation suites.
+    LLM-as-a-judge evaluator for test suites.
 
     This evaluator uses an LLM to judge whether an agent's output satisfies
     one or more assertions/criteria. It returns a ScoreResult for each assertion.

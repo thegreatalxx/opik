@@ -274,7 +274,7 @@ def get_dataset_experiments(
     return experiments
 
 
-def create_evaluation_suite_dataset(
+def create_test_suite_dataset(
     rest_client: OpikApi,
     dataset_name: str,
     project_name: Optional[str],
@@ -284,7 +284,7 @@ def create_evaluation_suite_dataset(
     tags: Optional[List[str]] = None,
 ) -> str:
     """
-    Create a dataset of type 'evaluation_suite' and its initial version
+    Create a dataset of type 'test_suite' and its initial version
     with evaluators and execution_policy persisted to the backend.
 
     Args:
@@ -303,7 +303,7 @@ def create_evaluation_suite_dataset(
         name=dataset_name,
         description=description,
         project_name=project_name,
-        type="evaluation_suite",
+        type="test_suite",
         tags=tags,
     )
 
@@ -334,7 +334,7 @@ def create_evaluation_suite_dataset(
     return dataset_fern.id
 
 
-def update_evaluation_suite_dataset(
+def update_test_suite_dataset(
     rest_client: OpikApi,
     dataset_id: str,
     base_version_id: str,

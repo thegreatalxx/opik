@@ -1,11 +1,11 @@
-"""Unit tests for EvaluationSuite validation and result building."""
+"""Unit tests for TestSuite validation and result building."""
 
 import pytest
 from unittest import mock
 
-from opik.api_objects.dataset.evaluation_suite import evaluation_suite
-from opik.api_objects.dataset.evaluation_suite import suite_result_constructor
-from opik.api_objects.dataset.evaluation_suite import types as suite_types
+from opik.api_objects.dataset.test_suite import test_suite
+from opik.api_objects.dataset.test_suite import suite_result_constructor
+from opik.api_objects.dataset.test_suite import types as suite_types
 from opik.api_objects.dataset import validators
 from opik.api_objects.dataset import dataset_item
 from opik.evaluation import suite_evaluators
@@ -40,7 +40,7 @@ class TestEvaluatorValidation:
         with pytest.raises(TypeError) as exc_info:
             validators.validate_evaluators([equals_metric], "suite-level evaluators")
 
-        assert "Evaluation suites only support LLMJudge evaluators" in str(
+        assert "Test suites only support LLMJudge evaluators" in str(
             exc_info.value
         )
         assert "Equals" in str(exc_info.value)
@@ -59,7 +59,7 @@ class TestEvaluatorValidation:
         """Test that suite stores the dataset reference."""
         mock_dataset = _create_mock_dataset()
 
-        suite = evaluation_suite.EvaluationSuite(
+        suite = test_suite.TestSuite(
             name="test_suite",
             dataset_=mock_dataset,
         )
@@ -78,14 +78,14 @@ class TestEvaluatorValidation:
                 context="item-level assertions",
             )
 
-        assert "Evaluation suites only support LLMJudge evaluators" in str(
+        assert "Test suites only support LLMJudge evaluators" in str(
             exc_info.value
         )
 
     def test_add_item__with_assertions__succeeds(self):
         """Test that assertions shorthand is accepted in add_item."""
         mock_dataset = _create_mock_dataset()
-        suite = evaluation_suite.EvaluationSuite(
+        suite = test_suite.TestSuite(
             name="test_suite",
             dataset_=mock_dataset,
         )
@@ -99,7 +99,7 @@ class TestEvaluatorValidation:
     def test_add_item__with_no_evaluators__succeeds(self):
         """Test that items can be added without evaluators."""
         mock_dataset = _create_mock_dataset()
-        suite = evaluation_suite.EvaluationSuite(
+        suite = test_suite.TestSuite(
             name="test_suite",
             dataset_=mock_dataset,
         )
@@ -117,14 +117,14 @@ class TestEvaluatorValidation:
                 [llm_judge, equals_metric], "suite-level evaluators"
             )
 
-        assert "Evaluation suites only support LLMJudge evaluators" in str(
+        assert "Test suites only support LLMJudge evaluators" in str(
             exc_info.value
         )
 
     def test_add_item__with_assertions_shorthand__creates_evaluator_items(self):
         """Test that assertions shorthand builds LLMJudge and creates evaluator items."""
         mock_dataset = _create_mock_dataset()
-        suite = evaluation_suite.EvaluationSuite(
+        suite = test_suite.TestSuite(
             name="test_suite",
             dataset_=mock_dataset,
         )
@@ -626,52 +626,52 @@ class TestValidateTaskResult:
     # --- dict results ---
 
     def test_validate_task_result__valid_dict__returns_as_is(self):
-        result = evaluation_suite.validate_task_result(
+        result = test_suite.validate_task_result(
             {"input": "hello", "output": "world"}
         )
         assert result == {"input": "hello", "output": "world"}
 
     def test_validate_task_result__dict_missing_output__raises_value_error(self):
         with pytest.raises(ValueError, match="missing.*output"):
-            evaluation_suite.validate_task_result({"input": "hello"})
+            test_suite.validate_task_result({"input": "hello"})
 
     def test_validate_task_result__dict_missing_both_keys__raises_value_error(self):
         with pytest.raises(ValueError, match="missing"):
-            evaluation_suite.validate_task_result({"response": "hello"})
+            test_suite.validate_task_result({"response": "hello"})
 
     def test_validate_task_result__dict_missing_input__raises_value_error(self):
         with pytest.raises(ValueError, match="missing.*input"):
-            evaluation_suite.validate_task_result({"output": "world"})
+            test_suite.validate_task_result({"output": "world"})
 
     # --- non-dict results: auto-wrapping ---
 
     def test_validate_task_result__string_result__wrapped_as_output(self):
-        result = evaluation_suite.validate_task_result("just a string")
+        result = test_suite.validate_task_result("just a string")
         assert result == {"output": "just a string"}
 
     def test_validate_task_result__string_result_with_input_data__wrapped_with_input(
         self,
     ):
-        result = evaluation_suite.validate_task_result(
+        result = test_suite.validate_task_result(
             "just a string", input_data={"question": "hi"}
         )
         assert result == {"input": {"question": "hi"}, "output": "just a string"}
 
     def test_validate_task_result__int_result__wrapped_as_output(self):
-        result = evaluation_suite.validate_task_result(42)
+        result = test_suite.validate_task_result(42)
         assert result == {"output": 42}
 
     def test_validate_task_result__none_result__wrapped_as_output(self):
-        result = evaluation_suite.validate_task_result(None)
+        result = test_suite.validate_task_result(None)
         assert result == {"output": None}
 
     def test_validate_task_result__none_input_data__not_included_in_wrapper(self):
-        result = evaluation_suite.validate_task_result("response", input_data=None)
+        result = test_suite.validate_task_result("response", input_data=None)
         assert result == {"output": "response"}
         assert "input" not in result
 
     def test_validate_task_result__list_result_with_input_data__wrapped_correctly(self):
-        result = evaluation_suite.validate_task_result(
+        result = test_suite.validate_task_result(
             ["a", "b"], input_data={"prompt": "list me things"}
         )
         assert result == {"input": {"prompt": "list me things"}, "output": ["a", "b"]}
@@ -682,12 +682,12 @@ class TestInternalRunOptimizationSuite:
 
     def test_passes_optimization_params_to_run_suite_evaluation(self):
         mock_dataset = _create_mock_dataset()
-        suite = evaluation_suite.EvaluationSuite(
+        suite = test_suite.TestSuite(
             name="test_suite",
             dataset_=mock_dataset,
         )
 
-        fake_result = mock.MagicMock(spec=suite_types.EvaluationSuiteResult)
+        fake_result = mock.MagicMock(spec=suite_types.TestSuiteResult)
 
         with mock.patch(
             "opik.evaluation.evaluator.evaluate_suite",
@@ -714,12 +714,12 @@ class TestInternalRunOptimizationSuite:
 
     def test_without_optimization_params__defaults_to_none(self):
         mock_dataset = _create_mock_dataset()
-        suite = evaluation_suite.EvaluationSuite(
+        suite = test_suite.TestSuite(
             name="test_suite",
             dataset_=mock_dataset,
         )
 
-        fake_result = mock.MagicMock(spec=suite_types.EvaluationSuiteResult)
+        fake_result = mock.MagicMock(spec=suite_types.TestSuiteResult)
 
         with mock.patch(
             "opik.evaluation.evaluator.evaluate_suite",
@@ -739,12 +739,12 @@ class TestInternalRunOptimizationSuite:
 
     def test_passes_client_through(self):
         mock_dataset = _create_mock_dataset()
-        suite = evaluation_suite.EvaluationSuite(
+        suite = test_suite.TestSuite(
             name="test_suite",
             dataset_=mock_dataset,
         )
         mock_client = mock.MagicMock()
-        fake_result = mock.MagicMock(spec=suite_types.EvaluationSuiteResult)
+        fake_result = mock.MagicMock(spec=suite_types.TestSuiteResult)
 
         with mock.patch(
             "opik.evaluation.evaluator.evaluate_suite",
@@ -762,12 +762,12 @@ class TestInternalRunOptimizationSuite:
 
     def test_run_delegates_to_internal_api(self):
         mock_dataset = _create_mock_dataset()
-        suite = evaluation_suite.EvaluationSuite(
+        suite = test_suite.TestSuite(
             name="test_suite",
             dataset_=mock_dataset,
         )
 
-        fake_result = mock.MagicMock(spec=suite_types.EvaluationSuiteResult)
+        fake_result = mock.MagicMock(spec=suite_types.TestSuiteResult)
 
         with mock.patch(
             "opik.evaluation.evaluator.evaluate_suite",
@@ -783,11 +783,11 @@ class TestInternalRunOptimizationSuite:
         mock_run.assert_called_once()
 
 
-class TestEvaluationSuiteResultPassRate:
-    """Unit tests for EvaluationSuiteResult.pass_rate property."""
+class TestTestSuiteResultPassRate:
+    """Unit tests for TestSuiteResult.pass_rate property."""
 
     def test_pass_rate__all_items_pass__returns_1(self):
-        result = suite_types.EvaluationSuiteResult(
+        result = suite_types.TestSuiteResult(
             items_passed=5,
             items_total=5,
             item_results={},
@@ -797,7 +797,7 @@ class TestEvaluationSuiteResultPassRate:
         assert result.pass_rate == 1.0
 
     def test_pass_rate__no_items_pass__returns_0(self):
-        result = suite_types.EvaluationSuiteResult(
+        result = suite_types.TestSuiteResult(
             items_passed=0,
             items_total=5,
             item_results={},
@@ -807,7 +807,7 @@ class TestEvaluationSuiteResultPassRate:
         assert result.pass_rate == 0.0
 
     def test_pass_rate__partial_pass__returns_ratio(self):
-        result = suite_types.EvaluationSuiteResult(
+        result = suite_types.TestSuiteResult(
             items_passed=3,
             items_total=10,
             item_results={},
@@ -818,7 +818,7 @@ class TestEvaluationSuiteResultPassRate:
 
     def test_pass_rate__zero_items__returns_none(self):
         """Edge case: no items evaluated should return None."""
-        result = suite_types.EvaluationSuiteResult(
+        result = suite_types.TestSuiteResult(
             items_passed=0,
             items_total=0,
             item_results={},

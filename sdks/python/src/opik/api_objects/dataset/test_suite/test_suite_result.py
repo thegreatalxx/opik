@@ -1,4 +1,4 @@
-"""EvaluationSuiteResult and ItemResult types."""
+"""TestSuiteResult and ItemResult types."""
 
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ def is_score_passed(score: ScoreResult) -> bool:
 
 @dataclasses.dataclass
 class ItemResult:
-    """Result for a single evaluation suite item."""
+    """Result for a single test suite item."""
 
     dataset_item_id: str
     """The ID of the dataset item."""
@@ -43,9 +43,9 @@ class ItemResult:
     """Individual test results for each run of this item."""
 
 
-class EvaluationSuiteResult:
+class TestSuiteResult:
     """
-    Result of running an evaluation suite.
+    Result of running an test suite.
 
     Contains pass/fail status for each item based on execution policy,
     as well as overall suite pass/fail status.
@@ -96,7 +96,7 @@ class EvaluationSuiteResult:
 
     @property
     def suite_name(self) -> Optional[str]:
-        """The name of the evaluation suite."""
+        """The name of the test suite."""
         return self._suite_name
 
     @property

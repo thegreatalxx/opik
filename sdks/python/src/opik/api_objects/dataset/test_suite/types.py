@@ -1,4 +1,4 @@
-"""Type definitions for evaluation suite."""
+"""Type definitions for test suite."""
 
 from __future__ import annotations
 
@@ -7,13 +7,13 @@ from typing import Any, Dict, List, TypedDict
 from typing_extensions import Required
 
 from ..execution_policy import ExecutionPolicy
-from .evaluation_suite_result import EvaluationSuiteResult, ItemResult
+from .test_suite_result import TestSuiteResult, ItemResult
 
-__all__ = ["EvaluationSuiteItem", "EvaluationSuiteResult", "ItemResult"]
+__all__ = ["TestSuiteItem", "TestSuiteResult", "ItemResult"]
 
 
-class EvaluationSuiteItem(TypedDict, total=False):
-    """A test case item to add to an evaluation suite."""
+class TestSuiteItem(TypedDict, total=False):
+    """A test case item to add to an test suite."""
 
     data: Required[Dict[str, Any]]
     assertions: List[str]

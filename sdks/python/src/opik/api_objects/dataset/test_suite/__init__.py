@@ -1,7 +1,7 @@
-from .evaluation_suite import EvaluationSuite
-from .types import EvaluationSuiteItem
+from .test_suite import TestSuite
+from .types import TestSuiteItem
 
 __all__ = [
-    "EvaluationSuite",
-    "EvaluationSuiteItem",
+    "TestSuite",
+    "TestSuiteItem",
 ]

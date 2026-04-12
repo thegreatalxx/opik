@@ -1,7 +1,7 @@
 """
-Evaluation Suite API for regression testing LLM applications.
+Test Suite API for regression testing LLM applications.
 
-Evaluation Suites are pre-configured regression test suites that let you
+Test Suites are pre-configured regression test suites that let you
 validate that prompt changes, model updates, or code modifications don't
 break existing functionality.
 """
@@ -71,11 +71,11 @@ def validate_task_result(
     return wrapped
 
 
-class EvaluationSuite:
+class TestSuite:
     """
     A pre-configured regression test suite for LLM applications.
 
-    Evaluation Suites let you:
+    Test Suites let you:
     - Define test cases with inputs and context
     - Configure assertions that will be checked by an LLM
     - Run tests against any task function
@@ -88,7 +88,7 @@ class EvaluationSuite:
         >>>
         >>> client = Opik()
         >>>
-        >>> suite = client.create_evaluation_suite(
+        >>> suite = client.create_test_suite(
         ...     name="Refund Policy Tests",
         ...     description="Regression tests for refund scenarios",
         ...     assertions=[
@@ -114,8 +114,8 @@ class EvaluationSuite:
         """
         Internal constructor — not part of the public API.
 
-        Use :meth:`opik.Opik.create_evaluation_suite` or
-        :meth:`opik.Opik.get_or_create_evaluation_suite` instead.
+        Use :meth:`opik.Opik.create_test_suite` or
+        :meth:`opik.Opik.get_or_create_test_suite` instead.
         """
         self._name = name
         self._dataset = dataset_
@@ -123,12 +123,12 @@ class EvaluationSuite:
 
     @property
     def name(self) -> str:
-        """The name of the evaluation suite."""
+        """The name of the test suite."""
         return self._name
 
     @property
     def description(self) -> Optional[str]:
-        """The description of the evaluation suite."""
+        """The description of the test suite."""
         return self._dataset.description
 
     @property
@@ -138,7 +138,7 @@ class EvaluationSuite:
 
     @property
     def project_name(self) -> Optional[str]:
-        """The project name associated with the evaluation suite."""
+        """The project name associated with the test suite."""
         return self._dataset.project_name
 
     def get_tags(self) -> List[str]:
@@ -241,7 +241,7 @@ class EvaluationSuite:
             version_info = self._dataset.get_version_info()
             if version_info is None:
                 raise RuntimeError(
-                    f"Cannot update evaluation suite '{self._name}': "
+                    f"Cannot update test suite '{self._name}': "
                     "no version info found. Add at least one item first."
                 )
 
@@ -250,7 +250,7 @@ class EvaluationSuite:
             if execution_policy is None:
                 execution_policy = self.get_execution_policy()
 
-            rest_operations.update_evaluation_suite_dataset(
+            rest_operations.update_test_suite_dataset(
                 rest_client=self._dataset._rest_client,
                 dataset_id=self._dataset.id,
                 base_version_id=version_info.id,
@@ -260,7 +260,7 @@ class EvaluationSuite:
 
     def delete_items(self, item_ids: List[str]) -> None:
         """
-        Delete items from the evaluation suite by their IDs.
+        Delete items from the test suite by their IDs.
 
         Args:
             item_ids: List of item IDs to delete.
@@ -298,7 +298,7 @@ class EvaluationSuite:
         execution_policy: Optional[execution_policy.ExecutionPolicy] = None,
     ) -> None:
         """
-        Add a test case to the evaluation suite.
+        Add a test case to the test suite.
 
         Args:
             data: Dictionary containing the test case data. This is passed to
@@ -357,10 +357,10 @@ class EvaluationSuite:
 
     def add_items(
         self,
-        items: List[suite_types.EvaluationSuiteItem],
+        items: List[suite_types.TestSuiteItem],
     ) -> None:
         """
-        Add multiple test cases to the evaluation suite in a single batch.
+        Add multiple test cases to the test suite in a single batch.
 
         This is more efficient than calling add_item() repeatedly, as it
         creates only one dataset version for the entire batch.
@@ -432,9 +432,9 @@ class EvaluationSuite:
         model: Optional[str] = None,
         generate_report: bool = True,
         report_output_path: Optional[str] = None,
-    ) -> suite_types.EvaluationSuiteResult:
+    ) -> suite_types.TestSuiteResult:
         """
-        Run the evaluation suite against a task function.
+        Run the test suite against a task function.
 
         The task function receives each test item's data dict and must return
         either a dict (with ``"input"`` and ``"output"`` as the supported keys)
@@ -460,10 +460,10 @@ class EvaluationSuite:
             generate_report: Whether to generate a structured JSON report file
                 after the evaluation completes. Defaults to True.
             report_output_path: Optional file path for the report. If not
-                provided, a default path is generated under ``opik_evaluation_suite_reports/``.
+                provided, a default path is generated under ``opik_test_suite_reports/``.
 
         Returns:
-            EvaluationSuiteResult with pass/fail status based on execution policy.
+            TestSuiteResult with pass/fail status based on execution policy.
 
         Example:
             >>> # Simplified: return any value it is auto-wrapped internally
@@ -516,9 +516,9 @@ class EvaluationSuite:
         client: Optional[Any] = None,
         generate_report: bool = True,
         report_output_path: Optional[str] = None,
-    ) -> suite_types.EvaluationSuiteResult:
+    ) -> suite_types.TestSuiteResult:
         """
-        Run the evaluation suite with optimization-specific parameters.
+        Run the test suite with optimization-specific parameters.
 
         This is the internal entry point used by the optimizer framework.
         It extends the public ``run()`` method with parameters for linking
@@ -547,10 +547,10 @@ class EvaluationSuite:
                 after the evaluation completes. Defaults to True.
             report_output_path: Optional file path for the report. If not
                 provided, a default path is generated under
-                ``opik_evaluation_suite_reports/``.
+                ``opik_test_suite_reports/``.
 
         Returns:
-            EvaluationSuiteResult with pass/fail status based on execution policy.
+            TestSuiteResult with pass/fail status based on execution policy.
         """
         from opik.evaluation import evaluator as opik_evaluator
 
@@ -586,7 +586,7 @@ class EvaluationSuite:
                 )
             except Exception:
                 LOGGER.warning(
-                    "Failed to save evaluation suite report file.",
+                    "Failed to save test suite report file.",
                     exc_info=True,
                 )
 

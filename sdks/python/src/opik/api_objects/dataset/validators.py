@@ -1,4 +1,4 @@
-"""Validators for dataset and evaluation suite operations."""
+"""Validators for dataset and test suite operations."""
 
 from typing import Any, List, Optional
 
@@ -19,7 +19,7 @@ def validate_evaluators(evaluators: List[Any], context: str) -> None:
     for evaluator in evaluators:
         if not isinstance(evaluator, llm_judge.LLMJudge):
             raise TypeError(
-                f"Evaluation suites only support LLMJudge evaluators. "
+                f"Test suites only support LLMJudge evaluators. "
                 f"Got {type(evaluator).__name__} in {context}. "
                 f"Use LLMJudge from opik.evaluation.suite_evaluators instead."
             )

@@ -22,7 +22,7 @@ from ..api_objects.experiment import helpers as experiment_helpers
 from ..api_objects.dataset import execution_policy as dataset_execution_policy
 from ..api_objects.prompt.chat import chat_prompt_template
 from ..api_objects.prompt import types as prompt_types
-from ..api_objects.dataset import evaluation_suite
+from ..api_objects.dataset import test_suite
 from . import (
     asyncio_support,
     engine,
@@ -37,10 +37,10 @@ from .scorers import scorer_function, scorer_wrapper_metric
 from . import test_result
 from .types import ExperimentScoreFunction, LLMTask, ScoringKeyMappingType
 from .. import url_helpers
-from ..api_objects.dataset.evaluation_suite import suite_result_constructor
+from ..api_objects.dataset.test_suite import suite_result_constructor
 
 if TYPE_CHECKING:
-    from ..api_objects.dataset.evaluation_suite import types as suite_types
+    from ..api_objects.dataset.test_suite import types as suite_types
 
 LOGGER = logging.getLogger(__name__)
 MODALITY_SUPPORT_DOC_URL = (
@@ -151,7 +151,7 @@ def _compute_experiment_scores(
 
 def evaluate(
     dataset: Union[
-        dataset.Dataset, dataset.DatasetVersion, evaluation_suite.EvaluationSuite
+        dataset.Dataset, dataset.DatasetVersion, test_suite.TestSuite
     ],
     task: LLMTask,
     scoring_metrics: Optional[List[base_metric.BaseMetric]] = None,
@@ -258,7 +258,7 @@ def evaluate(
             - `data.category = "test"` - Items with specific data field value
             - `created_at >= "2024-01-01T00:00:00Z"` - Items created after date
     """
-    if isinstance(dataset, evaluation_suite.EvaluationSuite):
+    if isinstance(dataset, test_suite.TestSuite):
         # backwards compatibility for transition period
         dataset = dataset.dataset
 
@@ -333,11 +333,11 @@ def evaluate_suite(
     evaluator_model: Optional[str],
     optimization_id: Optional[str],
     experiment_type: Optional[str],
-) -> "suite_types.EvaluationSuiteResult":
+) -> "suite_types.TestSuiteResult":
     """
-    Run evaluation on a dataset configured as an evaluation suite.
+    Run evaluation on a dataset configured as an test suite.
 
-    This function is designed for evaluation suites where evaluators and execution
+    This function is designed for test suites where evaluators and execution
     policies are stored in the dataset itself. Unlike the general `evaluate` function,
     this function:
     - Does not accept scoring_metrics (they come from the dataset)
@@ -345,7 +345,7 @@ def evaluate_suite(
     - Does not accept dataset_sampler or nb_samples (suites evaluate all items)
 
     Returns:
-        EvaluationSuiteResult with pass/fail status for each item and the suite.
+        TestSuiteResult with pass/fail status for each item and the suite.
     """
     if client is None:
         client = opik_client.get_global_client()
@@ -360,7 +360,7 @@ def evaluate_suite(
         dataset_name=dataset.name,
         experiment_config=experiment_config,
         prompts=prompts,
-        evaluation_method="evaluation_suite",
+        evaluation_method="test_suite",
         tags=experiment_tags,
         dataset_version_id=None,
         project_name=project_name,
@@ -778,7 +778,7 @@ def _build_prompt_evaluation_task(
 
 def evaluate_prompt(
     dataset: Union[
-        dataset.Dataset, dataset.DatasetVersion, evaluation_suite.EvaluationSuite
+        dataset.Dataset, dataset.DatasetVersion, test_suite.TestSuite
     ],
     messages: List[Dict[str, Any]],
     model: Optional[Union[str, base_model.OpikBaseModel]] = None,
@@ -866,7 +866,7 @@ def evaluate_prompt(
             - `data.category = "test"` - Items with specific data field value
             - `created_at >= "2024-01-01T00:00:00Z"` - Items created after date
     """
-    if isinstance(dataset, evaluation_suite.EvaluationSuite):
+    if isinstance(dataset, test_suite.TestSuite):
         # backwards compatibility for transition period
         dataset = dataset.dataset
 
@@ -1002,7 +1002,7 @@ def evaluate_prompt(
 def evaluate_optimization_trial(
     optimization_id: str,
     dataset: Union[
-        dataset.Dataset, dataset.DatasetVersion, evaluation_suite.EvaluationSuite
+        dataset.Dataset, dataset.DatasetVersion, test_suite.TestSuite
     ],
     task: LLMTask,
     scoring_metrics: Optional[List[base_metric.BaseMetric]] = None,
@@ -1108,7 +1108,7 @@ def evaluate_optimization_trial(
             - `data.category = "test"` - Items with specific data field value
             - `created_at >= "2024-01-01T00:00:00Z"` - Items created after date
     """
-    if isinstance(dataset, evaluation_suite.EvaluationSuite):
+    if isinstance(dataset, test_suite.TestSuite):
         # backwards compatibility for transition period
         dataset = dataset.dataset
 

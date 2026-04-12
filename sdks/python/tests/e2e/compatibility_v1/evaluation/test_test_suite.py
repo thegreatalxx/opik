@@ -1,6 +1,6 @@
-"""E2E tests for EvaluationSuite API.
+"""E2E tests for TestSuite API.
 
-These tests verify the core evaluation suite functionality:
+These tests verify the core test suite functionality:
 1. Item-level assertions stored as dataset item fields
 2. Suite-level assertions applied to all items
 3. Execution policy handling (runs_per_item, pass_threshold)
@@ -32,7 +32,7 @@ from tests.testlib import environment, ThreadSafeCounter
 @pytest.mark.skipif(
     not environment.has_openai_api_key(), reason="OPENAI_API_KEY is not set"
 )
-def test_evaluation_suite__item_level_assertions__feedback_scores_created(
+def test_test_suite__item_level_assertions__feedback_scores_created(
     opik_client: opik.Opik, dataset_name: str, experiment_name: str
 ):
     """
@@ -50,7 +50,7 @@ def test_evaluation_suite__item_level_assertions__feedback_scores_created(
     )
     math_assertion = "The response correctly states that 2 + 2 equals 4"
 
-    suite = opik_client.create_evaluation_suite(
+    suite = opik_client.create_test_suite(
         name=dataset_name,
         description="Test item-level assertions",
     )
@@ -79,7 +79,7 @@ def test_evaluation_suite__item_level_assertions__feedback_scores_created(
     )
     opik.flush_tracker()
 
-    verifiers.verify_evaluation_suite_result(
+    verifiers.verify_test_suite_result(
         opik_client=opik_client,
         suite_result=suite_result,
         items_total=2,
@@ -101,7 +101,7 @@ def test_evaluation_suite__item_level_assertions__feedback_scores_created(
 @pytest.mark.skipif(
     not environment.has_openai_api_key(), reason="OPENAI_API_KEY is not set"
 )
-def test_evaluation_suite__multiple_assertions_per_item__all_scores_created(
+def test_test_suite__multiple_assertions_per_item__all_scores_created(
     opik_client: opik.Opik, dataset_name: str, experiment_name: str
 ):
     """
@@ -111,7 +111,7 @@ def test_evaluation_suite__multiple_assertions_per_item__all_scores_created(
     assertion_1 = "The response is factually correct"
     assertion_2 = "The response is concise and clear"
 
-    suite = opik_client.create_evaluation_suite(
+    suite = opik_client.create_test_suite(
         name=dataset_name,
         description="Test multiple assertions per item",
     )
@@ -131,7 +131,7 @@ def test_evaluation_suite__multiple_assertions_per_item__all_scores_created(
     )
     opik.flush_tracker()
 
-    verifiers.verify_evaluation_suite_result(
+    verifiers.verify_test_suite_result(
         opik_client=opik_client,
         suite_result=suite_result,
         items_total=1,
@@ -145,7 +145,7 @@ def test_evaluation_suite__multiple_assertions_per_item__all_scores_created(
 @pytest.mark.skipif(
     not environment.has_openai_api_key(), reason="OPENAI_API_KEY is not set"
 )
-def test_evaluation_suite__suite_level_assertions__applied_to_all_items(
+def test_test_suite__suite_level_assertions__applied_to_all_items(
     opik_client: opik.Opik, dataset_name: str, experiment_name: str
 ):
     """
@@ -153,7 +153,7 @@ def test_evaluation_suite__suite_level_assertions__applied_to_all_items(
     """
     suite_assertion = "The response is helpful and informative"
 
-    suite = opik_client.create_evaluation_suite(
+    suite = opik_client.create_test_suite(
         name=dataset_name,
         description="Test suite-level assertions",
         assertions=[suite_assertion],
@@ -175,7 +175,7 @@ def test_evaluation_suite__suite_level_assertions__applied_to_all_items(
     )
     opik.flush_tracker()
 
-    verifiers.verify_evaluation_suite_result(
+    verifiers.verify_test_suite_result(
         opik_client=opik_client,
         suite_result=suite_result,
         items_total=2,
@@ -188,7 +188,7 @@ def test_evaluation_suite__suite_level_assertions__applied_to_all_items(
 @pytest.mark.skipif(
     not environment.has_openai_api_key(), reason="OPENAI_API_KEY is not set"
 )
-def test_evaluation_suite__combined_suite_and_item_level_assertions__all_scores_created(
+def test_test_suite__combined_suite_and_item_level_assertions__all_scores_created(
     opik_client: opik.Opik, dataset_name: str, experiment_name: str
 ):
     """
@@ -198,7 +198,7 @@ def test_evaluation_suite__combined_suite_and_item_level_assertions__all_scores_
     suite_assertion = "The response is helpful and informative"
     item_assertion = "The response correctly identifies Paris as the capital"
 
-    suite = opik_client.create_evaluation_suite(
+    suite = opik_client.create_test_suite(
         name=dataset_name,
         description="Test combined suite and item level assertions",
         assertions=[suite_assertion],
@@ -219,7 +219,7 @@ def test_evaluation_suite__combined_suite_and_item_level_assertions__all_scores_
     )
     opik.flush_tracker()
 
-    verifiers.verify_evaluation_suite_result(
+    verifiers.verify_test_suite_result(
         opik_client=opik_client,
         suite_result=suite_result,
         items_total=1,
@@ -234,7 +234,7 @@ def test_evaluation_suite__combined_suite_and_item_level_assertions__all_scores_
 # =============================================================================
 
 
-def test_evaluation_suite__no_assertions_default_policy__items_pass_with_single_run(
+def test_test_suite__no_assertions_default_policy__items_pass_with_single_run(
     opik_client: opik.Opik, dataset_name: str, experiment_name: str
 ):
     """
@@ -246,7 +246,7 @@ def test_evaluation_suite__no_assertions_default_policy__items_pass_with_single_
     - Default runs_per_item=1, pass_threshold=1
     - No feedback scores created
     """
-    suite = opik_client.create_evaluation_suite(
+    suite = opik_client.create_test_suite(
         name=dataset_name,
         description="Test items without assertions and default policy",
     )
@@ -280,7 +280,7 @@ def test_evaluation_suite__no_assertions_default_policy__items_pass_with_single_
     # Default: runs_per_item=1, so 2 items = 2 calls
     assert call_count.value == 2
 
-    verifiers.verify_evaluation_suite_result(
+    verifiers.verify_test_suite_result(
         opik_client=opik_client,
         suite_result=suite_result,
         items_total=2,
@@ -309,13 +309,13 @@ def test_evaluation_suite__no_assertions_default_policy__items_pass_with_single_
 # =============================================================================
 
 
-def test_evaluation_suite__execution_policy_runs_per_item__task_called_multiple_times(
+def test_test_suite__execution_policy_runs_per_item__task_called_multiple_times(
     opik_client: opik.Opik, dataset_name: str, experiment_name: str
 ):
     """
     Test that runs_per_item causes multiple task executions per item.
     """
-    suite = opik_client.create_evaluation_suite(
+    suite = opik_client.create_test_suite(
         name=dataset_name,
         description="Test runs_per_item execution policy",
         execution_policy={"runs_per_item": 2, "pass_threshold": 1},
@@ -340,7 +340,7 @@ def test_evaluation_suite__execution_policy_runs_per_item__task_called_multiple_
 
     assert call_count.value == 2
 
-    verifiers.verify_evaluation_suite_result(
+    verifiers.verify_test_suite_result(
         opik_client=opik_client,
         suite_result=suite_result,
         items_total=1,
@@ -363,13 +363,13 @@ def test_evaluation_suite__execution_policy_runs_per_item__task_called_multiple_
     assert item_result.pass_threshold == 1
 
 
-def test_evaluation_suite__item_level_execution_policy__overrides_suite_policy(
+def test_test_suite__item_level_execution_policy__overrides_suite_policy(
     opik_client: opik.Opik, dataset_name: str, experiment_name: str
 ):
     """
     Test that item-level execution policy overrides suite-level policy.
     """
-    suite = opik_client.create_evaluation_suite(
+    suite = opik_client.create_test_suite(
         name=dataset_name,
         description="Test item-level execution policy override",
         execution_policy={"runs_per_item": 1, "pass_threshold": 1},
@@ -407,7 +407,7 @@ def test_evaluation_suite__item_level_execution_policy__overrides_suite_policy(
     assert france_count.value == 1
     assert germany_count.value == 3
 
-    verifiers.verify_evaluation_suite_result(
+    verifiers.verify_test_suite_result(
         opik_client=opik_client,
         suite_result=suite_result,
         items_total=2,
@@ -441,7 +441,7 @@ def test_evaluation_suite__item_level_execution_policy__overrides_suite_policy(
 @pytest.mark.skipif(
     not environment.has_openai_api_key(), reason="OPENAI_API_KEY is not set"
 )
-def test_evaluation_suite__assertion_fails__item_fails(
+def test_test_suite__assertion_fails__item_fails(
     opik_client: opik.Opik, dataset_name: str, experiment_name: str
 ):
     """
@@ -449,7 +449,7 @@ def test_evaluation_suite__assertion_fails__item_fails(
     """
     failing_assertion = "The response correctly states that 2 + 2 equals 5"
 
-    suite = opik_client.create_evaluation_suite(
+    suite = opik_client.create_test_suite(
         name=dataset_name,
         description="Test assertion failure",
     )
@@ -469,7 +469,7 @@ def test_evaluation_suite__assertion_fails__item_fails(
     )
     opik.flush_tracker()
 
-    verifiers.verify_evaluation_suite_result(
+    verifiers.verify_test_suite_result(
         opik_client=opik_client,
         suite_result=suite_result,
         items_total=1,
@@ -493,7 +493,7 @@ def test_evaluation_suite__assertion_fails__item_fails(
 @pytest.mark.skipif(
     not environment.has_openai_api_key(), reason="OPENAI_API_KEY is not set"
 )
-def test_evaluation_suite__pass_threshold_not_met__item_fails(
+def test_test_suite__pass_threshold_not_met__item_fails(
     opik_client: opik.Opik, dataset_name: str, experiment_name: str
 ):
     """
@@ -502,7 +502,7 @@ def test_evaluation_suite__pass_threshold_not_met__item_fails(
     With runs_per_item=3, pass_threshold=2: only the first run returns a
     correct answer, so at most 1 run passes (< threshold of 2).
     """
-    suite = opik_client.create_evaluation_suite(
+    suite = opik_client.create_test_suite(
         name=dataset_name,
         description="Test pass threshold failure",
         assertions=["The response correctly states that 2 + 2 equals 4"],
@@ -527,7 +527,7 @@ def test_evaluation_suite__pass_threshold_not_met__item_fails(
     )
     opik.flush_tracker()
 
-    verifiers.verify_evaluation_suite_result(
+    verifiers.verify_test_suite_result(
         opik_client=opik_client,
         suite_result=suite_result,
         items_total=1,
@@ -543,7 +543,7 @@ def test_evaluation_suite__pass_threshold_not_met__item_fails(
 @pytest.mark.skipif(
     not environment.has_openai_api_key(), reason="OPENAI_API_KEY is not set"
 )
-def test_evaluation_suite__multiple_assertions_multiple_runs__pass_threshold_logic(
+def test_test_suite__multiple_assertions_multiple_runs__pass_threshold_logic(
     opik_client: opik.Opik, dataset_name: str, experiment_name: str
 ):
     """
@@ -560,7 +560,7 @@ def test_evaluation_suite__multiple_assertions_multiple_runs__pass_threshold_log
     assertion_2 = "The response mentions France"
     assertion_3 = "The response is factually correct"
 
-    suite = opik_client.create_evaluation_suite(
+    suite = opik_client.create_test_suite(
         name=dataset_name,
         description="Test multiple assertions with multiple runs",
         assertions=[assertion_1, assertion_2, assertion_3],
@@ -581,7 +581,7 @@ def test_evaluation_suite__multiple_assertions_multiple_runs__pass_threshold_log
 
     assert suite_result.pass_rate == 1.0
 
-    verifiers.verify_evaluation_suite_result(
+    verifiers.verify_test_suite_result(
         opik_client=opik_client,
         suite_result=suite_result,
         items_total=1,
@@ -618,18 +618,18 @@ def test_evaluation_suite__multiple_assertions_multiple_runs__pass_threshold_log
 @pytest.mark.skipif(
     not environment.has_openai_api_key(), reason="OPENAI_API_KEY is not set"
 )
-def test_evaluation_suite__create_get_and_run__end_to_end(
+def test_test_suite__create_get_and_run__end_to_end(
     opik_client: opik.Opik, dataset_name: str, experiment_name: str
 ):
     """
-    End-to-end test: create a suite, retrieve it via get_evaluation_suite(),
+    End-to-end test: create a suite, retrieve it via get_test_suite(),
     then run it. Verifies that suite-level config survives the round-trip.
     """
     suite_assertion = "The response correctly identifies Paris as the capital of France"
     item_assertion = "Response is correct"
 
     # 1. Create suite with assertions + execution_policy
-    suite = opik_client.create_evaluation_suite(
+    suite = opik_client.create_test_suite(
         name=dataset_name,
         description="Persistence test suite",
         assertions=[suite_assertion],
@@ -647,7 +647,7 @@ def test_evaluation_suite__create_get_and_run__end_to_end(
     )
 
     # 2. Retrieve from backend (simulates a fresh client loading existing suite)
-    retrieved_suite = opik_client.get_evaluation_suite(name=dataset_name)
+    retrieved_suite = opik_client.get_test_suite(name=dataset_name)
 
     # Verify item descriptions survived the round-trip
     retrieved_items = retrieved_suite.get_items()
@@ -675,7 +675,7 @@ def test_evaluation_suite__create_get_and_run__end_to_end(
     opik.flush_tracker()
 
     # Verify suite ran with persisted execution policy (runs_per_item=2)
-    verifiers.verify_evaluation_suite_result(
+    verifiers.verify_test_suite_result(
         opik_client=opik_client,
         suite_result=suite_result,
         items_total=2,
@@ -689,13 +689,13 @@ def test_evaluation_suite__create_get_and_run__end_to_end(
         assert item_result.pass_threshold == 1
 
 
-def test_evaluation_suite__delete_items__items_removed(
+def test_test_suite__delete_items__items_removed(
     opik_client: opik.Opik, dataset_name: str
 ):
     """
     Test that delete_items() removes items from the suite.
     """
-    suite = opik_client.create_evaluation_suite(
+    suite = opik_client.create_test_suite(
         name=dataset_name,
         description="Test delete items",
     )
@@ -727,13 +727,13 @@ def test_evaluation_suite__delete_items__items_removed(
     assert len(remaining_items) == 2
 
 
-def test_evaluation_suite__get_assertions__returns_assertion_strings(
+def test_test_suite__get_assertions__returns_assertion_strings(
     opik_client: opik.Opik, dataset_name: str
 ):
     """
     Test that get_assertions() returns assertion strings from suite-level config.
     """
-    opik_client.create_evaluation_suite(
+    opik_client.create_test_suite(
         name=dataset_name,
         description="Test get_assertions",
         assertions=[
@@ -744,7 +744,7 @@ def test_evaluation_suite__get_assertions__returns_assertion_strings(
     )
 
     # Retrieve from BE to verify persistence
-    retrieved_suite = opik_client.get_evaluation_suite(name=dataset_name)
+    retrieved_suite = opik_client.get_test_suite(name=dataset_name)
 
     assertions = retrieved_suite.get_assertions()
     assert set(assertions) == {
@@ -754,33 +754,33 @@ def test_evaluation_suite__get_assertions__returns_assertion_strings(
     }
 
 
-def test_evaluation_suite__get_execution_policy__returns_persisted_policy(
+def test_test_suite__get_execution_policy__returns_persisted_policy(
     opik_client: opik.Opik, dataset_name: str
 ):
     """
     Test that get_execution_policy() returns the persisted execution policy.
     """
-    opik_client.create_evaluation_suite(
+    opik_client.create_test_suite(
         name=dataset_name,
         description="Test get_execution_policy",
         execution_policy={"runs_per_item": 5, "pass_threshold": 3},
     )
 
     # Retrieve from BE to verify persistence
-    retrieved_suite = opik_client.get_evaluation_suite(name=dataset_name)
+    retrieved_suite = opik_client.get_test_suite(name=dataset_name)
 
     policy = retrieved_suite.get_execution_policy()
     assert policy["runs_per_item"] == 5
     assert policy["pass_threshold"] == 3
 
 
-def test_evaluation_suite__get_execution_policy__default_when_not_set(
+def test_test_suite__get_execution_policy__default_when_not_set(
     opik_client: opik.Opik, dataset_name: str
 ):
     """
     Test that get_execution_policy() returns default policy when none was set.
     """
-    suite = opik_client.create_evaluation_suite(
+    suite = opik_client.create_test_suite(
         name=dataset_name,
         description="Test default execution policy",
     )
@@ -790,13 +790,13 @@ def test_evaluation_suite__get_execution_policy__default_when_not_set(
     assert policy["pass_threshold"] == 1
 
 
-def test_evaluation_suite__update__changes_assertions_and_policy(
+def test_test_suite__update__changes_assertions_and_policy(
     opik_client: opik.Opik, dataset_name: str
 ):
     """
     Test that update() changes suite-level assertions and execution policy.
     """
-    suite = opik_client.create_evaluation_suite(
+    suite = opik_client.create_test_suite(
         name=dataset_name,
         description="Test update",
         assertions=["Response is helpful"],
@@ -817,7 +817,7 @@ def test_evaluation_suite__update__changes_assertions_and_policy(
     )
 
     # Retrieve from BE to verify persistence
-    retrieved_suite = opik_client.get_evaluation_suite(name=dataset_name)
+    retrieved_suite = opik_client.get_test_suite(name=dataset_name)
 
     updated_assertions = retrieved_suite.get_assertions()
     assert set(updated_assertions) == {
@@ -830,19 +830,19 @@ def test_evaluation_suite__update__changes_assertions_and_policy(
     assert updated_policy["pass_threshold"] == 2
 
 
-def test_get_or_create_evaluation_suite__existing__returns_existing(
+def test_get_or_create_test_suite__existing__returns_existing(
     opik_client: opik.Opik, dataset_name: str
 ):
     """
-    Test that get_or_create_evaluation_suite returns an existing suite
+    Test that get_or_create_test_suite returns an existing suite
     without creating a new one.
     """
-    opik_client.create_evaluation_suite(
+    opik_client.create_test_suite(
         name=dataset_name,
         description="Original suite",
     )
 
-    suite = opik_client.get_or_create_evaluation_suite(
+    suite = opik_client.get_or_create_test_suite(
         name=dataset_name,
         description="Should be ignored",
     )
@@ -850,43 +850,43 @@ def test_get_or_create_evaluation_suite__existing__returns_existing(
     assert suite.name == dataset_name
 
 
-def test_get_or_create_evaluation_suite__new__creates_suite(
+def test_get_or_create_test_suite__new__creates_suite(
     opik_client: opik.Opik, dataset_name: str
 ):
     """
-    Test that get_or_create_evaluation_suite creates a new suite when
+    Test that get_or_create_test_suite creates a new suite when
     none exists with the given name.
     """
-    suite = opik_client.get_or_create_evaluation_suite(
+    suite = opik_client.get_or_create_test_suite(
         name=dataset_name,
         description="New suite via get_or_create",
     )
 
     assert suite.name == dataset_name
 
-    retrieved = opik_client.get_evaluation_suite(name=dataset_name)
+    retrieved = opik_client.get_test_suite(name=dataset_name)
     assert retrieved.name == dataset_name
 
 
-def test_get_or_create_evaluation_suite__with_new_assertions__creates_new_version(
+def test_get_or_create_test_suite__with_new_assertions__creates_new_version(
     opik_client: opik.Opik, dataset_name: str
 ):
     """
-    Test that get_or_create_evaluation_suite with new assertions on an
+    Test that get_or_create_test_suite with new assertions on an
     existing suite creates a new version with those assertions.
     """
-    opik_client.create_evaluation_suite(
+    opik_client.create_test_suite(
         name=dataset_name,
         description="Original suite",
         assertions=["Response is helpful"],
     )
 
-    opik_client.get_or_create_evaluation_suite(
+    opik_client.get_or_create_test_suite(
         name=dataset_name,
         assertions=["Response is accurate", "Response is concise"],
     )
 
-    retrieved = opik_client.get_evaluation_suite(name=dataset_name)
+    retrieved = opik_client.get_test_suite(name=dataset_name)
     assertions = retrieved.get_assertions()
     assert set(assertions) == {
         "Response is accurate",
@@ -894,26 +894,26 @@ def test_get_or_create_evaluation_suite__with_new_assertions__creates_new_versio
     }
 
 
-def test_get_or_create_evaluation_suite__with_new_policy__creates_new_version(
+def test_get_or_create_test_suite__with_new_policy__creates_new_version(
     opik_client: opik.Opik, dataset_name: str
 ):
     """
-    Test that get_or_create_evaluation_suite with a new execution_policy
+    Test that get_or_create_test_suite with a new execution_policy
     on an existing suite creates a new version, keeping existing assertions.
     """
-    opik_client.create_evaluation_suite(
+    opik_client.create_test_suite(
         name=dataset_name,
         description="Original suite",
         assertions=["Response is helpful"],
         execution_policy={"runs_per_item": 1, "pass_threshold": 1},
     )
 
-    opik_client.get_or_create_evaluation_suite(
+    opik_client.get_or_create_test_suite(
         name=dataset_name,
         execution_policy={"runs_per_item": 5, "pass_threshold": 3},
     )
 
-    retrieved = opik_client.get_evaluation_suite(name=dataset_name)
+    retrieved = opik_client.get_test_suite(name=dataset_name)
 
     policy = retrieved.get_execution_policy()
     assert policy["runs_per_item"] == 5
@@ -923,13 +923,13 @@ def test_get_or_create_evaluation_suite__with_new_policy__creates_new_version(
     assert set(assertions) == {"Response is helpful"}
 
 
-def test_evaluation_suite__update_assertions_only__keeps_existing_policy(
+def test_test_suite__update_assertions_only__keeps_existing_policy(
     opik_client: opik.Opik, dataset_name: str
 ):
     """
     Test that update() with only assertions keeps the existing execution policy.
     """
-    suite = opik_client.create_evaluation_suite(
+    suite = opik_client.create_test_suite(
         name=dataset_name,
         description="Test partial update",
         assertions=["Response is helpful"],
@@ -938,7 +938,7 @@ def test_evaluation_suite__update_assertions_only__keeps_existing_policy(
 
     suite.update(assertions=["Response is accurate"])
 
-    retrieved = opik_client.get_evaluation_suite(name=dataset_name)
+    retrieved = opik_client.get_test_suite(name=dataset_name)
 
     assertions = retrieved.get_assertions()
     assert set(assertions) == {"Response is accurate"}
@@ -948,13 +948,13 @@ def test_evaluation_suite__update_assertions_only__keeps_existing_policy(
     assert policy["pass_threshold"] == 2
 
 
-def test_evaluation_suite__update_policy_only__keeps_existing_assertions(
+def test_test_suite__update_policy_only__keeps_existing_assertions(
     opik_client: opik.Opik, dataset_name: str
 ):
     """
     Test that update() with only execution_policy keeps existing assertions.
     """
-    suite = opik_client.create_evaluation_suite(
+    suite = opik_client.create_test_suite(
         name=dataset_name,
         description="Test partial update",
         assertions=["Response is helpful", "Response is accurate"],
@@ -963,7 +963,7 @@ def test_evaluation_suite__update_policy_only__keeps_existing_assertions(
 
     suite.update(execution_policy={"runs_per_item": 5, "pass_threshold": 3})
 
-    retrieved = opik_client.get_evaluation_suite(name=dataset_name)
+    retrieved = opik_client.get_test_suite(name=dataset_name)
 
     policy = retrieved.get_execution_policy()
     assert policy["runs_per_item"] == 5
@@ -976,13 +976,13 @@ def test_evaluation_suite__update_policy_only__keeps_existing_assertions(
     }
 
 
-def test_evaluation_suite__update_with_empty_assertions__clears_assertions(
+def test_test_suite__update_with_empty_assertions__clears_assertions(
     opik_client: opik.Opik, dataset_name: str
 ):
     """
     Test that update(assertions=[]) clears all suite-level assertions.
     """
-    suite = opik_client.create_evaluation_suite(
+    suite = opik_client.create_test_suite(
         name=dataset_name,
         description="Test clearing assertions",
         assertions=["Response is helpful", "Response is accurate"],
@@ -993,7 +993,7 @@ def test_evaluation_suite__update_with_empty_assertions__clears_assertions(
 
     suite.update(assertions=[])
 
-    retrieved = opik_client.get_evaluation_suite(name=dataset_name)
+    retrieved = opik_client.get_test_suite(name=dataset_name)
     assert retrieved.get_assertions() == []
 
     policy = retrieved.get_execution_policy()
@@ -1006,31 +1006,31 @@ def test_evaluation_suite__update_with_empty_assertions__clears_assertions(
 # =============================================================================
 
 
-def test_evaluation_suite__create_with_tags__tags_persisted(
+def test_test_suite__create_with_tags__tags_persisted(
     opik_client: opik.Opik, dataset_name: str
 ):
     """
-    Test that tags passed to create_evaluation_suite are persisted
-    and can be retrieved via get_evaluation_suite().
+    Test that tags passed to create_test_suite are persisted
+    and can be retrieved via get_test_suite().
     """
-    opik_client.create_evaluation_suite(
+    opik_client.create_test_suite(
         name=dataset_name,
         description="Suite with tags",
         tags=["regression", "v2"],
     )
 
-    suite = opik_client.get_evaluation_suite(dataset_name)
+    suite = opik_client.get_test_suite(dataset_name)
     assert sorted(suite.get_tags()) == ["regression", "v2"]
 
 
-def test_evaluation_suite__update_tags__tags_updated(
+def test_test_suite__update_tags__tags_updated(
     opik_client: opik.Opik, dataset_name: str
 ):
     """
-    Test that tags can be updated on an existing evaluation suite
-    and verified via get_evaluation_suite().
+    Test that tags can be updated on an existing test suite
+    and verified via get_test_suite().
     """
-    suite = opik_client.create_evaluation_suite(
+    suite = opik_client.create_test_suite(
         name=dataset_name,
         description="Suite for tag update test",
         tags=["initial"],
@@ -1038,37 +1038,37 @@ def test_evaluation_suite__update_tags__tags_updated(
 
     suite.update(tags=["updated", "new-tag"])
 
-    suite = opik_client.get_evaluation_suite(dataset_name)
+    suite = opik_client.get_test_suite(dataset_name)
     assert sorted(suite.get_tags()) == ["new-tag", "updated"]
 
 
-def test_get_or_create_evaluation_suite__with_tags__tags_persisted(
+def test_get_or_create_test_suite__with_tags__tags_persisted(
     opik_client: opik.Opik, dataset_name: str
 ):
     """
     Test that get_or_create passes tags on creation and updates.
     """
-    opik_client.get_or_create_evaluation_suite(
+    opik_client.get_or_create_test_suite(
         name=dataset_name,
         tags=["v1"],
     )
 
-    suite = opik_client.get_evaluation_suite(dataset_name)
+    suite = opik_client.get_test_suite(dataset_name)
     assert suite.get_tags() == ["v1"]
 
-    opik_client.get_or_create_evaluation_suite(
+    opik_client.get_or_create_test_suite(
         name=dataset_name,
         tags=["v2", "production"],
     )
 
-    suite = opik_client.get_evaluation_suite(dataset_name)
+    suite = opik_client.get_test_suite(dataset_name)
     assert sorted(suite.get_tags()) == ["production", "v2"]
 
 
 @pytest.mark.skipif(
     not environment.has_openai_api_key(), reason="OPENAI_API_KEY is not set"
 )
-def test_evaluation_suite__add_items_batch__all_items_persisted(
+def test_test_suite__add_items_batch__all_items_persisted(
     opik_client: opik.Opik, dataset_name: str, experiment_name: str
 ):
     """
@@ -1076,7 +1076,7 @@ def test_evaluation_suite__add_items_batch__all_items_persisted(
     """
     assertion = "The response is factually correct"
 
-    suite = opik_client.create_evaluation_suite(
+    suite = opik_client.create_test_suite(
         name=dataset_name,
         description="Test batch add_items",
     )
@@ -1114,7 +1114,7 @@ def test_evaluation_suite__add_items_batch__all_items_persisted(
     )
     opik.flush_tracker()
 
-    verifiers.verify_evaluation_suite_result(
+    verifiers.verify_test_suite_result(
         opik_client=opik_client,
         suite_result=suite_result,
         items_total=3,
