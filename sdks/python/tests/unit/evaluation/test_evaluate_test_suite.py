@@ -1,4 +1,4 @@
-"""Unit tests for evaluate_suite function — specifically that it passes
+"""Unit tests for evaluate_test_suite function — specifically that it passes
 evaluation_method='test_suite' when creating the experiment."""
 
 import threading
@@ -30,7 +30,7 @@ def _create_mock_dataset(name="test-dataset", items=None):
     return mock_dataset
 
 
-def test_evaluate_suite__creates_experiment_with_evaluation_method_test_suite():
+def test_evaluate_test_suite__creates_experiment_with_evaluation_method_test_suite():
     mock_dataset = _create_mock_dataset()
     mock_experiment = mock.MagicMock()
     mock_experiment.id = "exp-123"
@@ -51,7 +51,7 @@ def test_evaluate_suite__creates_experiment_with_evaluation_method_test_suite():
             return_value="http://example.com/exp",
         ),
     ):
-        evaluator_module.evaluate_suite(
+        evaluator_module.evaluate_test_suite(
             dataset=mock_dataset,
             task=lambda item: {"input": item, "output": "response"},
             client=None,
@@ -75,7 +75,7 @@ def test_evaluate_suite__creates_experiment_with_evaluation_method_test_suite():
     assert call_kwargs["evaluation_method"] == "test_suite"
 
 
-def test_evaluate_suite__passes_evaluation_method_not_dataset():
+def test_evaluate_test_suite__passes_evaluation_method_not_dataset():
     """Verify it's specifically 'test_suite', not 'dataset'."""
     mock_dataset = _create_mock_dataset()
     mock_experiment = mock.MagicMock()
@@ -97,7 +97,7 @@ def test_evaluate_suite__passes_evaluation_method_not_dataset():
             return_value="http://example.com/exp",
         ),
     ):
-        evaluator_module.evaluate_suite(
+        evaluator_module.evaluate_test_suite(
             dataset=mock_dataset,
             task=lambda item: {"input": item, "output": "response"},
             client=None,
@@ -121,8 +121,8 @@ def test_evaluate_suite__passes_evaluation_method_not_dataset():
     assert call_kwargs["evaluation_method"] == "test_suite"
 
 
-def _call_evaluate_suite(optimization_id, items):
-    """Helper that runs evaluate_suite through the real streamer pipeline."""
+def _call_evaluate_test_suite(optimization_id, items):
+    """Helper that runs evaluate_test_suite through the real streamer pipeline."""
     mock_dataset = _create_mock_dataset(items=items)
 
     mock_experiment = mock.Mock()
@@ -139,7 +139,7 @@ def _call_evaluate_suite(optimization_id, items):
         opik_client.Opik, "create_experiment", mock_create_experiment
     ):
         with mock.patch.object(url_helpers, "get_experiment_url_by_id", mock_get_url):
-            evaluator_module.evaluate_suite(
+            evaluator_module.evaluate_test_suite(
                 dataset=mock_dataset,
                 task=simple_task,
                 client=None,
@@ -159,7 +159,7 @@ def _call_evaluate_suite(optimization_id, items):
             )
 
 
-def test_evaluate_suite__without_optimization_id__trace_tree_source_experiment_and_spans_source_experiment(
+def test_evaluate_test_suite__without_optimization_id__trace_tree_source_experiment_and_spans_source_experiment(
     fake_backend,
 ):
     """When optimization_id is not set → trace and task span both carry source='experiment' (not 'optimization')."""
@@ -168,7 +168,7 @@ def test_evaluate_suite__without_optimization_id__trace_tree_source_experiment_a
             id="item-1", input={"message": "hello"}, reference="hello"
         ),
     ]
-    _call_evaluate_suite(optimization_id=None, items=items)
+    _call_evaluate_test_suite(optimization_id=None, items=items)
 
     expected = TraceModel(
         id=ANY_BUT_NONE,
@@ -209,7 +209,7 @@ def test_evaluate_suite__without_optimization_id__trace_tree_source_experiment_a
     assert_equal(expected, fake_backend.trace_trees[0])
 
 
-def test_evaluate_suite__with_optimization_id__trace_tree_source_optimization_and_spans_source_optimization(
+def test_evaluate_test_suite__with_optimization_id__trace_tree_source_optimization_and_spans_source_optimization(
     fake_backend,
 ):
     """When optimization_id is set → trace and task span both carry source='optimization'."""
@@ -218,7 +218,7 @@ def test_evaluate_suite__with_optimization_id__trace_tree_source_optimization_an
             id="item-1", input={"message": "hello"}, reference="hello"
         ),
     ]
-    _call_evaluate_suite(optimization_id="opt-789", items=items)
+    _call_evaluate_test_suite(optimization_id="opt-789", items=items)
 
     expected = TraceModel(
         id=ANY_BUT_NONE,
@@ -259,8 +259,8 @@ def test_evaluate_suite__with_optimization_id__trace_tree_source_optimization_an
     assert_equal(expected, fake_backend.trace_trees[0])
 
 
-def test_evaluate_suite__explicit_client__used_for_experiment_creation():
-    """When an explicit client is passed, evaluate_suite uses it instead of the global one."""
+def test_evaluate_test_suite__explicit_client__used_for_experiment_creation():
+    """When an explicit client is passed, evaluate_test_suite uses it instead of the global one."""
     mock_dataset = _create_mock_dataset()
     mock_experiment = mock.MagicMock()
     mock_experiment.id = "exp-explicit"
@@ -274,7 +274,7 @@ def test_evaluate_suite__explicit_client__used_for_experiment_creation():
         "get_experiment_url_by_id",
         return_value="http://example.com/exp",
     ):
-        evaluator_module.evaluate_suite(
+        evaluator_module.evaluate_test_suite(
             dataset=mock_dataset,
             task=lambda item: {"input": item, "output": "response"},
             client=explicit_client,
@@ -297,7 +297,7 @@ def test_evaluate_suite__explicit_client__used_for_experiment_creation():
 
 
 def test_test_suite_run__propagates_stored_client():
-    """TestSuite.run() passes its stored client to evaluate_suite."""
+    """TestSuite.run() passes its stored client to evaluate_test_suite."""
     mock_dataset = _create_mock_dataset()
     explicit_client = mock.MagicMock(spec=opik_client.Opik)
 
@@ -309,17 +309,17 @@ def test_test_suite_run__propagates_stored_client():
 
     with mock.patch.object(
         evaluator_module,
-        "evaluate_suite",
+        "evaluate_test_suite",
         return_value=mock.MagicMock(),
-    ) as mock_evaluate_suite:
+    ) as mock_evaluate_test_suite:
         suite.run(task=lambda item: {"output": "response"}, verbose=0)
 
-    mock_evaluate_suite.assert_called_once()
-    call_kwargs = mock_evaluate_suite.call_args[1]
+    mock_evaluate_test_suite.assert_called_once()
+    call_kwargs = mock_evaluate_test_suite.call_args[1]
     assert call_kwargs["client"] is explicit_client
 
 
-def test_evaluate_suite__explicit_client__propagated_to_worker_threads(
+def test_evaluate_test_suite__explicit_client__propagated_to_worker_threads(
     fake_backend,
 ):
     """The explicit client is visible via get_global_client() inside worker threads."""
@@ -351,7 +351,7 @@ def test_evaluate_suite__explicit_client__propagated_to_worker_threads(
         opik_client.Opik, "create_experiment", mock_create_experiment
     ):
         with mock.patch.object(url_helpers, "get_experiment_url_by_id", mock_get_url):
-            evaluator_module.evaluate_suite(
+            evaluator_module.evaluate_test_suite(
                 dataset=mock_dataset,
                 task=task_that_captures_client,
                 client=None,

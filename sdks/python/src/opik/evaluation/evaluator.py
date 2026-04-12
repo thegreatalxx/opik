@@ -315,7 +315,7 @@ def evaluate(
     )
 
 
-def evaluate_suite(
+def evaluate_test_suite(
     dataset: dataset.Dataset,
     task: LLMTask,
     *,
@@ -381,7 +381,7 @@ def evaluate_suite(
         )
         report.display_evaluation_in_progress(experiment_url)
 
-    eval_result, total_time = _evaluate_suite_task(
+    eval_result, total_time = _evaluate_test_suite_task(
         client=client,
         experiment=experiment_,
         dataset=dataset,
@@ -502,7 +502,7 @@ def _evaluate_task(
     return evaluation_result_
 
 
-def _evaluate_suite_task(
+def _evaluate_test_suite_task(
     *,
     client: opik_client.Opik,
     experiment: experiment.Experiment,

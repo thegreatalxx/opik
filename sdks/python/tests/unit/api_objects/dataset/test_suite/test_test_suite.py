@@ -690,7 +690,7 @@ class TestInternalRunOptimizationSuite:
         fake_result = mock.MagicMock(spec=suite_types.TestSuiteResult)
 
         with mock.patch(
-            "opik.evaluation.evaluator.evaluate_suite",
+            "opik.evaluation.evaluator.evaluate_test_suite",
             return_value=fake_result,
         ) as mock_run:
             result = suite.__internal_api__run_optimization_suite__(
@@ -722,7 +722,7 @@ class TestInternalRunOptimizationSuite:
         fake_result = mock.MagicMock(spec=suite_types.TestSuiteResult)
 
         with mock.patch(
-            "opik.evaluation.evaluator.evaluate_suite",
+            "opik.evaluation.evaluator.evaluate_test_suite",
             return_value=fake_result,
         ) as mock_run:
             suite.__internal_api__run_optimization_suite__(
@@ -747,7 +747,7 @@ class TestInternalRunOptimizationSuite:
         fake_result = mock.MagicMock(spec=suite_types.TestSuiteResult)
 
         with mock.patch(
-            "opik.evaluation.evaluator.evaluate_suite",
+            "opik.evaluation.evaluator.evaluate_test_suite",
             return_value=fake_result,
         ) as mock_run:
             suite.__internal_api__run_optimization_suite__(
@@ -770,7 +770,7 @@ class TestInternalRunOptimizationSuite:
         fake_result = mock.MagicMock(spec=suite_types.TestSuiteResult)
 
         with mock.patch(
-            "opik.evaluation.evaluator.evaluate_suite",
+            "opik.evaluation.evaluator.evaluate_test_suite",
             return_value=fake_result,
         ) as mock_run:
             result = suite.run(

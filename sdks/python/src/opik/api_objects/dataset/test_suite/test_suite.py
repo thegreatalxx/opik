@@ -558,7 +558,7 @@ class TestSuite:
         def _validated_task(data: Dict[str, Any]) -> Any:
             return validate_task_result(task(data), input_data=data)
 
-        suite_result = opik_evaluator.evaluate_suite(
+        suite_result = opik_evaluator.evaluate_test_suite(
             dataset=self._dataset,
             task=_validated_task,
             client=client,
