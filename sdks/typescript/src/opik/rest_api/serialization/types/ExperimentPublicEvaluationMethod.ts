@@ -7,8 +7,8 @@ import type * as serializers from "../index.js";
 export const ExperimentPublicEvaluationMethod: core.serialization.Schema<
     serializers.ExperimentPublicEvaluationMethod.Raw,
     OpikApi.ExperimentPublicEvaluationMethod
-> = core.serialization.enum_(["dataset", "evaluation_suite"]);
+> = core.serialization.enum_(["dataset", "test_suite"]);
 
 export declare namespace ExperimentPublicEvaluationMethod {
-    export type Raw = "dataset" | "evaluation_suite";
+    export type Raw = "dataset" | "test_suite";
 }
