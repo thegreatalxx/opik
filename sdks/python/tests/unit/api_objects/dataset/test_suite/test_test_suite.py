@@ -40,9 +40,7 @@ class TestEvaluatorValidation:
         with pytest.raises(TypeError) as exc_info:
             validators.validate_evaluators([equals_metric], "suite-level evaluators")
 
-        assert "Test suites only support LLMJudge evaluators" in str(
-            exc_info.value
-        )
+        assert "Test suites only support LLMJudge evaluators" in str(exc_info.value)
         assert "Equals" in str(exc_info.value)
 
     def test_validate_evaluators__with_llm_judge__succeeds(self):
@@ -78,9 +76,7 @@ class TestEvaluatorValidation:
                 context="item-level assertions",
             )
 
-        assert "Test suites only support LLMJudge evaluators" in str(
-            exc_info.value
-        )
+        assert "Test suites only support LLMJudge evaluators" in str(exc_info.value)
 
     def test_add_item__with_assertions__succeeds(self):
         """Test that assertions shorthand is accepted in add_item."""
@@ -117,9 +113,7 @@ class TestEvaluatorValidation:
                 [llm_judge, equals_metric], "suite-level evaluators"
             )
 
-        assert "Test suites only support LLMJudge evaluators" in str(
-            exc_info.value
-        )
+        assert "Test suites only support LLMJudge evaluators" in str(exc_info.value)
 
     def test_add_item__with_assertions_shorthand__creates_evaluator_items(self):
         """Test that assertions shorthand builds LLMJudge and creates evaluator items."""
@@ -626,9 +620,7 @@ class TestValidateTaskResult:
     # --- dict results ---
 
     def test_validate_task_result__valid_dict__returns_as_is(self):
-        result = test_suite.validate_task_result(
-            {"input": "hello", "output": "world"}
-        )
+        result = test_suite.validate_task_result({"input": "hello", "output": "world"})
         assert result == {"input": "hello", "output": "world"}
 
     def test_validate_task_result__dict_missing_output__raises_value_error(self):

@@ -204,9 +204,7 @@ def test_test_suite__combined_suite_and_item_level_assertions__all_scores_create
     suite_assertion = "The response is helpful and informative"
     item_assertion = "The response correctly identifies Paris as the capital"
 
-    project_name = (
-        "project_test_test_suite__combined_suite_and_item_level_assertions"
-    )
+    project_name = "project_test_test_suite__combined_suite_and_item_level_assertions"
     suite = opik_client.create_test_suite(
         name=dataset_name,
         description="Test combined suite and item level assertions",
