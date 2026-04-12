@@ -1,5 +1,5 @@
 --liquibase formatted sql
---changeset DanielDimenshtein:000079_rename_evaluation_suite_to_test_suite
+--changeset danield:000079_rename_evaluation_suite_to_test_suite
 --comment: Rename evaluation_method enum value from 'evaluation_suite' to 'test_suite' in experiments and experiment_aggregates
 
 ALTER TABLE ${ANALYTICS_DB_DATABASE_NAME}.experiments ON CLUSTER '{cluster}'
