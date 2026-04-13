@@ -46,11 +46,11 @@ public record Trace(
         @JsonView({Trace.View.Public.class, Trace.View.Write.class}) Set<String> tags,
         @JsonView({Trace.View.Public.class, Trace.View.Write.class}) ErrorInfo errorInfo,
         @JsonView({Trace.View.Public.class}) @Schema(accessMode = Schema.AccessMode.READ_ONLY) Map<String, Long> usage,
-        @JsonView({Trace.View.Public.class}) @Schema(accessMode = Schema.AccessMode.READ_ONLY) Instant createdAt,
+        @JsonView({Trace.View.Public.class, Trace.View.Write.class}) Instant createdAt,
         @JsonView({Trace.View.Public.class,
                 Trace.View.Write.class}) @InRange(before = InRangeValidator.MAX_ANALYTICS_DB) Instant lastUpdatedAt,
-        @JsonView({Trace.View.Public.class}) @Schema(accessMode = Schema.AccessMode.READ_ONLY) String createdBy,
-        @JsonView({Trace.View.Public.class}) @Schema(accessMode = Schema.AccessMode.READ_ONLY) String lastUpdatedBy,
+        @JsonView({Trace.View.Public.class, Trace.View.Write.class}) String createdBy,
+        @JsonView({Trace.View.Public.class, Trace.View.Write.class}) String lastUpdatedBy,
         @JsonView({
                 Trace.View.Public.class}) @Schema(accessMode = Schema.AccessMode.READ_ONLY) List<FeedbackScore> feedbackScores,
         @JsonView({
@@ -68,8 +68,7 @@ public record Trace(
         @JsonView({Trace.View.Public.class,
                 Trace.View.Write.class}) @Schema(description = "Time to first token in milliseconds") @PositiveOrZero Double ttft,
         @JsonView({Trace.View.Public.class, Trace.View.Write.class}) String threadId,
-        @JsonView({
-                Trace.View.Public.class}) @Schema(accessMode = Schema.AccessMode.READ_ONLY) VisibilityMode visibilityMode,
+        @JsonView({Trace.View.Public.class, Trace.View.Write.class}) VisibilityMode visibilityMode,
         @JsonView({
                 Trace.View.Public.class}) @Schema(accessMode = Schema.AccessMode.READ_ONLY) int llmSpanCount,
         @JsonView({

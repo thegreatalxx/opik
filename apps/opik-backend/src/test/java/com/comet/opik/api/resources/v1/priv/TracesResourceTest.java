@@ -2375,6 +2375,85 @@ class TracesResourceTest {
     }
 
     @Nested
+    @DisplayName("Create with custom timestamps and authors:")
+    @TestInstance(TestInstance.Lifecycle.PER_CLASS)
+    class CreateWithCustomTimestampsAndAuthors {
+
+        @Test
+        @DisplayName("when created_at is provided on single create, then trace is stored with that timestamp")
+        void create__whenCreatedAtIsProvided__thenStoredWithCustomCreatedAt() {
+            var customCreatedAt = Instant.now().minus(1, ChronoUnit.DAYS).truncatedTo(ChronoUnit.MICROS);
+            var trace = factory.manufacturePojo(Trace.class).toBuilder()
+                    .projectName(DEFAULT_PROJECT)
+                    .createdAt(customCreatedAt)
+                    .usage(null)
+                    .feedbackScores(null)
+                    .build();
+            var id = traceResourceClient.createTrace(trace, API_KEY, TEST_WORKSPACE);
+
+            var actual = traceResourceClient.getById(id, TEST_WORKSPACE, API_KEY);
+            assertThat(actual.createdAt()).isEqualTo(customCreatedAt);
+        }
+
+        @Test
+        @DisplayName("when created_by and last_updated_by are provided on single create, then trace is stored with those authors")
+        void create__whenCreatedByIsProvided__thenStoredWithCustomCreatedBy() {
+            var customAuthor = "import-user-" + RandomStringUtils.secure().nextAlphanumeric(8);
+            var trace = factory.manufacturePojo(Trace.class).toBuilder()
+                    .projectName(DEFAULT_PROJECT)
+                    .createdBy(customAuthor)
+                    .lastUpdatedBy(customAuthor)
+                    .usage(null)
+                    .feedbackScores(null)
+                    .build();
+            var id = traceResourceClient.createTrace(trace, API_KEY, TEST_WORKSPACE);
+
+            var actual = traceResourceClient.getById(id, TEST_WORKSPACE, API_KEY);
+            assertThat(actual.createdBy()).isEqualTo(customAuthor);
+            assertThat(actual.lastUpdatedBy()).isEqualTo(customAuthor);
+        }
+
+        @Test
+        @DisplayName("when created_at is provided on batch create, then all traces are stored with that timestamp")
+        void batch__whenCreatedAtIsProvided__thenStoredWithCustomCreatedAt() {
+            var projectName = "project-" + RandomStringUtils.secure().nextAlphanumeric(32);
+            var customCreatedAt = Instant.now().minus(1, ChronoUnit.DAYS).truncatedTo(ChronoUnit.MICROS);
+
+            var traces = IntStream.range(0, 3)
+                    .mapToObj(i -> Trace.builder()
+                            .id(generator.generate())
+                            .projectName(projectName)
+                            .startTime(Instant.now())
+                            .createdAt(customCreatedAt)
+                            .visibilityMode(VisibilityMode.DEFAULT)
+                            .build())
+                    .toList();
+            traceResourceClient.batchCreateTraces(traces, API_KEY, TEST_WORKSPACE);
+
+            traces.forEach(trace -> {
+                var actual = traceResourceClient.getById(trace.id(), TEST_WORKSPACE, API_KEY);
+                assertThat(actual.createdAt()).isEqualTo(customCreatedAt);
+            });
+        }
+
+        @Test
+        @DisplayName("when created_at is omitted, then server assigns a recent timestamp")
+        void create__whenCreatedAtIsOmitted__thenServerAssignsTimestamp() {
+            var before = Instant.now().truncatedTo(ChronoUnit.MICROS);
+            var trace = Trace.builder()
+                    .projectName(DEFAULT_PROJECT)
+                    .startTime(Instant.now())
+                    .visibilityMode(VisibilityMode.DEFAULT)
+                    .build();
+            var id = traceResourceClient.createTrace(trace, API_KEY, TEST_WORKSPACE);
+
+            var actual = traceResourceClient.getById(id, TEST_WORKSPACE, API_KEY);
+            assertThat(actual.createdAt()).isAfterOrEqualTo(before);
+            assertThat(actual.createdBy()).isEqualTo(USER);
+        }
+    }
+
+    @Nested
     @DisplayName("Batch:")
     @TestInstance(TestInstance.Lifecycle.PER_CLASS)
     class BatchInsert {

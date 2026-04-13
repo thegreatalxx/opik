@@ -109,6 +109,7 @@ public class SpanDAO {
                 usage,
                 last_updated_at,
                 error_info,
+                created_at,
                 created_by,
                 last_updated_by,
                 truncation_threshold,
@@ -141,6 +142,7 @@ public class SpanDAO {
                         mapFromArrays(:usage_keys<item.index>, :usage_values<item.index>),
                         if(:last_updated_at<item.index> IS NULL, NULL, parseDateTime64BestEffort(:last_updated_at<item.index>, 6)),
                         :error_info<item.index>,
+                        if(:created_at<item.index> IS NULL, now64(9), parseDateTime64BestEffort(:created_at<item.index>, 9)),
                         :created_by<item.index>,
                         :last_updated_by<item.index>,
                         :truncation_threshold<item.index>,
@@ -310,9 +312,9 @@ public class SpanDAO {
                     :tags as tags,
                     mapFromArrays(:usage_keys, :usage_values) as usage,
                     :error_info as error_info,
-                    now64(9) as created_at,
-                    :user_name as created_by,
-                    :user_name as last_updated_by,
+                    <if(created_at)> parseDateTime64BestEffort(:created_at, 9) <else> now64(9) <endif> as created_at,
+                    if(length(:created_by) > 0, :created_by, :user_name) as created_by,
+                    if(length(:last_updated_by) > 0, :last_updated_by, :user_name) as last_updated_by,
                     :truncation_threshold as truncation_threshold,
                     :input_slim as input_slim,
                     :output_slim as output_slim,
@@ -557,9 +559,9 @@ public class SpanDAO {
                     <if(tags)> :tags <else> [] <endif> as tags,
                     <if(usage)> CAST((:usageKeys, :usageValues), 'Map(String, Int64)') <else>  mapFromArrays([], []) <endif> as usage,
                     <if(error_info)> :error_info <else> '' <endif> as error_info,
-                    now64(9) as created_at,
-                    :user_name as created_by,
-                    :user_name as last_updated_by,
+                    <if(created_at)> parseDateTime64BestEffort(:created_at, 9) <else> now64(9) <endif> as created_at,
+                    if(length(:created_by) > 0, :created_by, :user_name) as created_by,
+                    if(length(:last_updated_by) > 0, :last_updated_by, :user_name) as last_updated_by,
                     :truncation_threshold as truncation_threshold,
                     <if(input)> :input_slim <else> '' <endif> as input_slim,
                     <if(output)> :output_slim <else> '' <endif> as output_slim,
@@ -1530,8 +1532,8 @@ public class SpanDAO {
                         .bind("tags" + i, span.tags() != null ? span.tags().toArray(String[]::new) : new String[]{})
                         .bind("error_info" + i,
                                 span.errorInfo() != null ? JsonUtils.readTree(span.errorInfo()).toString() : "")
-                        .bind("created_by" + i, userName)
-                        .bind("last_updated_by" + i, userName)
+                        .bind("created_by" + i, StringUtils.defaultIfBlank(span.createdBy(), userName))
+                        .bind("last_updated_by" + i, StringUtils.defaultIfBlank(span.lastUpdatedBy(), userName))
                         .bind("input_slim" + i, TruncationUtils.createSlimJsonString(inputValue))
                         .bind("output_slim" + i, TruncationUtils.createSlimJsonString(outputValue));
 
@@ -1557,6 +1559,12 @@ public class SpanDAO {
                 } else {
                     statement.bind("usage_keys" + i, new String[]{});
                     statement.bind("usage_values" + i, new Integer[]{});
+                }
+
+                if (span.createdAt() != null) {
+                    statement.bind("created_at" + i, span.createdAt().toString());
+                } else {
+                    statement.bindNull("created_at" + i, String.class);
                 }
 
                 if (span.lastUpdatedAt() != null) {
@@ -1661,6 +1669,14 @@ public class SpanDAO {
                 statement.bindNull("ttft", Double.class);
             }
 
+            // Empty string means "use :user_name fallback" in the SQL if() expression.
+            statement.bind("created_by", StringUtils.defaultIfBlank(span.createdBy(), ""));
+            statement.bind("last_updated_by", StringUtils.defaultIfBlank(span.lastUpdatedBy(), ""));
+
+            if (span.createdAt() != null) {
+                statement.bind("created_at", span.createdAt().toString());
+            }
+
             if (span.source() != null) {
                 statement.bind("source", span.source().getValue());
             } else {
@@ -1682,6 +1698,8 @@ public class SpanDAO {
                 .ifPresent(endTime -> template.add("end_time", endTime));
         Optional.ofNullable(span.ttft())
                 .ifPresent(ttft -> template.add("ttft", ttft));
+        Optional.ofNullable(span.createdAt())
+                .ifPresent(createdAt -> template.add("created_at", createdAt));
 
         return template;
     }
@@ -1714,6 +1732,9 @@ public class SpanDAO {
                     }
 
                     bindUpdateParams(spanUpdate, statement, false);
+                    // Empty strings so the SQL if(length(:created_by) > 0, ...) falls back to :user_name.
+                    statement.bind("created_by", "");
+                    statement.bind("last_updated_by", "");
 
                     if (spanUpdate.source() != null) {
                         statement.bind("source", spanUpdate.source().getValue());

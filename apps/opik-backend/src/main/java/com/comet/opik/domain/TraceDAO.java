@@ -200,6 +200,7 @@ class TraceDAOImpl implements TraceDAO {
                 tags,
                 last_updated_at,
                 error_info,
+                created_at,
                 created_by,
                 last_updated_by,
                 thread_id,
@@ -226,8 +227,9 @@ class TraceDAOImpl implements TraceDAO {
                         :tags<item.index>,
                         if(:last_updated_at<item.index> IS NULL, NULL, parseDateTime64BestEffort(:last_updated_at<item.index>, 6)),
                         :error_info<item.index>,
-                        :user_name,
-                        :user_name,
+                        if(:created_at<item.index> IS NULL, now64(9), parseDateTime64BestEffort(:created_at<item.index>, 9)),
+                        if(length(:created_by<item.index>) > 0, :created_by<item.index>, :user_name),
+                        if(length(:last_updated_by<item.index>) > 0, :last_updated_by<item.index>, :user_name),
                         :thread_id<item.index>,
                         if(:visibility_mode<item.index> IS NULL, 'default', :visibility_mode<item.index>),
                         :truncation_threshold<item.index>,
@@ -358,9 +360,9 @@ class TraceDAOImpl implements TraceDAO {
                     :metadata as metadata,
                     :tags as tags,
                     :error_info as error_info,
-                    now64(9) as created_at,
-                    :user_name as created_by,
-                    :user_name as last_updated_by,
+                    <if(created_at)> parseDateTime64BestEffort(:created_at, 9) <else> now64(9) <endif> as created_at,
+                    if(length(:created_by) > 0, :created_by, :user_name) as created_by,
+                    if(length(:last_updated_by) > 0, :last_updated_by, :user_name) as last_updated_by,
                     :thread_id as thread_id,
                     if(:visibility_mode IS NULL, 'default', :visibility_mode) as visibility_mode,
                     :truncation_threshold as truncation_threshold,
@@ -1856,9 +1858,9 @@ class TraceDAOImpl implements TraceDAO {
                     <if(metadata)> :metadata <else> '' <endif> as metadata,
                     <if(tags)> :tags <else> [] <endif> as tags,
                     <if(error_info)> :error_info <else> '' <endif> as error_info,
-                    now64(9) as created_at,
-                    :user_name as created_by,
-                    :user_name as last_updated_by,
+                    <if(created_at)> parseDateTime64BestEffort(:created_at, 9) <else> now64(9) <endif> as created_at,
+                    if(length(:created_by) > 0, :created_by, :user_name) as created_by,
+                    if(length(:last_updated_by) > 0, :last_updated_by, :user_name) as last_updated_by,
                     <if(thread_id)> :thread_id <else> '' <endif> as thread_id,
                     <if(visibility_mode)> :visibility_mode <else> 'unknown' <endif> as visibility_mode,
                     :truncation_threshold as truncation_threshold,
@@ -2519,6 +2521,14 @@ class TraceDAOImpl implements TraceDAO {
             statement.bindNull("visibility_mode", String.class);
         }
 
+        // Empty string means "use :user_name fallback" in the SQL if() expression.
+        statement.bind("created_by", StringUtils.defaultIfBlank(trace.createdBy(), ""));
+        statement.bind("last_updated_by", StringUtils.defaultIfBlank(trace.lastUpdatedBy(), ""));
+
+        if (trace.createdAt() != null) {
+            statement.bind("created_at", trace.createdAt().toString());
+        }
+
         if (trace.source() != null) {
             statement.bind("source", trace.source().getValue());
         } else {
@@ -2565,6 +2575,8 @@ class TraceDAOImpl implements TraceDAO {
                 .ifPresent(endTime -> template.add("end_time", endTime));
         Optional.ofNullable(trace.ttft())
                 .ifPresent(ttft -> template.add("ttft", ttft));
+        Optional.ofNullable(trace.createdAt())
+                .ifPresent(createdAt -> template.add("created_at", createdAt));
 
         return template;
     }
@@ -3010,6 +3022,9 @@ class TraceDAOImpl implements TraceDAO {
 
             statement.bind("id", traceId);
             statement.bind("project_id", projectId);
+            // Empty strings so the SQL if(length(:created_by) > 0, ...) falls back to :user_name.
+            statement.bind("created_by", "");
+            statement.bind("last_updated_by", "");
 
             bindUserNameAndWorkspace(statement, userName, workspaceId);
             bindUpdateParams(traceUpdate, statement);
@@ -3286,6 +3301,16 @@ class TraceDAOImpl implements TraceDAO {
                     statement.bind("visibility_mode" + i, trace.visibilityMode().getValue());
                 } else {
                     statement.bindNull("visibility_mode" + i, String.class);
+                }
+
+                // Empty string means "use :user_name fallback" in the SQL if() expression.
+                statement.bind("created_by" + i, StringUtils.defaultIfBlank(trace.createdBy(), ""));
+                statement.bind("last_updated_by" + i, StringUtils.defaultIfBlank(trace.lastUpdatedBy(), ""));
+
+                if (trace.createdAt() != null) {
+                    statement.bind("created_at" + i, trace.createdAt().toString());
+                } else {
+                    statement.bindNull("created_at" + i, String.class);
                 }
 
                 TruncationUtils.bindTruncationThreshold(statement, "truncation_threshold" + i, configuration);

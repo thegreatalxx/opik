@@ -1754,6 +1754,79 @@ class SpansResourceTest {
     }
 
     @Nested
+    @DisplayName("Create with custom timestamps and authors:")
+    @TestInstance(TestInstance.Lifecycle.PER_CLASS)
+    class CreateWithCustomTimestampsAndAuthors {
+
+        @Test
+        @DisplayName("when created_at is provided on single create, then span is stored with that timestamp")
+        void create__whenCreatedAtIsProvided__thenStoredWithCustomCreatedAt() {
+            var customCreatedAt = Instant.now().minus(1, ChronoUnit.DAYS).truncatedTo(ChronoUnit.MICROS);
+            var span = podamFactory.manufacturePojo(Span.class).toBuilder()
+                    .createdAt(customCreatedAt)
+                    .feedbackScores(null)
+                    .build();
+            var id = spanResourceClient.createSpan(span, API_KEY, TEST_WORKSPACE);
+
+            var actual = spanResourceClient.getById(id, TEST_WORKSPACE, API_KEY);
+            assertThat(actual.createdAt()).isEqualTo(customCreatedAt);
+        }
+
+        @Test
+        @DisplayName("when created_by and last_updated_by are provided on single create, then span is stored with those authors")
+        void create__whenCreatedByIsProvided__thenStoredWithCustomCreatedBy() {
+            var customAuthor = "import-user-" + RandomStringUtils.secure().nextAlphanumeric(8);
+            var span = podamFactory.manufacturePojo(Span.class).toBuilder()
+                    .createdBy(customAuthor)
+                    .lastUpdatedBy(customAuthor)
+                    .feedbackScores(null)
+                    .build();
+            var id = spanResourceClient.createSpan(span, API_KEY, TEST_WORKSPACE);
+
+            var actual = spanResourceClient.getById(id, TEST_WORKSPACE, API_KEY);
+            assertThat(actual.createdBy()).isEqualTo(customAuthor);
+            assertThat(actual.lastUpdatedBy()).isEqualTo(customAuthor);
+        }
+
+        @Test
+        @DisplayName("when created_at is provided on batch create, then all spans are stored with that timestamp")
+        void batch__whenCreatedAtIsProvided__thenStoredWithCustomCreatedAt() {
+            var traceId = generator.generate();
+            var customCreatedAt = Instant.now().minus(1, ChronoUnit.DAYS).truncatedTo(ChronoUnit.MICROS);
+
+            var spans = IntStream.range(0, 3)
+                    .mapToObj(i -> podamFactory.manufacturePojo(Span.class).toBuilder()
+                            .id(generator.generate())
+                            .traceId(traceId)
+                            .createdAt(customCreatedAt)
+                            .feedbackScores(null)
+                            .build())
+                    .toList();
+            spanResourceClient.batchCreateSpans(spans, API_KEY, TEST_WORKSPACE);
+
+            spans.forEach(span -> {
+                var actual = spanResourceClient.getById(span.id(), TEST_WORKSPACE, API_KEY);
+                assertThat(actual.createdAt()).isEqualTo(customCreatedAt);
+            });
+        }
+
+        @Test
+        @DisplayName("when created_at is omitted, then server assigns a recent timestamp")
+        void create__whenCreatedAtIsOmitted__thenServerAssignsTimestamp() {
+            var before = Instant.now().truncatedTo(ChronoUnit.MICROS);
+            var span = podamFactory.manufacturePojo(Span.class).toBuilder()
+                    .createdAt(null)
+                    .feedbackScores(null)
+                    .build();
+            var id = spanResourceClient.createSpan(span, API_KEY, TEST_WORKSPACE);
+
+            var actual = spanResourceClient.getById(id, TEST_WORKSPACE, API_KEY);
+            assertThat(actual.createdAt()).isAfterOrEqualTo(before);
+            assertThat(actual.createdBy()).isEqualTo(USER);
+        }
+    }
+
+    @Nested
     @DisplayName("Batch:")
     @TestInstance(TestInstance.Lifecycle.PER_CLASS)
     class BatchInsert {
