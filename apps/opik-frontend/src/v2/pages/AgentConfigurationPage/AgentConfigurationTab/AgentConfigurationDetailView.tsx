@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { Clock, FilePen, Pencil, User } from "lucide-react";
 
 import { ConfigHistoryItem } from "@/types/agent-configs";
@@ -19,6 +19,11 @@ import { COLUMN_TYPE } from "@/types/shared";
 import { Separator } from "@/ui/separator";
 import DiffVersionPopover from "./DiffVersionPopover";
 import AgentConfigTagList from "./AgentConfigTagList";
+import ExpandAllToggle from "@/v2/pages-shared/agent-configuration/fields/ExpandAllToggle";
+import { useFieldsCollapse } from "@/v2/pages-shared/agent-configuration/fields/useFieldsCollapse";
+import { collectMultiLineKeys } from "@/v2/pages-shared/agent-configuration/fields/blueprintFieldLayout";
+
+const DESCRIPTION_TRUNCATE_LENGTH = 140;
 
 type AgentConfigurationDetailViewProps = {
   item: ConfigHistoryItem;
@@ -57,6 +62,7 @@ const AgentConfigurationDetailView: React.FC<
     label: string;
     blueprintId: string;
   } | null>(null);
+  const [notesExpanded, setNotesExpanded] = useState(false);
 
   const handleSelectDiffVersion = (versionItem: ConfigHistoryItem) => {
     setDiffBase({
@@ -68,6 +74,18 @@ const AgentConfigurationDetailView: React.FC<
 
   const description =
     item.description || generateBlueprintDescription(item.values);
+
+  const descriptionIsLong = description.length > DESCRIPTION_TRUNCATE_LENGTH;
+  const displayedDescription =
+    !descriptionIsLong || notesExpanded
+      ? description
+      : description.slice(0, DESCRIPTION_TRUNCATE_LENGTH).trimEnd() + "…";
+
+  const collapsibleKeys = useMemo(
+    () => collectMultiLineKeys(agentConfig?.values ?? []),
+    [agentConfig],
+  );
+  const collapseController = useFieldsCollapse({ collapsibleKeys });
 
   return (
     <>
@@ -118,11 +136,20 @@ const AgentConfigurationDetailView: React.FC<
             </Button>
           </div>
         </div>
-        <p className="comet-body-s flex w-full min-w-0 items-start gap-1 overflow-hidden text-light-slate">
+        <p className="comet-body-s flex w-full min-w-0 items-start gap-1 text-light-slate">
           <FilePen className="mt-1 size-3 shrink-0" />
-          <TooltipWrapper content={description}>
-            <span className="w-fit max-w-full truncate">{description}</span>
-          </TooltipWrapper>
+          <span className="min-w-0 break-words">
+            {displayedDescription}
+            {descriptionIsLong && (
+              <button
+                type="button"
+                className="ml-1 text-primary hover:underline"
+                onClick={() => setNotesExpanded((v) => !v)}
+              >
+                {notesExpanded ? "Show less" : "Show more"}
+              </button>
+            )}
+          </span>
         </p>
         <div className="comet-body-s mt-1 flex items-center gap-1 text-light-slate">
           <Clock className="size-3 shrink-0" />
@@ -136,6 +163,11 @@ const AgentConfigurationDetailView: React.FC<
           </TooltipWrapper>
           <User className="ml-1.5 size-3.5 shrink-0" />
           <span>{item.created_by}</span>
+          {collapsibleKeys.length > 0 && (
+            <div className="ml-auto">
+              <ExpandAllToggle controller={collapseController} />
+            </div>
+          )}
         </div>
 
         <Separator className="mb-2 mt-4" />
@@ -143,7 +175,10 @@ const AgentConfigurationDetailView: React.FC<
         {isPending ? (
           <Loader />
         ) : (
-          <BlueprintValuesList values={agentConfig?.values ?? []} />
+          <BlueprintValuesList
+            values={agentConfig?.values ?? []}
+            controller={collapseController}
+          />
         )}
       </Card>
 

@@ -8,7 +8,7 @@ import useConfigHistoryListInfinite from "@/api/agent-configs/useConfigHistoryLi
 import { ConfigHistoryItem } from "@/types/agent-configs";
 import AgentConfigurationHistoryTimeline from "./AgentConfigurationHistoryTimeline";
 import AgentConfigurationDetailView from "./AgentConfigurationDetailView";
-import AgentConfigurationEditView from "@/v2/pages-shared/agent-configuration/AgentConfigurationEditView";
+import AgentConfigurationEditPanel from "@/v2/pages-shared/agent-configuration/AgentConfigurationEditPanel";
 
 type AgentConfigurationTabProps = {
   projectId: string;
@@ -67,10 +67,48 @@ const AgentConfigurationTab: React.FC<AgentConfigurationTabProps> = ({
 
   const selectedItem = allRows[selectedIndex] as ConfigHistoryItem;
 
-  if (editItem) {
-    return (
-      <div className="w-full p-4">
-        <AgentConfigurationEditView
+  return (
+    <>
+      <div className="flex gap-0">
+        <div className="w-[50vw] min-w-0 flex-1 [overflow-anchor:none]">
+          <div className="mx-6 mt-6">
+            <p className="comet-body-s-accented">Agent configuration</p>
+          </div>
+
+          {selectedItem ? (
+            <AgentConfigurationDetailView
+              item={selectedItem}
+              projectId={projectId}
+              versions={allRows}
+              onEdit={() => setEditItem(allRows[0])}
+            />
+          ) : (
+            <div className="flex h-full items-center justify-center text-muted-slate">
+              Select a version to view its configuration
+            </div>
+          )}
+        </div>
+
+        <div className="w-[25vw] shrink-0 pr-2">
+          <p className="comet-body-s-accented ml-3 mt-6">Version history</p>
+
+          <AgentConfigurationHistoryTimeline
+            items={allRows}
+            selectedIndex={selectedIndex}
+            onSelect={(index) => setSelectedId(allRows[index]?.id ?? undefined)}
+            hasNextPage={hasNextPage}
+            isFetchingNextPage={isFetchingNextPage}
+            onLoadMore={fetchNextPage}
+          />
+        </div>
+      </div>
+
+      {editItem && (
+        <AgentConfigurationEditPanel
+          open={!!editItem}
+          onOpenChange={(open) => {
+            if (!open) setEditItem(null);
+          }}
           item={editItem}
           projectId={projectId}
           onSaved={() => {
@@ -78,44 +116,8 @@ const AgentConfigurationTab: React.FC<AgentConfigurationTabProps> = ({
             setEditItem(null);
           }}
         />
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex gap-0">
-      <div className="w-[50vw] min-w-0 flex-1 [overflow-anchor:none]">
-        <div className="mx-6 mt-6">
-          <p className="comet-body-s-accented">Agent configuration</p>
-        </div>
-
-        {selectedItem ? (
-          <AgentConfigurationDetailView
-            item={selectedItem}
-            projectId={projectId}
-            versions={allRows}
-            onEdit={() => setEditItem(allRows[0])}
-          />
-        ) : (
-          <div className="flex h-full items-center justify-center text-muted-slate">
-            Select a version to view its configuration
-          </div>
-        )}
-      </div>
-
-      <div className="w-[25vw] shrink-0 pr-2">
-        <p className="comet-body-s-accented ml-3 mt-6">Version history</p>
-
-        <AgentConfigurationHistoryTimeline
-          items={allRows}
-          selectedIndex={selectedIndex}
-          onSelect={(index) => setSelectedId(allRows[index]?.id ?? undefined)}
-          hasNextPage={hasNextPage}
-          isFetchingNextPage={isFetchingNextPage}
-          onLoadMore={fetchNextPage}
-        />
-      </div>
-    </div>
+      )}
+    </>
   );
 };
 
