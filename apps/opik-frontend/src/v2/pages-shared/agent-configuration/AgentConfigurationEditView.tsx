@@ -158,13 +158,24 @@ const AgentConfigurationEditView = React.forwardRef<
     Record<string, string>
   >({});
 
-  // Snapshot current prompt templates from editors before opening diff
+  // Snapshot current prompt templates from editors before opening diff. This
+  // covers both edited existing prompts and brand-new PROMPT fields whose
+  // commit doesn't exist yet — we serialize their in-memory messages so the
+  // diff view can render them.
   const handleOpenSaveDialog = () => {
     const templates: Record<string, string> = {};
     for (const [key, handle] of Object.entries(promptRefs.current)) {
       if (handle && dirtyPromptKeys[key]) {
         templates[key] = handle.getCurrentTemplate();
       }
+    }
+    for (const field of newFields) {
+      if (field.type !== BlueprintValueType.PROMPT) continue;
+      const key = field.key.trim();
+      if (!key) continue;
+      templates[key] = JSON.stringify(
+        field.messages.map(({ role, content }) => ({ role, content })),
+      );
     }
     setDiffPromptTemplates(templates);
     setSaveDialogOpen(true);
