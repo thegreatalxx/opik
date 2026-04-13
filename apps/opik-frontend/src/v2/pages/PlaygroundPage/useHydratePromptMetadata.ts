@@ -9,6 +9,7 @@ import { PROMPT_TEMPLATE_STRUCTURE, PromptVersion } from "@/types/prompts";
 import { parsePromptVersionContent } from "@/lib/llm";
 import { useFetchPrompt } from "@/api/prompts/usePromptById";
 import { useFetchPromptVersion } from "@/api/prompts/usePromptVersionById";
+import { useFetchPromptByCommit } from "@/api/prompts/usePromptByCommit";
 
 type NormalizedMessage = { role: string; content: unknown };
 
@@ -53,11 +54,56 @@ const buildMetadata = (
 export function useHydratePromptMetadata() {
   const fetchPrompt = useFetchPrompt();
   const fetchPromptVersion = useFetchPromptVersion();
+  const fetchPromptByCommit = useFetchPromptByCommit();
 
   return useCallback(
     async (
       prompt: PlaygroundPromptType,
     ): Promise<PromptLibraryMetadata | undefined> => {
+      // For prompts loaded from an agent configuration blueprint
+      const blueprintRef = prompt.loadedBlueprintRef;
+      if (blueprintRef) {
+        try {
+          const commitData = await fetchPromptByCommit({
+            commitId: blueprintRef.commitId,
+          });
+          const version = commitData.requested_version;
+          if (!version?.template) return undefined;
+
+          let libraryMessages: NormalizedMessage[];
+          try {
+            const parsed = JSON.parse(version.template);
+            libraryMessages = normalizeForComparison(parsed);
+          } catch {
+            return undefined;
+          }
+
+          const currentMessages = normalizeForComparison(
+            prompt.messages.map((m) => ({ role: m.role, content: m.content })),
+          );
+
+          if (!isEqual(currentMessages, libraryMessages)) {
+            return undefined;
+          }
+
+          return buildMetadata(
+            {
+              name: commitData.name,
+              id: commitData.id,
+              template_structure: commitData.template_structure,
+            },
+            {
+              id: version.id,
+              template: version.template,
+              commit: version.commit,
+              metadata: version.metadata ?? undefined,
+            },
+          );
+        } catch {
+          return undefined;
+        }
+      }
+
       // For CHAT prompts - check prompt-level library link
       const chatPromptId = prompt.loadedChatPromptId;
       if (chatPromptId) {
@@ -140,6 +186,6 @@ export function useHydratePromptMetadata() {
 
       return undefined;
     },
-    [fetchPrompt, fetchPromptVersion],
+    [fetchPrompt, fetchPromptVersion, fetchPromptByCommit],
   );
 }
