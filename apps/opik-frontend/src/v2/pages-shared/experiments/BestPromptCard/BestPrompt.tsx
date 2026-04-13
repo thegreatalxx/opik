@@ -8,7 +8,7 @@ import get from "lodash/get";
 import { OPTIMIZATION_PROMPT_KEY } from "@/constants/experiments";
 import useAppStore, { useActiveProjectId } from "@/store/AppStore";
 import { Experiment } from "@/types/datasets";
-import { Optimization, OPTIMIZATION_STATUS } from "@/types/optimizations";
+import { Optimization } from "@/types/optimizations";
 import {
   Card,
   CardContent,
@@ -40,7 +40,6 @@ type BestPromptProps = {
   experiment: Experiment;
   scoreMap: Record<string, { score: number; percentage?: number }>;
   baselineExperiment?: Experiment | null;
-  status?: OPTIMIZATION_STATUS;
 };
 
 export const BestPrompt: React.FC<BestPromptProps> = ({
