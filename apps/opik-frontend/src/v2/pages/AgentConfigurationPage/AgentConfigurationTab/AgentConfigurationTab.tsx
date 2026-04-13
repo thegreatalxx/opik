@@ -68,13 +68,10 @@ const AgentConfigurationTab: React.FC<AgentConfigurationTabProps> = ({
   const selectedItem = allRows[selectedIndex] as ConfigHistoryItem;
 
   return (
-    <>
+    <div>
+      <h1 className="comet-title-xs px-6 pt-4">Agent configuration</h1>
       <div className="flex gap-0">
         <div className="w-[50vw] min-w-0 flex-1 [overflow-anchor:none]">
-          <div className="mx-6 mt-6">
-            <p className="comet-body-s-accented">Agent configuration</p>
-          </div>
-
           {selectedItem ? (
             <AgentConfigurationDetailView
               item={selectedItem}
@@ -90,8 +87,6 @@ const AgentConfigurationTab: React.FC<AgentConfigurationTabProps> = ({
         </div>
 
         <div className="w-[25vw] shrink-0 pr-2">
-          <p className="comet-body-s-accented ml-3 mt-6">Version history</p>
-
           <AgentConfigurationHistoryTimeline
             items={allRows}
             selectedIndex={selectedIndex}
@@ -117,7 +112,7 @@ const AgentConfigurationTab: React.FC<AgentConfigurationTabProps> = ({
           }}
         />
       )}
-    </>
+    </div>
   );
 };
 
