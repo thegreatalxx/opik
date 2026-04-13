@@ -6,6 +6,8 @@ import React, {
   useRef,
   useState,
 } from "react";
+import { Plus, RotateCcw, Trash } from "lucide-react";
+import { Button } from "@/ui/button";
 import {
   BlueprintValue,
   BlueprintValueType,
@@ -34,6 +36,10 @@ import {
   useAgentConfigurationSave,
   AgentConfigPayload,
 } from "./useAgentConfigurationSave";
+import NewBlueprintFieldEditor, {
+  NewFieldDraft,
+  createNewFieldDraft,
+} from "./NewBlueprintFieldEditor";
 
 export type AgentConfigurationEditViewHandle = {
   hasChanges: () => boolean;
@@ -99,13 +105,18 @@ const AgentConfigurationEditView = React.forwardRef<
     const [dirtyPromptKeys, setDirtyPromptKeys] = useState<
       Record<string, boolean>
     >({});
+    const [removedKeys, setRemovedKeys] = useState<Set<string>>(new Set());
+    const [newFields, setNewFields] = useState<NewFieldDraft[]>([]);
     const originalValues = useRef<Record<string, string>>({});
     const initialized = useRef(false);
+    const newFieldIdRef = useRef(0);
 
     const handleSaveComplete = useCallback(
       (newBlueprintId?: string) => {
         originalValues.current = { ...draftValues };
         setDirtyPromptKeys({});
+        setRemovedKeys(new Set());
+        setNewFields([]);
         setDescription("");
         onSaved(newBlueprintId);
       },
@@ -128,6 +139,8 @@ const AgentConfigurationEditView = React.forwardRef<
       projectId,
       onSaved: handleSaveComplete,
       dirtyPromptKeys,
+      removedKeys,
+      newFields,
     });
 
     useImperativeHandle(ref, () => ({
@@ -157,6 +170,40 @@ const AgentConfigurationEditView = React.forwardRef<
       }
     };
 
+    const toggleRemoved = useCallback(
+      (key: string) => {
+        setRemovedKeys((prev) => {
+          const next = new Set(prev);
+          if (next.has(key)) next.delete(key);
+          else next.add(key);
+          return next;
+        });
+        clearError(key);
+      },
+      [clearError],
+    );
+
+    const handleAddNewField = useCallback(() => {
+      const id = `new-${++newFieldIdRef.current}`;
+      setNewFields((prev) => [...prev, createNewFieldDraft(id)]);
+    }, []);
+
+    const updateNewField = useCallback(
+      (next: NewFieldDraft) => {
+        setNewFields((prev) => prev.map((f) => (f.id === next.id ? next : f)));
+        if (errors[next.id]) clearError(next.id);
+      },
+      [errors, clearError],
+    );
+
+    const removeNewField = useCallback(
+      (id: string) => {
+        setNewFields((prev) => prev.filter((f) => f.id !== id));
+        clearError(id);
+      },
+      [clearError],
+    );
+
     const collapsibleKeys = useMemo(
       () => collectMultiLineKeys(agentConfig?.values ?? []),
       [agentConfig],
@@ -167,12 +214,18 @@ const AgentConfigurationEditView = React.forwardRef<
 
     const currentValues = useMemo<BlueprintValue[]>(() => {
       if (!agentConfig) return [];
-      return agentConfig.values.map((v) =>
-        v.type === BlueprintValueType.PROMPT
-          ? v
-          : { ...v, value: draftValues[v.key] ?? v.value },
-      );
-    }, [agentConfig, draftValues]);
+      const kept = agentConfig.values
+        .filter((v) => !removedKeys.has(v.key))
+        .map((v) =>
+          v.type === BlueprintValueType.PROMPT
+            ? v
+            : { ...v, value: draftValues[v.key] ?? v.value },
+        );
+      const added: BlueprintValue[] = newFields
+        .filter((f) => f.key.trim())
+        .map((f) => ({ key: f.key.trim(), type: f.type, value: f.value }));
+      return [...kept, ...added];
+    }, [agentConfig, draftValues, removedKeys, newFields]);
 
     const diffPromptTemplates = useMemo<Record<string, string>>(() => {
       const out: Record<string, string> = {};
@@ -181,8 +234,13 @@ const AgentConfigurationEditView = React.forwardRef<
           out[key] = handle.getCurrentTemplate();
         }
       }
+      for (const field of newFields) {
+        if (field.type !== BlueprintValueType.PROMPT) continue;
+        const key = field.key.trim();
+        if (key) out[key] = field.value;
+      }
       return out;
-    }, [dirtyPromptKeys, promptRefs]);
+    }, [dirtyPromptKeys, promptRefs, newFields]);
 
     const hasErrors = Object.values(errors).some(Boolean);
     const isDirty = hasChanges();
@@ -252,11 +310,13 @@ const AgentConfigurationEditView = React.forwardRef<
           {(agentConfig?.values ?? []).map((v) => {
             const isPrompt = v.type === BlueprintValueType.PROMPT;
             const collapsible = isMultiLineField(v);
+            const isRemoved = removedKeys.has(v.key);
             const isChanged =
-              v.type === BlueprintValueType.PROMPT
+              isRemoved ||
+              (v.type === BlueprintValueType.PROMPT
                 ? !!dirtyPromptKeys[v.key]
                 : draftValues[v.key] !== undefined &&
-                  draftValues[v.key] !== originalValues.current[v.key];
+                  draftValues[v.key] !== originalValues.current[v.key]);
 
             const fieldExpandable = collapsible;
             const fieldExpanded = fieldExpandable
@@ -287,84 +347,131 @@ const AgentConfigurationEditView = React.forwardRef<
             ) : null;
 
             return (
-              <FieldSection
+              <div
                 key={v.key}
-                label={v.key}
-                icon={<BlueprintTypeIcon type={v.type} variant="secondary" />}
-                description={v.description}
-                expandable={fieldExpandable}
-                expanded={fieldExpanded}
-                onToggle={
-                  fieldExpandable ? () => controller.toggle(v.key) : undefined
-                }
-                afterLabel={booleanSwitch}
-                trailing={modifiedDot}
+                className={isRemoved ? "opacity-60" : undefined}
               >
-                {isPrompt ? (
-                  <div className="flex flex-col gap-1">
-                    <BlueprintValuePromptCompact
-                      key={v.value}
-                      value={v}
-                      projectId={projectId}
-                      isEditing
-                      tone="white"
-                      expanded={!!fieldExpanded}
-                      ref={(el) => {
-                        promptRefs.current[v.key] = el;
-                      }}
-                      onDirtyChange={(isDirty) => {
-                        setDirtyPromptKeys((prev) => ({
-                          ...prev,
-                          [v.key]: isDirty,
-                        }));
-                        clearError(v.key);
-                      }}
-                    />
-                    {errors[v.key] && (
-                      <span className="comet-body-xs text-destructive">
-                        {errors[v.key]}
-                      </span>
-                    )}
-                  </div>
-                ) : (
-                  (() => {
-                    if (isBoolean) return null;
-                    if (fieldExpandable && !fieldExpanded) return null;
+                <FieldSection
+                  label={v.key}
+                  icon={<BlueprintTypeIcon type={v.type} variant="secondary" />}
+                  description={v.description}
+                  expandable={fieldExpandable}
+                  expanded={fieldExpanded}
+                  onToggle={
+                    fieldExpandable ? () => controller.toggle(v.key) : undefined
+                  }
+                  afterLabel={booleanSwitch}
+                  trailing={
+                    <div className="flex items-center gap-1">
+                      {modifiedDot}
+                      <TooltipWrapper
+                        content={isRemoved ? "Restore field" : "Remove field"}
+                      >
+                        <Button
+                          variant="minimal"
+                          size="icon-xs"
+                          onClick={() => toggleRemoved(v.key)}
+                        >
+                          {isRemoved ? <RotateCcw /> : <Trash />}
+                        </Button>
+                      </TooltipWrapper>
+                    </div>
+                  }
+                >
+                  {isRemoved ? null : isPrompt ? (
+                    <div className="flex flex-col gap-1">
+                      <BlueprintValuePromptCompact
+                        key={v.value}
+                        value={v}
+                        projectId={projectId}
+                        isEditing
+                        tone="white"
+                        expanded={!!fieldExpanded}
+                        ref={(el) => {
+                          promptRefs.current[v.key] = el;
+                        }}
+                        onDirtyChange={(isDirty) => {
+                          setDirtyPromptKeys((prev) => ({
+                            ...prev,
+                            [v.key]: isDirty,
+                          }));
+                          clearError(v.key);
+                        }}
+                      />
+                      {errors[v.key] && (
+                        <span className="comet-body-xs text-destructive">
+                          {errors[v.key]}
+                        </span>
+                      )}
+                    </div>
+                  ) : (
+                    (() => {
+                      if (isBoolean) return null;
+                      if (fieldExpandable && !fieldExpanded) return null;
 
-                    const inputMode =
-                      v.type === BlueprintValueType.INT
-                        ? "numeric"
-                        : v.type === BlueprintValueType.FLOAT
-                          ? "decimal"
-                          : "text";
-                    const currentValue = draftValues[v.key] ?? "";
-                    const errorLine = errors[v.key] ? (
-                      <span className="comet-body-xs text-destructive">
-                        {errors[v.key]}
-                      </span>
-                    ) : null;
+                      const inputMode =
+                        v.type === BlueprintValueType.INT
+                          ? "numeric"
+                          : v.type === BlueprintValueType.FLOAT
+                            ? "decimal"
+                            : "text";
+                      const currentValue = draftValues[v.key] ?? "";
+                      const errorLine = errors[v.key] ? (
+                        <span className="comet-body-xs text-destructive">
+                          {errors[v.key]}
+                        </span>
+                      ) : null;
 
-                    return (
-                      <div className="flex flex-col gap-1">
-                        <div className="rounded-md border bg-background px-3 py-2">
-                          <Input
-                            variant="ghost"
-                            className="h-auto p-0"
-                            inputMode={inputMode}
-                            value={currentValue}
-                            onChange={(e) =>
-                              handleFieldChange(v.key, e.target.value)
-                            }
-                          />
+                      return (
+                        <div className="flex flex-col gap-1">
+                          <div className="rounded-md border bg-background px-3 py-2">
+                            <Input
+                              variant="ghost"
+                              className="h-auto p-0"
+                              inputMode={inputMode}
+                              value={currentValue}
+                              onChange={(e) =>
+                                handleFieldChange(v.key, e.target.value)
+                              }
+                            />
+                          </div>
+                          {errorLine}
                         </div>
-                        {errorLine}
-                      </div>
-                    );
-                  })()
-                )}
-              </FieldSection>
+                      );
+                    })()
+                  )}
+                </FieldSection>
+              </div>
             );
           })}
+
+          {newFields.length > 0 &&
+            newFields.map((field) => {
+              const reservedKeys = new Set([
+                ...(agentConfig?.values
+                  ?.filter((v) => !removedKeys.has(v.key))
+                  ?.map((v) => v.key) ?? []),
+                ...newFields
+                  .filter((f) => f.id !== field.id)
+                  .map((f) => f.key.trim())
+                  .filter(Boolean),
+              ]);
+              return (
+                <NewBlueprintFieldEditor
+                  key={field.id}
+                  field={field}
+                  reservedKeys={reservedKeys}
+                  onChange={updateNewField}
+                  onRemove={() => removeNewField(field.id)}
+                  error={errors[field.id]}
+                />
+              );
+            })}
+
+          <Button variant="outline" size="sm" onClick={handleAddNewField}>
+            <Plus className="mr-1 size-3.5" />
+            Add field
+          </Button>
         </div>
 
         {DialogComponent}
