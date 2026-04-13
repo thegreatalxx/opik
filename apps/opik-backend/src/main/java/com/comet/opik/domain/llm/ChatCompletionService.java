@@ -24,6 +24,7 @@ import ru.vyarus.dropwizard.guice.module.yaml.bind.Config;
 
 import java.net.ConnectException;
 import java.nio.channels.ClosedChannelException;
+import java.util.Map;
 import java.util.Optional;
 import java.util.function.Consumer;
 
@@ -49,11 +50,12 @@ public class ChatCompletionService {
         this.retryPolicy = newRetryPolicy();
     }
 
-    public ChatCompletionResponse create(@NonNull ChatCompletionRequest rawRequest, @NonNull String workspaceId) {
+    public ChatCompletionResponse create(@NonNull ChatCompletionRequest rawRequest, @NonNull String workspaceId,
+            @NonNull Map<String, String> requestHeaders) {
         // must be final or effectively final for lambda
         var request = MessageContentNormalizer.normalizeRequest(rawRequest);
 
-        var llmProviderClient = llmProviderFactory.getService(workspaceId, request.model());
+        var llmProviderClient = llmProviderFactory.getService(workspaceId, request.model(), requestHeaders);
         llmProviderClient.validateRequest(request);
 
         ChatCompletionResponse chatCompletionResponse;
@@ -77,12 +79,13 @@ public class ChatCompletionService {
     public void createAndStreamResponse(
             @NonNull ChatCompletionRequest rawRequest,
             @NonNull String workspaceId,
+            @NonNull Map<String, String> requestHeaders,
             @NonNull ChunkedOutputHandlers handlers) {
         var request = MessageContentNormalizer.normalizeRequest(rawRequest);
 
         log.info("Creating and streaming chat completions, workspaceId '{}', model '{}'", workspaceId, request.model());
 
-        var llmProviderClient = llmProviderFactory.getService(workspaceId, request.model());
+        var llmProviderClient = llmProviderFactory.getService(workspaceId, request.model(), requestHeaders);
 
         llmProviderClient.generateStream(
                 request,

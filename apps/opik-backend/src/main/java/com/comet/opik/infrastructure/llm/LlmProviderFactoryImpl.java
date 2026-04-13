@@ -50,9 +50,15 @@ class LlmProviderFactoryImpl implements LlmProviderFactory {
     }
 
     public LlmProviderService getService(@NonNull String workspaceId, @NonNull String model) {
+        return getService(workspaceId, model, Map.of());
+    }
+
+    @Override
+    public LlmProviderService getService(@NonNull String workspaceId, @NonNull String model,
+            @NonNull Map<String, String> requestHeaders) {
         var llmProvider = getLlmProvider(model);
         var providerConfig = getProviderApiKey(workspaceId, llmProvider, model);
-        var config = buildConfig(providerConfig);
+        var config = buildConfig(providerConfig, requestHeaders);
 
         return Optional.ofNullable(services.get(llmProvider))
                 .map(provider -> provider.getService(config))
@@ -61,6 +67,11 @@ class LlmProviderFactoryImpl implements LlmProviderFactory {
     }
 
     private LlmProviderClientApiConfig buildConfig(ProviderApiKey providerConfig) {
+        return buildConfig(providerConfig, Map.of());
+    }
+
+    private LlmProviderClientApiConfig buildConfig(ProviderApiKey providerConfig,
+            Map<String, String> requestHeaders) {
         var configuration = Optional.ofNullable(providerConfig.configuration()).orElse(Map.of());
 
         // For providers that support naming, add provider_name to configuration if present
@@ -70,9 +81,14 @@ class LlmProviderFactoryImpl implements LlmProviderFactory {
             configuration.put("provider_name", providerConfig.providerName());
         }
 
+        // Merge request passthrough headers with provider-configured headers.
+        // Provider-configured headers take precedence over request passthrough headers.
+        var mergedHeaders = new HashMap<>(requestHeaders);
+        mergedHeaders.putAll(Optional.ofNullable(providerConfig.headers()).orElse(Map.of()));
+
         return LlmProviderClientApiConfig.builder()
                 .apiKey(providerConfig.apiKey() != null ? decrypt(providerConfig.apiKey()) : null)
-                .headers(Optional.ofNullable(providerConfig.headers()).orElse(Map.of()))
+                .headers(mergedHeaders)
                 .baseUrl(providerConfig.baseUrl())
                 .configuration(configuration)
                 .build();

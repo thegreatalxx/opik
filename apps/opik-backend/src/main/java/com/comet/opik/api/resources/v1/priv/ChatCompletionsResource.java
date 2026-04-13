@@ -32,6 +32,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.glassfish.jersey.server.ChunkedOutput;
 
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
+
 import static com.comet.opik.infrastructure.http.CorsFactory.OPIK_ACTUAL_MODEL_HEADER;
 import static com.comet.opik.infrastructure.http.CorsFactory.OPIK_PROVIDER_HEADER;
 
@@ -43,6 +47,8 @@ import static com.comet.opik.infrastructure.http.CorsFactory.OPIK_PROVIDER_HEADE
 @RequiredArgsConstructor(onConstructor_ = @Inject)
 @Tag(name = "Chat Completions", description = "Chat Completions related resources")
 public class ChatCompletionsResource {
+
+    private static final Set<String> EXCLUDED_PASSTHROUGH_HEADERS = Set.of("x-api-key", "authorization");
 
     private final @NonNull Provider<RequestContext> requestContextProvider;
     private final @NonNull ChatCompletionService chatCompletionService;
@@ -60,6 +66,7 @@ public class ChatCompletionsResource {
     public Response create(
             @RequestBody(content = @Content(schema = @Schema(implementation = ChatCompletionRequest.class))) @NotNull @Valid ChatCompletionRequest request) {
         var workspaceId = requestContextProvider.get().getWorkspaceId();
+        var passthroughHeaders = extractPassthroughHeaders();
         String type;
         Object entity;
 
@@ -76,14 +83,14 @@ public class ChatCompletionsResource {
             type = MediaType.SERVER_SENT_EVENTS;
             // Use "\n\n" separator for SSE format (each event ends with double newline)
             var chunkedOutput = new ChunkedOutput<String>(String.class, "\n\n");
-            chatCompletionService.createAndStreamResponse(request, workspaceId,
+            chatCompletionService.createAndStreamResponse(request, workspaceId, passthroughHeaders,
                     new ChunkedOutputHandlers(chunkedOutput));
             entity = chunkedOutput;
         } else {
             log.info("Creating chat completions, workspaceId '{}', model '{}', actualModel '{}'",
                     workspaceId, request.model(), resolvedModelInfo.actualModel());
             type = MediaType.APPLICATION_JSON;
-            entity = chatCompletionService.create(request, workspaceId);
+            entity = chatCompletionService.create(request, workspaceId, passthroughHeaders);
         }
 
         // Include actual model and provider in response headers for frontend span tracking.
@@ -97,5 +104,20 @@ public class ChatCompletionsResource {
                 .build();
         log.info("Created chat completions, workspaceId '{}', model '{}'", workspaceId, request.model());
         return response;
+    }
+
+    private Map<String, String> extractPassthroughHeaders() {
+        var requestHeaders = requestContextProvider.get().getHeaders();
+        if (requestHeaders == null) {
+            return Map.of();
+        }
+        return requestHeaders.entrySet().stream()
+                .filter(e -> e.getKey() != null && e.getKey().toLowerCase().startsWith("x-"))
+                .filter(e -> !EXCLUDED_PASSTHROUGH_HEADERS.contains(e.getKey().toLowerCase()))
+                .filter(e -> e.getValue() != null && !e.getValue().isEmpty())
+                .collect(Collectors.toMap(
+                        Map.Entry::getKey,
+                        e -> e.getValue().getFirst(),
+                        (existing, replacement) -> existing));
     }
 }

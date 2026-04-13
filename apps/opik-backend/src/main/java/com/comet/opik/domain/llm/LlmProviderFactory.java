@@ -6,6 +6,8 @@ import com.comet.opik.domain.llm.structuredoutput.StructuredOutputStrategy;
 import com.comet.opik.infrastructure.llm.LlmServiceProvider;
 import dev.langchain4j.model.chat.ChatModel;
 
+import java.util.Map;
+
 public interface LlmProviderFactory {
 
     String ERROR_MODEL_NOT_SUPPORTED = "model not supported %s";
@@ -13,6 +15,10 @@ public interface LlmProviderFactory {
     void register(LlmProvider llmProvider, LlmServiceProvider service);
 
     LlmProviderService getService(String workspaceId, String model);
+
+    default LlmProviderService getService(String workspaceId, String model, Map<String, String> requestHeaders) {
+        return getService(workspaceId, model);
+    }
 
     ChatModel getLanguageModel(String workspaceId, LlmAsJudgeModelParameters modelParameters);
 

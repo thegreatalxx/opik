@@ -13,6 +13,7 @@ import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
 import java.time.Instant;
+import java.util.Map;
 
 @Singleton
 @Slf4j
@@ -44,7 +45,7 @@ public class ExperimentItemProcessor {
                         Instant startTime = Instant.now();
                         try {
                             var chatRequest = messageRenderer.buildChatCompletionRequest(prompt, renderedMessages);
-                            var response = chatCompletionService.create(chatRequest, message.workspaceId());
+                            var response = chatCompletionService.create(chatRequest, message.workspaceId(), Map.of());
                             return new LlmCallResult(response, null, null, startTime, Instant.now());
                         } catch (Exception e) {
                             log.warn("LLM call failed for experiment '{}', dataset item '{}'",
