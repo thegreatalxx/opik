@@ -47,10 +47,12 @@ import {
 } from "@/hooks/useLLMProviderModelsData";
 import { useActiveProjectId } from "@/store/AppStore";
 import { usePermissions } from "@/contexts/PermissionsContext";
-import PromptsSelectBox from "@/v2/pages-shared/llm/PromptsSelectBox/PromptsSelectBox";
+import BlueprintPromptsSelectBox from "@/v2/pages-shared/llm/BlueprintPromptsSelectBox/BlueprintPromptsSelectBox";
 import AddNewPromptVersionDialog from "@/v2/pages-shared/llm/LLMPromptMessages/AddNewPromptVersionDialog";
 import { PROMPT_TEMPLATE_STRUCTURE } from "@/types/prompts";
 import useLoadChatPrompt from "@/hooks/useLoadChatPrompt";
+import { AGENT_CONFIGS_KEY } from "@/api/api";
+import { BlueprintPromptRef } from "@/types/playground";
 
 interface PlaygroundPromptProps {
   workspaceName: string;
@@ -100,8 +102,7 @@ const PlaygroundPrompt = ({
   const [lastImportedPromptName, setLastImportedPromptName] =
     useState<string>("");
 
-  // Get the loaded chat prompt ID from the prompt data
-  const selectedChatPromptId = prompt?.loadedChatPromptId;
+  const selectedBlueprintRef = prompt?.loadedBlueprintRef;
 
   const handleChatPromptMessagesLoaded = useCallback(
     (newMessages: LLMMessage[], promptName: string) => {
@@ -117,7 +118,7 @@ const PlaygroundPrompt = ({
     chatPromptTemplate,
     hasUnsavedChatPromptChanges,
   } = useLoadChatPrompt({
-    selectedChatPromptId,
+    selectedBlueprintRef,
     messages,
     onMessagesLoaded: handleChatPromptMessagesLoaded,
     skipInitialLoad: prompt?.skipInitialPromptLoad,
@@ -263,16 +264,15 @@ const PlaygroundPrompt = ({
     model,
   ]);
 
-  // Handler for importing chat prompt
-  const handleImportChatPrompt = useCallback(
-    (loadedPromptId: string) => {
-      updatePrompt(promptId, { loadedChatPromptId: loadedPromptId });
+  const handleImportBlueprintPrompt = useCallback(
+    (ref?: BlueprintPromptRef) => {
+      updatePrompt(promptId, { loadedBlueprintRef: ref });
     },
     [promptId, updatePrompt],
   );
 
   const handleDetachPrompt = useCallback(() => {
-    updatePrompt(promptId, { loadedChatPromptId: undefined });
+    updatePrompt(promptId, { loadedBlueprintRef: undefined });
   }, [promptId, updatePrompt]);
 
   // Handler for saving chat prompt
@@ -320,15 +320,12 @@ const PlaygroundPrompt = ({
         </div>
 
         <div className="flex min-w-0 items-center overflow-hidden pl-4 [@media(hover:hover)]:max-w-0 [@media(hover:hover)]:pl-0 [@media(hover:hover)]:group-hover/prompt:max-w-none [@media(hover:hover)]:group-hover/prompt:pl-4">
-          <PromptsSelectBox
-            compact
+          <BlueprintPromptsSelectBox
             projectId={activeProjectId!}
-            value={selectedChatPromptId}
-            onValueChange={(value) => value && handleImportChatPrompt(value)}
+            value={selectedBlueprintRef}
+            onValueChange={handleImportBlueprintPrompt}
             onClear={handleDetachPrompt}
-            filterByTemplateStructure={PROMPT_TEMPLATE_STRUCTURE.CHAT}
             hasUnsavedChanges={hasUnsavedChatPromptChanges}
-            promptName={chatPromptData?.name}
           />
 
           <div className="flex shrink-0 items-center">
@@ -338,7 +335,7 @@ const PlaygroundPrompt = ({
                   variant="minimal"
                   size="icon-sm"
                   onClick={handleSaveChatPrompt}
-                  disabled={!canCreatePrompts && !selectedChatPromptId}
+                  disabled={!canCreatePrompts && !selectedBlueprintRef}
                 >
                   <Save />
                 </Button>
@@ -398,18 +395,32 @@ const PlaygroundPrompt = ({
         onSave={(version, _, savedPromptId) => {
           setShowSaveChatPromptDialog(false);
 
-          // Update the loaded chat prompt ID to the saved prompt
-          if (savedPromptId) {
+          if (!savedPromptId) return;
+
+          // If this prompt was loaded from a blueprint, update the in-memory
+          // ref to point at the new commit. The backend auto-creates a new
+          // blueprint version pinning this commit; we invalidate the agent
+          // config cache so the selector reflects it.
+          if (selectedBlueprintRef && version.commit) {
+            const newRef: BlueprintPromptRef = {
+              ...selectedBlueprintRef,
+              commitId: version.commit,
+            };
+            updatePrompt(promptId, { loadedBlueprintRef: newRef });
+
+            const newDedupKey = `${newRef.blueprintId}-${newRef.key}-${newRef.commitId}-${version.id}`;
+            loadedChatPromptRef.current = newDedupKey;
+
+            queryClient.invalidateQueries({
+              queryKey: ["prompt-by-commit", { commitId: version.commit }],
+            });
+            queryClient.invalidateQueries({ queryKey: [AGENT_CONFIGS_KEY] });
+          } else {
             updatePrompt(promptId, { loadedChatPromptId: savedPromptId });
 
-            // Update the ref to mark this new version as "already loaded"
-            // This prevents the useEffect from re-loading messages when we invalidate queries
             const newChatPromptKey = `${savedPromptId}-${version.id}`;
             loadedChatPromptRef.current = newChatPromptKey;
 
-            // Invalidate the prompt queries to refetch the latest data
-            // This ensures the unsaved changes indicator updates correctly
-            // CRITICAL: Query keys must match the format used in the hooks (objects, not strings)
             queryClient.invalidateQueries({
               queryKey: ["prompt", { promptId: savedPromptId }],
             });
