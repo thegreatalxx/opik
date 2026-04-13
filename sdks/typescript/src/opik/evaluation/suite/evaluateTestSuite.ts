@@ -14,6 +14,7 @@ import {
   resolveItemExecutionPolicy,
 } from "./suiteHelpers";
 import type { ExecutionPolicy } from "./types";
+import { ExperimentWriteEvaluationMethod } from "@/rest_api/api/resources/experiments/types/ExperimentWriteEvaluationMethod";
 
 export interface EvaluateTestSuiteOptions<T = Record<string, unknown>> {
   /** The dataset to evaluate against */
@@ -109,7 +110,7 @@ export async function evaluateTestSuite<T = Record<string, unknown>>(
     prompts: options.prompts,
     datasetVersionId: versionInfo?.id,
     // TODO: OPIK-5795 - migrate DB value from 'evaluation_suite' to 'test_suite'
-    evaluationMethod: "evaluation_suite",
+    evaluationMethod: ExperimentWriteEvaluationMethod.EvaluationSuite,
     tags: options.tags,
     projectName: options.projectName,
   });
