@@ -7,6 +7,10 @@ og:title: Evaluate Function - Opik
 title: Evaluate Function
 ---
 
+<Note>
+  In Opik 2.0, experiments are project-scoped. Make sure to specify a `projectName` when calling `evaluate()` so results are associated with the correct project.
+</Note>
+
 The `evaluate` function allows you to run comprehensive evaluations of LLM tasks against datasets using customizable metrics.
 
 ```typescript
@@ -80,7 +84,7 @@ const llmTask: EvaluationTask<DatasetItem> = async (datasetItem) => {
 
 async function runEvaluation() {
   // Get or create dataset
-  const dataset = await opik.getOrCreateDataset<DatasetItem>("example-dataset");
+  const dataset = await opik.getOrCreateDataset<DatasetItem>("example-dataset", "Evaluation dataset", "my-project");
 
   // Run evaluation
   const result = await evaluate({
@@ -88,6 +92,7 @@ async function runEvaluation() {
     task: llmTask,
     scoringMetrics: [new ExactMatch()],
     experimentName: "Example Evaluation",
+    projectName: "my-project",
 
     // Map the output of the task and dataset item data to the expected metric inputs
     scoringKeyMapping: {
@@ -103,7 +108,7 @@ For reproducible evaluations, use a `DatasetVersion` instead of `Dataset`:
 
 ```typescript
 // Get a specific version for reproducible evaluation
-const dataset = await opik.getOrCreateDataset<DatasetItem>("example-dataset");
+const dataset = await opik.getOrCreateDataset<DatasetItem>("example-dataset", "Evaluation dataset", "my-project");
 const v2 = await dataset.getVersionView("v2");
 
 const result = await evaluate({
@@ -111,6 +116,7 @@ const result = await evaluate({
   task: llmTask,
   scoringMetrics: [new ExactMatch()],
   experimentName: "Pinned to v2",
+  projectName: "my-project",
 });
 // Experiment is linked to version v2, not latest
 ```

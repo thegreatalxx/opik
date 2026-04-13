@@ -7,6 +7,10 @@ og:title: Manage Prompts Efficiently with Opik
 title: Prompts
 ---
 
+<Note>
+  In Opik 2.0, prompts are project-scoped. Make sure to specify a `projectName` when creating prompts so they are associated with the correct project.
+</Note>
+
 The Opik TypeScript SDK provides comprehensive prompt management functionality for versioning, storing, and formatting your LLM prompt templates. Prompts in Opik are versioned automatically, allowing you to track changes over time while seamlessly integrating with your codebase.
 
 ## Introduction
@@ -43,6 +47,7 @@ const prompt = await client.createPrompt({
   type: PromptType.MUSTACHE,
   metadata: { version: "1.0" },
   tags: ["greetings"],
+  projectName: "my-project",
 });
 
 console.log(`Created prompt with commit: ${prompt.commit}`);
@@ -98,6 +103,7 @@ await client.createPrompt({
   name: "mustache-prompt",
   prompt: "Hello {{name}}, your score is {{score}}",
   type: PromptType.MUSTACHE,
+  projectName: "my-project",
 });
 
 // Jinja2 syntax for advanced templating
@@ -105,6 +111,7 @@ await client.createPrompt({
   name: "jinja2-prompt",
   prompt: "Hello {{ name }}! {% if premium %}Premium user{% endif %}",
   type: PromptType.JINJA2,
+  projectName: "my-project",
 });
 ```
 
@@ -135,6 +142,7 @@ const prompt1 = await client.createPrompt({
   type: PromptType.MUSTACHE,
   metadata: { version: "1.0" },
   tags: ["greetings"],
+  projectName: "my-project",
 });
 
 // Same template, metadata, and type - returns existing version
@@ -144,6 +152,7 @@ const prompt2 = await client.createPrompt({
   metadata: { version: "1.0" }, // Same
   type: PromptType.MUSTACHE, // Same
   tags: ["updated-tags"], // Different tags don't trigger new version
+  projectName: "my-project",
 });
 console.log(prompt2.commit === prompt1.commit); // true
 
@@ -152,6 +161,7 @@ const prompt3 = await client.createPrompt({
   name: "greeting-prompt",
   prompt: "Hi {{name}}, score: {{score}}", // Different template
   changeDescription: "Simplified greeting message",
+  projectName: "my-project",
 });
 
 // Changed metadata - creates new version 3
@@ -160,6 +170,7 @@ const prompt4 = await client.createPrompt({
   prompt: "Hi {{name}}, score: {{score}}", // Same as version 2
   metadata: { version: "2.0" }, // Different metadata triggers new version
   changeDescription: "Updated metadata",
+  projectName: "my-project",
 });
 ```
 
@@ -411,6 +422,7 @@ const prompt = await client.createPrompt({
   name: "greeting",
   prompt: GREETING_TEMPLATE,
   metadata: { version: "1.0" },
+  projectName: "my-project",
 });
 ```
 
@@ -422,6 +434,7 @@ const prompt = await client.createPrompt({
   prompt: updatedTemplate,
   changeDescription: "Added support for multi-language summaries",
   metadata: { sprint: "Q1-2024" },
+  projectName: "my-project",
 });
 ```
 
@@ -432,6 +445,7 @@ const prompt = await client.createPrompt({
   name: "production-greeting",
   prompt: template,
   tags: ["production", "customer-facing", "v2"],
+  projectName: "my-project",
 });
 
 // Later, search by tags
@@ -478,6 +492,7 @@ const chatPrompt = await client.createChatPrompt({
   type: PromptType.MUSTACHE,
   metadata: { category: "education" },
   tags: ["education", "assistant"],
+  projectName: "my-project",
 });
 
 console.log(`Created chat prompt with commit: ${chatPrompt.commit}`);
@@ -535,6 +550,7 @@ const messages = [
 const chatPrompt = await client.createChatPrompt({
   name: "customer-support-flow",
   messages: messages,
+  projectName: "my-project",
 });
 
 // Format with specific values
@@ -576,6 +592,7 @@ const messages = [
 const chatPrompt = await client.createChatPrompt({
   name: "image-analyzer",
   messages: messages,
+  projectName: "my-project",
 });
 
 // Format with variables
@@ -615,6 +632,7 @@ const messages = [
 const chatPrompt = await client.createChatPrompt({
   name: "video-analyzer",
   messages: messages,
+  projectName: "my-project",
 });
 
 // Format with variables
@@ -653,6 +671,7 @@ const messages = [
 const chatPrompt = await client.createChatPrompt({
   name: "image-comparison",
   messages: messages,
+  projectName: "my-project",
 });
 
 const formatted = chatPrompt.format(
@@ -737,6 +756,7 @@ const chatPrompt = await client.createChatPrompt({
   name: "mustache-example",
   messages: messages,
   type: PromptType.MUSTACHE, // Default
+  projectName: "my-project",
 });
 
 const formatted = chatPrompt.format({
@@ -768,6 +788,7 @@ const chatPrompt = await client.createChatPrompt({
   name: "jinja-example",
   messages: messages,
   type: PromptType.JINJA2,
+  projectName: "my-project",
 });
 
 // With premium user
@@ -805,6 +826,7 @@ const messagesV1 = [
 const chatPrompt = await client.createChatPrompt({
   name: "greeting-prompt",
   messages: messagesV1,
+  projectName: "my-project",
 });
 
 console.log(`Version 1 commit: ${chatPrompt.commit}`);
@@ -819,6 +841,7 @@ const chatPromptV2 = await client.createChatPrompt({
   name: "greeting-prompt",
   messages: messagesV2,
   changeDescription: "Added personalization with name variable",
+  projectName: "my-project",
 });
 
 console.log(`Version 2 commit: ${chatPromptV2.commit}`);

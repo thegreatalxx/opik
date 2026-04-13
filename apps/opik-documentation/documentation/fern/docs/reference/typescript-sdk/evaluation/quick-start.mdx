@@ -9,6 +9,10 @@ title: Quick Start
 
 **In just 15 minutes**, learn how to evaluate your AI models with Opik's TypeScript SDK. This guide will walk you through creating a dataset, defining an evaluation task, and analyzing results with built-in metrics – everything you need to start making data-driven decisions about your AI systems.
 
+<Tip>
+  In Opik 2.0, datasets and experiments are project-scoped rather than workspace-scoped. Pass `projectName` to `getOrCreateDataset()` and `evaluate()` to associate them with the correct project.
+</Tip>
+
 ## Complete Working Example
 
 💡 **Copy, paste, and run** this complete example that:
@@ -44,7 +48,9 @@ type DatasetItem = {
 
 // Retrieve the existing dataset by name
 const retrievedDataset = await opik.getOrCreateDataset<DatasetItem>(
-  "testDataset"
+  "testDataset",
+  "Evaluation dataset",
+  "my-project"
 );
 
 // Add items to a dataset
@@ -77,6 +83,7 @@ const result = await evaluate({
   task: llmTask,
   scoringMetrics: [new ExactMatch()],
   experimentName: "My First Evaluation",
+  projectName: "my-project",
 
   // map the output of the task and dataset item data to the expected metric inputs
   scoringKeyMapping: {
@@ -136,7 +143,9 @@ type DatasetItem = {
 
 // Retrieve the existing dataset by name
 const retrievedDataset = await opik.getOrCreateDataset<DatasetItem>(
-  "testDataset"
+  "testDataset",
+  "Evaluation dataset",
+  "my-project"
 );
 
 // Add items to a dataset
@@ -192,6 +201,7 @@ const result = await evaluate({
   task: llmTask,
   scoringMetrics: [new ExactMatch()], // Use multiple metrics for comprehensive evaluation
   experimentName: "My First Evaluation",
+  projectName: "my-project",
 
   // map the output of the task and dataset item data to the expected metric inputs
   scoringKeyMapping: {
