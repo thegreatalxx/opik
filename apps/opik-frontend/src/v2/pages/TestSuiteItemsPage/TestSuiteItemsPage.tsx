@@ -295,7 +295,7 @@ function TestSuiteItemsPage(): React.ReactElement {
   }
 
   return (
-    <div className="pt-6">
+    <div className="pt-4">
       <AddVersionDialog
         open={addVersionDialogOpen}
         setOpen={setAddVersionDialogOpen}

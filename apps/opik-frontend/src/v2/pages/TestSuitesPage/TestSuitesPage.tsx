@@ -8,6 +8,7 @@ import {
   RowSelectionState,
 } from "@tanstack/react-table";
 import { JsonParam, StringParam, useQueryParam } from "use-query-params";
+import { Plus } from "lucide-react";
 
 import DataTable from "@/shared/DataTable/DataTable";
 import DataTablePagination from "@/shared/DataTablePagination/DataTablePagination";
@@ -21,7 +22,6 @@ import DatasetActionsPanel from "@/v2/pages-shared/datasets/DatasetActionsPanel/
 import { createDatasetRowActionsCell } from "@/v2/pages-shared/datasets/DatasetRowActionsCell/DatasetRowActionsCell";
 import { Button } from "@/ui/button";
 import { Separator } from "@/ui/separator";
-import { buildDocsUrl } from "@/lib/utils";
 import useAppStore, { useActiveProjectId } from "@/store/AppStore";
 import SearchInput from "@/shared/SearchInput/SearchInput";
 import TimeCell from "@/shared/DataTableCells/TimeCell";
@@ -429,7 +429,7 @@ const TestSuitesPage: React.FunctionComponent = () => {
           <DataTableNoData title={noDataText}>
             {noData && canCreateDatasets && (
               <Button variant="link" onClick={handleNewSuiteClick}>
-                Create new
+                Create evaluation suite
               </Button>
             )}
           </DataTableNoData>

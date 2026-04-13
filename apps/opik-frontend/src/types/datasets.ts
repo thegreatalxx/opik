@@ -56,7 +56,8 @@ export interface DatasetVersion {
 
 export enum DATASET_TYPE {
   DATASET = "dataset",
-  TEST_SUITE = "test_suite",
+  // TODO: OPIK-5795 - migrate DB value from 'evaluation_suite' to 'test_suite'
+  TEST_SUITE = "evaluation_suite",
 }
 
 export enum DATASET_STATUS {

@@ -3175,7 +3175,7 @@ class DatasetsResourceTest {
         Stream<Arguments> filterByType() {
             return Stream.of(
                     arguments(DatasetType.DATASET, "dataset"),
-                    arguments(DatasetType.TEST_SUITE, "test_suite"));
+                    arguments(DatasetType.TEST_SUITE, "evaluation_suite"));
         }
 
         @Test
