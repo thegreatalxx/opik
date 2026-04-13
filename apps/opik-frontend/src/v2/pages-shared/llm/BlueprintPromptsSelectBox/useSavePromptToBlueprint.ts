@@ -13,6 +13,7 @@ import {
 } from "@/types/prompts";
 import useAgentConfigById from "@/api/agent-configs/useAgentConfigById";
 import useAgentConfigCreateMutation from "@/api/agent-configs/useAgentConfigCreateMutation";
+import useAgentConfigPostMutation from "@/api/agent-configs/useAgentConfigPostMutation";
 import useConfigHistoryListInfinite from "@/api/agent-configs/useConfigHistoryListInfinite";
 import useCreatePromptVersionMutation from "@/api/prompts/useCreatePromptVersionMutation";
 import usePromptCreateMutation from "@/api/prompts/usePromptCreateMutation";
@@ -65,10 +66,16 @@ const useSavePromptToBlueprint = (
     useCreatePromptVersionMutation();
   const { mutateAsync: createPrompt, isPending: isCreatingPrompt } =
     usePromptCreateMutation();
-  const { mutateAsync: createBlueprint, isPending: isCreatingBlueprint } =
+  const { mutateAsync: postBlueprint, isPending: isPostingBlueprint } =
+    useAgentConfigPostMutation();
+  const { mutateAsync: patchBlueprint, isPending: isPatchingBlueprint } =
     useAgentConfigCreateMutation();
 
-  const isSaving = isCreatingVersion || isCreatingPrompt || isCreatingBlueprint;
+  const isSaving =
+    isCreatingVersion ||
+    isCreatingPrompt ||
+    isPostingBlueprint ||
+    isPatchingBlueprint;
 
   const invalidateAfterSave = useCallback(
     (commit: string) => {
@@ -141,6 +148,7 @@ const useSavePromptToBlueprint = (
         value: commit,
       };
 
+      const hasExistingBlueprint = !!latestBlueprintFull;
       const values: BlueprintValue[] = [
         ...(latestBlueprintFull?.values?.map(stripValueForPayload) ?? []),
         newValue,
@@ -148,7 +156,8 @@ const useSavePromptToBlueprint = (
 
       let blueprintIdForRef: string;
       try {
-        const { id } = await createBlueprint({
+        const mutation = hasExistingBlueprint ? patchBlueprint : postBlueprint;
+        const { id } = await mutation({
           agentConfig: {
             project_id: projectId,
             blueprint: { type: BlueprintType.BLUEPRINT, values },
@@ -170,7 +179,8 @@ const useSavePromptToBlueprint = (
     [
       latestBlueprintFull,
       createPrompt,
-      createBlueprint,
+      patchBlueprint,
+      postBlueprint,
       projectId,
       invalidateAfterSave,
     ],
