@@ -77,6 +77,8 @@ const HistoryPopover: React.FC<HistoryPopoverProps> = ({
       >
         {items.map((item, index) => {
           const isSelected = index === selectedIndex;
+          const blueprintDescription =
+            item.description || generateBlueprintDescription(item.values);
 
           return (
             <button
@@ -99,15 +101,9 @@ const HistoryPopover: React.FC<HistoryPopoverProps> = ({
               <div className="mt-1 flex flex-col gap-1 pl-[18px]">
                 <p className="comet-body-xs flex min-w-0 items-center gap-1 text-light-slate">
                   <FilePen className="size-3 shrink-0" />
-                  <TooltipWrapper
-                    content={
-                      item.description ||
-                      generateBlueprintDescription(item.values)
-                    }
-                  >
+                  <TooltipWrapper content={blueprintDescription}>
                     <span className="w-fit max-w-full truncate">
-                      {item.description ||
-                        generateBlueprintDescription(item.values)}
+                      {blueprintDescription}
                     </span>
                   </TooltipWrapper>
                 </p>
