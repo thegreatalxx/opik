@@ -27,6 +27,21 @@ const parseTemplateJson = (template: string | undefined): unknown => {
   }
 };
 
+// True when the playground messages still match the chat template stored on
+// the loaded prompt version. Returns false if anything fails to parse.
+const matchesChatTemplate = (
+  template: string,
+  current: Array<{ role: string; content: unknown }>,
+): boolean => {
+  let libraryMessages: NormalizedMessage[];
+  try {
+    libraryMessages = normalizeForComparison(JSON.parse(template));
+  } catch {
+    return false;
+  }
+  return isEqual(normalizeForComparison(current), libraryMessages);
+};
+
 interface VersionData {
   id: string;
   template?: string;
@@ -60,7 +75,12 @@ export function useHydratePromptMetadata() {
     async (
       prompt: PlaygroundPromptType,
     ): Promise<PromptLibraryMetadata | undefined> => {
-      // For prompts loaded from an agent configuration blueprint
+      const currentMessages = prompt.messages.map((m) => ({
+        role: m.role,
+        content: m.content,
+      }));
+
+      // Loaded from an agent configuration blueprint
       const blueprintRef = prompt.loadedBlueprintRef;
       if (blueprintRef) {
         try {
@@ -69,22 +89,8 @@ export function useHydratePromptMetadata() {
           });
           const version = commitData.requested_version;
           if (!version?.template) return undefined;
-
-          let libraryMessages: NormalizedMessage[];
-          try {
-            const parsed = JSON.parse(version.template);
-            libraryMessages = normalizeForComparison(parsed);
-          } catch {
+          if (!matchesChatTemplate(version.template, currentMessages))
             return undefined;
-          }
-
-          const currentMessages = normalizeForComparison(
-            prompt.messages.map((m) => ({ role: m.role, content: m.content })),
-          );
-
-          if (!isEqual(currentMessages, libraryMessages)) {
-            return undefined;
-          }
 
           return buildMetadata(
             {
@@ -104,46 +110,27 @@ export function useHydratePromptMetadata() {
         }
       }
 
-      // For CHAT prompts - check prompt-level library link
+      // Loaded from a CHAT prompt in the library (legacy path)
       const chatPromptId = prompt.loadedChatPromptId;
       if (chatPromptId) {
         try {
           const promptData = await fetchPrompt({ promptId: chatPromptId });
-
           if (!promptData?.latest_version?.id) return undefined;
 
-          // Fetch the version data for more accurate comparison
           let versionData: PromptVersion | undefined;
           try {
             versionData = await fetchPromptVersion({
               versionId: promptData.latest_version.id,
             });
           } catch {
-            // Fall back to latest_version from prompt data
+            // Fall back to latest_version embedded in the prompt response
           }
 
           const templateToCompare =
             versionData?.template ?? promptData.latest_version.template;
-
           if (!templateToCompare) return undefined;
-
-          // Parse the library template for comparison
-          let libraryMessages: NormalizedMessage[];
-          try {
-            const parsed = JSON.parse(templateToCompare);
-            libraryMessages = normalizeForComparison(parsed);
-          } catch {
+          if (!matchesChatTemplate(templateToCompare, currentMessages))
             return undefined;
-          }
-
-          // Compare current messages to library template
-          const currentMessages = normalizeForComparison(
-            prompt.messages.map((m) => ({ role: m.role, content: m.content })),
-          );
-
-          if (!isEqual(currentMessages, libraryMessages)) {
-            return undefined; // Prompt was edited
-          }
 
           return buildMetadata(promptData, {
             id: versionData?.id ?? promptData.latest_version.id,
