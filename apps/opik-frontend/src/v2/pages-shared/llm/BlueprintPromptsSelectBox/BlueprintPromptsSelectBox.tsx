@@ -5,6 +5,7 @@ import { Button } from "@/ui/button";
 import LoadableSelectBox from "@/shared/LoadableSelectBox/LoadableSelectBox";
 import TooltipWrapper from "@/shared/TooltipWrapper/TooltipWrapper";
 import useConfigHistoryListInfinite from "@/api/agent-configs/useConfigHistoryListInfinite";
+import useAgentConfigById from "@/api/agent-configs/useAgentConfigById";
 import { BlueprintValueType } from "@/types/agent-configs";
 import { BlueprintPromptRef } from "@/types/playground";
 
@@ -65,15 +66,23 @@ const BlueprintPromptsSelectBox: React.FC<BlueprintPromptsSelectBoxProps> = ({
 }) => {
   const [open, setOpen] = useState(false);
 
-  const { data, isLoading } = useConfigHistoryListInfinite({ projectId });
-  const latestBlueprint = data?.pages?.[0]?.content?.[0];
+  const { data: history, isLoading: isLoadingHistory } =
+    useConfigHistoryListInfinite({ projectId });
+  const latestBlueprintId = history?.pages?.[0]?.content?.[0]?.id;
+
+  // The history list returns a summary; fetch the full blueprint to get
+  // PROMPT-typed values, mirroring AgentConfigurationDetailView.
+  const { data: blueprint, isLoading: isLoadingBlueprint } = useAgentConfigById(
+    { blueprintId: latestBlueprintId ?? "" },
+  );
+
+  const isLoading = isLoadingHistory || isLoadingBlueprint;
 
   const promptValues = useMemo(
     () =>
-      latestBlueprint?.values?.filter(
-        (v) => v.type === BlueprintValueType.PROMPT,
-      ) ?? [],
-    [latestBlueprint],
+      blueprint?.values?.filter((v) => v.type === BlueprintValueType.PROMPT) ??
+      [],
+    [blueprint],
   );
 
   const options = useMemo(
@@ -84,14 +93,14 @@ const BlueprintPromptsSelectBox: React.FC<BlueprintPromptsSelectBoxProps> = ({
   const handleChange = useCallback(
     (key: string) => {
       const match = promptValues.find((v) => v.key === key);
-      if (!match || !latestBlueprint) return;
+      if (!match || !latestBlueprintId) return;
       onValueChange({
-        blueprintId: latestBlueprint.id,
+        blueprintId: latestBlueprintId,
         key: match.key,
         commitId: match.value,
       });
     },
-    [latestBlueprint, promptValues, onValueChange],
+    [latestBlueprintId, promptValues, onValueChange],
   );
 
   if (value) {
