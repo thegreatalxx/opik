@@ -5,21 +5,55 @@ import { Button } from "@/ui/button";
 import LoadableSelectBox from "@/shared/LoadableSelectBox/LoadableSelectBox";
 import TooltipWrapper from "@/shared/TooltipWrapper/TooltipWrapper";
 import useConfigHistoryListInfinite from "@/api/agent-configs/useConfigHistoryListInfinite";
-import {
-  BlueprintValue,
-  BlueprintValueType,
-  ConfigHistoryItem,
-} from "@/types/agent-configs";
+import { BlueprintValueType } from "@/types/agent-configs";
 import { BlueprintPromptRef } from "@/types/playground";
 
 interface BlueprintPromptsSelectBoxProps {
   projectId: string;
   value?: BlueprintPromptRef;
-  onValueChange: (value?: BlueprintPromptRef) => void;
+  onValueChange: (value: BlueprintPromptRef) => void;
   onClear?: () => void;
   hasUnsavedChanges?: boolean;
   disabled?: boolean;
 }
+
+interface LoadedDisplayProps {
+  promptKey: string;
+  hasUnsavedChanges: boolean;
+  onClear?: () => void;
+}
+
+const LoadedDisplay: React.FC<LoadedDisplayProps> = ({
+  promptKey,
+  hasUnsavedChanges,
+  onClear,
+}) => (
+  <div className="flex min-w-0 items-center px-1">
+    <TooltipWrapper content={hasUnsavedChanges ? "Unsaved changes" : promptKey}>
+      <div className="flex min-w-0 items-center gap-1">
+        <FileTerminal className="size-3.5 shrink-0 text-[#b8e54a]" />
+        <span className="comet-body-xs-accented truncate text-light-slate">
+          {promptKey}
+        </span>
+        {hasUnsavedChanges && (
+          <span className="mb-auto size-1 shrink-0 rounded-full bg-warning" />
+        )}
+      </div>
+    </TooltipWrapper>
+    {onClear && (
+      <TooltipWrapper content="Detach prompt">
+        <Button
+          variant="minimal"
+          size="icon-xs"
+          className="shrink-0"
+          onClick={onClear}
+        >
+          <XCircle />
+        </Button>
+      </TooltipWrapper>
+    )}
+  </div>
+);
 
 const BlueprintPromptsSelectBox: React.FC<BlueprintPromptsSelectBoxProps> = ({
   projectId,
@@ -32,13 +66,9 @@ const BlueprintPromptsSelectBox: React.FC<BlueprintPromptsSelectBoxProps> = ({
   const [open, setOpen] = useState(false);
 
   const { data, isLoading } = useConfigHistoryListInfinite({ projectId });
+  const latestBlueprint = data?.pages?.[0]?.content?.[0];
 
-  const latestBlueprint: ConfigHistoryItem | undefined = useMemo(
-    () => data?.pages?.[0]?.content?.[0],
-    [data],
-  );
-
-  const promptValues: BlueprintValue[] = useMemo(
+  const promptValues = useMemo(
     () =>
       latestBlueprint?.values?.filter(
         (v) => v.type === BlueprintValueType.PROMPT,
@@ -66,33 +96,11 @@ const BlueprintPromptsSelectBox: React.FC<BlueprintPromptsSelectBoxProps> = ({
 
   if (value) {
     return (
-      <div className="flex min-w-0 items-center px-1">
-        <TooltipWrapper
-          content={hasUnsavedChanges ? "Unsaved changes" : value.key}
-        >
-          <div className="flex min-w-0 items-center gap-1">
-            <FileTerminal className="size-3.5 shrink-0 text-[#b8e54a]" />
-            <span className="comet-body-xs-accented truncate text-light-slate">
-              {value.key}
-            </span>
-            {hasUnsavedChanges && (
-              <span className="mb-auto size-1 shrink-0 rounded-full bg-warning" />
-            )}
-          </div>
-        </TooltipWrapper>
-        {onClear && (
-          <TooltipWrapper content="Detach prompt">
-            <Button
-              variant="minimal"
-              size="icon-xs"
-              className="shrink-0"
-              onClick={onClear}
-            >
-              <XCircle />
-            </Button>
-          </TooltipWrapper>
-        )}
-      </div>
+      <LoadedDisplay
+        promptKey={value.key}
+        hasUnsavedChanges={hasUnsavedChanges}
+        onClear={onClear}
+      />
     );
   }
 
