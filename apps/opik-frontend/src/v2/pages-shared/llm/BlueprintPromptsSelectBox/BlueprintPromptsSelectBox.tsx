@@ -10,12 +10,7 @@ import {
   BlueprintValueType,
   ConfigHistoryItem,
 } from "@/types/agent-configs";
-
-export interface BlueprintPromptRef {
-  blueprintId: string;
-  key: string;
-  commitId: string;
-}
+import { BlueprintPromptRef } from "@/types/playground";
 
 interface BlueprintPromptsSelectBoxProps {
   projectId: string;
