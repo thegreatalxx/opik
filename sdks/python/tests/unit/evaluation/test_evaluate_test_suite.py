@@ -72,7 +72,8 @@ def test_evaluate_test_suite__creates_experiment_with_evaluation_method_test_sui
 
     mock_client.create_experiment.assert_called_once()
     call_kwargs = mock_client.create_experiment.call_args[1]
-    assert call_kwargs["evaluation_method"] == "test_suite"
+    # TODO: OPIK-5795 - migrate DB value from 'evaluation_suite' to 'test_suite'
+    assert call_kwargs["evaluation_method"] == "evaluation_suite"
 
 
 def test_evaluate_test_suite__passes_evaluation_method_not_dataset():
@@ -118,7 +119,8 @@ def test_evaluate_test_suite__passes_evaluation_method_not_dataset():
 
     call_kwargs = mock_client.create_experiment.call_args[1]
     assert call_kwargs["evaluation_method"] != "dataset"
-    assert call_kwargs["evaluation_method"] == "test_suite"
+    # TODO: OPIK-5795 - migrate DB value from 'evaluation_suite' to 'test_suite'
+    assert call_kwargs["evaluation_method"] == "evaluation_suite"
 
 
 def _call_evaluate_test_suite(optimization_id, items):
