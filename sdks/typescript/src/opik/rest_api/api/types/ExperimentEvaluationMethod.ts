@@ -2,6 +2,6 @@
 
 export const ExperimentEvaluationMethod = {
     Dataset: "dataset",
-    TestSuite: "test_suite",
+    EvaluationSuite: "evaluation_suite",
 } as const;
 export type ExperimentEvaluationMethod = (typeof ExperimentEvaluationMethod)[keyof typeof ExperimentEvaluationMethod];

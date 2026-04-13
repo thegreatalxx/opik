@@ -11755,7 +11755,7 @@ components:
           type: string
           enum:
           - dataset
-          - test_suite
+          - evaluation_suite
         visibility:
           type: string
           enum:
@@ -11875,7 +11875,7 @@ components:
           type: string
           enum:
           - dataset
-          - test_suite
+          - evaluation_suite
         visibility:
           type: string
           enum:
@@ -12984,7 +12984,7 @@ components:
           type: string
           enum:
           - dataset
-          - test_suite
+          - evaluation_suite
         visibility:
           type: string
           enum:
@@ -13688,7 +13688,7 @@ components:
           type: string
           enum:
           - dataset
-          - test_suite
+          - evaluation_suite
         optimization_id:
           type: string
           format: uuid
@@ -13871,7 +13871,7 @@ components:
           type: string
           enum:
           - dataset
-          - test_suite
+          - evaluation_suite
         optimization_id:
           type: string
           format: uuid
@@ -14751,7 +14751,7 @@ components:
           type: string
           enum:
           - dataset
-          - test_suite
+          - evaluation_suite
         optimization_id:
           type: string
           format: uuid

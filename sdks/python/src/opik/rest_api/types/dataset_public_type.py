@@ -2,4 +2,4 @@
 
 import typing
 
-DatasetPublicType = typing.Union[typing.Literal["dataset", "test_suite"], typing.Any]
+DatasetPublicType = typing.Union[typing.Literal["dataset", "evaluation_suite"], typing.Any]

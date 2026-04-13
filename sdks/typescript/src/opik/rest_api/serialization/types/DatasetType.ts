@@ -5,8 +5,8 @@ import * as core from "../../core/index.js";
 import type * as serializers from "../index.js";
 
 export const DatasetType: core.serialization.Schema<serializers.DatasetType.Raw, OpikApi.DatasetType> =
-    core.serialization.enum_(["dataset", "test_suite"]);
+    core.serialization.enum_(["dataset", "evaluation_suite"]);
 
 export declare namespace DatasetType {
-    export type Raw = "dataset" | "test_suite";
+    export type Raw = "dataset" | "evaluation_suite";
 }

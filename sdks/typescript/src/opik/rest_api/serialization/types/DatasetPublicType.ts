@@ -7,8 +7,8 @@ import type * as serializers from "../index.js";
 export const DatasetPublicType: core.serialization.Schema<
     serializers.DatasetPublicType.Raw,
     OpikApi.DatasetPublicType
-> = core.serialization.enum_(["dataset", "test_suite"]);
+> = core.serialization.enum_(["dataset", "evaluation_suite"]);
 
 export declare namespace DatasetPublicType {
-    export type Raw = "dataset" | "test_suite";
+    export type Raw = "dataset" | "evaluation_suite";
 }

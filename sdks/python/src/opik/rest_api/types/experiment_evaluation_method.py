@@ -2,4 +2,4 @@
 
 import typing
 
-ExperimentEvaluationMethod = typing.Union[typing.Literal["dataset", "test_suite"], typing.Any]
+ExperimentEvaluationMethod = typing.Union[typing.Literal["dataset", "evaluation_suite"], typing.Any]
