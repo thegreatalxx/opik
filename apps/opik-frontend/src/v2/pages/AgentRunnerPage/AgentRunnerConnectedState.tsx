@@ -1,10 +1,12 @@
 import React, { useCallback, useMemo, useRef, useState } from "react";
-import { Loader2, Save } from "lucide-react";
+import { ArrowRight, ArrowUpRight, Loader2, Save } from "lucide-react";
 import { useNavigate } from "@tanstack/react-router";
+import { useQueryClient } from "@tanstack/react-query";
 
+import { AGENT_CONFIGS_KEY } from "@/api/api";
+import { ConfigHistoryItem } from "@/types/agent-configs";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/ui/tabs";
 import { Button } from "@/ui/button";
-import { Tag } from "@/ui/tag";
 import { ToastAction } from "@/ui/toast";
 import { useToast } from "@/ui/use-toast";
 import useAppStore from "@/store/AppStore";
@@ -54,6 +56,7 @@ const AgentRunnerConnectedState: React.FC<AgentRunnerConnectedStateProps> = ({
     isSaving: false,
     hasErrors: false,
     collapsibleKeys: [],
+    hasExpandableFields: false,
   });
 
   const controller = useFieldsCollapse({
@@ -115,14 +118,35 @@ const AgentRunnerConnectedState: React.FC<AgentRunnerConnectedStateProps> = ({
     await configEditRef.current?.save();
   }, []);
 
+  const queryClient = useQueryClient();
+
+  const resolveSavedVersionName = useCallback(
+    async (newBlueprintId?: string): Promise<string | undefined> => {
+      if (!newBlueprintId) return undefined;
+      const fromCurrent = allVersions.find((v) => v.id === newBlueprintId);
+      if (fromCurrent) return fromCurrent.name;
+      const queryKey = [AGENT_CONFIGS_KEY, "history", { projectId }];
+      await queryClient.refetchQueries({ queryKey });
+      type Page = { content: ConfigHistoryItem[] };
+      const data = queryClient.getQueryData<{ pages: Page[] }>(queryKey);
+      const found = data?.pages
+        ?.flatMap((p) => p.content)
+        ?.find((v) => v.id === newBlueprintId);
+      return found?.name;
+    },
+    [allVersions, queryClient, projectId],
+  );
+
   const handleConfigSaved = useCallback(
-    (savedVersionName?: string) => {
+    async (newBlueprintId?: string) => {
       setSelectedVersionId("");
+      const versionName = await resolveSavedVersionName(newBlueprintId);
+      const description = versionName
+        ? `You've created ${versionName} of agent configuration. You can deploy it from Agent configuration page.`
+        : "You've created a new version of agent configuration. You can deploy it from Agent configuration page.";
       toast({
         title: "New agent configuration saved",
-        description: savedVersionName
-          ? `You've created a new version of ${savedVersionName}. You can deploy it from the Agent configuration page.`
-          : "You can deploy it from the Agent configuration page.",
+        description,
         actions: [
           <ToastAction
             key="manage"
@@ -137,11 +161,12 @@ const AgentRunnerConnectedState: React.FC<AgentRunnerConnectedStateProps> = ({
             }
           >
             Manage agent configuration
+            <ArrowRight className="ml-1 size-3.5" />
           </ToastAction>,
         ],
       });
     },
-    [toast, navigate, workspaceName, projectId],
+    [toast, navigate, workspaceName, projectId, resolveSavedVersionName],
   );
 
   return (
@@ -205,12 +230,13 @@ const AgentRunnerConnectedState: React.FC<AgentRunnerConnectedStateProps> = ({
                   )}
                 />
                 {editState.isDirty && (
-                  <Tag variant="orange" size="sm">
-                    Unsaved changes
-                  </Tag>
+                  <span className="comet-body-xs flex items-center gap-1 text-muted-slate">
+                    <span className="size-1.5 rounded-full bg-destructive" />
+                    Edited
+                  </span>
                 )}
                 <div className="ml-auto flex items-center gap-1">
-                  {editState.collapsibleKeys.length > 0 && (
+                  {editState.hasExpandableFields && (
                     <ExpandAllToggle controller={controller} />
                   )}
                   <Button
@@ -225,6 +251,7 @@ const AgentRunnerConnectedState: React.FC<AgentRunnerConnectedStateProps> = ({
                   >
                     <Save className="mr-1 size-3.5" />
                     {editState.isSaving ? "Saving…" : "Save configuration"}
+                    <ArrowUpRight className="ml-1 size-3.5" />
                   </Button>
                 </div>
               </div>

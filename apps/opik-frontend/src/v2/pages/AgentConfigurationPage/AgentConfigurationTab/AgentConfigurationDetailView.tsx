@@ -4,6 +4,7 @@ import { Clock, FilePen, Pencil, User } from "lucide-react";
 import { ConfigHistoryItem } from "@/types/agent-configs";
 import { formatDate, getTimeFromNow } from "@/lib/date";
 import Loader from "@/shared/Loader/Loader";
+import { cn } from "@/lib/utils";
 import { Card } from "@/ui/card";
 import DeployToPopover from "./DeployToPopover";
 import BlueprintValuesList from "@/v2/pages-shared/traces/ConfigurationTab/BlueprintValuesList";
@@ -21,9 +22,12 @@ import DiffVersionPopover from "./DiffVersionPopover";
 import AgentConfigTagList from "./AgentConfigTagList";
 import ExpandAllToggle from "@/v2/pages-shared/agent-configuration/fields/ExpandAllToggle";
 import { useFieldsCollapse } from "@/v2/pages-shared/agent-configuration/fields/useFieldsCollapse";
-import { collectMultiLineKeys } from "@/v2/pages-shared/agent-configuration/fields/blueprintFieldLayout";
+import {
+  collectMultiLineKeys,
+  hasAnyExpandableField,
+} from "@/v2/pages-shared/agent-configuration/fields/blueprintFieldLayout";
 
-const DESCRIPTION_TRUNCATE_LENGTH = 140;
+const DESCRIPTION_TRUNCATE_LENGTH = 80;
 
 type AgentConfigurationDetailViewProps = {
   item: ConfigHistoryItem;
@@ -76,13 +80,13 @@ const AgentConfigurationDetailView: React.FC<
     item.description || generateBlueprintDescription(item.values);
 
   const descriptionIsLong = description.length > DESCRIPTION_TRUNCATE_LENGTH;
-  const displayedDescription =
-    !descriptionIsLong || notesExpanded
-      ? description
-      : description.slice(0, DESCRIPTION_TRUNCATE_LENGTH).trimEnd() + "…";
 
   const collapsibleKeys = useMemo(
     () => collectMultiLineKeys(agentConfig?.values ?? []),
+    [agentConfig],
+  );
+  const hasExpandableFields = useMemo(
+    () => hasAnyExpandableField(agentConfig?.values ?? []),
     [agentConfig],
   );
   const collapseController = useFieldsCollapse({ collapsibleKeys });
@@ -131,26 +135,38 @@ const AgentConfigurationDetailView: React.FC<
               />
             )}
             <Button size="xs" variant="outline" onClick={onEdit}>
-              <Pencil className="mr-1.5 size-3.5" />
+              <Pencil className="mr-1.5 size-3.5 text-light-slate" />
               Edit configuration
             </Button>
           </div>
         </div>
-        <p className="comet-body-s flex w-full min-w-0 items-start gap-1 text-light-slate">
+        <div className="comet-body-s flex w-full min-w-0 items-start gap-1 text-light-slate">
           <FilePen className="mt-1 size-3 shrink-0" />
-          <span className="min-w-0 break-words">
-            {displayedDescription}
+          <div
+            className={cn(
+              "flex min-w-0 flex-1 items-baseline gap-1",
+              notesExpanded && "flex-wrap",
+            )}
+          >
+            <span
+              className={cn(
+                "min-w-0",
+                notesExpanded ? "break-words" : "truncate",
+              )}
+            >
+              {description}
+            </span>
             {descriptionIsLong && (
               <button
                 type="button"
-                className="ml-1 text-primary hover:underline"
+                className="shrink-0 text-light-slate underline"
                 onClick={() => setNotesExpanded((v) => !v)}
               >
                 {notesExpanded ? "Show less" : "Show more"}
               </button>
             )}
-          </span>
-        </p>
+          </div>
+        </div>
         <div className="comet-body-s mt-1 flex items-center gap-1 text-light-slate">
           <Clock className="size-3 shrink-0" />
           <TooltipWrapper
@@ -163,7 +179,7 @@ const AgentConfigurationDetailView: React.FC<
           </TooltipWrapper>
           <User className="ml-1.5 size-3.5 shrink-0" />
           <span>{item.created_by}</span>
-          {collapsibleKeys.length > 0 && (
+          {hasExpandableFields && (
             <div className="ml-auto">
               <ExpandAllToggle controller={collapseController} />
             </div>

@@ -1,31 +1,35 @@
 import React from "react";
-import { ChevronsDownUp, ChevronsUpDown } from "lucide-react";
+import { FoldVertical, UnfoldVertical } from "lucide-react";
 
 import { Button } from "@/ui/button";
+import TooltipWrapper from "@/shared/TooltipWrapper/TooltipWrapper";
 import { FieldsCollapseController } from "./useFieldsCollapse";
 
 type ExpandAllToggleProps = {
   controller: FieldsCollapseController;
-  size?: "xs" | "2xs";
+  size?: "icon-xs" | "icon-2xs" | "icon-sm";
 };
 
 const ExpandAllToggle: React.FC<ExpandAllToggleProps> = ({
   controller,
-  size = "2xs",
+  size = "icon-2xs",
 }) => {
   const label = controller.allExpanded ? "Collapse all" : "Expand all";
   const onClick = () =>
     controller.allExpanded ? controller.collapseAll() : controller.expandAll();
+  const Icon = controller.allExpanded ? FoldVertical : UnfoldVertical;
 
   return (
-    <Button variant="ghost" size={size} onClick={onClick}>
-      {controller.allExpanded ? (
-        <ChevronsDownUp className="mr-1 size-3.5" />
-      ) : (
-        <ChevronsUpDown className="mr-1 size-3.5" />
-      )}
-      {label}
-    </Button>
+    <TooltipWrapper content={label}>
+      <Button
+        variant="outline"
+        size={size}
+        onClick={onClick}
+        aria-label={label}
+      >
+        <Icon className="text-light-slate" />
+      </Button>
+    </TooltipWrapper>
   );
 };
 

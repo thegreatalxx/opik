@@ -3,8 +3,9 @@ import React, { useMemo } from "react";
 import { BlueprintValue, BlueprintValueType } from "@/types/agent-configs";
 import { formatBlueprintValue } from "@/utils/agent-configurations";
 import BlueprintTypeIcon from "./BlueprintTypeIcon";
-import BlueprintValuePrompt from "./BlueprintValuePrompt";
-import CollapsibleField from "@/v2/pages-shared/agent-configuration/fields/CollapsibleField";
+import BlueprintValuePromptCompact from "@/v2/pages-shared/agent-configuration/fields/BlueprintValuePromptCompact";
+import FieldSection from "@/v2/pages-shared/agent-configuration/fields/FieldSection";
+import CollapsibleBlock from "@/v2/pages-shared/agent-configuration/fields/CollapsibleBlock";
 import {
   collectMultiLineKeys,
   isMultiLineField,
@@ -14,17 +15,11 @@ import {
   useFieldsCollapse,
 } from "@/v2/pages-shared/agent-configuration/fields/useFieldsCollapse";
 
-const renderValue = (v: BlueprintValue) => {
-  if (v.type === BlueprintValueType.PROMPT) {
-    return <BlueprintValuePrompt key={v.value} value={v} />;
-  }
-
-  return (
-    <div className="comet-body-s whitespace-pre-wrap break-words text-foreground">
-      {formatBlueprintValue(v)}
-    </div>
-  );
-};
+const renderScalarValue = (v: BlueprintValue) => (
+  <div className="comet-body-s whitespace-pre-wrap break-words text-foreground">
+    {formatBlueprintValue(v)}
+  </div>
+);
 
 type BlueprintValuesListProps = {
   values: BlueprintValue[];
@@ -40,22 +35,35 @@ const BlueprintValuesList: React.FC<BlueprintValuesListProps> = ({
   const controller = externalController ?? internalController;
 
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex flex-col gap-4">
       {values.map((v) => {
-        const collapsible = isMultiLineField(v);
+        const isPrompt = v.type === BlueprintValueType.PROMPT;
+        const collapsible = !isPrompt && isMultiLineField(v);
         return (
-          <CollapsibleField
+          <FieldSection
             key={v.key}
-            fieldKey={v.key}
             label={v.key}
             description={v.description}
             icon={<BlueprintTypeIcon type={v.type} />}
-            collapsible={collapsible}
-            expanded={controller.isExpanded(v.key)}
-            onToggle={() => controller.toggle(v.key)}
+            testId={`field-section-${v.key}`}
           >
-            {renderValue(v)}
-          </CollapsibleField>
+            {isPrompt ? (
+              <BlueprintValuePromptCompact
+                key={v.value}
+                value={v}
+                controller={controller}
+              />
+            ) : (
+              <CollapsibleBlock
+                collapsible={collapsible}
+                expanded={controller.isExpanded(v.key)}
+                onToggle={() => controller.toggle(v.key)}
+                testId={`field-block-${v.key}`}
+              >
+                {renderScalarValue(v)}
+              </CollapsibleBlock>
+            )}
+          </FieldSection>
         );
       })}
     </div>
