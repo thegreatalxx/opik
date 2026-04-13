@@ -22,7 +22,7 @@ from ..api_objects.experiment import helpers as experiment_helpers
 from ..api_objects.dataset import execution_policy as dataset_execution_policy
 from ..api_objects.prompt.chat import chat_prompt_template
 from ..api_objects.prompt import types as prompt_types
-from ..api_objects.dataset import test_suite
+from ..api_objects.dataset import test_suite as test_suite_module
 from . import (
     asyncio_support,
     engine,
@@ -150,7 +150,7 @@ def _compute_experiment_scores(
 
 
 def evaluate(
-    dataset: Union[dataset.Dataset, dataset.DatasetVersion, test_suite.TestSuite],
+    dataset: Union[dataset.Dataset, dataset.DatasetVersion],
     task: LLMTask,
     scoring_metrics: Optional[List[base_metric.BaseMetric]] = None,
     scoring_functions: Optional[List[scorer_function.ScorerFunction]] = None,
@@ -256,7 +256,7 @@ def evaluate(
             - `data.category = "test"` - Items with specific data field value
             - `created_at >= "2024-01-01T00:00:00Z"` - Items created after date
     """
-    if isinstance(dataset, test_suite.TestSuite):
+    if isinstance(dataset, test_suite_module.TestSuite):
         # backwards compatibility for transition period
         dataset = dataset.dataset
 
@@ -428,7 +428,7 @@ def __internal_api__run_test_suite__(
 
 
 def run_tests(
-    test_suite: test_suite.TestSuite,
+    test_suite: Union[test_suite_module.TestSuite, test_suite_module.TestSuiteVersion],
     task: LLMTask,
     *,
     experiment_name: Optional[str] = None,
@@ -446,13 +446,16 @@ def run_tests(
     """
     Run a test suite against a task function.
 
+    Accepts either a :class:`TestSuite` (runs against the latest version) or
+    a :class:`TestSuiteVersion` (runs against a specific version snapshot).
+
     The task function receives each test item's data dict and must return
     either a dict (with ``"input"`` and ``"output"`` keys) or any other
     value, which will be automatically wrapped as
     ``{"input": <item data>, "output": <returned value>}``.
 
     Args:
-        test_suite: The test suite to run.
+        test_suite: The test suite or test suite version to run.
         task: A callable that takes a dict and returns a result.
         experiment_name: Optional explicit name for the experiment.
         experiment_name_prefix: Optional prefix for auto-generated name.
@@ -478,10 +481,16 @@ def run_tests(
         ... )
         >>> print(f"Pass rate: {result.pass_rate:.0%}")
     """
+    if isinstance(test_suite, test_suite_module.TestSuiteVersion):
+        suite_dataset = test_suite._dataset_version
+    else:
+        suite_dataset = test_suite._dataset
+    client = suite_dataset.client
+
     return __internal_api__run_test_suite__(
-        suite_dataset=test_suite._dataset,
+        suite_dataset=suite_dataset,
         task=task,
-        client=test_suite._client,
+        client=client,
         experiment_name_prefix=experiment_name_prefix,
         experiment_name=experiment_name,
         project_name=project_name or test_suite.project_name,
@@ -871,7 +880,7 @@ def _build_prompt_evaluation_task(
 
 
 def evaluate_prompt(
-    dataset: Union[dataset.Dataset, dataset.DatasetVersion, test_suite.TestSuite],
+    dataset: Union[dataset.Dataset, dataset.DatasetVersion],
     messages: List[Dict[str, Any]],
     model: Optional[Union[str, base_model.OpikBaseModel]] = None,
     scoring_metrics: Optional[List[base_metric.BaseMetric]] = None,
@@ -958,7 +967,7 @@ def evaluate_prompt(
             - `data.category = "test"` - Items with specific data field value
             - `created_at >= "2024-01-01T00:00:00Z"` - Items created after date
     """
-    if isinstance(dataset, test_suite.TestSuite):
+    if isinstance(dataset, test_suite_module.TestSuite):
         # backwards compatibility for transition period
         dataset = dataset.dataset
 
@@ -1093,7 +1102,7 @@ def evaluate_prompt(
 
 def evaluate_optimization_trial(
     optimization_id: str,
-    dataset: Union[dataset.Dataset, dataset.DatasetVersion, test_suite.TestSuite],
+    dataset: Union[dataset.Dataset, dataset.DatasetVersion],
     task: LLMTask,
     scoring_metrics: Optional[List[base_metric.BaseMetric]] = None,
     scoring_functions: Optional[List[scorer_function.ScorerFunction]] = None,
@@ -1198,7 +1207,7 @@ def evaluate_optimization_trial(
             - `data.category = "test"` - Items with specific data field value
             - `created_at >= "2024-01-01T00:00:00Z"` - Items created after date
     """
-    if isinstance(dataset, test_suite.TestSuite):
+    if isinstance(dataset, test_suite_module.TestSuite):
         # backwards compatibility for transition period
         dataset = dataset.dataset
 

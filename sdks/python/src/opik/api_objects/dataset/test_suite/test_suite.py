@@ -16,11 +16,14 @@ if TYPE_CHECKING:
     from opik.api_objects import opik_client as opik_client_module
     from opik.evaluation.suite_evaluators.llm_judge import LLMJudge
 
+import datetime
+
 from opik import id_helpers
 from opik import exceptions as opik_exceptions
 from opik.api_objects.prompt import base_prompt
 from opik.api_objects.dataset import dataset, dataset_item
-from . import types as suite_types
+from opik.rest_api.types import dataset_version_public
+from . import types as suite_types, converters
 from .report_processors import displayer, file_writer
 from .. import validators, execution_policy, rest_operations
 
@@ -77,6 +80,114 @@ def validate_task_result(
     if input_data is not None:
         wrapped["input"] = input_data
     return wrapped
+
+
+class TestSuiteVersion:
+    """
+    A read-only view of a specific test suite version.
+
+    Provides access to suite items, assertions, and execution policy at a
+    specific version point in time. Does not allow mutations.
+
+    Obtain an instance via :meth:`TestSuite.get_version_view`.
+    """
+
+    def __init__(
+        self,
+        name: str,
+        dataset_version: dataset.DatasetVersion,
+        version_info: dataset_version_public.DatasetVersionPublic,
+    ) -> None:
+        self._name = name
+        self._dataset_version = dataset_version
+        self._version_info = version_info
+
+    @property
+    def name(self) -> str:
+        """The name of the test suite this version belongs to."""
+        return self._name
+
+    @property
+    def id(self) -> str:
+        """The dataset ID of the test suite."""
+        return self._dataset_version.dataset_id
+
+    @property
+    def version_name(self) -> Optional[str]:
+        """The sequential version name (e.g., 'v1', 'v2')."""
+        return self._version_info.version_name
+
+    @property
+    def version_id(self) -> Optional[str]:
+        """The unique identifier of this specific version."""
+        return self._version_info.id
+
+    @property
+    def is_latest(self) -> Optional[bool]:
+        """Whether this is the latest version."""
+        return self._version_info.is_latest
+
+    @property
+    def items_total(self) -> Optional[int]:
+        """Total number of items in this version."""
+        return self._version_info.items_total
+
+    @property
+    def change_description(self) -> Optional[str]:
+        """Description of changes in this version."""
+        return self._version_info.change_description
+
+    @property
+    def created_at(self) -> Optional[datetime.datetime]:
+        """Timestamp when this version was created."""
+        return self._version_info.created_at
+
+    @property
+    def project_name(self) -> Optional[str]:
+        """The project name associated with the test suite."""
+        return self._dataset_version.project_name
+
+    def get_items(
+        self,
+        nb_samples: Optional[int] = None,
+        filter_string: Optional[str] = None,
+    ) -> List[suite_types.TestSuiteItem]:
+        """
+        Retrieve suite items at this version as a list of dictionaries.
+
+        Args:
+            nb_samples: Maximum number of items to retrieve.
+            filter_string: Optional OQL filter string.
+
+        Returns:
+            A list of item dicts with keys: id, data, description,
+            assertions, execution_policy.
+        """
+        return [
+            converters.dataset_item_to_suite_item_dict(item)
+            for item in self._dataset_version.__internal_api__stream_items_as_dataclasses__(
+                nb_samples=nb_samples,
+                filter_string=filter_string,
+            )
+        ]
+
+    def get_global_assertions(self) -> List[str]:
+        """
+        Get the suite-level assertions stored in this version.
+
+        Returns:
+            List of assertion strings.
+        """
+        return converters.version_evaluators_to_assertions(self._version_info.evaluators)
+
+    def get_global_execution_policy(self) -> execution_policy.ExecutionPolicy:
+        """
+        Get the suite-level execution policy stored in this version.
+
+        Returns:
+            ExecutionPolicy dict with runs_per_item and pass_threshold.
+        """
+        return converters.version_policy_to_execution_policy(self._version_info.execution_policy)
 
 
 class TestSuite:
@@ -172,7 +283,7 @@ class TestSuite:
 
     def get_version_info(
         self,
-    ) -> Optional[Any]:
+    ) -> Optional[dataset_version_public.DatasetVersionPublic]:
         """
         Get version information for the current (latest) version.
 
@@ -182,7 +293,7 @@ class TestSuite:
         """
         return self._dataset.get_version_info()
 
-    def get_version_view(self, version_name: str) -> Any:
+    def get_version_view(self, version_name: str) -> TestSuiteVersion:
         """
         Get a read-only view of a specific version.
 
@@ -190,29 +301,46 @@ class TestSuite:
             version_name: The version name (e.g., 'v1', 'v2').
 
         Returns:
-            A read-only DatasetVersion object for accessing the specified
-            version's items and metadata.
+            A read-only TestSuiteVersion for accessing the specified
+            version's items, assertions, and execution policy.
 
         Raises:
             opik.exceptions.DatasetVersionNotFound: If the version does not
                 exist.
         """
-        return self._dataset.get_version_view(version_name)
+        version_info = rest_operations.find_version_by_name(
+            rest_client=self._dataset._rest_client,
+            dataset_id=self._dataset.id,
+            version_name=version_name,
+        )
+        if version_info is None:
+            raise opik_exceptions.DatasetVersionNotFound(
+                f"Version '{version_name}' not found in test suite '{self._name}'"
+            )
+
+        dataset_version = dataset.DatasetVersion(
+            dataset_name=self._name,
+            dataset_id=self._dataset.id,
+            rest_client=self._dataset._rest_client,
+            version_info=version_info,
+            project_name=self._dataset.project_name,
+        )
+        return TestSuiteVersion(
+            name=self._name,
+            dataset_version=dataset_version,
+            version_info=version_info,
+        )
 
     def get_items(
         self,
         nb_samples: Optional[int] = None,
         filter_string: Optional[str] = None,
-    ) -> List[Dict[str, Any]]:
+    ) -> List[suite_types.TestSuiteItem]:
         """
         Retrieve suite items as a list of dictionaries.
 
-        Each item dict has keys:
-        - "id": the dataset item ID (str)
-        - "data": the test case data (dict)
-        - "description": optional item description (str or None)
-        - "assertions": list of assertion strings (or empty list)
-        - "execution_policy": ExecutionPolicyItem or None
+        Each item dict has keys: ``id``, ``data``, ``description``,
+        ``assertions``, ``execution_policy``.
 
         Args:
             nb_samples: Maximum number of items to retrieve.
@@ -222,32 +350,13 @@ class TestSuite:
         Returns:
             A list of item dictionaries.
         """
-        from opik.evaluation.suite_evaluators import llm_judge
-        from opik.evaluation.suite_evaluators.llm_judge import config as llm_judge_config
-
-        result = []
-        for item in self._dataset.__internal_api__stream_items_as_dataclasses__(
-            nb_samples=nb_samples,
-            filter_string=filter_string,
-        ):
-            item_assertions: List[str] = []
-            if item.evaluators:
-                for e in item.evaluators:
-                    if e.type == "llm_judge":
-                        cfg = llm_judge_config.LLMJudgeConfig(**e.config)
-                        judge = llm_judge.LLMJudge.from_config(cfg)
-                        item_assertions.extend(judge.assertions)
-
-            result.append(
-                {
-                    "id": item.id,
-                    "data": item.get_content(),
-                    "description": item.description,
-                    "assertions": item_assertions,
-                    "execution_policy": item.execution_policy,
-                }
+        return [
+            converters.dataset_item_to_suite_item_dict(item)
+            for item in self._dataset.__internal_api__stream_items_as_dataclasses__(
+                nb_samples=nb_samples,
+                filter_string=filter_string,
             )
-        return result
+        ]
 
     def update(
         self,
@@ -304,7 +413,7 @@ class TestSuite:
                 )
 
             current_evaluators = self._dataset.get_evaluators()
-            current_policy = self.get_execution_policy()
+            current_policy = self.get_global_execution_policy()
 
             new_evaluators = resolved if resolved is not None else current_evaluators
             new_policy = global_execution_policy if global_execution_policy is not None else current_policy
@@ -348,7 +457,7 @@ class TestSuite:
         if item_ids:
             self._dataset.delete(item_ids)
 
-    def get_execution_policy(self) -> execution_policy.ExecutionPolicy:
+    def get_global_execution_policy(self) -> execution_policy.ExecutionPolicy:
         """
         Get the suite-level execution policy.
 
@@ -357,18 +466,14 @@ class TestSuite:
         """
         return self._dataset.get_execution_policy()
 
-    def get_assertions(self) -> List[str]:
+    def get_global_assertions(self) -> List[str]:
         """
         Get the suite-level assertions.
 
         Returns:
             List of assertion strings.
         """
-        evaluators = self._dataset.get_evaluators()
-        assertions: List[str] = []
-        for evaluator in evaluators:
-            assertions.extend(evaluator.assertions)
-        return assertions
+        return converters.evaluators_to_assertions(self._dataset.get_evaluators())
 
     def update_items(
         self,

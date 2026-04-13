@@ -27,10 +27,12 @@ def _create_mock_dataset(name="test-dataset", items=None):
     mock_dataset.__internal_api__stream_items_as_dataclasses__ = mock.MagicMock(
         return_value=iter(items if items else [])
     )
+    mock_dataset.client = None
     return mock_dataset
 
 
 def _create_suite(mock_dataset, client=None):
+    mock_dataset.client = client
     return test_suite.TestSuite(
         name=mock_dataset.name,
         dataset_=mock_dataset,

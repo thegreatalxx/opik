@@ -1042,6 +1042,7 @@ class Opik:
             dataset_fern=dataset_fern,
             project_name=project_name,
             rest_client=self._rest_client,
+            client=self,
         )
 
     def get_datasets(
@@ -1146,6 +1147,7 @@ class Opik:
             project_name=project_name,
             rest_client=self._rest_client,
             dataset_items_count=0,
+            client=self,
         )
 
         self._display_created_dataset_url(dataset_name=name, dataset_id=result.id)
@@ -1250,6 +1252,7 @@ class Opik:
             project_name=project_name,
             rest_client=self._rest_client,
             dataset_items_count=0,
+            client=self,
         )
 
         return test_suite.TestSuite(
@@ -1287,6 +1290,7 @@ class Opik:
             dataset_fern=dataset_fern,
             project_name=project_name,
             rest_client=self._rest_client,
+            client=self,
         )
 
         return test_suite.TestSuite(

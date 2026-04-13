@@ -753,7 +753,7 @@ def test_test_suite__delete__items_removed(
     assert len(remaining_items) == 2
 
 
-def test_test_suite__get_assertions__returns_assertion_strings(
+def test_test_suite__get_global_assertions__returns_assertion_strings(
     opik_client: opik.Opik, dataset_name: str
 ):
     """
@@ -772,7 +772,7 @@ def test_test_suite__get_assertions__returns_assertion_strings(
     # Retrieve from BE to verify persistence
     retrieved_suite = opik_client.get_test_suite(name=dataset_name)
 
-    assertions = retrieved_suite.get_assertions()
+    assertions = retrieved_suite.get_global_assertions()
     assert set(assertions) == {
         "Response is helpful",
         "Response is accurate",
@@ -780,7 +780,7 @@ def test_test_suite__get_assertions__returns_assertion_strings(
     }
 
 
-def test_test_suite__get_execution_policy__returns_persisted_policy(
+def test_test_suite__get_global_execution_policy__returns_persisted_policy(
     opik_client: opik.Opik, dataset_name: str
 ):
     """
@@ -795,12 +795,12 @@ def test_test_suite__get_execution_policy__returns_persisted_policy(
     # Retrieve from BE to verify persistence
     retrieved_suite = opik_client.get_test_suite(name=dataset_name)
 
-    policy = retrieved_suite.get_execution_policy()
+    policy = retrieved_suite.get_global_execution_policy()
     assert policy["runs_per_item"] == 5
     assert policy["pass_threshold"] == 3
 
 
-def test_test_suite__get_execution_policy__default_when_not_set(
+def test_test_suite__get_global_execution_policy__default_when_not_set(
     opik_client: opik.Opik, dataset_name: str
 ):
     """
@@ -811,7 +811,7 @@ def test_test_suite__get_execution_policy__default_when_not_set(
         description="Test default execution policy",
     )
 
-    policy = suite.get_execution_policy()
+    policy = suite.get_global_execution_policy()
     assert policy["runs_per_item"] == 1
     assert policy["pass_threshold"] == 1
 
@@ -830,10 +830,10 @@ def test_test_suite__update__changes_assertions_and_policy(
     )
 
     # Verify initial state
-    assertions = suite.get_assertions()
+    assertions = suite.get_global_assertions()
     assert set(assertions) == {"Response is helpful"}
 
-    policy = suite.get_execution_policy()
+    policy = suite.get_global_execution_policy()
     assert policy["runs_per_item"] == 1
 
     # Update with new assertions and policy
@@ -845,13 +845,13 @@ def test_test_suite__update__changes_assertions_and_policy(
     # Retrieve from BE to verify persistence
     retrieved_suite = opik_client.get_test_suite(name=dataset_name)
 
-    updated_assertions = retrieved_suite.get_assertions()
+    updated_assertions = retrieved_suite.get_global_assertions()
     assert set(updated_assertions) == {
         "Response is accurate",
         "Response is concise",
     }
 
-    updated_policy = retrieved_suite.get_execution_policy()
+    updated_policy = retrieved_suite.get_global_execution_policy()
     assert updated_policy["runs_per_item"] == 3
     assert updated_policy["pass_threshold"] == 2
 
@@ -913,7 +913,7 @@ def test_get_or_create_test_suite__with_new_assertions__updates_suite(
     )
 
     retrieved = opik_client.get_test_suite(name=dataset_name)
-    assertions = retrieved.get_assertions()
+    assertions = retrieved.get_global_assertions()
     assert set(assertions) == {
         "Response is accurate",
         "Response is concise",
@@ -941,11 +941,11 @@ def test_get_or_create_test_suite__with_new_policy__updates_suite(
 
     retrieved = opik_client.get_test_suite(name=dataset_name)
 
-    policy = retrieved.get_execution_policy()
+    policy = retrieved.get_global_execution_policy()
     assert policy["runs_per_item"] == 5
     assert policy["pass_threshold"] == 3
 
-    assertions = retrieved.get_assertions()
+    assertions = retrieved.get_global_assertions()
     assert set(assertions) == {"Response is helpful"}
 
 
@@ -966,10 +966,10 @@ def test_test_suite__update_assertions_only__keeps_existing_policy(
 
     retrieved = opik_client.get_test_suite(name=dataset_name)
 
-    assertions = retrieved.get_assertions()
+    assertions = retrieved.get_global_assertions()
     assert set(assertions) == {"Response is accurate"}
 
-    policy = retrieved.get_execution_policy()
+    policy = retrieved.get_global_execution_policy()
     assert policy["runs_per_item"] == 3
     assert policy["pass_threshold"] == 2
 
@@ -991,11 +991,11 @@ def test_test_suite__update_policy_only__keeps_existing_assertions(
 
     retrieved = opik_client.get_test_suite(name=dataset_name)
 
-    policy = retrieved.get_execution_policy()
+    policy = retrieved.get_global_execution_policy()
     assert policy["runs_per_item"] == 5
     assert policy["pass_threshold"] == 3
 
-    assertions = retrieved.get_assertions()
+    assertions = retrieved.get_global_assertions()
     assert set(assertions) == {
         "Response is helpful",
         "Response is accurate",
@@ -1015,14 +1015,14 @@ def test_test_suite__update_with_empty_assertions__clears_assertions(
         global_execution_policy={"runs_per_item": 1, "pass_threshold": 1},
     )
 
-    assert len(suite.get_assertions()) == 2
+    assert len(suite.get_global_assertions()) == 2
 
     suite.update(global_assertions=[])
 
     retrieved = opik_client.get_test_suite(name=dataset_name)
-    assert retrieved.get_assertions() == []
+    assert retrieved.get_global_assertions() == []
 
-    policy = retrieved.get_execution_policy()
+    policy = retrieved.get_global_execution_policy()
     assert policy["runs_per_item"] == 1
     assert policy["pass_threshold"] == 1
 

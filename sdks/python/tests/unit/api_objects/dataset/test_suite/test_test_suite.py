@@ -29,6 +29,7 @@ def _create_mock_dataset():
     )
     mock_dataset.__internal_api__insert_items_as_dataclasses__ = mock.MagicMock()
     mock_dataset.project_name = "test-project"
+    mock_dataset.client = None
     return mock_dataset
 
 
