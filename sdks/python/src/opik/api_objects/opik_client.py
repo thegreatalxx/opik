@@ -1880,6 +1880,45 @@ class Opik:
             rest_httpx_client=self._httpx_client,
         )
 
+    def queue_attachment_upload(
+        self,
+        entity_type: Literal["trace", "span"],
+        entity_id: str,
+        project_name: str,
+        file_path: str,
+        file_name: Optional[str] = None,
+        mime_type: Optional[str] = None,
+    ) -> None:
+        """Queue a local file for background upload as an attachment via the streamer.
+
+        This method is non-blocking: the upload is handled by the background streamer
+        which provides parallelization, automatic retries, and monitoring. Call
+        :meth:`flush` to wait for all queued uploads to complete.
+
+        Parameters:
+            entity_type: The type of entity to attach the file to (``"trace"`` or ``"span"``).
+            entity_id: The ID of the trace or span to attach the file to.
+            project_name: The name of the project containing the entity.
+            file_path: Path to the local file to upload.
+            file_name: Name to assign the attachment. Defaults to the file's basename.
+            mime_type: MIME type of the file. Auto-detected from the file name if not provided.
+        """
+        attachment_data = Attachment(
+            data=file_path,
+            file_name=file_name,
+            content_type=mime_type,
+            create_temp_copy=False,
+        )
+        self._streamer.put(
+            attachment_converters.attachment_to_message(
+                attachment_data=attachment_data,
+                entity_type=entity_type,
+                entity_id=entity_id,
+                project_name=project_name,
+                url_override=self._config.url_override,
+            )
+        )
+
     def create_prompt(
         self,
         name: str,
@@ -2707,22 +2746,12 @@ class Opik:
             ),
         )
 
-    def _resolve_project_name(self, project_name: Optional[str]) -> str:
-        """Resolve the project name using the following precedence:
-
-        1. Explicit ``project_name`` argument (if not None).
-        2. Active project context set by ``@track(project_name=...)``
-           or ``opik.project_context(...)``.
-        3. The client's default project (``self._project_name``).
-        """
-        if project_name is not None:
-            return project_name
-
-        context_project = context_storage.get_context_project_name()
-        if context_project is not None:
-            return context_project
-
-        return self._project_name
+    def _resolve_project_name(self, explicitly_passed_value: Optional[str]) -> str:
+        return helpers.resolve_project_name(
+            explicitly_passed_value=explicitly_passed_value,
+            value_from_config=self._project_name,
+            value_from_context=context_storage.get_context_project_name(),
+        )
 
 
 _context_client_var: contextvars.ContextVar[Optional[Opik]] = contextvars.ContextVar(

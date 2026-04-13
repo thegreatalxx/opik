@@ -217,6 +217,7 @@ from .complete_multipart_upload_request import CompleteMultipartUploadRequest
 from .complete_multipart_upload_request_entity_type import CompleteMultipartUploadRequestEntityType
 from .completion_tokens_details import CompletionTokensDetails
 from .count_value_stat_public import CountValueStatPublic
+from .create_session_response import CreateSessionResponse
 from .dashboard_page_public import DashboardPagePublic
 from .dashboard_public import DashboardPublic
 from .dashboard_public_scope import DashboardPublicScope
@@ -292,8 +293,10 @@ from .execution_policy_public import ExecutionPolicyPublic
 from .execution_policy_write import ExecutionPolicyWrite
 from .experiment import Experiment
 from .experiment_evaluation_method import ExperimentEvaluationMethod
+from .experiment_execution_response import ExperimentExecutionResponse
 from .experiment_group_aggregations_response import ExperimentGroupAggregationsResponse
 from .experiment_group_response import ExperimentGroupResponse
+from .experiment_info import ExperimentInfo
 from .experiment_item import ExperimentItem
 from .experiment_item_bulk_record import ExperimentItemBulkRecord
 from .experiment_item_bulk_record_experiment_item_bulk_write_view import (
@@ -505,6 +508,7 @@ from .prompt_public_template_structure import PromptPublicTemplateStructure
 from .prompt_template_structure import PromptTemplateStructure
 from .prompt_tokens_details import PromptTokensDetails
 from .prompt_type import PromptType
+from .prompt_variant import PromptVariant
 from .prompt_version import PromptVersion
 from .prompt_version_detail import PromptVersionDetail
 from .prompt_version_detail_template_structure import PromptVersionDetailTemplateStructure
@@ -844,6 +848,7 @@ __all__ = [
     "CompleteMultipartUploadRequestEntityType",
     "CompletionTokensDetails",
     "CountValueStatPublic",
+    "CreateSessionResponse",
     "DashboardPagePublic",
     "DashboardPublic",
     "DashboardPublicScope",
@@ -919,8 +924,10 @@ __all__ = [
     "ExecutionPolicyWrite",
     "Experiment",
     "ExperimentEvaluationMethod",
+    "ExperimentExecutionResponse",
     "ExperimentGroupAggregationsResponse",
     "ExperimentGroupResponse",
+    "ExperimentInfo",
     "ExperimentItem",
     "ExperimentItemBulkRecord",
     "ExperimentItemBulkRecordExperimentItemBulkWriteView",
@@ -1123,6 +1130,7 @@ __all__ = [
     "PromptTemplateStructure",
     "PromptTokensDetails",
     "PromptType",
+    "PromptVariant",
     "PromptVersion",
     "PromptVersionDetail",
     "PromptVersionDetailTemplateStructure",

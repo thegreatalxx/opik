@@ -77,6 +77,8 @@ tags:
   description: Ollie pod state persistence
 - name: OpenTelemetry Ingestion
   description: Resource to ingest Traces and Spans via OpenTelemetry
+- name: Opik Connect
+  description: Pairing sessions for the `opik connect` CLI command
 - name: Optimizations
   description: Optimization resources
 - name: Projects
@@ -3003,6 +3005,27 @@ paths:
       responses:
         "204":
           description: No content
+  /v1/private/experiments/execute:
+    post:
+      tags:
+      - Experiments
+      summary: Create and execute experiment
+      description: Creates experiments for each prompt variant and asynchronously
+        processes all dataset items
+      operationId: executeExperiment
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExperimentExecutionRequest"
+        required: true
+      responses:
+        "202":
+          description: Experiments created and processing started
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExperimentExecutionResponse"
   /v1/private/experiments/items/bulk:
     put:
       tags:
@@ -4714,6 +4737,118 @@ paths:
           description: default response
           content:
             '*/*': {}
+  /v1/private/opik-connect/sessions/{sessionId}/activate:
+    post:
+      tags:
+      - Opik Connect
+      summary: Activate an opik-connect pairing session
+      description: Verify the activation HMAC and flip the runner row to CONNECTED
+      operationId: activateOpikConnectSession
+      parameters:
+      - name: sessionId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ActivateRequest"
+      responses:
+        "201":
+          description: Session activated
+          headers:
+            Location:
+              description: URI of the runner
+              style: simple
+        "403":
+          description: Invalid HMAC
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorMessage"
+        "404":
+          description: Session not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorMessage"
+        "409":
+          description: Session already activated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorMessage"
+        "422":
+          description: Unprocessable entity
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorMessage"
+        "429":
+          description: Too many requests
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorMessage"
+        "501":
+          description: Feature disabled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorMessage"
+  /v1/private/opik-connect/sessions:
+    post:
+      tags:
+      - Opik Connect
+      summary: Create an opik-connect pairing session
+      description: Register a short-lived pairing session that a local daemon will
+        later activate via HMAC
+      operationId: createOpikConnectSession
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSessionRequest"
+      responses:
+        "201":
+          description: Session created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateSessionResponse"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorMessage"
+        "404":
+          description: Project not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorMessage"
+        "422":
+          description: Unprocessable entity
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorMessage"
+        "429":
+          description: Too many requests
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorMessage"
+        "501":
+          description: Feature disabled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorMessage"
   /v1/private/optimizations/studio/{id}/cancel:
     get:
       tags:
@@ -7838,10 +7973,11 @@ paths:
         determination, clients must never derive the version themselves.
 
         Determination logic (priority order):
-        1) Feature flag override (TOGGLE_FORCE_WORKSPACE_VERSION)
-        2) Auth one-way V2 gate (authenticated mode only)
-        3) Version 1 entity check (entities without project_id)
-        4) Fallback on failure
+        1) V2 workspace allowlist (TOGGLE_V2_WORKSPACE_ALLOWLIST)
+        2) Feature flag override (TOGGLE_FORCE_WORKSPACE_VERSION)
+        3) Auth one-way V2 gate (authenticated mode only)
+        4) Version 1 entity check (entities without project_id)
+        5) Fallback on failure
 
         In unauthenticated mode (authentication.enabled=false), auth steps are skipped.
         Called by the frontend on workspace load.
@@ -11223,7 +11359,16 @@ components:
           additionalProperties:
             type: object
     Message:
+      required:
+      - content
+      - role
       type: object
+      properties:
+        role:
+          minLength: 1
+          type: string
+        content:
+          $ref: "#/components/schemas/JsonNode"
     ResponseFormat:
       type: object
       properties:
@@ -12264,6 +12409,13 @@ components:
             format: uuid
         enrichment_options:
           $ref: "#/components/schemas/SpanEnrichmentOptions"
+        evaluators:
+          type: array
+          description: Optional evaluators to apply to the created items
+          items:
+            $ref: "#/components/schemas/EvaluatorItem"
+        execution_policy:
+          $ref: "#/components/schemas/ExecutionPolicy"
     SpanEnrichmentOptions:
       type: object
       properties:
@@ -12295,6 +12447,13 @@ components:
             format: uuid
         enrichment_options:
           $ref: "#/components/schemas/TraceEnrichmentOptions"
+        evaluators:
+          type: array
+          description: Optional evaluators to apply to the created items
+          items:
+            $ref: "#/components/schemas/EvaluatorItem"
+        execution_policy:
+          $ref: "#/components/schemas/ExecutionPolicy"
     TraceEnrichmentOptions:
       type: object
       properties:
@@ -13856,6 +14015,76 @@ components:
           items:
             type: string
             format: uuid
+    ExperimentExecutionResponse:
+      type: object
+      properties:
+        experiments:
+          type: array
+          items:
+            $ref: "#/components/schemas/ExperimentInfo"
+        total_items:
+          type: integer
+          format: int32
+    ExperimentInfo:
+      type: object
+      properties:
+        experiment_id:
+          type: string
+          format: uuid
+        prompt_index:
+          type: integer
+          format: int32
+    ExperimentExecutionRequest:
+      required:
+      - dataset_id
+      - dataset_name
+      - prompts
+      type: object
+      properties:
+        dataset_name:
+          minLength: 1
+          type: string
+        dataset_version_id:
+          type: string
+          format: uuid
+        prompts:
+          minItems: 1
+          type: array
+          items:
+            $ref: "#/components/schemas/PromptVariant"
+        project_name:
+          type: string
+        dataset_id:
+          type: string
+          format: uuid
+        version_hash:
+          type: string
+        prompt_versions:
+          type: array
+          items:
+            $ref: "#/components/schemas/PromptVersionLink"
+    PromptVariant:
+      required:
+      - messages
+      - model
+      type: object
+      properties:
+        model:
+          minLength: 1
+          type: string
+        messages:
+          minItems: 1
+          type: array
+          items:
+            $ref: "#/components/schemas/Message"
+        configs:
+          type: object
+          additionalProperties:
+            $ref: "#/components/schemas/JsonNode"
+        prompt_versions:
+          type: array
+          items:
+            $ref: "#/components/schemas/PromptVersionLink"
     Check:
       type: object
       properties:
@@ -15845,6 +16074,9 @@ components:
         mask_id:
           type: string
           format: uuid
+        blueprint_name:
+          pattern: (?s)^\s*(\S.*\S|\S)\s*$
+          type: string
         metadata:
           $ref: "#/components/schemas/LocalRunnerJobMetadata"
     LocalRunnerJobMetadata:
@@ -15962,6 +16194,9 @@ components:
         mask_id:
           type: string
           format: uuid
+        blueprint_name:
+          pattern: (?s)^\s*(\S.*\S|\S)\s*$
+          type: string
         metadata:
           $ref: "#/components/schemas/LocalRunnerJobMetadata"
         timeout:
@@ -16272,6 +16507,47 @@ components:
       description: Response from Ollama connection test.
     ExportTraceServiceRequest:
       $ref: "#/components/schemas/JsonNode"
+    ActivateRequest:
+      required:
+      - hmac
+      - runner_name
+      type: object
+      properties:
+        runner_name:
+          maxLength: 128
+          minLength: 0
+          type: string
+        hmac:
+          maxLength: 44
+          minLength: 43
+          type: string
+    CreateSessionResponse:
+      type: object
+      properties:
+        session_id:
+          type: string
+          format: uuid
+        runner_id:
+          type: string
+          format: uuid
+    CreateSessionRequest:
+      required:
+      - activation_key
+      - project_id
+      type: object
+      properties:
+        project_id:
+          type: string
+          format: uuid
+        activation_key:
+          maxLength: 44
+          minLength: 43
+          type: string
+        ttl_seconds:
+          maximum: 600
+          minimum: 60
+          type: integer
+          format: int32
     Optimization:
       required:
       - dataset_name
@@ -17435,6 +17711,7 @@ components:
           enum:
           - mustache
           - jinja2
+          - python
         template_structure:
           type: string
           description: "Template structure type: 'text' or 'chat'. Immutable after\
@@ -17498,6 +17775,7 @@ components:
           enum:
           - mustache
           - jinja2
+          - python
         change_description:
           type: string
         tags:
@@ -17567,6 +17845,7 @@ components:
           enum:
           - mustache
           - jinja2
+          - python
         template_structure:
           type: string
           description: "Template structure type: 'text' or 'chat'. Immutable after\
@@ -17610,6 +17889,7 @@ components:
           enum:
           - mustache
           - jinja2
+          - python
         change_description:
           type: string
         tags:
@@ -17794,6 +18074,7 @@ components:
           enum:
           - mustache
           - jinja2
+          - python
         change_description:
           type: string
         tags:
@@ -18034,6 +18315,7 @@ components:
       - spanLlmAsJudgeEnabled
       - spanUserDefinedMetricPythonEnabled
       - traceThreadPythonEvaluatorEnabled
+      - v2WorkspaceAllowlistIds
       - vertexaiProviderEnabled
       - welcomeWizardEnabled
       type: object
@@ -18082,9 +18364,18 @@ components:
           type: boolean
         collaboratorsTabEnabled:
           type: boolean
+        v2WorkspaceAllowlistIds:
+          uniqueItems: true
+          type: array
+          items:
+            minLength: 1
+            type: string
         forceWorkspaceVersion:
           minLength: 1
           type: string
+        v2WorkspaceAllowlist:
+          type: string
+          writeOnly: true
     SpanBatchUpdate:
       required:
       - ids
