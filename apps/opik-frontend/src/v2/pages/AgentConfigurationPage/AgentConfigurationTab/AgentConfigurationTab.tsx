@@ -8,7 +8,7 @@ import useConfigHistoryListInfinite from "@/api/agent-configs/useConfigHistoryLi
 import { ConfigHistoryItem } from "@/types/agent-configs";
 import AgentConfigurationHistoryTimeline from "./AgentConfigurationHistoryTimeline";
 import AgentConfigurationDetailView from "./AgentConfigurationDetailView";
-import AgentConfigurationEditView from "@/v2/pages-shared/agent-configuration/AgentConfigurationEditView";
+import AgentConfigurationEditPanel from "@/v2/pages-shared/agent-configuration/AgentConfigurationEditPanel";
 
 type AgentConfigurationTabProps = {
   projectId: string;
@@ -67,21 +67,6 @@ const AgentConfigurationTab: React.FC<AgentConfigurationTabProps> = ({
 
   const selectedItem = allRows[selectedIndex] as ConfigHistoryItem;
 
-  if (editItem) {
-    return (
-      <div className="w-full p-4">
-        <AgentConfigurationEditView
-          item={editItem}
-          projectId={projectId}
-          onSaved={() => {
-            setSelectedId(undefined);
-            setEditItem(null);
-          }}
-        />
-      </div>
-    );
-  }
-
   return (
     <div>
       <h1 className="comet-title-xs px-6 pt-4">Agent configuration</h1>
@@ -112,6 +97,21 @@ const AgentConfigurationTab: React.FC<AgentConfigurationTabProps> = ({
           />
         </div>
       </div>
+
+      {editItem && (
+        <AgentConfigurationEditPanel
+          open={!!editItem}
+          onOpenChange={(open) => {
+            if (!open) setEditItem(null);
+          }}
+          item={editItem}
+          projectId={projectId}
+          onSaved={() => {
+            setSelectedId(undefined);
+            setEditItem(null);
+          }}
+        />
+      )}
     </div>
   );
 };
