@@ -1356,6 +1356,79 @@ class Opik:
 
         return suite
 
+    def delete_test_suite(
+        self, name: str, project_name: Optional[str] = None
+    ) -> None:
+        """
+        Delete a test suite by name.
+
+        Args:
+            name: The name of the test suite.
+            project_name: The name of the project the suite belongs to.
+        """
+        project_name = self._resolve_project_name(project_name)
+        self._rest_client.datasets.delete_dataset_by_name(
+            dataset_name=name, project_name=project_name
+        )
+
+    def get_test_suites(
+        self,
+        max_results: int = 100,
+        project_name: Optional[str] = None,
+    ) -> List[test_suite.TestSuite]:
+        """
+        Returns all test suites up to the specified limit.
+
+        Only returns test suites, not regular datasets.
+
+        Args:
+            max_results: The maximum number of test suites to return.
+            project_name: The name of the project the suites belong to.
+
+        Returns:
+            List[TestSuite]: A list of test suite objects.
+        """
+        from .dataset import rest_operations
+
+        return rest_operations.get_test_suites(
+            project_name=self._resolve_project_name(project_name),
+            rest_client=self._rest_client,
+            max_results=max_results,
+        )
+
+    def get_test_suite_experiments(
+        self,
+        name: str,
+        max_results: int = 100,
+        project_name: Optional[str] = None,
+    ) -> List[experiment.Experiment]:
+        """
+        Returns all experiments for a test suite.
+
+        Args:
+            name: The name of the test suite.
+            max_results: The maximum number of experiments to return.
+            project_name: The name of the project the suite belongs to.
+
+        Returns:
+            List[Experiment]: A list of experiment objects.
+        """
+        from .dataset import rest_operations as dataset_rest_operations
+
+        project_name = self._resolve_project_name(project_name)
+        dataset_id = dataset_rest_operations.get_dataset_id(
+            self._rest_client, dataset_name=name, project_name=project_name
+        )
+
+        experiments_client = self.get_experiments_client()
+        return dataset_rest_operations.get_dataset_experiments(
+            rest_client=self._rest_client,
+            dataset_id=dataset_id,
+            max_results=max_results,
+            streamer=self._streamer,
+            experiments_client=experiments_client,
+        )
+
     def create_experiment(
         self,
         dataset_name: str,

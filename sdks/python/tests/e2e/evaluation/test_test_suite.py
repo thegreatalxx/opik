@@ -1177,3 +1177,156 @@ def test_test_suite__insert_batch__all_items_persisted(
         total_feedback_scores=3,
         expected_score_names={assertion},
     )
+
+
+# =============================================================================
+# CLIENT-LEVEL: delete, list, get_experiments (OPIK-5802)
+# =============================================================================
+
+
+def test_delete_test_suite__removes_suite(
+    opik_client: opik.Opik, dataset_name: str
+):
+    """
+    Test that delete_test_suite() removes the suite.
+    """
+    opik_client.create_test_suite(name=dataset_name)
+
+    opik_client.delete_test_suite(name=dataset_name)
+
+    with pytest.raises(Exception):
+        opik_client.get_test_suite(name=dataset_name)
+
+
+def test_get_test_suites__returns_only_test_suites(
+    opik_client: opik.Opik, dataset_name: str
+):
+    """
+    Test that get_test_suites() only returns test suites, not regular datasets.
+    """
+    suite_name = dataset_name + "-suite"
+    dataset_regular_name = dataset_name + "-dataset"
+
+    opik_client.create_test_suite(name=suite_name)
+    opik_client.create_dataset(name=dataset_regular_name)
+
+    suites = opik_client.get_test_suites()
+    suite_names = {s.name for s in suites}
+
+    assert suite_name in suite_names
+    assert dataset_regular_name not in suite_names
+
+    # Also verify get_datasets excludes test suites
+    datasets = opik_client.get_datasets()
+    dataset_names = {d.name for d in datasets}
+
+    assert dataset_regular_name in dataset_names
+    assert suite_name not in dataset_names
+
+    # cleanup
+    opik_client.delete_test_suite(name=suite_name)
+    opik_client.delete_dataset(name=dataset_regular_name)
+
+
+def test_get_test_suite_experiments__returns_experiments(
+    opik_client: opik.Opik, dataset_name: str, experiment_name: str
+):
+    """
+    Test that get_test_suite_experiments() returns experiments run on the suite.
+    """
+    suite = opik_client.create_test_suite(name=dataset_name)
+    suite.insert([{"data": {"input": {"question": "Hello"}}}])
+
+    def task(item: Dict[str, Any]) -> Dict[str, Any]:
+        return {"input": item["input"], "output": "World"}
+
+    suite.run(task=task, experiment_name=experiment_name, verbose=0)
+    opik.flush_tracker()
+
+    experiments = opik_client.get_test_suite_experiments(name=dataset_name)
+    experiment_names = {e.name for e in experiments}
+
+    assert experiment_name in experiment_names
+
+
+# =============================================================================
+# ITEM MANAGEMENT: update_items, update_item_assertions/policy (OPIK-5803)
+# =============================================================================
+
+
+def test_update_items__updates_existing_items(
+    opik_client: opik.Opik, dataset_name: str
+):
+    """
+    Test that update_items() updates data on existing items.
+    """
+    suite = opik_client.create_test_suite(name=dataset_name)
+    suite.insert([
+        {"data": {"question": "Original question"}},
+    ])
+
+    items = suite.get_items()
+    assert len(items) == 1
+    item_id = items[0]["id"]
+
+    suite.update_items([
+        {"id": item_id, "data": {"question": "Updated question"}},
+    ])
+
+    updated_items = suite.get_items()
+    assert len(updated_items) == 1
+    assert updated_items[0]["data"]["question"] == "Updated question"
+
+
+def test_update_items__missing_id__raises_error(
+    opik_client: opik.Opik, dataset_name: str
+):
+    """
+    Test that update_items() raises error when item has no id.
+    """
+    suite = opik_client.create_test_suite(name=dataset_name)
+
+    with pytest.raises(Exception, match="Missing id"):
+        suite.update_items([{"data": {"question": "No ID"}}])
+
+
+# =============================================================================
+# ITEM MANAGEMENT: clear, get_items params (OPIK-5804)
+# =============================================================================
+
+
+def test_clear__removes_all_items(
+    opik_client: opik.Opik, dataset_name: str
+):
+    """
+    Test that clear() removes all items from the suite.
+    """
+    suite = opik_client.create_test_suite(name=dataset_name)
+    suite.insert([
+        {"data": {"question": "Q1"}},
+        {"data": {"question": "Q2"}},
+        {"data": {"question": "Q3"}},
+    ])
+
+    assert len(suite.get_items()) == 3
+
+    suite.clear()
+
+    assert len(suite.get_items()) == 0
+
+
+def test_get_items__nb_samples__limits_results(
+    opik_client: opik.Opik, dataset_name: str
+):
+    """
+    Test that get_items(nb_samples=N) returns at most N items.
+    """
+    suite = opik_client.create_test_suite(name=dataset_name)
+    suite.insert([
+        {"data": {"question": "Q1"}},
+        {"data": {"question": "Q2"}},
+        {"data": {"question": "Q3"}},
+    ])
+
+    items = suite.get_items(nb_samples=2)
+    assert len(items) == 2

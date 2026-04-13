@@ -20,6 +20,7 @@ from ...rest_api.core.api_error import ApiError
 
 if TYPE_CHECKING:
     from opik.evaluation.suite_evaluators import llm_judge
+    from .test_suite.test_suite import TestSuite
 
 LOGGER = logging.getLogger(__name__)
 
@@ -200,6 +201,9 @@ def get_datasets(
             break
 
         for dataset_fern in page_datasets.content[: (max_results - len(datasets))]:
+            if dataset_fern.type == "test_suite":
+                continue
+
             dataset_ = dataset.Dataset(
                 name=dataset_fern.name,
                 description=dataset_fern.description,
@@ -216,6 +220,57 @@ def get_datasets(
         page += 1
 
     return datasets
+
+
+def get_test_suites(
+    project_name: Optional[str],
+    rest_client: OpikApi,
+    max_results: int = 1000,
+) -> List[TestSuite]:
+    from .test_suite import test_suite as test_suite_module
+
+    page_size = 100
+    suites: List[test_suite_module.TestSuite] = []
+    page = 1
+
+    project_id = rest_helpers.resolve_project_id_by_name_optional(
+        rest_client, project_name=project_name
+    )
+
+    while len(suites) < max_results:
+        page_datasets = rest_client.datasets.find_datasets(
+            page=page,
+            size=page_size,
+            project_id=project_id,
+        )
+
+        if len(page_datasets.content) == 0:
+            break
+
+        for dataset_fern in page_datasets.content:
+            if len(suites) >= max_results:
+                break
+            if dataset_fern.type != "test_suite":
+                continue
+
+            suite_dataset = dataset.Dataset(
+                name=dataset_fern.name,
+                description=dataset_fern.description,
+                project_name=project_name,
+                rest_client=rest_client,
+                dataset_items_count=dataset_fern.dataset_items_count,
+            )
+
+            suites.append(
+                test_suite_module.TestSuite(
+                    name=dataset_fern.name,
+                    dataset_=suite_dataset,
+                )
+            )
+
+        page += 1
+
+    return suites
 
 
 def get_dataset_id(

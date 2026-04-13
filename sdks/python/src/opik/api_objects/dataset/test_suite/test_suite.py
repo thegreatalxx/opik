@@ -14,11 +14,12 @@ from typing import Any, Callable, Dict, List, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from opik.api_objects import opik_client as opik_client_module
+    from opik.evaluation.suite_evaluators.llm_judge import LLMJudge
 
 from opik import id_helpers
+from opik import exceptions as opik_exceptions
 from opik.api_objects.prompt import base_prompt
 from opik.api_objects.dataset import dataset, dataset_item
-
 from . import types as suite_types
 from .report_processors import displayer, file_writer
 from .. import validators, execution_policy, rest_operations
@@ -29,7 +30,7 @@ LOGGER = logging.getLogger(__name__)
 LLMTask = Callable[[Dict[str, Any]], Any]
 
 
-def _evaluators_equal(a: List[Any], b: List[Any]) -> bool:
+def _evaluators_equal(a: List[LLMJudge], b: List[LLMJudge]) -> bool:
     """Compare two lists of LLMJudge evaluators by their assertion sets."""
     a_assertions = sorted(assertion for e in a for assertion in e.assertions)
     b_assertions = sorted(assertion for e in b for assertion in e.assertions)
@@ -159,7 +160,11 @@ class TestSuite:
         """
         return self._dataset.get_tags()
 
-    def get_items(self) -> List[Dict[str, Any]]:
+    def get_items(
+        self,
+        nb_samples: Optional[int] = None,
+        filter_string: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
         """
         Retrieve suite items as a list of dictionaries.
 
@@ -170,17 +175,23 @@ class TestSuite:
         - "assertions": list of assertion strings (or empty list)
         - "execution_policy": ExecutionPolicyItem or None
 
+        Args:
+            nb_samples: Maximum number of items to retrieve.
+                If None, all items are returned.
+            filter_string: Optional OQL filter string to filter items.
+
         Returns:
             A list of item dictionaries.
         """
         from opik.evaluation.suite_evaluators import llm_judge
-        from opik.evaluation.suite_evaluators.llm_judge import (
-            config as llm_judge_config,
-        )
+        from opik.evaluation.suite_evaluators.llm_judge import config as llm_judge_config
 
         result = []
-        for item in self._dataset.__internal_api__stream_items_as_dataclasses__():
-            item_assertions: list[str] = []
+        for item in self._dataset.__internal_api__stream_items_as_dataclasses__(
+            nb_samples=nb_samples,
+            filter_string=filter_string,
+        ):
+            item_assertions: List[str] = []
             if item.evaluators:
                 for e in item.evaluators:
                     if e.type == "llm_judge":
@@ -286,6 +297,18 @@ class TestSuite:
         """
         self._dataset.delete(items_ids)
 
+    def clear(self) -> None:
+        """
+        Delete all items from the test suite.
+        """
+        item_ids = [
+            item.id
+            for item in self._dataset.__internal_api__stream_items_as_dataclasses__()
+            if item.id is not None
+        ]
+        if item_ids:
+            self._dataset.delete(item_ids)
+
     def get_execution_policy(self) -> execution_policy.ExecutionPolicy:
         """
         Get the suite-level execution policy.
@@ -303,10 +326,36 @@ class TestSuite:
             List of assertion strings.
         """
         evaluators = self._dataset.get_evaluators()
-        assertions: list[str] = []
+        assertions: List[str] = []
         for evaluator in evaluators:
             assertions.extend(evaluator.assertions)
         return assertions
+
+    def update_items(
+        self,
+        items: List[Dict[str, Any]],
+    ) -> None:
+        """
+        Update existing items in the test suite.
+
+        Each item dict must include an ``"id"`` key identifying the item to
+        update.  The remaining keys (``"data"``, ``"assertions"``,
+        ``"description"``, ``"execution_policy"``) replace the previous values.
+
+        Args:
+            items: List of item dicts to update. Each must contain ``"id"``.
+
+        Raises:
+            DatasetItemUpdateOperationRequiresItemId: If any item is missing
+                an ``"id"`` key.
+        """
+        for item in items:
+            if "id" not in item:
+                raise opik_exceptions.DatasetItemUpdateOperationRequiresItemId(
+                    "Missing id for test suite item to update: %s", item
+                )
+
+        self.insert(items)
 
     def insert(
         self,
@@ -357,7 +406,7 @@ class TestSuite:
 
             ds_items.append(
                 dataset_item.DatasetItem(
-                    id=id_helpers.generate_id(),
+                    id=item.get("id", id_helpers.generate_id()),
                     description=item.get("description"),
                     evaluators=evaluator_items,
                     execution_policy=execution_policy_item,
@@ -463,7 +512,7 @@ class TestSuite:
         experiment_type: Optional[str] = None,
         dataset_item_ids: Optional[List[str]] = None,
         dataset_filter_string: Optional[str] = None,
-        client: Optional[Any] = None,
+        client: Optional[opik_client_module.Opik] = None,
         generate_report: bool = True,
         report_output_path: Optional[str] = None,
     ) -> suite_types.TestSuiteResult:

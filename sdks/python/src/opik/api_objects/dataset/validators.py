@@ -1,6 +1,11 @@
 """Validators for dataset and test suite operations."""
 
-from typing import Any, List, Optional
+from __future__ import annotations
+
+from typing import Any, List, Optional, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from opik.evaluation.suite_evaluators.llm_judge import LLMJudge
 
 
 def validate_evaluators(evaluators: List[Any], context: str) -> None:
@@ -29,7 +34,7 @@ def resolve_evaluators(
     assertions: Optional[List[str]],
     evaluators: Optional[List[Any]],
     context: str,
-) -> Optional[List[Any]]:
+) -> Optional[List[LLMJudge]]:
     """
     Resolve assertions shorthand and/or evaluators into a list of LLMJudge instances.
 
@@ -66,7 +71,7 @@ def resolve_evaluators(
     return None
 
 
-_VALID_ITEM_KEYS = {"data", "assertions", "description", "execution_policy"}
+_VALID_ITEM_KEYS = {"id", "data", "assertions", "description", "execution_policy"}
 _VALID_EXECUTION_POLICY_KEYS = {"runs_per_item", "pass_threshold"}
 
 
