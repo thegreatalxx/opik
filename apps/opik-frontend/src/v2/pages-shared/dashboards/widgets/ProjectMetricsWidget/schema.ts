@@ -8,6 +8,8 @@ export const BreakdownConfigSchema = z
     field: z.nativeEnum(BREAKDOWN_FIELD).default(BREAKDOWN_FIELD.NONE),
     metadataKey: z.string().optional(),
     aggregateTotal: z.boolean().optional(),
+    tagValues: z.array(z.string()).optional(),
+    tagValuesMode: z.enum(["include", "exclude"]).optional(),
   })
   .refine(
     (data) => {

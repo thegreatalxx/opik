@@ -71,6 +71,10 @@ const processBreakdownConfig = (breakdown?: BreakdownConfig) => {
     field: breakdown.field,
     ...(breakdown.metadataKey && { metadata_key: breakdown.metadataKey }),
     ...(breakdown.subMetric && { sub_metric: breakdown.subMetric }),
+    ...(breakdown.tagValues?.length && {
+      tag_values: breakdown.tagValues,
+      tag_values_exclude: breakdown.tagValuesMode === "exclude",
+    }),
   };
 };
 

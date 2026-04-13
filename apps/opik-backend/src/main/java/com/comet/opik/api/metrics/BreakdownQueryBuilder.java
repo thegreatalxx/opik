@@ -2,6 +2,9 @@ package com.comet.opik.api.metrics;
 
 import org.apache.commons.lang3.StringUtils;
 
+import java.util.List;
+import java.util.stream.Collectors;
+
 import static com.comet.opik.api.metrics.BreakdownField.SPAN_METRICS;
 
 public class BreakdownQueryBuilder {
@@ -73,11 +76,43 @@ public class BreakdownQueryBuilder {
     }
 
     /**
+     * Builds the ClickHouse array literal from a list of tag values, escaping single quotes.
+     */
+    private static String buildTagValuesArray(List<String> tagValues) {
+        return tagValues.stream()
+                .map(v -> "'" + v.replace("'", "''") + "'")
+                .collect(Collectors.joining(", ", "[", "]"));
+    }
+
+    /**
+     * Builds a tag-filtered arrayJoin expression with optional include/exclude filtering.
+     *
+     * @param tableAlias the table alias prefix (e.g. "s" for spans, "t" for traces)
+     * @param tagValues  the list of tag values to filter by (non-null, non-empty)
+     * @param exclude    when true, excludes the listed tags; when false, includes only them
+     */
+    private static String buildTagFilteredExpression(String tableAlias, List<String> tagValues, boolean exclude) {
+        String tagsExpr = "if(empty(" + tableAlias + ".tags), ['Unknown'], " + tableAlias + ".tags)";
+        String tagValuesArray = buildTagValuesArray(tagValues);
+        String predicate = exclude
+                ? "x -> NOT has(" + tagValuesArray + ", x)"
+                : "x -> has(" + tagValuesArray + ", x)";
+        return "arrayJoin(arrayFilter(" + predicate + ", " + tagsExpr + "))";
+    }
+
+    private static boolean hasTagFilter(BreakdownConfig breakdown) {
+        return breakdown.tagValues() != null && !breakdown.tagValues().isEmpty();
+    }
+
+    /**
      * Get breakdown expression for span metrics using 's.' table alias.
      */
     private static String getSpanBreakdownExpression(BreakdownConfig breakdown) {
         return switch (breakdown.field()) {
-            case TAGS -> "arrayJoin(if(empty(s.tags), ['Unknown'], s.tags))";
+            case TAGS -> hasTagFilter(breakdown)
+                    ? buildTagFilteredExpression("s", breakdown.tagValues(),
+                            Boolean.TRUE.equals(breakdown.tagValuesExclude()))
+                    : "arrayJoin(if(empty(s.tags), ['Unknown'], s.tags))";
             case METADATA -> "ifNull(JSONExtractString(s.metadata, :metadata_key), 'Unknown')";
             case NAME -> "ifNull(s.name, 'Unknown')";
             case ERROR_INFO -> "if(length(s.error_info) > 0, 'Has Error', 'No Error')";
@@ -95,7 +130,10 @@ public class BreakdownQueryBuilder {
      */
     private static String getTraceOrThreadBreakdownExpression(BreakdownConfig breakdown) {
         return switch (breakdown.field()) {
-            case TAGS -> "arrayJoin(if(empty(t.tags), ['Unknown'], t.tags))";
+            case TAGS -> hasTagFilter(breakdown)
+                    ? buildTagFilteredExpression("t", breakdown.tagValues(),
+                            Boolean.TRUE.equals(breakdown.tagValuesExclude()))
+                    : "arrayJoin(if(empty(t.tags), ['Unknown'], t.tags))";
             case METADATA -> "ifNull(JSONExtractString(t.metadata, :metadata_key), 'Unknown')";
             case NAME -> "ifNull(t.name, 'Unknown')";
             case ERROR_INFO -> "if(length(t.error_info) > 0, 'Has Error', 'No Error')";

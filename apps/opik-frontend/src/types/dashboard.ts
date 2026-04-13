@@ -68,6 +68,8 @@ export interface BreakdownConfig {
   metadataKey?: string;
   subMetric?: string;
   aggregateTotal?: boolean;
+  tagValues?: string[];
+  tagValuesMode?: "include" | "exclude";
 }
 
 export interface ProjectMetricsWidget {

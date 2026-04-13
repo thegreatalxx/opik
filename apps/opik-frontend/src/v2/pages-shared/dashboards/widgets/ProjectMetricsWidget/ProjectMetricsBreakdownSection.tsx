@@ -1,4 +1,4 @@
-import React, { useMemo, useEffect, useCallback } from "react";
+import React, { useMemo, useEffect, useCallback, useState } from "react";
 import { Control, useController } from "react-hook-form";
 import get from "lodash/get";
 
@@ -11,10 +11,12 @@ import {
 } from "@/ui/accordion";
 import { ToggleGroup, ToggleGroupItem } from "@/ui/toggle-group";
 import { Label } from "@/ui/label";
+import { Input } from "@/ui/input";
 
 import SelectBox from "@/shared/SelectBox/SelectBox";
 import TracesOrSpansPathsAutocomplete from "@/v2/pages-shared/traces/TracesOrSpansPathsAutocomplete/TracesOrSpansPathsAutocomplete";
 import ExplainerIcon from "@/shared/ExplainerIcon/ExplainerIcon";
+import RemovableTag from "@/shared/RemovableTag/RemovableTag";
 import { EXPLAINER_ID, EXPLAINERS_MAP } from "@/constants/explainers";
 import { TRACE_DATA_TYPE } from "@/hooks/useTracesOrSpansList";
 import { cn } from "@/lib/utils";
@@ -53,7 +55,10 @@ const ProjectMetricsBreakdownSection: React.FC<
   onBreakdownChange,
 }) => {
   const isMetadataBreakdown = breakdown.field === BREAKDOWN_FIELD.METADATA;
+  const isTagsBreakdown = breakdown.field === BREAKDOWN_FIELD.TAGS;
   const hasBreakdownField = breakdown.field !== BREAKDOWN_FIELD.NONE;
+
+  const [tagInput, setTagInput] = useState("");
 
   const isGroupByDisabled =
     !metricType ||
@@ -70,6 +75,64 @@ const ProjectMetricsBreakdownSection: React.FC<
     control,
     name: "breakdown.metadataKey",
   });
+
+  const { field: breakdownTagValuesController } = useController({
+    control,
+    name: "breakdown.tagValues",
+  });
+
+  const { field: breakdownTagValuesModeController } = useController({
+    control,
+    name: "breakdown.tagValuesMode",
+  });
+
+  const tagValues: string[] = useMemo(
+    () => breakdownTagValuesController.value ?? [],
+    [breakdownTagValuesController.value],
+  );
+  const tagValuesMode: "include" | "exclude" =
+    breakdownTagValuesModeController.value ?? "include";
+
+  const handleAddTag = useCallback(
+    (value: string) => {
+      const trimmed = value.trim();
+      if (!trimmed || tagValues.includes(trimmed)) return;
+      const next = [...tagValues, trimmed];
+      breakdownTagValuesController.onChange(next);
+      onBreakdownChange({ tagValues: next });
+      setTagInput("");
+    },
+    [tagValues, breakdownTagValuesController, onBreakdownChange],
+  );
+
+  const handleRemoveTag = useCallback(
+    (tag: string) => {
+      const next = tagValues.filter((t) => t !== tag);
+      breakdownTagValuesController.onChange(next);
+      onBreakdownChange({ tagValues: next });
+    },
+    [tagValues, breakdownTagValuesController, onBreakdownChange],
+  );
+
+  const handleTagInputKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLInputElement>) => {
+      if (e.key === "Enter" || e.key === ",") {
+        e.preventDefault();
+        handleAddTag(tagInput);
+      }
+    },
+    [tagInput, handleAddTag],
+  );
+
+  const handleTagValuesModeChange = useCallback(
+    (value: string) => {
+      if (!value) return;
+      const mode = value as "include" | "exclude";
+      breakdownTagValuesModeController.onChange(mode);
+      onBreakdownChange({ tagValuesMode: mode });
+    },
+    [breakdownTagValuesModeController, onBreakdownChange],
+  );
 
   const compatibleBreakdownFields = useMemo(() => {
     if (!metricType) return [BREAKDOWN_FIELD.NONE];
@@ -89,18 +152,31 @@ const ProjectMetricsBreakdownSection: React.FC<
       if (field === BREAKDOWN_FIELD.NONE) {
         breakdownFieldController.onChange(BREAKDOWN_FIELD.NONE);
         breakdownMetadataKeyController.onChange(undefined);
+        breakdownTagValuesController.onChange(undefined);
+        breakdownTagValuesModeController.onChange(undefined);
+        setTagInput("");
         onBreakdownChange({
           field: BREAKDOWN_FIELD.NONE,
           metadataKey: undefined,
+          tagValues: undefined,
+          tagValuesMode: undefined,
         });
       } else {
         breakdownFieldController.onChange(field);
+        const isTagsField = field === BREAKDOWN_FIELD.TAGS;
+        if (!isTagsField) {
+          breakdownTagValuesController.onChange(undefined);
+          breakdownTagValuesModeController.onChange(undefined);
+          setTagInput("");
+        }
         onBreakdownChange({
           field,
           metadataKey:
             field === BREAKDOWN_FIELD.METADATA
               ? breakdown.metadataKey
               : undefined,
+          tagValues: isTagsField ? breakdown.tagValues : undefined,
+          tagValuesMode: isTagsField ? breakdown.tagValuesMode : undefined,
           aggregateTotal: true,
         });
       }
@@ -108,8 +184,12 @@ const ProjectMetricsBreakdownSection: React.FC<
     [
       breakdownFieldController,
       breakdownMetadataKeyController,
+      breakdownTagValuesController,
+      breakdownTagValuesModeController,
       onBreakdownChange,
       breakdown.metadataKey,
+      breakdown.tagValues,
+      breakdown.tagValuesMode,
     ],
   );
 
@@ -129,9 +209,14 @@ const ProjectMetricsBreakdownSection: React.FC<
     if (isGroupByDisabled && hasBreakdownField) {
       breakdownFieldController.onChange(BREAKDOWN_FIELD.NONE);
       breakdownMetadataKeyController.onChange(undefined);
+      breakdownTagValuesController.onChange(undefined);
+      breakdownTagValuesModeController.onChange(undefined);
+      setTagInput("");
       onBreakdownChange({
         field: BREAKDOWN_FIELD.NONE,
         metadataKey: undefined,
+        tagValues: undefined,
+        tagValuesMode: undefined,
       });
     }
   }, [
@@ -139,6 +224,8 @@ const ProjectMetricsBreakdownSection: React.FC<
     hasBreakdownField,
     breakdownFieldController,
     breakdownMetadataKeyController,
+    breakdownTagValuesController,
+    breakdownTagValuesModeController,
     onBreakdownChange,
   ]);
 
@@ -240,6 +327,57 @@ const ProjectMetricsBreakdownSection: React.FC<
                 )}
               </div>
             </div>
+            {isTagsBreakdown && (
+              <div className="flex-1">
+                <Label className="comet-body-s-accented mb-1 flex items-center gap-1">
+                  Filter tags
+                </Label>
+                <div className="flex flex-col gap-2">
+                  <ToggleGroup
+                    type="single"
+                    variant="ghost"
+                    value={tagValuesMode}
+                    onValueChange={handleTagValuesModeChange}
+                    className="w-fit justify-start"
+                  >
+                    <ToggleGroupItem
+                      value="include"
+                      aria-label="Include"
+                      className="gap-1.5"
+                    >
+                      Include
+                    </ToggleGroupItem>
+                    <ToggleGroupItem
+                      value="exclude"
+                      aria-label="Exclude"
+                      className="gap-1.5"
+                    >
+                      Exclude
+                    </ToggleGroupItem>
+                  </ToggleGroup>
+                  <Input
+                    placeholder="Type a tag and press Enter"
+                    value={tagInput}
+                    onChange={(e) => setTagInput(e.target.value)}
+                    onKeyDown={handleTagInputKeyDown}
+                    onBlur={() => {
+                      if (tagInput.trim()) handleAddTag(tagInput);
+                    }}
+                  />
+                  {tagValues.length > 0 && (
+                    <div className="flex flex-wrap gap-1">
+                      {tagValues.map((tag) => (
+                        <RemovableTag
+                          key={tag}
+                          label={tag}
+                          onDelete={handleRemoveTag}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
             <div className="min-w-fit">
               <Label className="comet-body-s-accented mb-1 flex items-center gap-1">
                 Aggregation mode{" "}
