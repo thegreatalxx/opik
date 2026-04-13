@@ -139,7 +139,8 @@ export enum EXPERIMENT_STATUS {
 
 export enum EVALUATION_METHOD {
   DATASET = "dataset",
-  TEST_SUITE = "test_suite",
+  // TODO: OPIK-5795 - migrate DB value from 'evaluation_suite' to 'test_suite'
+  TEST_SUITE = "evaluation_suite",
 }
 
 export interface Experiment {
