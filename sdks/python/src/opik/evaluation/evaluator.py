@@ -313,40 +313,45 @@ def evaluate(
     )
 
 
-def evaluate_test_suite(
-    dataset: dataset.Dataset,
+def __internal_api__run_test_suite__(
+    suite_dataset: dataset.Dataset,
     task: LLMTask,
     *,
     client: Optional[opik_client.Opik],
-    dataset_item_ids: Optional[List[str]],
-    dataset_filter_string: Optional[str],
-    experiment_name_prefix: Optional[str],
-    experiment_name: Optional[str],
-    project_name: Optional[str],
-    experiment_config: Optional[Dict[str, Any]],
-    prompts: Optional[List[base_prompt.BasePrompt]],
-    experiment_tags: Optional[List[str]],
-    verbose: int,
-    task_threads: int,
-    evaluator_model: Optional[str],
-    optimization_id: Optional[str],
-    experiment_type: Optional[str],
+    dataset_item_ids: Optional[List[str]] = None,
+    dataset_filter_string: Optional[str] = None,
+    experiment_name_prefix: Optional[str] = None,
+    experiment_name: Optional[str] = None,
+    project_name: Optional[str] = None,
+    experiment_config: Optional[Dict[str, Any]] = None,
+    prompts: Optional[List[base_prompt.BasePrompt]] = None,
+    experiment_tags: Optional[List[str]] = None,
+    verbose: int = 2,
+    task_threads: int = 16,
+    evaluator_model: Optional[str] = None,
+    optimization_id: Optional[str] = None,
+    experiment_type: Optional[str] = None,
+    generate_report: bool = True,
+    report_output_path: Optional[str] = None,
 ) -> "suite_types.TestSuiteResult":
     """
-    Run evaluation on a dataset configured as a test suite.
+    Internal function that runs the full test suite evaluation pipeline:
+    task validation, evaluation, report generation, and result display.
 
-    This function is designed for test suites where evaluators and execution
-    policies are stored in the dataset itself. Unlike the general `evaluate` function,
-    this function:
-    - Does not accept scoring_metrics (they come from the dataset)
-    - Does not accept trial_count (it comes from the dataset's execution_policy)
-    - Does not accept dataset_sampler or nb_samples (suites evaluate all items)
-
-    Returns:
-        TestSuiteResult with pass/fail status for each item and the suite.
+    Used by both ``run_tests()`` and
+    ``TestSuite.__internal_api__run_optimization_suite__()``.
     """
+    from ..api_objects.dataset.test_suite.test_suite import validate_task_result
+    from ..api_objects.dataset.test_suite.report_processors import displayer, file_writer
+
+    import functools
+
     if client is None:
         client = opik_client.get_global_client()
+
+    @functools.wraps(task)
+    def _validated_task(data: Dict[str, Any]) -> Any:
+        return validate_task_result(task(data), input_data=data)
 
     experiment_name = _use_or_create_experiment_name(
         experiment_name=experiment_name,
@@ -355,7 +360,7 @@ def evaluate_test_suite(
 
     create_experiment_kwargs: Dict[str, Any] = dict(
         name=experiment_name,
-        dataset_name=dataset.name,
+        dataset_name=suite_dataset.name,
         experiment_config=experiment_config,
         prompts=prompts,
         evaluation_method="test_suite",
@@ -374,7 +379,7 @@ def evaluate_test_suite(
     if verbose >= 1:
         experiment_url = url_helpers.get_experiment_url_by_id(
             experiment_id=experiment_.id,
-            dataset_id=dataset.id,
+            dataset_id=suite_dataset.id,
             url_override=client.config.url_override,
         )
         report.display_evaluation_in_progress(experiment_url)
@@ -382,8 +387,8 @@ def evaluate_test_suite(
     eval_result, total_time = _evaluate_test_suite_task(
         client=client,
         experiment=experiment_,
-        dataset=dataset,
-        task=task,
+        dataset=suite_dataset,
+        task=_validated_task,
         project_name=project_name,
         verbose=verbose,
         task_threads=task_threads,
@@ -393,10 +398,101 @@ def evaluate_test_suite(
         source=source,  # type: ignore[arg-type]
     )
 
-    return suite_result_constructor.build_suite_result(
+    suite_result = suite_result_constructor.build_suite_result(
         eval_result,
-        suite_name=dataset.name,
+        suite_name=suite_dataset.name,
         total_time=total_time,
+    )
+
+    report_path: Optional[str] = None
+    if generate_report:
+        try:
+            report_path = file_writer.save_report(
+                suite_result,
+                output_path=report_output_path,
+            )
+        except Exception:
+            logging.getLogger(__name__).warning(
+                "Failed to save test suite report file.",
+                exc_info=True,
+            )
+
+    if verbose >= 1:
+        displayer.display_suite_results(
+            suite_result,
+            verbose=verbose,
+            report_path=report_path,
+        )
+
+    return suite_result
+
+
+def run_tests(
+    test_suite: test_suite.TestSuite,
+    task: LLMTask,
+    *,
+    experiment_name: Optional[str] = None,
+    experiment_name_prefix: Optional[str] = None,
+    project_name: Optional[str] = None,
+    experiment_config: Optional[Dict[str, Any]] = None,
+    prompts: Optional[List[base_prompt.BasePrompt]] = None,
+    experiment_tags: Optional[List[str]] = None,
+    verbose: int = 2,
+    worker_threads: int = 16,
+    model: Optional[str] = None,
+    generate_report: bool = True,
+    report_output_path: Optional[str] = None,
+) -> "suite_types.TestSuiteResult":
+    """
+    Run a test suite against a task function.
+
+    The task function receives each test item's data dict and must return
+    either a dict (with ``"input"`` and ``"output"`` keys) or any other
+    value, which will be automatically wrapped as
+    ``{"input": <item data>, "output": <returned value>}``.
+
+    Args:
+        test_suite: The test suite to run.
+        task: A callable that takes a dict and returns a result.
+        experiment_name: Optional explicit name for the experiment.
+        experiment_name_prefix: Optional prefix for auto-generated name.
+        project_name: Optional project name for tracking.
+        experiment_config: Optional configuration dict for the experiment.
+        prompts: Optional list of Prompt objects to associate.
+        experiment_tags: Optional list of tags for the experiment.
+        verbose: Verbosity level. 0=silent, 1=summary, 2=detailed (default).
+        worker_threads: Number of threads for parallel task execution.
+        model: Optional model name for checking assertions.
+        generate_report: Whether to generate a JSON report file.
+        report_output_path: Optional file path for the report.
+
+    Returns:
+        TestSuiteResult with pass/fail status based on execution policy.
+
+    Example:
+        >>> import opik
+        >>> result = opik.run_tests(
+        ...     test_suite=suite,
+        ...     task=my_llm_function,
+        ...     experiment_name="v2-prompt-test",
+        ... )
+        >>> print(f"Pass rate: {result.pass_rate:.0%}")
+    """
+    return __internal_api__run_test_suite__(
+        suite_dataset=test_suite._dataset,
+        task=task,
+        client=test_suite._client,
+        experiment_name_prefix=experiment_name_prefix,
+        experiment_name=experiment_name,
+        project_name=project_name or test_suite.project_name,
+        experiment_config=experiment_config,
+        prompts=prompts,
+        experiment_tags=experiment_tags,
+        verbose=verbose,
+        task_threads=worker_threads,
+        evaluator_model=model,
+        generate_report=generate_report,
+        report_output_path=report_output_path,
     )
 
 

@@ -92,9 +92,9 @@ class TestSuite:
     metadata and read by the evaluation engine when running the suite.
 
     Example:
-        >>> from opik import Opik
+        >>> import opik
         >>>
-        >>> client = Opik()
+        >>> client = opik.Opik()
         >>>
         >>> suite = client.create_test_suite(
         ...     name="Refund Policy Tests",
@@ -112,7 +112,7 @@ class TestSuite:
         ...     },
         ... ])
         >>>
-        >>> results = suite.run(task=my_llm_function)
+        >>> results = opik.run_tests(test_suite=suite, task=my_llm_function)
     """
 
     def __init__(
@@ -132,6 +132,11 @@ class TestSuite:
         self._client = client
 
     @property
+    def id(self) -> str:
+        """The ID of the test suite."""
+        return self._dataset.id
+
+    @property
     def name(self) -> str:
         """The name of the test suite."""
         return self._name
@@ -140,11 +145,6 @@ class TestSuite:
     def description(self) -> Optional[str]:
         """The description of the test suite."""
         return self._dataset.description
-
-    @property
-    def dataset(self) -> dataset.Dataset:
-        """The underlying dataset storing suite items."""
-        return self._dataset
 
     @property
     def project_name(self) -> Optional[str]:
@@ -159,6 +159,45 @@ class TestSuite:
             List of tag strings.
         """
         return self._dataset.get_tags()
+
+    def get_current_version_name(self) -> Optional[str]:
+        """
+        Get the current version name of the test suite.
+
+        Returns:
+            The current version name (e.g., 'v1', 'v2'), or None if
+            no version exists.
+        """
+        return self._dataset.get_current_version_name()
+
+    def get_version_info(
+        self,
+    ) -> Optional[Any]:
+        """
+        Get version information for the current (latest) version.
+
+        Returns:
+            DatasetVersionPublic containing the current version's metadata,
+            or None if no version exists yet.
+        """
+        return self._dataset.get_version_info()
+
+    def get_version_view(self, version_name: str) -> Any:
+        """
+        Get a read-only view of a specific version.
+
+        Args:
+            version_name: The version name (e.g., 'v1', 'v2').
+
+        Returns:
+            A read-only DatasetVersion object for accessing the specified
+            version's items and metadata.
+
+        Raises:
+            opik.exceptions.DatasetVersionNotFound: If the version does not
+                exist.
+        """
+        return self._dataset.get_version_view(version_name)
 
     def get_items(
         self,
@@ -416,85 +455,6 @@ class TestSuite:
 
         self._dataset.__internal_api__insert_items_as_dataclasses__(ds_items)
 
-    def run(
-        self,
-        task: LLMTask,
-        *,
-        experiment_name_prefix: Optional[str] = None,
-        experiment_name: Optional[str] = None,
-        project_name: Optional[str] = None,
-        experiment_config: Optional[Dict[str, Any]] = None,
-        prompts: Optional[List[base_prompt.BasePrompt]] = None,
-        experiment_tags: Optional[List[str]] = None,
-        verbose: int = 2,
-        worker_threads: int = 16,
-        model: Optional[str] = None,
-        generate_report: bool = True,
-        report_output_path: Optional[str] = None,
-    ) -> suite_types.TestSuiteResult:
-        """
-        Run the test suite against a task function.
-
-        The task function receives each test item's data dict and must return
-        either a dict (with ``"input"`` and ``"output"`` as the supported keys)
-        or any other value, which will be automatically wrapped as
-        ``{"input": <item data>, "output": <returned value>}``.
-
-        Args:
-            task: A callable that takes a dict (the item's data) and returns
-                a dict with ``"input"``/``"output"`` keys, or any other value
-                to be auto-wrapped.
-            experiment_name_prefix: Optional prefix for auto-generated experiment name.
-            experiment_name: Optional explicit name for the experiment.
-            project_name: Optional project name for tracking.
-            experiment_config: Optional configuration dict for the experiment.
-            prompts: Optional list of Prompt objects to associate with the experiment.
-            experiment_tags: Optional list of tags to associate with the experiment.
-            verbose: Verbosity level. 0=silent, 1=summary only (pass/fail,
-                items passed, pass rate), 2=summary + per-assertion pass rates
-                (default).
-            worker_threads: Number of threads for parallel task execution.
-            model: Optional model name to use for checking assertions.
-                If not provided, uses the default model (gpt-5-nano).
-            generate_report: Whether to generate a structured JSON report file
-                after the evaluation completes. Defaults to True.
-            report_output_path: Optional file path for the report. If not
-                provided, a default path is generated under ``opik_test_suite_reports/``.
-
-        Returns:
-            TestSuiteResult with pass/fail status based on execution policy.
-
-        Example:
-            >>> # Simplified: return any value it is auto-wrapped internally
-            >>> def my_llm_task(data: dict) -> str:
-            ...     return call_my_llm(data["user_input"], user_tier=data.get("user_tier"))
-            >>>
-            >>> # Explicit: return a dict with "input" and "output" keys directly
-            >>> def my_llm_task_explicit(data: dict) -> dict:
-            ...     response = call_my_llm(data["user_input"], user_tier=data.get("user_tier"))
-            ...     return {"input": data, "output": response}
-            >>>
-            >>> result = suite.run(task=my_llm_task, model="gpt-4o")
-            >>> print(f"Suite passed: {result.passed}")
-            >>> print(f"Items passed: {result.items_passed}/{result.items_total}")
-        """
-        project_name = project_name or self.project_name
-        return self.__internal_api__run_optimization_suite__(
-            task=task,
-            experiment_name_prefix=experiment_name_prefix,
-            experiment_name=experiment_name,
-            project_name=project_name,
-            experiment_config=experiment_config,
-            prompts=prompts,
-            experiment_tags=experiment_tags,
-            verbose=verbose,
-            worker_threads=worker_threads,
-            model=model,
-            generate_report=generate_report,
-            report_output_path=report_output_path,
-            client=self._client,
-        )
-
     def __internal_api__run_optimization_suite__(
         self,
         task: LLMTask,
@@ -517,49 +477,13 @@ class TestSuite:
         report_output_path: Optional[str] = None,
     ) -> suite_types.TestSuiteResult:
         """
-        Run the test suite with optimization-specific parameters.
-
-        This is the internal entry point used by the optimizer framework.
-        It extends the public ``run()`` method with parameters for linking
-        experiments to optimization runs, filtering dataset items, and
-        injecting a pre-configured Opik client.
-
-        Args:
-            task: A callable that takes a dict (the item's data) and returns
-                a dict with ``"input"``/``"output"`` keys, or any other value
-                to be auto-wrapped.
-            experiment_name_prefix: Optional prefix for auto-generated experiment name.
-            experiment_name: Optional explicit name for the experiment.
-            project_name: Optional project name for tracking.
-            experiment_config: Optional configuration dict for the experiment.
-            prompts: Optional list of Prompt objects to associate with the experiment.
-            experiment_tags: Optional list of tags to associate with the experiment.
-            verbose: Verbosity level. 0=silent, 1=summary only, 2=detailed (default).
-            worker_threads: Number of threads for parallel task execution.
-            model: Optional model name to use for checking assertions.
-            optimization_id: Optimization ID to link the experiment to.
-            experiment_type: Experiment type (e.g. "trial", "mini-batch").
-            dataset_item_ids: Subset of dataset item IDs to evaluate.
-            dataset_filter_string: OQL filter string to filter dataset items.
-            client: Opik client instance. If not provided, uses the cached client.
-            generate_report: Whether to generate a structured JSON report file
-                after the evaluation completes. Defaults to True.
-            report_output_path: Optional file path for the report. If not
-                provided, a default path is generated under
-                ``opik_test_suite_reports/``.
-
-        Returns:
-            TestSuiteResult with pass/fail status based on execution policy.
+        Internal entry point used by the optimizer framework.
         """
-        from opik.evaluation import evaluator as opik_evaluator
+        from opik.evaluation.evaluator import __internal_api__run_test_suite__
 
-        @functools.wraps(task)
-        def _validated_task(data: Dict[str, Any]) -> Any:
-            return validate_task_result(task(data), input_data=data)
-
-        suite_result = opik_evaluator.evaluate_test_suite(
-            dataset=self._dataset,
-            task=_validated_task,
+        return __internal_api__run_test_suite__(
+            suite_dataset=self._dataset,
+            task=task,
             client=client,
             dataset_item_ids=dataset_item_ids,
             dataset_filter_string=dataset_filter_string,
@@ -574,26 +498,6 @@ class TestSuite:
             evaluator_model=model,
             optimization_id=optimization_id,
             experiment_type=experiment_type,
+            generate_report=generate_report,
+            report_output_path=report_output_path,
         )
-
-        report_path: Optional[str] = None
-        if generate_report:
-            try:
-                report_path = file_writer.save_report(
-                    suite_result,
-                    output_path=report_output_path,
-                )
-            except Exception:
-                LOGGER.warning(
-                    "Failed to save test suite report file.",
-                    exc_info=True,
-                )
-
-        if verbose >= 1:
-            displayer.display_suite_results(
-                suite_result,
-                verbose=verbose,
-                report_path=report_path,
-            )
-
-        return suite_result

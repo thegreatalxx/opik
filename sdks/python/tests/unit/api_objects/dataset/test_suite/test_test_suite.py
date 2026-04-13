@@ -53,8 +53,8 @@ class TestEvaluatorValidation:
         # Should not raise
         validators.validate_evaluators([llm_judge], "suite-level evaluators")
 
-    def test_init__stores_dataset_reference(self):
-        """Test that suite stores the dataset reference."""
+    def test_init__stores_name(self):
+        """Test that suite stores the name."""
         mock_dataset = _create_mock_dataset()
 
         suite = test_suite.TestSuite(
@@ -62,7 +62,6 @@ class TestEvaluatorValidation:
             dataset_=mock_dataset,
         )
 
-        assert suite.dataset is mock_dataset
         assert suite.name == "test_suite"
 
     def test_resolve_evaluators__with_non_llm_judge_evaluator__raises_type_error(self):
@@ -683,7 +682,7 @@ class TestInternalRunOptimizationSuite:
         fake_result = mock.MagicMock(spec=suite_types.TestSuiteResult)
 
         with mock.patch(
-            "opik.evaluation.evaluator.evaluate_test_suite",
+            "opik.evaluation.evaluator.__internal_api__run_test_suite__",
             return_value=fake_result,
         ) as mock_run:
             result = suite.__internal_api__run_optimization_suite__(
@@ -703,7 +702,7 @@ class TestInternalRunOptimizationSuite:
         assert call_kwargs["experiment_type"] == "mini-batch"
         assert call_kwargs["dataset_item_ids"] == ["item-1", "item-2"]
         assert call_kwargs["dataset_filter_string"] == 'input = "hello"'
-        assert call_kwargs["dataset"] is mock_dataset
+        assert call_kwargs["suite_dataset"] is mock_dataset
 
     def test_without_optimization_params__defaults_to_none(self):
         mock_dataset = _create_mock_dataset()
@@ -715,7 +714,7 @@ class TestInternalRunOptimizationSuite:
         fake_result = mock.MagicMock(spec=suite_types.TestSuiteResult)
 
         with mock.patch(
-            "opik.evaluation.evaluator.evaluate_test_suite",
+            "opik.evaluation.evaluator.__internal_api__run_test_suite__",
             return_value=fake_result,
         ) as mock_run:
             suite.__internal_api__run_optimization_suite__(
@@ -740,7 +739,7 @@ class TestInternalRunOptimizationSuite:
         fake_result = mock.MagicMock(spec=suite_types.TestSuiteResult)
 
         with mock.patch(
-            "opik.evaluation.evaluator.evaluate_test_suite",
+            "opik.evaluation.evaluator.__internal_api__run_test_suite__",
             return_value=fake_result,
         ) as mock_run:
             suite.__internal_api__run_optimization_suite__(
@@ -753,7 +752,9 @@ class TestInternalRunOptimizationSuite:
         call_kwargs = mock_run.call_args[1]
         assert call_kwargs["client"] is mock_client
 
-    def test_run_delegates_to_internal_api(self):
+    def test_run_tests_delegates_to_internal_api(self):
+        from opik.evaluation.evaluator import run_tests
+
         mock_dataset = _create_mock_dataset()
         suite = test_suite.TestSuite(
             name="test_suite",
@@ -763,10 +764,11 @@ class TestInternalRunOptimizationSuite:
         fake_result = mock.MagicMock(spec=suite_types.TestSuiteResult)
 
         with mock.patch(
-            "opik.evaluation.evaluator.evaluate_test_suite",
+            "opik.evaluation.evaluator.__internal_api__run_test_suite__",
             return_value=fake_result,
         ) as mock_run:
-            result = suite.run(
+            result = run_tests(
+                test_suite=suite,
                 task=lambda data: {"input": data, "output": "resp"},
                 experiment_name="run-exp",
                 verbose=0,

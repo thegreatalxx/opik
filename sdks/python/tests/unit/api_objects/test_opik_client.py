@@ -778,12 +778,11 @@ class TestOpikClientGetTestSuite:
             yield
 
     def test_get_test_suite__returns_test_suite(self):
-        """Verify get_test_suite returns a TestSuite with the correct name and dataset."""
+        """Verify get_test_suite returns a TestSuite with the correct name."""
         result = self.opik_client_.get_test_suite(name="my-suite")
 
         assert isinstance(result, TestSuite)
         assert result.name == "my-suite"
-        assert result.dataset is not None
 
     def test_get_test_suite__no_project_name__uses_default_project(self):
         """Verify get_test_suite passes the default project name to get_dataset_by_identifier."""
