@@ -205,7 +205,7 @@ const TestSuiteItemPanelLayout: React.FC<TestSuiteItemPanelLayoutProps> = ({
         <div className="relative size-full overflow-y-auto">
           <div className="sticky top-0 z-10 border-b bg-background p-6 pb-4">
             <div className="comet-body-accented">
-              {isNewItem ? "Add suite item" : "Edit evaluation item"}
+              {isNewItem ? "Add suite item" : "Edit test suite item"}
             </div>
             <TagListRenderer
               tags={tags}

@@ -193,7 +193,7 @@ const dataset = await client.getOrCreateDataset("${escapedName}");`;
   const renderStepEvaluationType = () => (
     <>
       <div className="mb-4">
-        <h3 className="comet-body-s-accented">Select evaluation type</h3>
+        <h3 className="comet-body-s-accented">Select test type</h3>
         <p className="comet-body-xs text-light-slate">
           Choose how you want to evaluate your results
         </p>
