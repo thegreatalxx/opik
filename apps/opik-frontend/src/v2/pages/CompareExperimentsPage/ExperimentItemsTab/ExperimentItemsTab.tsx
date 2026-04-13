@@ -277,12 +277,12 @@ const ExperimentItemsTab: React.FunctionComponent<ExperimentItemsTabProps> = ({
 
   const visibleOutputColumns = useMemo(
     () =>
-      isEvalSuite
+      isTestSuite
         ? dynamicOutputColumns.filter(
             (c: DynamicColumn) => c.label !== EVAL_SUITE_ECHOED_OUTPUT_KEY,
           )
         : dynamicOutputColumns,
-    [dynamicOutputColumns, isEvalSuite],
+    [dynamicOutputColumns, isTestSuite],
   );
 
   const outputColumnsData = useMemo(() => {

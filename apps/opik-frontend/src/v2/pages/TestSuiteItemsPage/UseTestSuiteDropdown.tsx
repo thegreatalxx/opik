@@ -81,7 +81,9 @@ function UseTestSuiteDropdown({
           open={openConfirmDialog}
           setOpen={setOpenConfirmDialog}
           onConfirm={handleLoadPlayground}
-          title={`Load ${isTestSuite ? "test suite" : "dataset"} into playground`}
+          title={`Load ${
+            isTestSuite ? "test suite" : "dataset"
+          } into playground`}
           description={`Loading this ${
             isTestSuite ? "test suite" : "dataset"
           } into the Playground will replace any unsaved changes. This action cannot be undone.`}
@@ -114,8 +116,8 @@ function UseTestSuiteDropdown({
                     <span>Open in Playground</span>
                     <span className="text-light-slate">
                       Test prompts over your{" "}
-                      {isTestSuite ? "test suite" : "dataset"} and run evaluations
-                      interactively
+                      {isTestSuite ? "test suite" : "dataset"} and run
+                      evaluations interactively
                     </span>
                   </div>
                 </DropdownMenuItem>
