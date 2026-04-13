@@ -183,7 +183,8 @@ describe("evaluateTestSuite", () => {
         name: "suite-experiment",
         datasetName: "test-dataset",
         datasetVersionId: "version-1",
-        evaluationMethod: "test_suite",
+        // TODO: OPIK-5795 - migrate DB value from 'evaluation_suite' to 'test_suite'
+        evaluationMethod: "evaluation_suite",
       })
     );
 

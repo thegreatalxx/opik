@@ -93,7 +93,8 @@ describe("TestSuite static methods", () => {
         expect.objectContaining({
           name: "my-suite",
           description: "My test suite",
-          type: "test_suite",
+          // TODO: OPIK-5795 - migrate DB value from 'evaluation_suite' to 'test_suite'
+          type: "evaluation_suite",
         })
       );
       // No evaluators or policy, so applyDatasetItemChanges should not be called
@@ -161,7 +162,8 @@ describe("TestSuite static methods", () => {
         expect.objectContaining({
           name: "my-suite",
           tags: ["prod", "v2"],
-          type: "test_suite",
+          // TODO: OPIK-5795 - migrate DB value from 'evaluation_suite' to 'test_suite'
+          type: "evaluation_suite",
         })
       );
     });
@@ -283,7 +285,8 @@ describe("TestSuite static methods", () => {
         expect.objectContaining({
           name: "new-suite",
           description: "New suite",
-          type: "test_suite",
+          // TODO: OPIK-5795 - migrate DB value from 'evaluation_suite' to 'test_suite'
+          type: "evaluation_suite",
         })
       );
     });
