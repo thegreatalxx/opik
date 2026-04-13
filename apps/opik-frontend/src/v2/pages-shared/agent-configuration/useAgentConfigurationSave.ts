@@ -59,6 +59,22 @@ type UseAgentConfigurationSaveParams = {
 
 const FIELD_NAME_PATTERN = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
 
+const isMessageEmpty = (message: { content: unknown }): boolean => {
+  const content = message.content;
+  if (typeof content === "string") return !content.trim();
+  if (Array.isArray(content)) {
+    return content.every(
+      (part) =>
+        part &&
+        typeof part === "object" &&
+        "type" in part &&
+        part.type === "text" &&
+        !(part as { text?: string }).text?.trim(),
+    );
+  }
+  return true;
+};
+
 const validateNewField = (
   field: NewFieldDraft,
   existingKeys: Set<string>,
@@ -70,20 +86,23 @@ const validateNewField = (
     return "Use letters, digits and underscore; start with a letter or underscore";
   if (existingKeys.has(key)) return "A field with this name already exists";
   if (siblingKeys.has(key)) return "Duplicate field name in the new fields";
-  if (
-    field.type !== BlueprintValueType.PROMPT &&
-    field.type !== BlueprintValueType.BOOLEAN
-  ) {
+  if (field.type === BlueprintValueType.PROMPT) {
+    if (field.messages.length === 0) return "Add at least one message";
+    if (field.messages.some(isMessageEmpty))
+      return "Messages must not be empty";
+    return "";
+  }
+  if (field.type !== BlueprintValueType.BOOLEAN) {
     const err = validateField(field.type, field.value);
     if (err) return err;
   }
-  if (field.type === BlueprintValueType.PROMPT && !field.value.trim())
-    return "Prompt content must not be empty";
   return "";
 };
 
-const buildChatTemplateFromText = (text: string): string =>
-  JSON.stringify([{ role: "system", content: text }]);
+const buildChatTemplateFromMessages = (
+  messages: Array<{ role: string; content: unknown }>,
+): string =>
+  JSON.stringify(messages.map(({ role, content }) => ({ role, content })));
 
 export const useAgentConfigurationSave = ({
   agentConfig,
@@ -196,8 +215,8 @@ export const useAgentConfigurationSave = ({
         }
       }
 
-      // Materialize new PROMPT fields by creating brand-new prompts in the
-      // library; reuse the user-entered value as the system message.
+      // Materialize new PROMPT fields by creating brand-new chat prompts in
+      // the library from the user-entered messages.
       const addedValues: BlueprintValue[] = [];
       for (const field of added) {
         const key = field.key.trim();
@@ -207,7 +226,7 @@ export const useAgentConfigurationSave = ({
             created = (await createPrompt({
               prompt: {
                 name: key,
-                template: buildChatTemplateFromText(field.value),
+                template: buildChatTemplateFromMessages(field.messages),
                 template_structure: PROMPT_TEMPLATE_STRUCTURE.CHAT,
                 project_id: projectId,
               },

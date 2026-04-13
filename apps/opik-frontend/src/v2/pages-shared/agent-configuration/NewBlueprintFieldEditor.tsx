@@ -1,12 +1,14 @@
-import React, { useMemo } from "react";
+import React, { useCallback, useMemo } from "react";
 import { Trash } from "lucide-react";
 
 import { BlueprintValueType } from "@/types/agent-configs";
+import { LLM_MESSAGE_ROLE, LLMMessage } from "@/types/llm";
+import { generateDefaultLLMPromptMessage } from "@/lib/llm";
 import BlueprintTypeIcon from "@/v2/pages-shared/traces/ConfigurationTab/BlueprintTypeIcon";
+import LLMPromptMessages from "@/v2/pages-shared/llm/LLMPromptMessages/LLMPromptMessages";
 import { Button } from "@/ui/button";
 import { Input } from "@/ui/input";
 import { Switch } from "@/ui/switch";
-import { Textarea } from "@/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -29,25 +31,34 @@ export interface NewFieldDraft {
   id: string;
   key: string;
   type: BlueprintValueType;
+  // Used for scalar types and as the BOOLEAN's "true"/"false".
   value: string;
+  // Used only when type === PROMPT.
+  messages: LLMMessage[];
 }
+
+const buildDefaultPromptMessages = (): LLMMessage[] => [
+  generateDefaultLLMPromptMessage({ role: LLM_MESSAGE_ROLE.system }),
+];
 
 export const createNewFieldDraft = (id: string): NewFieldDraft => ({
   id,
   key: "",
   type: BlueprintValueType.STRING,
   value: "",
+  messages: [],
 });
 
-export const defaultValueForType = (type: BlueprintValueType): string => {
-  switch (type) {
-    case BlueprintValueType.BOOLEAN:
-      return "false";
-    case BlueprintValueType.PROMPT:
-      return "";
-    default:
-      return "";
+const initialStateForType = (
+  type: BlueprintValueType,
+): Pick<NewFieldDraft, "value" | "messages"> => {
+  if (type === BlueprintValueType.BOOLEAN) {
+    return { value: "false", messages: [] };
   }
+  if (type === BlueprintValueType.PROMPT) {
+    return { value: "", messages: buildDefaultPromptMessages() };
+  }
+  return { value: "", messages: [] };
 };
 
 interface NewBlueprintFieldEditorProps {
@@ -76,8 +87,28 @@ const NewBlueprintFieldEditor: React.FC<NewBlueprintFieldEditorProps> = ({
   }, [trimmedKey, reservedKeys]);
 
   const handleTypeChange = (next: BlueprintValueType) => {
-    onChange({ ...field, type: next, value: defaultValueForType(next) });
+    onChange({ ...field, type: next, ...initialStateForType(next) });
   };
+
+  const handleMessagesChange = useCallback(
+    (messages: LLMMessage[]) => onChange({ ...field, messages }),
+    [field, onChange],
+  );
+
+  const handleAddMessage = useCallback(() => {
+    const lastRole = field.messages.at(-1)?.role;
+    const nextRole =
+      lastRole === LLM_MESSAGE_ROLE.user
+        ? LLM_MESSAGE_ROLE.assistant
+        : LLM_MESSAGE_ROLE.user;
+    onChange({
+      ...field,
+      messages: [
+        ...field.messages,
+        generateDefaultLLMPromptMessage({ role: nextRole }),
+      ],
+    });
+  }, [field, onChange]);
 
   return (
     <div className="flex flex-col gap-2 rounded-md border border-dashed border-amber-400/50 bg-primary-foreground p-3">
@@ -119,11 +150,13 @@ const NewBlueprintFieldEditor: React.FC<NewBlueprintFieldEditorProps> = ({
           }
         />
       ) : field.type === BlueprintValueType.PROMPT ? (
-        <Textarea
-          value={field.value}
-          onChange={(e) => onChange({ ...field, value: e.target.value })}
-          placeholder="System message for the new prompt"
-          className="min-h-20"
+        <LLMPromptMessages
+          messages={field.messages}
+          onChange={handleMessagesChange}
+          onAddMessage={handleAddMessage}
+          hidePromptActions
+          disableMedia
+          compact
         />
       ) : (
         <Input
