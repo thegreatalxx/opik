@@ -358,7 +358,8 @@ def evaluate_test_suite(
         dataset_name=dataset.name,
         experiment_config=experiment_config,
         prompts=prompts,
-        evaluation_method="test_suite",
+        # TODO: OPIK-5795 - migrate DB value from 'evaluation_suite' to 'test_suite'
+        evaluation_method="evaluation_suite",
         tags=experiment_tags,
         dataset_version_id=None,
         project_name=project_name,

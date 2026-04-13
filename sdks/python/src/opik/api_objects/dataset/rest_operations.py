@@ -303,7 +303,8 @@ def create_test_suite_dataset(
         name=dataset_name,
         description=description,
         project_name=project_name,
-        type="test_suite",
+        # TODO: OPIK-5795 - migrate DB value from 'evaluation_suite' to 'test_suite'
+        type="evaluation_suite",
         tags=tags,
     )
 

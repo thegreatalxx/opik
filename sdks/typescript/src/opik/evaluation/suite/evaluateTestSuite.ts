@@ -108,7 +108,8 @@ export async function evaluateTestSuite<T = Record<string, unknown>>(
     experimentConfig: options.experimentConfig,
     prompts: options.prompts,
     datasetVersionId: versionInfo?.id,
-    evaluationMethod: "test_suite",
+    // TODO: OPIK-5795 - migrate DB value from 'evaluation_suite' to 'test_suite'
+    evaluationMethod: "evaluation_suite",
     tags: options.tags,
     projectName: options.projectName,
   });
