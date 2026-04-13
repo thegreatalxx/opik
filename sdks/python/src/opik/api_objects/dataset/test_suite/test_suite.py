@@ -8,7 +8,6 @@ break existing functionality.
 
 from __future__ import annotations
 
-import functools
 import logging
 from typing import Any, Callable, Dict, List, Optional, TYPE_CHECKING
 
@@ -24,7 +23,6 @@ from opik.api_objects.prompt import base_prompt
 from opik.api_objects.dataset import dataset, dataset_item
 from opik.rest_api.types import dataset_version_public
 from . import types as suite_types, converters
-from .report_processors import displayer, file_writer
 from .. import validators, execution_policy, rest_operations
 
 
@@ -178,7 +176,9 @@ class TestSuiteVersion:
         Returns:
             List of assertion strings.
         """
-        return converters.version_evaluators_to_assertions(self._version_info.evaluators)
+        return converters.version_evaluators_to_assertions(
+            self._version_info.evaluators
+        )
 
     def get_global_execution_policy(self) -> execution_policy.ExecutionPolicy:
         """
@@ -187,7 +187,9 @@ class TestSuiteVersion:
         Returns:
             ExecutionPolicy dict with runs_per_item and pass_threshold.
         """
-        return converters.version_policy_to_execution_policy(self._version_info.execution_policy)
+        return converters.version_policy_to_execution_policy(
+            self._version_info.execution_policy
+        )
 
 
 class TestSuite:
@@ -403,7 +405,9 @@ class TestSuite:
                 tags=tags,
             )
 
-        has_version_updates = resolved is not None or global_execution_policy is not None
+        has_version_updates = (
+            resolved is not None or global_execution_policy is not None
+        )
         if has_version_updates:
             version_info = self._dataset.get_version_info()
             if version_info is None:
@@ -416,9 +420,16 @@ class TestSuite:
             current_policy = self.get_global_execution_policy()
 
             new_evaluators = resolved if resolved is not None else current_evaluators
-            new_policy = global_execution_policy if global_execution_policy is not None else current_policy
+            new_policy = (
+                global_execution_policy
+                if global_execution_policy is not None
+                else current_policy
+            )
 
-            if _evaluators_equal(new_evaluators, current_evaluators) and new_policy == current_policy:
+            if (
+                _evaluators_equal(new_evaluators, current_evaluators)
+                and new_policy == current_policy
+            ):
                 return
 
             change_parts: List[str] = []
@@ -477,7 +488,7 @@ class TestSuite:
 
     def update_items(
         self,
-        items: List[Dict[str, Any]],
+        items: List[suite_types.TestSuiteItem],
     ) -> None:
         """
         Update existing items in the test suite.

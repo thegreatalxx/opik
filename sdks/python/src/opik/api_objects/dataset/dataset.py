@@ -294,7 +294,10 @@ class DatasetVersion(DatasetExportOperations):
         """
         return self._version_info
 
-    def get_evaluators(self) -> List[Any]:
+    def get_evaluators(
+        self,
+        evaluator_model: Optional[str] = None,
+    ) -> List[Any]:
         """
         Get suite-level evaluators for this dataset version.
 

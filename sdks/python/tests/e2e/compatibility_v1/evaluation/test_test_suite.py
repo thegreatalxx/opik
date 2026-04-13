@@ -55,16 +55,18 @@ def test_test_suite__item_level_assertions__feedback_scores_created(
         description="Test item-level assertions",
     )
 
-    suite.insert([
-        {
-            "data": {"input": {"question": "What is the capital of France?"}},
-            "assertions": [geography_assertion],
-        },
-        {
-            "data": {"input": {"question": "What is 2 + 2?"}},
-            "assertions": [math_assertion],
-        },
-    ])
+    suite.insert(
+        [
+            {
+                "data": {"input": {"question": "What is the capital of France?"}},
+                "assertions": [geography_assertion],
+            },
+            {
+                "data": {"input": {"question": "What is 2 + 2?"}},
+                "assertions": [math_assertion],
+            },
+        ]
+    )
 
     def task(item: Dict[str, Any]) -> Dict[str, Any]:
         question = item["input"]["question"]
@@ -119,12 +121,14 @@ def test_test_suite__multiple_assertions_per_item__all_scores_created(
         description="Test multiple assertions per item",
     )
 
-    suite.insert([
-        {
-            "data": {"input": {"question": "What is the capital of France?"}},
-            "assertions": [assertion_1, assertion_2],
-        },
-    ])
+    suite.insert(
+        [
+            {
+                "data": {"input": {"question": "What is the capital of France?"}},
+                "assertions": [assertion_1, assertion_2],
+            },
+        ]
+    )
 
     def task(item: Dict[str, Any]) -> Dict[str, Any]:
         return {"input": item["input"], "output": "Paris is the capital of France."}
@@ -165,10 +169,12 @@ def test_test_suite__suite_level_assertions__applied_to_all_items(
         global_assertions=[suite_assertion],
     )
 
-    suite.insert([
-        {"data": {"input": {"question": "What is the capital of France?"}}},
-        {"data": {"input": {"question": "What is 2 + 2?"}}},
-    ])
+    suite.insert(
+        [
+            {"data": {"input": {"question": "What is the capital of France?"}}},
+            {"data": {"input": {"question": "What is 2 + 2?"}}},
+        ]
+    )
 
     def task(item: Dict[str, Any]) -> Dict[str, Any]:
         question = item["input"]["question"]
@@ -213,12 +219,14 @@ def test_test_suite__combined_suite_and_item_level_assertions__all_scores_create
         global_assertions=[suite_assertion],
     )
 
-    suite.insert([
-        {
-            "data": {"input": {"question": "What is the capital of France?"}},
-            "assertions": [item_assertion],
-        },
-    ])
+    suite.insert(
+        [
+            {
+                "data": {"input": {"question": "What is the capital of France?"}},
+                "assertions": [item_assertion],
+            },
+        ]
+    )
 
     def task(item: Dict[str, Any]) -> Dict[str, Any]:
         return {"input": item["input"], "output": "The capital of France is Paris."}
@@ -263,20 +271,22 @@ def test_test_suite__no_assertions_default_policy__items_pass_with_single_run(
         description="Test items without assertions and default policy",
     )
 
-    suite.insert([
-        {
-            "data": {
-                "input": {"question": "What is the capital of France?"},
-                "reference": "Paris",
+    suite.insert(
+        [
+            {
+                "data": {
+                    "input": {"question": "What is the capital of France?"},
+                    "reference": "Paris",
+                },
             },
-        },
-        {
-            "data": {
-                "input": {"question": "What is the capital of Germany?"},
-                "reference": "Berlin",
+            {
+                "data": {
+                    "input": {"question": "What is the capital of Germany?"},
+                    "reference": "Berlin",
+                },
             },
-        },
-    ])
+        ]
+    )
 
     call_count = ThreadSafeCounter()
 
@@ -336,9 +346,11 @@ def test_test_suite__execution_policy_runs_per_item__task_called_multiple_times(
         global_execution_policy={"runs_per_item": 2, "pass_threshold": 1},
     )
 
-    suite.insert([
-        {"data": {"input": {"question": "What is the capital of France?"}}},
-    ])
+    suite.insert(
+        [
+            {"data": {"input": {"question": "What is the capital of France?"}}},
+        ]
+    )
 
     call_count = ThreadSafeCounter()
 
@@ -393,13 +405,15 @@ def test_test_suite__item_level_execution_policy__overrides_suite_policy(
 
     # Item 1: uses suite-level policy (runs_per_item=1)
     # Item 2: overrides with item-level policy (runs_per_item=3)
-    suite.insert([
-        {"data": {"input": {"question": "What is the capital of France?"}}},
-        {
-            "data": {"input": {"question": "What is the capital of Germany?"}},
-            "execution_policy": {"runs_per_item": 3, "pass_threshold": 2},
-        },
-    ])
+    suite.insert(
+        [
+            {"data": {"input": {"question": "What is the capital of France?"}}},
+            {
+                "data": {"input": {"question": "What is the capital of Germany?"}},
+                "execution_policy": {"runs_per_item": 3, "pass_threshold": 2},
+            },
+        ]
+    )
 
     france_count = ThreadSafeCounter()
     germany_count = ThreadSafeCounter()
@@ -470,12 +484,14 @@ def test_test_suite__assertion_fails__item_fails(
         description="Test assertion failure",
     )
 
-    suite.insert([
-        {
-            "data": {"input": {"question": "What is 2 + 2?"}},
-            "assertions": [failing_assertion],
-        },
-    ])
+    suite.insert(
+        [
+            {
+                "data": {"input": {"question": "What is 2 + 2?"}},
+                "assertions": [failing_assertion],
+            },
+        ]
+    )
 
     def task(item: Dict[str, Any]) -> Dict[str, Any]:
         return {"input": item["input"], "output": "2 + 2 equals 4."}
@@ -657,17 +673,19 @@ def test_test_suite__create_get_and_run__end_to_end(
         global_execution_policy={"runs_per_item": 2, "pass_threshold": 1},
     )
 
-    suite.insert([
-        {
-            "data": {"input": {"question": "What is the capital of France?"}},
-            "assertions": [item_assertion],
-            "description": "Geography: France capital",
-        },
-        {
-            "data": {"input": {"question": "What is the capital of Germany?"}},
-            "description": "Geography: Germany capital",
-        },
-    ])
+    suite.insert(
+        [
+            {
+                "data": {"input": {"question": "What is the capital of France?"}},
+                "assertions": [item_assertion],
+                "description": "Geography: France capital",
+            },
+            {
+                "data": {"input": {"question": "What is the capital of Germany?"}},
+                "description": "Geography: Germany capital",
+            },
+        ]
+    )
 
     # 2. Retrieve from backend (simulates a fresh client loading existing suite)
     retrieved_suite = opik_client.get_test_suite(name=dataset_name)
@@ -713,9 +731,7 @@ def test_test_suite__create_get_and_run__end_to_end(
         assert item_result.pass_threshold == 1
 
 
-def test_test_suite__delete__items_removed(
-    opik_client: opik.Opik, dataset_name: str
-):
+def test_test_suite__delete__items_removed(opik_client: opik.Opik, dataset_name: str):
     """
     Test that delete() removes items from the suite.
     """
@@ -724,17 +740,19 @@ def test_test_suite__delete__items_removed(
         description="Test delete items",
     )
 
-    suite.insert([
-        {
-            "data": {"input": {"question": "Question 1"}},
-            "description": "First question",
-        },
-        {
-            "data": {"input": {"question": "Question 2"}},
-            "description": "Second question",
-        },
-        {"data": {"input": {"question": "Question 3"}}},
-    ])
+    suite.insert(
+        [
+            {
+                "data": {"input": {"question": "Question 1"}},
+                "description": "First question",
+            },
+            {
+                "data": {"input": {"question": "Question 2"}},
+                "description": "Second question",
+            },
+            {"data": {"input": {"question": "Question 3"}}},
+        ]
+    )
 
     items = suite.get_items()
     assert len(items) == 3
@@ -894,12 +912,12 @@ def test_get_or_create_test_suite__new__creates_suite(
     assert retrieved.name == dataset_name
 
 
-def test_get_or_create_test_suite__with_new_assertions__updates_suite(
+def test_get_or_create_test_suite__existing_with_different_assertions__does_not_modify(
     opik_client: opik.Opik, dataset_name: str
 ):
     """
-    Test that get_or_create_test_suite with new assertions on an
-    existing suite updates the assertions.
+    Test that get_or_create_test_suite does not modify an existing suite's
+    assertions even when different values are passed.
     """
     opik_client.create_test_suite(
         name=dataset_name,
@@ -914,18 +932,15 @@ def test_get_or_create_test_suite__with_new_assertions__updates_suite(
 
     retrieved = opik_client.get_test_suite(name=dataset_name)
     assertions = retrieved.get_global_assertions()
-    assert set(assertions) == {
-        "Response is accurate",
-        "Response is concise",
-    }
+    assert set(assertions) == {"Response is helpful"}
 
 
-def test_get_or_create_test_suite__with_new_policy__updates_suite(
+def test_get_or_create_test_suite__existing_with_different_policy__does_not_modify(
     opik_client: opik.Opik, dataset_name: str
 ):
     """
-    Test that get_or_create_test_suite with a new execution_policy
-    on an existing suite updates the policy, keeping existing assertions.
+    Test that get_or_create_test_suite does not modify an existing suite's
+    execution policy even when different values are passed.
     """
     opik_client.create_test_suite(
         name=dataset_name,
@@ -942,8 +957,8 @@ def test_get_or_create_test_suite__with_new_policy__updates_suite(
     retrieved = opik_client.get_test_suite(name=dataset_name)
 
     policy = retrieved.get_global_execution_policy()
-    assert policy["runs_per_item"] == 5
-    assert policy["pass_threshold"] == 3
+    assert policy["runs_per_item"] == 1
+    assert policy["pass_threshold"] == 1
 
     assertions = retrieved.get_global_assertions()
     assert set(assertions) == {"Response is helpful"}
@@ -1072,7 +1087,8 @@ def test_get_or_create_test_suite__with_tags__tags_persisted(
     opik_client: opik.Opik, dataset_name: str
 ):
     """
-    Test that get_or_create passes tags on creation and updates.
+    Test that get_or_create passes tags on creation but does not
+    modify tags on an existing suite.
     """
     opik_client.get_or_create_test_suite(
         name=dataset_name,
@@ -1088,7 +1104,7 @@ def test_get_or_create_test_suite__with_tags__tags_persisted(
     )
 
     suite = opik_client.get_test_suite(dataset_name)
-    assert sorted(suite.get_tags()) == ["production", "v2"]
+    assert suite.get_tags() == ["v1"]
 
 
 @pytest.mark.skipif(
@@ -1107,20 +1123,22 @@ def test_test_suite__insert_batch__all_items_persisted(
         description="Test batch insert",
     )
 
-    suite.insert([
-        {
-            "data": {"input": {"question": "What is the capital of France?"}},
-            "assertions": [assertion],
-        },
-        {
-            "data": {"input": {"question": "What is the capital of Germany?"}},
-            "assertions": [assertion],
-        },
-        {
-            "data": {"input": {"question": "What is the capital of Spain?"}},
-            "assertions": [assertion],
-        },
-    ])
+    suite.insert(
+        [
+            {
+                "data": {"input": {"question": "What is the capital of France?"}},
+                "assertions": [assertion],
+            },
+            {
+                "data": {"input": {"question": "What is the capital of Germany?"}},
+                "assertions": [assertion],
+            },
+            {
+                "data": {"input": {"question": "What is the capital of Spain?"}},
+                "assertions": [assertion],
+            },
+        ]
+    )
 
     def task(item: Dict[str, Any]) -> Dict[str, Any]:
         answers = {

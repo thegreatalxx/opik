@@ -2,7 +2,6 @@
 
 from unittest import mock
 
-import pytest
 
 from opik.api_objects.dataset import dataset_item
 from opik.api_objects.dataset.test_suite import converters
@@ -100,7 +99,7 @@ class TestDatasetItemToSuiteItemDict:
         assert result["data"]["question"] == "What is 2+2?"
         assert result["description"] == "Test item"
         assert result["assertions"] == []
-        assert result["execution_policy"] is None
+        assert "execution_policy" not in result
 
     def test_item_with_llm_judge_evaluator(self):
         from opik.evaluation.suite_evaluators import LLMJudge
@@ -136,5 +135,5 @@ class TestDatasetItemToSuiteItemDict:
 
         result = converters.dataset_item_to_suite_item_dict(item)
 
-        assert result["execution_policy"].runs_per_item == 3
-        assert result["execution_policy"].pass_threshold == 2
+        assert result["execution_policy"]["runs_per_item"] == 3
+        assert result["execution_policy"]["pass_threshold"] == 2

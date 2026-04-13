@@ -87,9 +87,11 @@ class TestEvaluatorValidation:
         )
 
         # Should not raise
-        suite.insert([
-            {"data": {"input": "test"}, "assertions": ["Response is polite"]},
-        ])
+        suite.insert(
+            [
+                {"data": {"input": "test"}, "assertions": ["Response is polite"]},
+            ]
+        )
 
     def test_insert__with_no_evaluators__succeeds(self):
         """Test that items can be added without evaluators."""
@@ -122,12 +124,14 @@ class TestEvaluatorValidation:
             dataset_=mock_dataset,
         )
 
-        suite.insert([
-            {
-                "data": {"input": "test"},
-                "assertions": ["Response is polite", "Response is helpful"],
-            },
-        ])
+        suite.insert(
+            [
+                {
+                    "data": {"input": "test"},
+                    "assertions": ["Response is polite", "Response is helpful"],
+                },
+            ]
+        )
 
         mock_dataset.__internal_api__insert_items_as_dataclasses__.assert_called_once()
         inserted_items = (
@@ -782,43 +786,95 @@ class TestInternalRunOptimizationSuite:
 class TestTestSuiteResultPassRate:
     """Unit tests for TestSuiteResult.pass_rate property."""
 
-    def test_pass_rate__all_items_pass__returns_1(self):
-        result = suite_types.TestSuiteResult(
-            items_passed=5,
-            items_total=5,
-            item_results={},
-            evaluation_result_=mock.MagicMock(),
+    @staticmethod
+    def _item_result(
+        item_id: str, passed: bool, has_assertions: bool
+    ) -> suite_types.ItemResult:
+        return suite_types.ItemResult(
+            dataset_item_id=item_id,
+            passed=passed,
+            has_assertions=has_assertions,
+            runs_passed=1 if passed else 0,
+            runs_total=1,
+            configured_runs_per_item=1,
+            pass_threshold=1,
+            test_results=[],
         )
 
+    def test_pass_rate__all_items_with_assertions_pass__returns_1(self):
+        item_results = {
+            "a": self._item_result("a", passed=True, has_assertions=True),
+            "b": self._item_result("b", passed=True, has_assertions=True),
+        }
+        result = suite_types.TestSuiteResult(
+            items_passed=2,
+            items_total=2,
+            item_results=item_results,
+            evaluation_result_=mock.MagicMock(),
+        )
         assert result.pass_rate == 1.0
 
-    def test_pass_rate__no_items_pass__returns_0(self):
+    def test_pass_rate__no_items_with_assertions_pass__returns_0(self):
+        item_results = {
+            "a": self._item_result("a", passed=False, has_assertions=True),
+            "b": self._item_result("b", passed=False, has_assertions=True),
+        }
         result = suite_types.TestSuiteResult(
             items_passed=0,
-            items_total=5,
-            item_results={},
+            items_total=2,
+            item_results=item_results,
             evaluation_result_=mock.MagicMock(),
         )
-
         assert result.pass_rate == 0.0
 
     def test_pass_rate__partial_pass__returns_ratio(self):
+        item_results = {
+            "a": self._item_result("a", passed=True, has_assertions=True),
+            "b": self._item_result("b", passed=False, has_assertions=True),
+            "c": self._item_result("c", passed=True, has_assertions=True),
+        }
         result = suite_types.TestSuiteResult(
-            items_passed=3,
-            items_total=10,
-            item_results={},
+            items_passed=2,
+            items_total=3,
+            item_results=item_results,
             evaluation_result_=mock.MagicMock(),
         )
+        assert result.pass_rate == pytest.approx(2 / 3)
 
-        assert result.pass_rate == 0.3
+    def test_pass_rate__items_without_assertions_excluded(self):
+        """Items without assertions should not affect pass_rate."""
+        item_results = {
+            "a": self._item_result("a", passed=True, has_assertions=True),
+            "b": self._item_result("b", passed=True, has_assertions=False),
+            "c": self._item_result("c", passed=False, has_assertions=True),
+        }
+        result = suite_types.TestSuiteResult(
+            items_passed=2,
+            items_total=3,
+            item_results=item_results,
+            evaluation_result_=mock.MagicMock(),
+        )
+        # Only 2 items have assertions: 1 passed, 1 failed -> 50%
+        assert result.pass_rate == 0.5
+
+    def test_pass_rate__no_items_have_assertions__returns_none(self):
+        item_results = {
+            "a": self._item_result("a", passed=True, has_assertions=False),
+            "b": self._item_result("b", passed=True, has_assertions=False),
+        }
+        result = suite_types.TestSuiteResult(
+            items_passed=2,
+            items_total=2,
+            item_results=item_results,
+            evaluation_result_=mock.MagicMock(),
+        )
+        assert result.pass_rate is None
 
     def test_pass_rate__zero_items__returns_none(self):
-        """Edge case: no items evaluated should return None."""
         result = suite_types.TestSuiteResult(
             items_passed=0,
             items_total=0,
             item_results={},
             evaluation_result_=mock.MagicMock(),
         )
-
         assert result.pass_rate is None

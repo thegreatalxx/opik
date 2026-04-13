@@ -53,12 +53,20 @@ def version_policy_to_execution_policy(
     return execution_policy.DEFAULT_EXECUTION_POLICY.copy()
 
 
-def dataset_item_to_suite_item_dict(item: dataset_item.DatasetItem) -> suite_types.TestSuiteItem:
+def dataset_item_to_suite_item_dict(
+    item: dataset_item.DatasetItem,
+) -> suite_types.TestSuiteItem:
     """Convert a DatasetItem into a TestSuiteItem dict with decoded assertions."""
-    return suite_types.TestSuiteItem(
+    result = suite_types.TestSuiteItem(
         id=item.id,
         data=item.get_content(),
-        description=item.description,
         assertions=version_evaluators_to_assertions(item.evaluators),
-        execution_policy=item.execution_policy,
     )
+    if item.description is not None:
+        result["description"] = item.description
+    if item.execution_policy is not None:
+        result["execution_policy"] = {
+            "runs_per_item": item.execution_policy.runs_per_item or 1,
+            "pass_threshold": item.execution_policy.pass_threshold or 1,
+        }
+    return result

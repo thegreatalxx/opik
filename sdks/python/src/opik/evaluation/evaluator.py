@@ -314,7 +314,7 @@ def evaluate(
 
 
 def __internal_api__run_test_suite__(
-    suite_dataset: dataset.Dataset,
+    suite_dataset: Union[dataset.Dataset, dataset.DatasetVersion],
     task: LLMTask,
     *,
     client: Optional[opik_client.Opik],
@@ -342,7 +342,10 @@ def __internal_api__run_test_suite__(
     ``TestSuite.__internal_api__run_optimization_suite__()``.
     """
     from ..api_objects.dataset.test_suite.test_suite import validate_task_result
-    from ..api_objects.dataset.test_suite.report_processors import displayer, file_writer
+    from ..api_objects.dataset.test_suite.report_processors import (
+        displayer,
+        file_writer,
+    )
 
     import functools
 
@@ -481,6 +484,7 @@ def run_tests(
         ... )
         >>> print(f"Pass rate: {result.pass_rate:.0%}")
     """
+    suite_dataset: Union[dataset.Dataset, dataset.DatasetVersion]
     if isinstance(test_suite, test_suite_module.TestSuiteVersion):
         suite_dataset = test_suite._dataset_version
     else:
@@ -609,7 +613,7 @@ def _evaluate_test_suite_task(
     *,
     client: opik_client.Opik,
     experiment: experiment.Experiment,
-    dataset: dataset.Dataset,
+    dataset: Union[dataset.Dataset, dataset.DatasetVersion],
     task: LLMTask,
     project_name: Optional[str],
     verbose: int,

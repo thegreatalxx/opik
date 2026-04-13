@@ -1185,7 +1185,9 @@ class Opik:
         name: str,
         description: Optional[str] = None,
         global_assertions: Optional[List[str]] = None,
-        global_execution_policy: Optional[dataset_execution_policy.ExecutionPolicy] = None,
+        global_execution_policy: Optional[
+            dataset_execution_policy.ExecutionPolicy
+        ] = None,
         tags: Optional[List[str]] = None,
         project_name: Optional[str] = None,
     ) -> test_suite.TestSuite:
@@ -1304,36 +1306,33 @@ class Opik:
         name: str,
         description: Optional[str] = None,
         global_assertions: Optional[List[str]] = None,
-        global_execution_policy: Optional[dataset_execution_policy.ExecutionPolicy] = None,
+        global_execution_policy: Optional[
+            dataset_execution_policy.ExecutionPolicy
+        ] = None,
         tags: Optional[List[str]] = None,
         project_name: Optional[str] = None,
     ) -> test_suite.TestSuite:
         """
         Get an existing test suite by name or create a new one if it does not exist.
 
-        If the suite already exists and ``global_assertions``,
-        ``global_execution_policy``, or ``tags`` are provided, the suite is
-        updated accordingly. A new version is only created when the values
-        actually differ from the current ones.
+        If the suite already exists it is returned as-is — the
+        ``global_assertions``, ``global_execution_policy``, ``description``,
+        and ``tags`` parameters are only used when creating a new suite.
+        To modify an existing suite, use :meth:`TestSuite.update` instead.
 
         Args:
             name: The name of the test suite.
             description: Optional description (used only when creating).
-            global_assertions: Suite-level assertions applied to all items.
-            global_execution_policy: Execution policy for the suite.
-            tags: Optional list of tags for the suite.
+            global_assertions: Suite-level assertions (used only when creating).
+            global_execution_policy: Execution policy (used only when creating).
+            tags: Optional list of tags (used only when creating).
             project_name: Optional name of the project the suite is associated with.
 
         Returns:
             TestSuite: The test suite object.
         """
-        from .dataset import validators
-
-        if global_execution_policy is not None:
-            validators.validate_execution_policy(global_execution_policy)
-
         try:
-            suite = self.get_test_suite(name, project_name=project_name)
+            return self.get_test_suite(name, project_name=project_name)
         except ApiError as e:
             if e.status_code == 404:
                 return self.create_test_suite(
@@ -1346,23 +1345,7 @@ class Opik:
                 )
             raise
 
-        has_updates = (
-            global_assertions is not None
-            or global_execution_policy is not None
-            or tags is not None
-        )
-        if has_updates:
-            suite.update(
-                global_assertions=global_assertions,
-                global_execution_policy=global_execution_policy,
-                tags=tags,
-            )
-
-        return suite
-
-    def delete_test_suite(
-        self, name: str, project_name: Optional[str] = None
-    ) -> None:
+    def delete_test_suite(self, name: str, project_name: Optional[str] = None) -> None:
         """
         Delete a test suite by name.
 
