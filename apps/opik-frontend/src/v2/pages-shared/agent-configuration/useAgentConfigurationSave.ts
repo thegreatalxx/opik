@@ -140,25 +140,22 @@ export const useAgentConfigurationSave = ({
         }
       }
 
-      const values: BlueprintValue[] = agentConfig.values
-        .filter((v) => {
-          if (v.type === BlueprintValueType.PROMPT) {
-            return newCommits.has(v.key);
-          }
-          return (
-            originalValues.current !== null &&
-            draftValues[v.key] !== originalValues.current[v.key]
-          );
-        })
-        .map((v) => ({
+      // Always send the full set of values. PROMPT-typed entries use the
+      // newly created commit if one was saved this round, otherwise the
+      // existing one. Scalar entries use the draft value if the user edited
+      // them, otherwise the original value.
+      const values: BlueprintValue[] = agentConfig.values.map((v) => {
+        const isPrompt = v.type === BlueprintValueType.PROMPT;
+        const value = isPrompt
+          ? newCommits.get(v.key) ?? v.value
+          : draftValues[v.key] ?? v.value;
+        return {
           key: v.key,
           type: v.type,
-          value:
-            v.type === BlueprintValueType.PROMPT
-              ? newCommits.get(v.key) ?? v.value
-              : draftValues[v.key],
+          value,
           ...(v.description ? { description: v.description } : {}),
-        }));
+        };
+      });
 
       return {
         project_id: projectId,
@@ -169,7 +166,7 @@ export const useAgentConfigurationSave = ({
         },
       };
     },
-    [agentConfig, draftValues, originalValues, description, projectId, toast],
+    [agentConfig, draftValues, description, projectId, toast],
   );
 
   const handleSave = useCallback(async () => {
