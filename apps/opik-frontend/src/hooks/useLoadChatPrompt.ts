@@ -2,12 +2,19 @@ import { useEffect, useMemo, useRef } from "react";
 import isEqual from "fast-deep-equal";
 import usePromptById from "@/api/prompts/usePromptById";
 import usePromptVersionById from "@/api/prompts/usePromptVersionById";
+import usePromptByCommit from "@/api/prompts/usePromptByCommit";
 import { LLM_MESSAGE_ROLE, LLMMessage } from "@/types/llm";
 import { generateDefaultLLMPromptMessage } from "@/lib/llm";
-import { PromptWithLatestVersion } from "@/types/prompts";
+import {
+  PromptByCommit,
+  PromptVersion,
+  PromptWithLatestVersion,
+} from "@/types/prompts";
+import { BlueprintPromptRef } from "@/types/playground";
 
 export interface UseLoadChatPromptOptions {
-  selectedChatPromptId: string | undefined;
+  selectedChatPromptId?: string;
+  selectedBlueprintRef?: BlueprintPromptRef;
   messages: LLMMessage[];
   onMessagesLoaded: (messages: LLMMessage[], promptName: string) => void;
   skipInitialLoad?: boolean;
@@ -16,15 +23,43 @@ export interface UseLoadChatPromptOptions {
 export interface UseLoadChatPromptReturn {
   chatPromptData: PromptWithLatestVersion | undefined;
   chatPromptDataLoaded: boolean;
-  chatPromptVersionData: ReturnType<typeof usePromptVersionById>["data"];
+  chatPromptVersionData: PromptVersion | undefined;
   chatPromptVersionDataLoaded: boolean;
   loadedChatPromptRef: React.MutableRefObject<string | null>;
   chatPromptTemplate: string;
   hasUnsavedChatPromptChanges: boolean;
 }
 
+const promptByCommitToPrompt = (
+  data: PromptByCommit | undefined,
+): PromptWithLatestVersion | undefined => {
+  if (!data) return undefined;
+  const v = data.requested_version;
+  return {
+    id: data.id,
+    name: data.name,
+    description: "",
+    last_updated_at: data.last_updated_at,
+    created_at: data.created_at,
+    version_count: data.version_count,
+    tags: [],
+    template_structure: data.template_structure,
+    latest_version: {
+      id: v.id,
+      template: v.template,
+      metadata: v.metadata ?? {},
+      commit: v.commit,
+      prompt_id: data.id,
+      created_at: v.created_at,
+      type: v.type,
+      change_description: v.change_description,
+    },
+  };
+};
+
 const useLoadChatPrompt = ({
   selectedChatPromptId,
+  selectedBlueprintRef,
   messages,
   onMessagesLoaded,
   skipInitialLoad = false,
@@ -32,27 +67,47 @@ const useLoadChatPrompt = ({
   const skippedRef = useRef(false);
   const loadedChatPromptRef = useRef<string | null>(null);
 
-  const { data: chatPromptData, isSuccess: chatPromptDataLoaded } =
+  const useBlueprint = !!selectedBlueprintRef;
+
+  // Library-prompt branch (existing behavior)
+  const { data: libraryPromptData, isSuccess: libraryPromptLoaded } =
     usePromptById(
+      { promptId: selectedChatPromptId! },
+      { enabled: !useBlueprint && !!selectedChatPromptId },
+    );
+
+  const { data: libraryVersionData, isSuccess: libraryVersionLoaded } =
+    usePromptVersionById(
+      { versionId: libraryPromptData?.latest_version?.id || "" },
       {
-        promptId: selectedChatPromptId!,
-      },
-      {
-        enabled: !!selectedChatPromptId,
+        enabled:
+          !useBlueprint &&
+          !!libraryPromptData?.latest_version?.id &&
+          libraryPromptLoaded,
       },
     );
 
-  const {
-    data: chatPromptVersionData,
-    isSuccess: chatPromptVersionDataLoaded,
-  } = usePromptVersionById(
-    {
-      versionId: chatPromptData?.latest_version?.id || "",
-    },
-    {
-      enabled: !!chatPromptData?.latest_version?.id && chatPromptDataLoaded,
-    },
+  // Blueprint-commit branch
+  const { data: commitData, isSuccess: commitLoaded } = usePromptByCommit(
+    { commitId: selectedBlueprintRef?.commitId ?? "" },
+    { enabled: useBlueprint && !!selectedBlueprintRef?.commitId },
   );
+
+  const chatPromptData: PromptWithLatestVersion | undefined = useBlueprint
+    ? promptByCommitToPrompt(commitData)
+    : libraryPromptData;
+
+  const chatPromptDataLoaded = useBlueprint
+    ? commitLoaded
+    : libraryPromptLoaded;
+
+  const chatPromptVersionData: PromptVersion | undefined = useBlueprint
+    ? chatPromptData?.latest_version
+    : libraryVersionData;
+
+  const chatPromptVersionDataLoaded = useBlueprint
+    ? commitLoaded
+    : libraryVersionLoaded;
 
   const chatPromptTemplate = useMemo(
     () =>
@@ -62,23 +117,29 @@ const useLoadChatPrompt = ({
     [messages],
   );
 
+  const selectionKey = useBlueprint
+    ? selectedBlueprintRef
+      ? `${selectedBlueprintRef.blueprintId}-${selectedBlueprintRef.key}-${selectedBlueprintRef.commitId}`
+      : null
+    : selectedChatPromptId ?? null;
+
   const hasUnsavedChatPromptChanges = useMemo(() => {
     const hasContent = messages.length > 0;
 
-    if (!hasContent || !selectedChatPromptId) {
+    if (!hasContent || !selectionKey) {
       return false;
     }
 
-    if (!chatPromptData || chatPromptData.id !== selectedChatPromptId) {
-      return false;
+    if (!useBlueprint) {
+      if (!chatPromptData || chatPromptData.id !== selectedChatPromptId) {
+        return false;
+      }
     }
 
     if (!chatPromptVersionData?.template) {
       return false;
     }
 
-    // Parse both templates as objects to compare semantically, not by string formatting
-    // IMPORTANT: Only compare role and content, ignore text prompt metadata fields
     try {
       const currentTemplate = JSON.parse(chatPromptTemplate);
       const loadedTemplate = JSON.parse(chatPromptVersionData.template);
@@ -100,6 +161,8 @@ const useLoadChatPrompt = ({
       return !isEqual(chatPromptTemplate, chatPromptVersionData.template);
     }
   }, [
+    selectionKey,
+    useBlueprint,
     selectedChatPromptId,
     chatPromptData,
     chatPromptVersionData,
@@ -107,34 +170,27 @@ const useLoadChatPrompt = ({
     messages.length,
   ]);
 
-  // effect to populate messages when chat prompt data is loaded
   useEffect(() => {
-    // create a unique key for this chat prompt load (prompt ID + version ID)
-    const chatPromptKey =
-      selectedChatPromptId && chatPromptVersionData
-        ? `${selectedChatPromptId}-${chatPromptVersionData.id}`
-        : null;
+    const versionId = chatPromptVersionData?.id;
+    const dedupKey =
+      selectionKey && versionId ? `${selectionKey}-${versionId}` : null;
 
     if (
       chatPromptVersionData?.template &&
-      selectedChatPromptId &&
+      selectionKey &&
       chatPromptData &&
       chatPromptVersionDataLoaded &&
-      chatPromptKey &&
-      loadedChatPromptRef.current !== chatPromptKey // prevent duplicate loads
+      dedupKey &&
+      loadedChatPromptRef.current !== dedupKey
     ) {
-      // Skip the first load for duplicated prompts that already have messages.
-      // We still mark the key as loaded so the hook won't re-trigger and
-      // overwrite the duplicated messages with the saved library version.
       if (skipInitialLoad && !skippedRef.current) {
         skippedRef.current = true;
-        loadedChatPromptRef.current = chatPromptKey;
+        loadedChatPromptRef.current = dedupKey;
         return;
       }
 
       try {
-        // Mark this chat prompt as loaded to prevent race conditions
-        loadedChatPromptRef.current = chatPromptKey;
+        loadedChatPromptRef.current = dedupKey;
 
         const parsedMessages = JSON.parse(chatPromptVersionData.template);
 
@@ -152,13 +208,12 @@ const useLoadChatPrompt = ({
       }
     }
 
-    // reset the ref when chat prompt is deselected
-    if (!selectedChatPromptId) {
+    if (!selectionKey) {
       loadedChatPromptRef.current = null;
     }
   }, [
     chatPromptVersionData,
-    selectedChatPromptId,
+    selectionKey,
     chatPromptData,
     chatPromptVersionDataLoaded,
     onMessagesLoaded,
