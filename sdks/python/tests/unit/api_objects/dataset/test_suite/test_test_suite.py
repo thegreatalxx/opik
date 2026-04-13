@@ -65,7 +65,7 @@ class TestEvaluatorValidation:
         assert suite.dataset is mock_dataset
         assert suite.name == "test_suite"
 
-    def test_add_item__with_non_llm_judge_evaluator__raises_type_error(self):
+    def test_resolve_evaluators__with_non_llm_judge_evaluator__raises_type_error(self):
         """Test that non-LLMJudge evaluators raise TypeError via resolve_evaluators."""
         equals_metric = metrics.Equals()
 
@@ -78,8 +78,8 @@ class TestEvaluatorValidation:
 
         assert "Test suites only support LLMJudge evaluators" in str(exc_info.value)
 
-    def test_add_item__with_assertions__succeeds(self):
-        """Test that assertions shorthand is accepted in add_item."""
+    def test_insert__with_assertions__succeeds(self):
+        """Test that assertions shorthand is accepted in insert."""
         mock_dataset = _create_mock_dataset()
         suite = test_suite.TestSuite(
             name="test_suite",
@@ -87,12 +87,11 @@ class TestEvaluatorValidation:
         )
 
         # Should not raise
-        suite.add_item(
-            data={"input": "test"},
-            assertions=["Response is polite"],
-        )
+        suite.insert([
+            {"data": {"input": "test"}, "assertions": ["Response is polite"]},
+        ])
 
-    def test_add_item__with_no_evaluators__succeeds(self):
+    def test_insert__with_no_evaluators__succeeds(self):
         """Test that items can be added without evaluators."""
         mock_dataset = _create_mock_dataset()
         suite = test_suite.TestSuite(
@@ -101,7 +100,7 @@ class TestEvaluatorValidation:
         )
 
         # Should not raise
-        suite.add_item(data={"input": "test"})
+        suite.insert([{"data": {"input": "test"}}])
 
     def test_validate_evaluators__with_mixed_evaluators__raises_type_error(self):
         """Test that mixing LLMJudge with other evaluators raises TypeError."""
@@ -115,7 +114,7 @@ class TestEvaluatorValidation:
 
         assert "Test suites only support LLMJudge evaluators" in str(exc_info.value)
 
-    def test_add_item__with_assertions_shorthand__creates_evaluator_items(self):
+    def test_insert__with_assertions_shorthand__creates_evaluator_items(self):
         """Test that assertions shorthand builds LLMJudge and creates evaluator items."""
         mock_dataset = _create_mock_dataset()
         suite = test_suite.TestSuite(
@@ -123,10 +122,12 @@ class TestEvaluatorValidation:
             dataset_=mock_dataset,
         )
 
-        suite.add_item(
-            data={"input": "test"},
-            assertions=["Response is polite", "Response is helpful"],
-        )
+        suite.insert([
+            {
+                "data": {"input": "test"},
+                "assertions": ["Response is polite", "Response is helpful"],
+            },
+        ])
 
         mock_dataset.__internal_api__insert_items_as_dataclasses__.assert_called_once()
         inserted_items = (

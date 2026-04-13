@@ -29,6 +29,13 @@ LOGGER = logging.getLogger(__name__)
 LLMTask = Callable[[Dict[str, Any]], Any]
 
 
+def _evaluators_equal(a: List[Any], b: List[Any]) -> bool:
+    """Compare two lists of LLMJudge evaluators by their assertion sets."""
+    a_assertions = sorted(assertion for e in a for assertion in e.assertions)
+    b_assertions = sorted(assertion for e in b for assertion in e.assertions)
+    return a_assertions == b_assertions
+
+
 def validate_task_result(
     result: Any,
     input_data: Any = None,
@@ -91,16 +98,18 @@ class TestSuite:
         >>> suite = client.create_test_suite(
         ...     name="Refund Policy Tests",
         ...     description="Regression tests for refund scenarios",
-        ...     assertions=[
+        ...     global_assertions=[
         ...         "Response does not contain hallucinated information",
         ...         "Response is helpful to the user",
         ...     ],
         ... )
         >>>
-        >>> suite.add_item(
-        ...     data={"user_input": "How do I get a refund?", "user_tier": "premium"},
-        ...     assertions=["Response is polite"],
-        ... )
+        >>> suite.insert([
+        ...     {
+        ...         "data": {"user_input": "How do I get a refund?", "user_tier": "premium"},
+        ...         "assertions": ["Response is polite"],
+        ...     },
+        ... ])
         >>>
         >>> results = suite.run(task=my_llm_function)
     """
@@ -193,42 +202,41 @@ class TestSuite:
     def update(
         self,
         *,
-        execution_policy: Optional[execution_policy.ExecutionPolicy] = None,
-        assertions: Optional[List[str]] = None,
+        global_execution_policy: Optional[execution_policy.ExecutionPolicy] = None,
+        global_assertions: Optional[List[str]] = None,
         tags: Optional[List[str]] = None,
     ) -> None:
         """
         Update the suite-level assertions, execution policy, and/or tags.
 
         Supports partial updates: any parameter not provided will retain
-        its current value.
+        its current value. If the new values are identical to the current
+        values, no new version is created.
 
         Args:
-            execution_policy: New execution policy for the suite.
+            global_execution_policy: New execution policy for the suite.
                 If not provided, the current policy is kept.
-            assertions: New suite-level assertions. Each string describes
-                an expected behavior that will be checked by an LLM.
-                If not provided, the current assertions are kept.
+            global_assertions: New suite-level assertions. Each string
+                describes an expected behavior that will be checked by an
+                LLM. If not provided, the current assertions are kept.
             tags: Tags for the suite.
 
         Raises:
             ValueError: If nothing to update is provided.
         """
-        if execution_policy is not None:
-            validators.validate_execution_policy(execution_policy)
+        if global_execution_policy is not None:
+            validators.validate_execution_policy(global_execution_policy)
 
         resolved = validators.resolve_evaluators(
-            assertions, None, "suite-level assertions"
+            global_assertions, None, "suite-level assertions"
         )
 
-        if resolved is None and execution_policy is None and tags is None:
+        if resolved is None and global_execution_policy is None and tags is None:
             raise ValueError(
-                "At least one of 'assertions', "
-                "'execution_policy', or 'tags' must be provided."
+                "At least one of 'global_assertions', "
+                "'global_execution_policy', or 'tags' must be provided."
             )
 
-        # Tags are a dataset-level field, so they're updated separately
-        # from assertions/execution_policy which are version-level.
         if tags is not None:
             self._dataset._rest_client.datasets.update_dataset(
                 id=self._dataset.id,
@@ -236,7 +244,7 @@ class TestSuite:
                 tags=tags,
             )
 
-        has_version_updates = resolved is not None or execution_policy is not None
+        has_version_updates = resolved is not None or global_execution_policy is not None
         if has_version_updates:
             version_info = self._dataset.get_version_info()
             if version_info is None:
@@ -245,27 +253,38 @@ class TestSuite:
                     "no version info found. Add at least one item first."
                 )
 
-            if resolved is None:
-                resolved = self._dataset.get_evaluators()
-            if execution_policy is None:
-                execution_policy = self.get_execution_policy()
+            current_evaluators = self._dataset.get_evaluators()
+            current_policy = self.get_execution_policy()
+
+            new_evaluators = resolved if resolved is not None else current_evaluators
+            new_policy = global_execution_policy if global_execution_policy is not None else current_policy
+
+            if _evaluators_equal(new_evaluators, current_evaluators) and new_policy == current_policy:
+                return
+
+            change_parts: List[str] = []
+            if resolved is not None:
+                change_parts.append("assertions")
+            if global_execution_policy is not None:
+                change_parts.append("execution policy")
 
             rest_operations.update_test_suite_dataset(
                 rest_client=self._dataset._rest_client,
                 dataset_id=self._dataset.id,
                 base_version_id=version_info.id,
-                evaluators=resolved,
-                exec_policy=execution_policy,
+                evaluators=new_evaluators,
+                exec_policy=new_policy,
+                change_description=f"Updated {' and '.join(change_parts)} via SDK",
             )
 
-    def delete_items(self, item_ids: List[str]) -> None:
+    def delete(self, items_ids: List[str]) -> None:
         """
         Delete items from the test suite by their IDs.
 
         Args:
-            item_ids: List of item IDs to delete.
+            items_ids: List of item IDs to delete.
         """
-        self._dataset.delete(item_ids)
+        self._dataset.delete(items_ids)
 
     def get_execution_policy(self) -> execution_policy.ExecutionPolicy:
         """
@@ -289,87 +308,18 @@ class TestSuite:
             assertions.extend(evaluator.assertions)
         return assertions
 
-    def add_item(
-        self,
-        data: Dict[str, Any],
-        *,
-        assertions: Optional[List[str]] = None,
-        description: Optional[str] = None,
-        execution_policy: Optional[execution_policy.ExecutionPolicy] = None,
-    ) -> None:
-        """
-        Add a test case to the test suite.
-
-        Args:
-            data: Dictionary containing the test case data. This is passed to
-                the task function and can contain any fields needed.
-                Example: {"user_input": "How do I get a refund?", "user_tier": "premium"}
-            assertions: Item-specific assertions. Each string describes an
-                expected behavior that will be checked by an LLM.
-            description: Optional description of this test case.
-            execution_policy: Item-specific execution policy override.
-                Example: {"runs_per_item": 3, "pass_threshold": 2}
-
-        Example:
-            >>> suite.add_item(
-            ...     data={"user_input": "How do I get a refund?", "user_tier": "premium"},
-            ...     description="Test refund request from premium user",
-            ...     assertions=["Response is polite"],
-            ... )
-        """
-        if execution_policy is not None:
-            validators.validate_execution_policy(execution_policy)
-
-        evaluators = validators.resolve_evaluators(
-            assertions, None, "item-level assertions"
-        )
-
-        item_id = id_helpers.generate_id()
-
-        # Convert LLMJudge evaluators to EvaluatorItem format for the API
-        evaluator_items = None
-        if evaluators:
-            evaluator_items = [
-                dataset_item.EvaluatorItem(
-                    name=e.name,
-                    type="llm_judge",
-                    config=e.to_config().model_dump(by_alias=True),
-                )
-                for e in evaluators
-            ]
-
-        # Convert execution_policy to ExecutionPolicyItem format for the API
-        execution_policy_item = None
-        if execution_policy:
-            execution_policy_item = dataset_item.ExecutionPolicyItem(
-                runs_per_item=execution_policy.get("runs_per_item"),
-                pass_threshold=execution_policy.get("pass_threshold"),
-            )
-
-        ds_item = dataset_item.DatasetItem(
-            id=item_id,
-            description=description,
-            evaluators=evaluator_items,
-            execution_policy=execution_policy_item,
-            **data,
-        )
-        self._dataset.__internal_api__insert_items_as_dataclasses__([ds_item])
-
-    def add_items(
+    def insert(
         self,
         items: List[suite_types.TestSuiteItem],
     ) -> None:
         """
-        Add multiple test cases to the test suite in a single batch.
-
-        This is more efficient than calling add_item() repeatedly, as it
-        creates only one dataset version for the entire batch.
+        Insert test cases into the test suite.
 
         Args:
             items: List of test case items to add.
 
         Example:
-            >>> suite.add_items([
+            >>> suite.insert([
             ...     {"data": {"question": "How do I get a refund?"}},
             ...     {
             ...         "data": {"question": "Is my account hacked?"},

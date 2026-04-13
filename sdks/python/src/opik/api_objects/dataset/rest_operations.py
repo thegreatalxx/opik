@@ -313,7 +313,9 @@ def create_test_suite_dataset(
     )
 
     resolved_policy = exec_policy or execution_policy.DEFAULT_EXECUTION_POLICY.copy()
-    request: Dict[str, Any] = {}
+    request: Dict[str, Any] = {
+        "change_description": "Suite created via SDK",
+    }
     if evaluators:
         request["evaluators"] = [
             {
@@ -340,6 +342,7 @@ def update_test_suite_dataset(
     base_version_id: str,
     evaluators: List[llm_judge.LLMJudge],
     exec_policy: execution_policy.ExecutionPolicy,
+    change_description: Optional[str] = None,
 ) -> None:
     """
     Update suite-level evaluators and execution_policy by creating a new
@@ -351,6 +354,7 @@ def update_test_suite_dataset(
         base_version_id: The current latest version UUID to base the update on.
         evaluators: Suite-level LLMJudge evaluators.
         exec_policy: Execution policy dict.
+        change_description: Optional description of the change for the new version.
     """
     request: Dict[str, Any] = {
         "base_version": base_version_id,
@@ -367,6 +371,8 @@ def update_test_suite_dataset(
             "pass_threshold": exec_policy.get("pass_threshold", 1),
         },
     }
+    if change_description:
+        request["change_description"] = change_description
     rest_client.datasets.apply_dataset_item_changes(
         id=dataset_id, request=request, override=False
     )

@@ -1182,8 +1182,8 @@ class Opik:
         self,
         name: str,
         description: Optional[str] = None,
-        assertions: Optional[List[str]] = None,
-        execution_policy: Optional[dataset_execution_policy.ExecutionPolicy] = None,
+        global_assertions: Optional[List[str]] = None,
+        global_execution_policy: Optional[dataset_execution_policy.ExecutionPolicy] = None,
         tags: Optional[List[str]] = None,
         project_name: Optional[str] = None,
     ) -> test_suite.TestSuite:
@@ -1197,9 +1197,10 @@ class Opik:
         Args:
             name: The name of the test suite.
             description: Optional description of what this suite tests.
-            assertions: Suite-level assertions. Each string describes an
-                expected behavior that will be checked by an LLM.
-            execution_policy: Suite-level execution policy.
+            global_assertions: Suite-level assertions applied to all items.
+                Each string describes an expected behavior that will be
+                checked by an LLM.
+            global_execution_policy: Suite-level execution policy.
                 Example: {"runs_per_item": 3, "pass_threshold": 2}
             tags: Optional list of tags for the suite.
             project_name: Optional name of the project to associate the suite with.
@@ -1212,25 +1213,25 @@ class Opik:
             ...     name="Refund Policy Tests",
             ...     description="Regression tests for refund scenarios",
             ...     project_name="custom-project",
-            ...     assertions=[
+            ...     global_assertions=[
             ...         "No hallucinated information",
             ...         "Response is helpful",
             ...     ],
             ... )
             >>>
-            >>> suite.add_item(
-            ...     data={"user_input": "How do I get a refund?", "user_tier": "premium"},
-            ... )
+            >>> suite.insert([
+            ...     {"data": {"user_input": "How do I get a refund?", "user_tier": "premium"}},
+            ... ])
             >>>
             >>> results = suite.run(task=my_llm_function)
         """
         from .dataset import validators, rest_operations
 
-        if execution_policy is not None:
-            validators.validate_execution_policy(execution_policy)
+        if global_execution_policy is not None:
+            validators.validate_execution_policy(global_execution_policy)
 
         evaluators = validators.resolve_evaluators(
-            assertions, None, "suite-level assertions"
+            global_assertions, None, "suite-level assertions"
         )
 
         project_name = self._resolve_project_name(project_name)
@@ -1240,7 +1241,7 @@ class Opik:
             project_name=project_name,
             description=description,
             evaluators=evaluators,
-            exec_policy=execution_policy,
+            exec_policy=global_execution_policy,
             tags=tags,
         )
         suite_dataset = dataset.Dataset(
@@ -1298,24 +1299,24 @@ class Opik:
         self,
         name: str,
         description: Optional[str] = None,
-        assertions: Optional[List[str]] = None,
-        execution_policy: Optional[dataset_execution_policy.ExecutionPolicy] = None,
+        global_assertions: Optional[List[str]] = None,
+        global_execution_policy: Optional[dataset_execution_policy.ExecutionPolicy] = None,
         tags: Optional[List[str]] = None,
         project_name: Optional[str] = None,
     ) -> test_suite.TestSuite:
         """
         Get an existing test suite by name or create a new one if it does not exist.
 
-        If the suite already exists and ``assertions``, ``execution_policy``,
-        or ``tags`` are provided, the suite is updated accordingly
-        (unspecified parameters retain their current values).
+        If the suite already exists and ``global_assertions``,
+        ``global_execution_policy``, or ``tags`` are provided, the suite is
+        updated accordingly. A new version is only created when the values
+        actually differ from the current ones.
 
         Args:
             name: The name of the test suite.
             description: Optional description (used only when creating).
-            assertions: Suite-level assertions. Each string describes an
-                expected behavior that will be checked by an LLM.
-            execution_policy: Execution policy for the suite.
+            global_assertions: Suite-level assertions applied to all items.
+            global_execution_policy: Execution policy for the suite.
             tags: Optional list of tags for the suite.
             project_name: Optional name of the project the suite is associated with.
 
@@ -1324,8 +1325,8 @@ class Opik:
         """
         from .dataset import validators
 
-        if execution_policy is not None:
-            validators.validate_execution_policy(execution_policy)
+        if global_execution_policy is not None:
+            validators.validate_execution_policy(global_execution_policy)
 
         try:
             suite = self.get_test_suite(name, project_name=project_name)
@@ -1334,20 +1335,22 @@ class Opik:
                 return self.create_test_suite(
                     name=name,
                     description=description,
-                    execution_policy=execution_policy,
-                    assertions=assertions,
+                    global_execution_policy=global_execution_policy,
+                    global_assertions=global_assertions,
                     tags=tags,
                     project_name=project_name,
                 )
             raise
 
         has_updates = (
-            assertions is not None or execution_policy is not None or tags is not None
+            global_assertions is not None
+            or global_execution_policy is not None
+            or tags is not None
         )
         if has_updates:
             suite.update(
-                assertions=assertions,
-                execution_policy=execution_policy,
+                global_assertions=global_assertions,
+                global_execution_policy=global_execution_policy,
                 tags=tags,
             )
 
