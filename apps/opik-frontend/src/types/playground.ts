@@ -23,6 +23,12 @@ export interface PromptLibraryMetadata {
   };
 }
 
+export interface BlueprintPromptRef {
+  blueprintId: string;
+  key: string;
+  commitId: string;
+}
+
 export interface PlaygroundPromptType {
   name: string;
   id: string;
@@ -31,6 +37,7 @@ export interface PlaygroundPromptType {
   provider: COMPOSED_PROVIDER_TYPE | "";
   configs: LLMPromptConfigsType;
   loadedChatPromptId?: string;
+  loadedBlueprintRef?: BlueprintPromptRef;
   skipInitialPromptLoad?: boolean;
 }
 
