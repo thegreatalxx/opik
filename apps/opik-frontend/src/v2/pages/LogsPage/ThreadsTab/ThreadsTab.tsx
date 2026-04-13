@@ -42,7 +42,10 @@ import {
 } from "@/lib/table";
 import useQueryParamAndLocalStorageState from "@/hooks/useQueryParamAndLocalStorageState";
 import { generateSelectColumDef } from "@/shared/DataTable/utils";
-import NoThreadsPage from "@/v2/pages/LogsPage/ThreadsTab/NoThreadsPage";
+import DataTableEmptyContent from "@/shared/DataTableNoData/DataTableEmptyContent";
+import { buildDocsUrl } from "@/lib/utils";
+import emptyLogsLightUrl from "/images/empty-logs-light.svg";
+import emptyLogsDarkUrl from "/images/empty-logs-dark.svg";
 import SearchInput from "@/shared/SearchInput/SearchInput";
 import FiltersButton from "@/shared/FiltersButton/FiltersButton";
 import { Button } from "@/ui/button";
@@ -774,7 +777,15 @@ export const ThreadsTab: React.FC<ThreadsTabProps> = ({
       <DataTableStateHandler
         isLoading={isTableLoading}
         isEmpty={showEmptyState}
-        emptyState={<NoThreadsPage />}
+        emptyState={
+          <DataTableEmptyContent
+            title="No threads yet"
+            description="Threads will appear here once your agent starts receiving requests."
+            lightImageUrl={emptyLogsLightUrl}
+            darkImageUrl={emptyLogsDarkUrl}
+            docsUrl={buildDocsUrl("/tracing/log_chat_conversations")}
+          />
+        }
         skeleton
       >
         <DataTable
