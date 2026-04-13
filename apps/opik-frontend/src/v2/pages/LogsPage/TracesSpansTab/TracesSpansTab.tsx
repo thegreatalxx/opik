@@ -52,9 +52,11 @@ import {
 } from "@/lib/metadata";
 import { BaseTraceData, Span, Trace, LOGS_SOURCE } from "@/types/traces";
 import { convertColumnDataToColumn, migrateSelectedColumns } from "@/lib/table";
-import { getJSONPaths } from "@/lib/utils";
+import { getJSONPaths, buildDocsUrl } from "@/lib/utils";
 import { generateSelectColumDef } from "@/shared/DataTable/utils";
-import NoTracesPage from "@/v2/pages/LogsPage/NoTracesPage";
+import DataTableEmptyContent from "@/shared/DataTableNoData/DataTableEmptyContent";
+import emptyLogsLightUrl from "/images/empty-logs-light.svg";
+import emptyLogsDarkUrl from "/images/empty-logs-dark.svg";
 import SearchInput from "@/shared/SearchInput/SearchInput";
 import FiltersButton from "@/shared/FiltersButton/FiltersButton";
 import TracesActionsPanel from "@/v2/pages-shared/traces/TracesActionsPanel/TracesActionsPanel";
@@ -1362,7 +1364,17 @@ export const TracesSpansTab: React.FC<TracesSpansTabProps> = ({
       <DataTableStateHandler
         isLoading={isTableLoading}
         isEmpty={showEmptyState}
-        emptyState={<NoTracesPage type={type} />}
+        emptyState={
+          <DataTableEmptyContent
+            title={`No ${type} yet`}
+            description={`${
+              type === TRACE_DATA_TYPE.spans ? "Spans" : "Traces"
+            } will appear here once your agent starts receiving requests.`}
+            lightImageUrl={emptyLogsLightUrl}
+            darkImageUrl={emptyLogsDarkUrl}
+            docsUrl={buildDocsUrl("/tracing/log_traces")}
+          />
+        }
         skeleton
       >
         <DataTable
