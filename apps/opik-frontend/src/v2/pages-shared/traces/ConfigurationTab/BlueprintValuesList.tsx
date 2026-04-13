@@ -54,6 +54,10 @@ const BlueprintValuesList: React.FC<BlueprintValuesListProps> = ({
   const [internalOpen, setInternalOpen] = useState<string[]>(allKeys);
   const controlled = openItems !== undefined;
 
+  useEffect(() => {
+    if (!controlled) setInternalOpen(allKeys);
+  }, [allKeys, controlled]);
+
   return (
     <Accordion
       type="multiple"

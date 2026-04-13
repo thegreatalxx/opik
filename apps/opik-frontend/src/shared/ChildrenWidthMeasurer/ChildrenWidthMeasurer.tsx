@@ -1,12 +1,11 @@
 import React, {
-  useCallback,
   useEffect,
   useRef,
   useState,
   useMemo,
   ReactElement,
 } from "react";
-import { map } from "lodash";
+import map from "lodash/map";
 import { cn } from "@/lib/utils";
 
 type ChildrenWidthMeasurerProps = {
@@ -46,10 +45,6 @@ const ChildrenWidthMeasurer: React.FC<ChildrenWidthMeasurerProps> = ({
     }
   }, [childrenSignature]);
 
-  const ref = useCallback((el: HTMLDivElement | null) => {
-    setNode(el);
-  }, []);
-
   // measure immediately or observe until visible
   useEffect(() => {
     if (!node || hasMeasured) return;
@@ -79,7 +74,7 @@ const ChildrenWidthMeasurer: React.FC<ChildrenWidthMeasurerProps> = ({
 
   return (
     <div
-      ref={ref}
+      ref={setNode}
       aria-hidden="true"
       className={cn(
         "invisible absolute flex size-full items-center justify-start gap-1.5 p-0 py-1",
