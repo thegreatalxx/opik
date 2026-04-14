@@ -74,7 +74,7 @@ const DatasetItemsPageHeader: React.FunctionComponent<
               Draft
             </Tag>
           )}
-          <h1 className="comet-title-l truncate break-words">
+          <h1 className="comet-body-accented truncate break-words">
             {dataset?.name ?? (isTestSuite ? "Test suite" : "Dataset")}
           </h1>
         </div>

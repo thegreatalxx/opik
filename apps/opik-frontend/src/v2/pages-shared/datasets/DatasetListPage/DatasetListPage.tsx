@@ -12,6 +12,7 @@ import { JsonParam, StringParam, useQueryParam } from "use-query-params";
 import DataTable from "@/shared/DataTable/DataTable";
 import DataTablePagination from "@/shared/DataTablePagination/DataTablePagination";
 import DataTableNoData from "@/shared/DataTableNoData/DataTableNoData";
+import PageEmptyState from "@/shared/PageEmptyState/PageEmptyState";
 import useProjectDatasetsList from "@/api/datasets/useProjectDatasetsList";
 import { Dataset, DATASET_TYPE } from "@/types/datasets";
 import Loader from "@/shared/Loader/Loader";
@@ -19,6 +20,7 @@ import AddEditDatasetDialog from "@/v2/pages-shared/datasets/AddEditDatasetDialo
 import AddEditTestSuiteDialog from "@/v2/pages-shared/datasets/AddEditTestSuiteDialog/AddEditTestSuiteDialog";
 import DatasetActionsPanel from "@/v2/pages-shared/datasets/DatasetActionsPanel/DatasetActionsPanel";
 import { createDatasetRowActionsCell } from "@/v2/pages-shared/datasets/DatasetRowActionsCell/DatasetRowActionsCell";
+import { Plus } from "lucide-react";
 import { Button } from "@/ui/button";
 import { Separator } from "@/ui/separator";
 import useAppStore, { useActiveProjectId } from "@/store/AppStore";
@@ -46,6 +48,8 @@ import { useIsFeatureEnabled } from "@/contexts/feature-toggles-provider";
 import { FeatureToggleKeys } from "@/types/feature-toggles";
 import { buildDocsUrl } from "@/lib/utils";
 import { Filter } from "@/types/filters";
+import emptyTestSuitesLightUrl from "/images/empty-test-suites-light.svg";
+import emptyTestSuitesDarkUrl from "/images/empty-test-suites-dark.svg";
 
 export type DatasetListType = "dataset" | "test_suite";
 
@@ -56,12 +60,14 @@ type DatasetListPageProps = {
 const TYPE_CONFIG = {
   dataset: {
     title: "Datasets",
-    description:
-      "A dataset is a collection of inputs and expected outputs used to evaluate your agent.",
     docsUrl: "/evaluation/manage_datasets",
     entityName: "datasets",
-    createButtonText: "Create new",
+    createButtonText: "Create dataset",
     noDataText: "There are no datasets yet",
+    emptyStateTitle: "No datasets yet",
+    emptyStateDescription:
+      "Get started by creating your first dataset.\nDefine inputs and expected outputs to evaluate and optimize your agent.",
+    emptyStatePrimaryActionLabel: "Create your first dataset",
     storagePrefix: "datasets",
     typeFilter: [
       {
@@ -80,13 +86,15 @@ const TYPE_CONFIG = {
   },
   test_suite: {
     title: "Test suites",
-    description:
-      "A test suite is a collection of inputs and corresponding assertions that will be used to evaluate the performance of your agent.",
     // TODO: replace with test suites documentation URL once it exists
     docsUrl: "/evaluation/manage_datasets",
     entityName: "test suites",
-    createButtonText: "Create new",
+    createButtonText: "Create test suite",
     noDataText: "There are no test suites yet",
+    emptyStateTitle: "No test suites yet",
+    emptyStateDescription:
+      "Get started by creating your first test suite.\nDefine test cases with expected outputs and scoring to compare and optimize your configurations.",
+    emptyStatePrimaryActionLabel: "Create your first suite",
     storagePrefix: "test-suites",
     typeFilter: [
       {
@@ -297,6 +305,7 @@ const DatasetListPage: React.FunctionComponent<DatasetListPageProps> = ({
   );
   const total = data?.total ?? 0;
   const noData = !search && filters.length === 0;
+  const isEmpty = noData && datasets.length === 0;
   const noDataText = noData ? config.noDataText : "No search results";
 
   const [selectedColumns, setSelectedColumns] = useLocalStorageState<string[]>(
@@ -415,93 +424,101 @@ const DatasetListPage: React.FunctionComponent<DatasetListPageProps> = ({
   }
 
   return (
-    <div className="pt-6">
-      <div className="mb-1 flex items-center justify-between">
-        <h1 className="comet-title-l truncate break-words">{config.title}</h1>
+    <div className="pt-4">
+      <div className="mb-4 flex min-h-7 items-center justify-between">
+        <h1 className="comet-body-accented truncate break-words">
+          {config.title}
+        </h1>
+        {canCreateDatasets && (
+          <Button variant="default" size="xs" onClick={handleCreateClick}>
+            <Plus className="mr-1 size-4" />
+            {config.createButtonText}
+          </Button>
+        )}
       </div>
-      <div className="comet-body-s mb-4 text-muted-slate">
-        {config.description}{" "}
-        <a
-          href={buildDocsUrl(config.docsUrl)}
-          target="_blank"
-          rel="noreferrer"
-          className="text-primary"
-        >
-          Read more
-        </a>
-      </div>
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-x-8 gap-y-2">
-        <div className="flex items-center gap-2">
-          <SearchInput
-            searchText={search!}
-            setSearchText={setSearch}
-            placeholder="Search by name"
-            className="w-[320px]"
-            dimension="sm"
-          ></SearchInput>
-          <FiltersButton
-            columns={FILTERS_COLUMNS}
-            filters={filters}
-            onChange={setFilters}
-            layout="icon"
-          />
-        </div>
-        <div className="flex items-center gap-2">
-          {canDeleteDatasets && (
-            <>
-              <DatasetActionsPanel
-                datasets={selectedRows}
-                entityName={config.entityName}
+      {isEmpty ? (
+        <PageEmptyState
+          lightImageUrl={emptyTestSuitesLightUrl}
+          darkImageUrl={emptyTestSuitesDarkUrl}
+          title={config.emptyStateTitle}
+          description={config.emptyStateDescription}
+          primaryActionLabel={
+            canCreateDatasets ? config.emptyStatePrimaryActionLabel : undefined
+          }
+          onPrimaryAction={canCreateDatasets ? handleCreateClick : undefined}
+          docsUrl={buildDocsUrl(config.docsUrl)}
+        />
+      ) : (
+        <>
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-x-8 gap-y-2">
+            <div className="flex items-center gap-2">
+              <SearchInput
+                searchText={search!}
+                setSearchText={setSearch}
+                placeholder="Search by name"
+                className="w-[320px]"
+                dimension="sm"
+              ></SearchInput>
+              <FiltersButton
+                columns={FILTERS_COLUMNS}
+                filters={filters}
+                onChange={setFilters}
+                layout="icon"
               />
-              <Separator orientation="vertical" className="mx-2 h-4" />
-            </>
-          )}
-          <ColumnsButton
-            columns={DEFAULT_COLUMNS}
-            selectedColumns={selectedColumns}
-            onSelectionChange={setSelectedColumns}
-            order={columnsOrder}
-            onOrderChange={setColumnsOrder}
-          ></ColumnsButton>
-          {canCreateDatasets && (
-            <Button variant="default" size="sm" onClick={handleCreateClick}>
-              {config.createButtonText}
-            </Button>
-          )}
-        </div>
-      </div>
-      <DataTable
-        columns={columns}
-        data={datasets}
-        onRowClick={handleRowClick}
-        sortConfig={sortConfig}
-        resizeConfig={resizeConfig}
-        selectionConfig={{
-          rowSelection,
-          setRowSelection,
-        }}
-        getRowId={getRowId}
-        columnPinning={DEFAULT_COLUMN_PINNING}
-        noData={
-          <DataTableNoData title={noDataText}>
-            {noData && canCreateDatasets && (
-              <Button variant="link" onClick={handleCreateClick}>
-                {config.createButtonText}
-              </Button>
-            )}
-          </DataTableNoData>
-        }
-        showLoadingOverlay={isPlaceholderData && isFetching}
-      />
-      <div className="py-4">
-        <DataTablePagination
-          page={page}
-          pageChange={setPage}
-          size={size}
-          sizeChange={setSize}
-          total={total}
-        ></DataTablePagination>
-      </div>
+            </div>
+            <div className="flex items-center gap-2">
+              {canDeleteDatasets && (
+                <>
+                  <DatasetActionsPanel
+                    datasets={selectedRows}
+                    entityName={config.entityName}
+                  />
+                  <Separator orientation="vertical" className="mx-2 h-4" />
+                </>
+              )}
+              <ColumnsButton
+                columns={DEFAULT_COLUMNS}
+                selectedColumns={selectedColumns}
+                onSelectionChange={setSelectedColumns}
+                order={columnsOrder}
+                onOrderChange={setColumnsOrder}
+              ></ColumnsButton>
+            </div>
+          </div>
+          <DataTable
+            columns={columns}
+            data={datasets}
+            onRowClick={handleRowClick}
+            sortConfig={sortConfig}
+            resizeConfig={resizeConfig}
+            selectionConfig={{
+              rowSelection,
+              setRowSelection,
+            }}
+            getRowId={getRowId}
+            columnPinning={DEFAULT_COLUMN_PINNING}
+            noData={
+              <DataTableNoData title={noDataText}>
+                {noData && canCreateDatasets && (
+                  <Button variant="link" onClick={handleCreateClick}>
+                    {config.createButtonText}
+                  </Button>
+                )}
+              </DataTableNoData>
+            }
+            showLoadingOverlay={isPlaceholderData && isFetching}
+          />
+          <div className="py-4">
+            <DataTablePagination
+              page={page}
+              pageChange={setPage}
+              size={size}
+              sizeChange={setSize}
+              total={total}
+            ></DataTablePagination>
+          </div>
+        </>
+      )}
       {config.useSimpleDialog ? (
         <AddEditDatasetDialog
           open={openDialog}

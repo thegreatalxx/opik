@@ -615,7 +615,7 @@ function DatasetItemsTab({
             description="Add test cases to run evaluations and measure performance."
           >
             <button
-              onClick={() => setOpenCreatePanel(true)}
+              onClick={handleNewDatasetItemClick}
               className="comet-body-s underline underline-offset-4 hover:text-primary"
             >
               Add new item
