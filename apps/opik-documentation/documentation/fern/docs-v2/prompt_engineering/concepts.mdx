@@ -44,7 +44,7 @@ This means you can update your agent's behavior in production by simply moving t
 
 ## Fallback configuration
 
-Every call to `get_agent_config` / `getAgentConfigVersion` requires a `fallback` value. This is the configuration your agent uses when:
+Every call to `get_or_create_config` / `getOrCreateConfig` requires a `fallback` value. This is the configuration your agent uses when:
 
 - **Cold start**: The first time your agent runs and no cached value exists yet
 - **Opik unreachable**: If Opik can't be reached and there is no cached value to serve

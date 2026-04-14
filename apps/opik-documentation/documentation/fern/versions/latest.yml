@@ -111,7 +111,7 @@ navigation:
           - section: Advanced
             slug: /advanced
             contents:
-              - page: Building Evaluation Suites
+              - page: Building Test Suites
                 path: ../docs-v2/evaluation/building_evaluation_suites.mdx
                 slug: building-evaluation-suites
               - page: Datasets & Experiments

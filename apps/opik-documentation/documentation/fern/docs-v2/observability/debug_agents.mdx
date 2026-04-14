@@ -39,9 +39,9 @@ Example prompts:
 
 Ollie can scan across multiple traces, aggregate patterns, and run arbitrary queries against your workspace data to surface systemic issues, not just one-off failures.
 
-### Add to an evaluation suite
+### Add to a test suite
 
-Once you understand the failure, turn it into a test case so the problem can't silently regress. Ask Ollie to add the trace to an evaluation suite with an assertion that captures the expected behavior:
+Once you understand the failure, turn it into a test case so the problem can't silently regress. Ask Ollie to add the trace to a test suite with an assertion that captures the expected behavior:
 
 *"Add this trace to my customer-support-qa suite with the assertion: the response must cite a specific step from the provided context"*
 
@@ -55,12 +55,12 @@ Fix the root cause. Depending on what you found:
 - **Logic issue** — edit your agent code and redeploy
 - **Tool or retrieval issue** — adjust the tool definition, retrieval parameters, or post-processing
 
-### Test against the evaluation suite
+### Test against the test suite
 
-Run the evaluation suite against the updated agent to verify the fix works and nothing else regressed:
+Run the test suite against the updated agent to verify the fix works and nothing else regressed:
 
 ```python
-result = suite.run(task=my_agent_task)
+result = opik.run_tests(test_suite=suite, task=my_agent_task)
 print(f"Pass rate: {result.pass_rate:.0%}")
 ```
 
@@ -68,7 +68,7 @@ Ollie can trigger this run for you and summarize the results directly in the cha
 
 ### Repeat
 
-Each cycle tightens the feedback loop: new traces reveal new failure modes, which become new test cases, which drive improvements. Over time your evaluation suite becomes a comprehensive regression guard for your agent.
+Each cycle tightens the feedback loop: new traces reveal new failure modes, which become new test cases, which drive improvements. Over time your test suite becomes a comprehensive regression guard for your agent.
 
 </Steps>
 
@@ -78,7 +78,7 @@ Each cycle tightens the feedback loop: new traces reveal new failure modes, whic
 |------------|---------|
 | Read and analyze any trace or span | *"What did the retrieval step return for this query?"* |
 | Search across your workspace | *"Find all traces where the tool call timed out this week"* |
-| Add items to evaluation suites | *"Add this to my suite with assertion: response must be under 3 sentences"* |
-| Run evaluation suites | *"Run the customer-support-qa suite against the updated prompt"* |
+| Add items to test suites | *"Add this to my suite with assertion: response must be under 3 sentences"* |
+| Run test suites | *"Run the customer-support-qa suite against the updated prompt"* |
 | Navigate to any resource | *"Show me the dataset for the last experiment"* |
 | Explain results | *"Why did 3 of the 5 items in this run fail?"* |

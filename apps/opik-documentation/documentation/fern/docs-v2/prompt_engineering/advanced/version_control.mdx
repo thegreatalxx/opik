@@ -27,20 +27,19 @@ You can create new versions from the Opik UI or programmatically using the SDK.
     The new version will be available immediately and can be assigned to an environment label.
   </Tab>
   <Tab title="Python SDK">
-    Use `create_agent_config_version` to create a new version programmatically:
+    Use `create_config` to create a new version programmatically:
 
     ```python
     import opik
-    from typing import Annotated
 
     client = opik.Opik()
 
-    class MyAgentsConfiguration(opik.AgentConfig):
-        model: Annotated[str, "LLM model to use for all LLM calls"]
-        temperature: Annotated[float, "Sampling temperature for LLM calls"]
-        system_prompt: Annotated[opik.Prompt, "System prompt for the agent"]
+    class MyAgentsConfiguration(opik.Config):
+        model: str = "gpt-4o-mini"
+        temperature: float = 0.75
+        system_prompt: opik.Prompt = None
 
-    client.create_agent_config_version(
+    client.create_config(
       config=MyAgentsConfiguration(
         model="gpt-4o",
         temperature=0.5,
@@ -50,32 +49,22 @@ You can create new versions from the Opik UI or programmatically using the SDK.
     )
     ```
 
-    Each call to `create_agent_config_version` creates a new version with the provided parameters.
+    Each call to `create_config` creates a new version with the provided parameters.
   </Tab>
   <Tab title="TypeScript SDK">
-    Use `createAgentConfig` to create a new version programmatically:
+    Use `createConfig` to create a new version programmatically:
 
     ```ts
     import Opik, { Prompt } from "opik";
-    import { z } from "zod";
 
     const client = new Opik();
-
-    const MyAgentsConfiguration = z
-      .object({
-        model: z.string().describe("LLM model to use for all LLM calls"),
-        temperature: z.number().describe("Sampling temperature for LLM calls"),
-        system_prompt: z.instanceof(Prompt).describe("System prompt for the agent"),
-      })
-      .describe("MyAgentsConfiguration");
 
     const systemPrompt = await client.createPrompt({
       name: "system_prompt",
       prompt: "You are a coding assistant.",
     });
 
-    await client.createAgentConfig(
-      MyAgentsConfiguration,
+    await client.createConfig(
       {
         model: "gpt-4o",
         temperature: 0.5,
@@ -85,7 +74,7 @@ You can create new versions from the Opik UI or programmatically using the SDK.
     );
     ```
 
-    Each call to `createAgentConfig` creates a new version with the provided parameters.
+    Each call to `createConfig` creates a new version with the provided parameters.
   </Tab>
 </Tabs>
 
@@ -103,7 +92,7 @@ After creating a version, you can assign an environment label to control which v
   </Tab>
   <Tab title="Python SDK">
     ```python
-    cfg = client.get_agent_config(
+    cfg = client.get_or_create_config(
       fallback=MyAgentsConfiguration(
         model="gpt-4o-mini",
         temperature=0.75,
@@ -122,7 +111,7 @@ After creating a version, you can assign an environment label to control which v
   </Tab>
   <Tab title="TypeScript SDK">
     ```ts
-    const cfg = await client.getAgentConfigVersion(MyAgentsConfiguration, {
+    const cfg = await client.getOrCreateConfig({
       fallback: { model: "gpt-4o-mini", temperature: 0.75, system_prompt: systemPrompt },
       projectName: "my-agent-name",
       env: "prod",

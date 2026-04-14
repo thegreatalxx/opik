@@ -33,15 +33,14 @@ provide a hardcoded fallback configuration that the SDK will use instead of rais
 <CodeBlocks>
   ```python title="Python"
   import opik
-  from typing import Annotated
 
   client = opik.Opik()
 
   # Define the schema for my configuration
-  class MyAgentsConfiguration(opik.AgentConfig):
-      model: Annotated[str, "LLM model to use for all LLM calls"]
-      temperature: Annotated[float, "Sampling temperature for LLM calls"]
-      system_prompt: Annotated[opik.Prompt, "System prompt for the agent"]
+  class MyAgentsConfiguration(opik.Config):
+      model: str = "gpt-4o-mini"
+      temperature: float = 0.75
+      system_prompt: opik.Prompt = None
 
   FALLBACK_CONFIGURATION = MyAgentsConfiguration(
     model="gpt-4o-mini",
@@ -49,7 +48,7 @@ provide a hardcoded fallback configuration that the SDK will use instead of rais
     system_prompt=opik.Prompt(name="system_prompt", prompt="You are an AI assistant.")
   )
 
-  cfg = client.get_agent_config(
+  cfg = client.get_or_create_config(
     fallback=FALLBACK_CONFIGURATION,
     project_name="my-agent-name",
     env="latest",
@@ -62,24 +61,15 @@ provide a hardcoded fallback configuration that the SDK will use instead of rais
 
   ```ts title="Typescript"
   import Opik, { Prompt } from "opik";
-  import { z } from "zod";
 
   const client = new Opik();
-
-  const MyAgentsConfiguration = z
-    .object({
-      model: z.string(),
-      temperature: z.number(),
-      system_prompt: z.instanceof(Prompt),
-    })
-    .describe("MyAgentsConfiguration");
 
   const fallbackPrompt = await client.createPrompt({
     name: "system_prompt",
     prompt: "You are an AI assistant.",
   });
 
-  const cfg = await client.getAgentConfigVersion(MyAgentsConfiguration, {
+  const cfg = await client.getOrCreateConfig({
     projectName: "my-agent-name",
     env: "latest",
     fallback: {
