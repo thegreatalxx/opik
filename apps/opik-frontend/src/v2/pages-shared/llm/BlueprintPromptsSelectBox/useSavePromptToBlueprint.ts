@@ -80,8 +80,8 @@ const useSavePromptToBlueprint = (projectId: string) => {
     [queryClient],
   );
 
-  // Updates an existing prompt loaded from a blueprint. The backend
-  // auto-publishes a new blueprint version pinning the new commit.
+  // Updates an existing prompt version and publishes a new blueprint version
+  // with the updated commit. If no blueprint exists yet, creates the first one.
   const saveExistingVersion = useCallback(
     async ({
       ref,
@@ -90,8 +90,9 @@ const useSavePromptToBlueprint = (projectId: string) => {
       templateStructure = PROMPT_TEMPLATE_STRUCTURE.CHAT,
       changeDescription,
     }: SaveExistingArgs): Promise<SaveExistingResult | null> => {
+      let version: PromptVersion;
       try {
-        const version = await createPromptVersion({
+        version = await createPromptVersion({
           name: promptName,
           template,
           templateStructure,
@@ -99,18 +100,51 @@ const useSavePromptToBlueprint = (projectId: string) => {
           projectId,
           onSuccess: () => {},
         });
-        if (!version.commit) return null;
+      } catch {
+        return null;
+      }
+      if (!version.commit) return null;
+
+      const values: BlueprintValue[] = latestBlueprint
+        ? latestBlueprint.values.map((v) =>
+            v.key === ref.key
+              ? { ...stripBlueprintValue(v), value: version.commit }
+              : stripBlueprintValue(v),
+          )
+        : [
+            {
+              key: ref.key,
+              type: BlueprintValueType.PROMPT,
+              value: version.commit,
+            },
+          ];
+
+      const writeBlueprint = latestBlueprint ? patchBlueprint : postBlueprint;
+      try {
+        const { id } = await writeBlueprint({
+          agentConfig: {
+            project_id: projectId,
+            blueprint: { type: BlueprintType.BLUEPRINT, values },
+          },
+        });
+        if (!id) return null;
         invalidateAfterSave(version.commit);
         return {
           version,
-          newRef: { ...ref, commitId: version.commit },
+          newRef: { ...ref, blueprintId: id, commitId: version.commit },
         };
       } catch {
-        // The mutation already toasts the error.
         return null;
       }
     },
-    [createPromptVersion, projectId, invalidateAfterSave],
+    [
+      createPromptVersion,
+      latestBlueprint,
+      patchBlueprint,
+      postBlueprint,
+      projectId,
+      invalidateAfterSave,
+    ],
   );
 
   // Creates a brand-new prompt and either appends it to the latest blueprint
