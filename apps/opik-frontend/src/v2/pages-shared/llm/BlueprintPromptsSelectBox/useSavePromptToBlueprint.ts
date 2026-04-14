@@ -24,12 +24,14 @@ interface SaveExistingArgs {
   ref: BlueprintPromptRef;
   promptName: string;
   template: string;
+  templateStructure?: PROMPT_TEMPLATE_STRUCTURE;
   changeDescription?: string;
 }
 
 interface SaveAsNewFieldArgs {
   fieldName: string;
   template: string;
+  templateStructure?: PROMPT_TEMPLATE_STRUCTURE;
 }
 
 interface SaveExistingResult {
@@ -85,13 +87,14 @@ const useSavePromptToBlueprint = (projectId: string) => {
       ref,
       promptName,
       template,
+      templateStructure = PROMPT_TEMPLATE_STRUCTURE.CHAT,
       changeDescription,
     }: SaveExistingArgs): Promise<SaveExistingResult | null> => {
       try {
         const version = await createPromptVersion({
           name: promptName,
           template,
-          templateStructure: PROMPT_TEMPLATE_STRUCTURE.CHAT,
+          templateStructure,
           ...(changeDescription && { changeDescription }),
           projectId,
           onSuccess: () => {},
@@ -117,6 +120,7 @@ const useSavePromptToBlueprint = (projectId: string) => {
     async ({
       fieldName,
       template,
+      templateStructure = PROMPT_TEMPLATE_STRUCTURE.CHAT,
     }: SaveAsNewFieldArgs): Promise<BlueprintPromptRef | null> => {
       let createdPrompt: PromptWithLatestVersion;
       try {
@@ -124,7 +128,7 @@ const useSavePromptToBlueprint = (projectId: string) => {
           prompt: {
             name: fieldName,
             template,
-            template_structure: PROMPT_TEMPLATE_STRUCTURE.CHAT,
+            template_structure: templateStructure,
             project_id: projectId,
           },
           withResponse: true,
