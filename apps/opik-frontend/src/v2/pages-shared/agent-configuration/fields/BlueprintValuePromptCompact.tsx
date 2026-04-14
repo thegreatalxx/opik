@@ -18,7 +18,6 @@ import { BlueprintValuePromptHandle } from "@/v2/pages-shared/traces/Configurati
 import BlueprintChatMessages from "./BlueprintChatMessages";
 import CollapsibleBlock from "./CollapsibleBlock";
 import { FieldsCollapseController } from "./useFieldsCollapse";
-import { Textarea } from "@/ui/textarea";
 
 type BlueprintValuePromptCompactProps = {
   value: BlueprintValue;
@@ -214,10 +213,20 @@ const BlueprintValuePromptCompact = forwardRef<
         tone={tone}
       >
         {isEditing ? (
-          <Textarea
-            className="comet-code min-h-32"
+          <textarea
+            className="comet-body-s w-full resize-none overflow-hidden bg-transparent text-foreground outline-none"
             value={draftTemplate}
-            onChange={(e) => setDraftTemplate(e.target.value)}
+            onChange={(e) => {
+              setDraftTemplate(e.target.value);
+              e.target.style.height = "auto";
+              e.target.style.height = e.target.scrollHeight + "px";
+            }}
+            ref={(el) => {
+              if (el) {
+                el.style.height = "auto";
+                el.style.height = el.scrollHeight + "px";
+              }
+            }}
           />
         ) : (
           <div className="comet-body-s whitespace-pre-wrap break-words text-foreground">

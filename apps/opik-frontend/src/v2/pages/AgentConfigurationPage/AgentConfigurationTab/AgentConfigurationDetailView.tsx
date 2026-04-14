@@ -180,7 +180,7 @@ const AgentConfigurationDetailView: React.FC<
           <User className="ml-1.5 size-3.5 shrink-0" />
           <span>{item.created_by}</span>
           {hasExpandableFields && (
-            <div className="ml-auto">
+            <div className="ml-auto text-foreground">
               <ExpandAllToggle controller={collapseController} />
             </div>
           )}

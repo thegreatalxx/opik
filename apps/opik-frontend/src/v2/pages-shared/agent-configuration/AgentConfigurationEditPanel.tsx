@@ -64,7 +64,7 @@ const AgentConfigurationEditPanel: React.FC<
         header={
           <div className="flex h-12 items-center justify-between border-b px-6">
             <div className="flex items-center gap-2">
-              <SheetTitle className="comet-title-xs text-left">
+              <SheetTitle className="comet-body-accented text-left">
                 {title}
               </SheetTitle>
               <Tag
@@ -86,18 +86,18 @@ const AgentConfigurationEditPanel: React.FC<
           </div>
         }
       >
-        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
+        <div className="min-h-0 flex-1 overflow-y-auto px-6">
           {view === "edit" && (
             <Textarea
               placeholder="Add version notes"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              className="mb-3 min-h-[64px]"
+              className="mb-4 min-h-[55px]"
             />
           )}
-          <div className="mb-3 flex items-center justify-between">
+          <div className="mb-4 flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <h3 className="comet-body-s-accented flex items-center gap-1">
+              <h3 className="comet-body-accented flex items-center gap-1">
                 {view === "diff" ? (
                   <>
                     Compare {item.name}

@@ -27,7 +27,7 @@ const ExpandAllToggle: React.FC<ExpandAllToggleProps> = ({
         onClick={onClick}
         aria-label={label}
       >
-        <Icon className="text-light-slate" />
+        <Icon />
       </Button>
     </TooltipWrapper>
   );

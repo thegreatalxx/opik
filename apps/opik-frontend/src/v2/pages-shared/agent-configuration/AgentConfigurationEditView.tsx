@@ -283,6 +283,7 @@ const AgentConfigurationEditView = React.forwardRef<
                       value={v}
                       projectId={projectId}
                       isEditing
+                      tone="white"
                       controller={controller}
                       ref={(el) => {
                         promptRefs.current[v.key] = el;
