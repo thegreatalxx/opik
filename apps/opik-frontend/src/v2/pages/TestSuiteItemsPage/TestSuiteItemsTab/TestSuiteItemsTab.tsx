@@ -291,12 +291,6 @@ function TestSuiteItemsTab({
 
   const itemLabel = isTestSuite ? "suite items" : "dataset items";
 
-  const noDataText = useMemo(() => {
-    if (isDraftMode && deletedIds.size > 0 && totalCount !== deletedIds.size) {
-      return `All ${itemLabel} on this page have been deleted`;
-    }
-    return `There are no ${itemLabel} yet`;
-  }, [isDraftMode, deletedIds.size, totalCount, itemLabel]);
 
   const handleSearchChange = useCallback(
     (newSearch: string | null) => {
@@ -625,9 +619,7 @@ function TestSuiteItemsTab({
         columnPinning={DEFAULT_COLUMN_PINNING}
         noData={
           <DataTableEmptyContent
-            title={`No ${
-              isTestSuite ? "suite" : "dataset"
-            } items yet`}
+            title={`No ${isTestSuite ? "suite" : "dataset"} items yet`}
             description="Add test cases to run evaluations and measure performance."
           >
             <button
