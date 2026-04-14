@@ -51,8 +51,7 @@ import {
   injectColumnCallback,
   migrateSelectedColumns,
 } from "@/lib/table";
-import { buildDocsUrl } from "@/lib/utils";
-import DataTableNoData from "@/shared/DataTableNoData/DataTableNoData";
+import DataTableEmptyContent from "@/shared/DataTableNoData/DataTableEmptyContent";
 import Loader from "@/shared/Loader/Loader";
 import {
   buildDatasetFilterColumns,
@@ -190,6 +189,7 @@ function TestSuiteItemsTab({
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
   const isAllItemsSelected = useIsAllItemsSelected();
   const setIsAllItemsSelected = useSetIsAllItemsSelected();
+  const deletedIds = useDeletedIds();
 
   const [height, setHeight] = useQueryParamAndLocalStorageState<
     string | null | undefined
@@ -209,7 +209,6 @@ function TestSuiteItemsTab({
   );
 
   const isDraftMode = useIsDraftMode();
-  const deletedIds = useDeletedIds();
 
   const { data, isPending, isPlaceholderData, isFetching } =
     useTestSuiteItemsWithDraft(
@@ -625,20 +624,19 @@ function TestSuiteItemsTab({
         rowHeight={height as ROW_HEIGHT}
         columnPinning={DEFAULT_COLUMN_PINNING}
         noData={
-          <DataTableNoData title={noDataText}>
-            <Button variant="link">
-              <a
-                href={buildDocsUrl(
-                  "/evaluation/manage_datasets",
-                  "#insert-items",
-                )}
-                target="_blank"
-                rel="noreferrer"
-              >
-                Check our documentation
-              </a>
-            </Button>
-          </DataTableNoData>
+          <DataTableEmptyContent
+            title={`No ${
+              isTestSuite ? "suite" : "dataset"
+            } items yet`}
+            description="Add test cases to run evaluations and measure performance."
+          >
+            <button
+              onClick={() => setOpenCreatePanel(true)}
+              className="comet-body-s underline underline-offset-4 hover:text-primary"
+            >
+              Add new item
+            </button>
+          </DataTableEmptyContent>
         }
       />
       <div className="flex justify-end py-4">

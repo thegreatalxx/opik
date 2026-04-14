@@ -9,6 +9,10 @@ import {
 } from "@tanstack/react-table";
 import { JsonParam, StringParam, useQueryParam } from "use-query-params";
 
+import { Plus } from "lucide-react";
+import PageEmptyState from "@/shared/PageEmptyState/PageEmptyState";
+import emptyEvalSuitesLightUrl from "/images/empty-evaluation-suites-light.svg";
+import emptyEvalSuitesDarkUrl from "/images/empty-evaluation-suites-dark.svg";
 import DataTable from "@/shared/DataTable/DataTable";
 import DataTablePagination from "@/shared/DataTablePagination/DataTablePagination";
 import DataTableNoData from "@/shared/DataTableNoData/DataTableNoData";
@@ -355,96 +359,105 @@ const TestSuitesPage: React.FunctionComponent = () => {
     return <Loader />;
   }
 
+  const isEmpty = noData && datasets.length === 0;
+
   return (
-    <div className="pt-6">
-      <div className="mb-1 flex items-center justify-between">
-        <h1 className="comet-title-l truncate break-words">Test suites</h1>
+    <div className="flex min-h-full flex-col pt-4">
+      <div className="mb-4 flex min-h-7 items-center justify-between">
+        <h1 className="comet-body-accented truncate break-words">
+          Test suites
+        </h1>
+        {canCreateDatasets && (
+          <Button variant="default" size="xs" onClick={handleNewSuiteClick}>
+            <Plus className="mr-1 size-4" />
+            Create suite
+          </Button>
+        )}
       </div>
-      <div className="comet-body-s mb-4 text-muted-slate">
-        A test suite is a collection of inputs, expected outputs, and evaluation
-        criteria used to evaluate your LLM application.{" "}
-        <a
-          href={buildDocsUrl("/evaluation/manage_datasets")}
-          target="_blank"
-          rel="noreferrer"
-          className="text-primary"
-        >
-          Read more
-        </a>
-      </div>
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-x-8 gap-y-2">
-        <div className="flex items-center gap-2">
-          <SearchInput
-            searchText={search!}
-            setSearchText={setSearch}
-            placeholder="Search by name"
-            className="w-[320px]"
-            dimension="sm"
-          ></SearchInput>
-          <FiltersButton
-            columns={FILTERS_COLUMNS}
-            filters={filters}
-            onChange={setFilters}
-            config={filtersConfig as never}
-            layout="icon"
-          />
-        </div>
-        <div className="flex items-center gap-2">
-          {canDeleteDatasets && (
-            <>
-              <DatasetActionsPanel
-                datasets={selectedRows}
-                entityName="test suites"
+      {isEmpty ? (
+        <PageEmptyState
+          lightImageUrl={emptyEvalSuitesLightUrl}
+          darkImageUrl={emptyEvalSuitesDarkUrl}
+          title="No test suites yet"
+          description={
+            "Create set of test cases with expected outputs and scoring to help you compare\nand optimize your configurations."
+          }
+          primaryActionLabel="Create your first suite"
+          onPrimaryAction={handleNewSuiteClick}
+          docsUrl={buildDocsUrl("/evaluation/manage_datasets")}
+        />
+      ) : (
+        <>
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-x-8 gap-y-2">
+            <div className="flex items-center gap-2">
+              <SearchInput
+                searchText={search!}
+                setSearchText={setSearch}
+                placeholder="Search by name"
+                className="w-[320px]"
+                dimension="sm"
+              ></SearchInput>
+              <FiltersButton
+                columns={FILTERS_COLUMNS}
+                filters={filters}
+                onChange={setFilters}
+                config={filtersConfig as never}
+                layout="icon"
               />
-              <Separator orientation="vertical" className="mx-2 h-4" />
-            </>
-          )}
-          <ColumnsButton
-            columns={DEFAULT_COLUMNS}
-            selectedColumns={selectedColumns}
-            onSelectionChange={setSelectedColumns}
-            order={columnsOrder}
-            onOrderChange={setColumnsOrder}
-          ></ColumnsButton>
-          {canCreateDatasets && (
-            <Button variant="default" size="sm" onClick={handleNewSuiteClick}>
-              Create test suite
-            </Button>
-          )}
-        </div>
-      </div>
-      <DataTable
-        columns={columns}
-        data={datasets}
-        onRowClick={handleRowClick}
-        sortConfig={sortConfig}
-        resizeConfig={resizeConfig}
-        selectionConfig={{
-          rowSelection,
-          setRowSelection,
-        }}
-        getRowId={getRowId}
-        columnPinning={DEFAULT_COLUMN_PINNING}
-        noData={
-          <DataTableNoData title={noDataText}>
-            {noData && canCreateDatasets && (
-              <Button variant="link" onClick={handleNewSuiteClick}>
-                Create evaluation suite
-              </Button>
-            )}
-          </DataTableNoData>
-        }
-        showLoadingOverlay={isPlaceholderData && isFetching}
-      />
-      <div className="py-4">
-        <DataTablePagination
-          page={page}
-          pageChange={setPage}
-          size={size}
-          sizeChange={setSize}
-          total={total}
-        ></DataTablePagination>
-      </div>
+            </div>
+            <div className="flex items-center gap-2">
+              {canDeleteDatasets && (
+                <>
+                  <DatasetActionsPanel
+                    datasets={selectedRows}
+                    entityName="test suites"
+                  />
+                  <Separator orientation="vertical" className="mx-2 h-4" />
+                </>
+              )}
+              <ColumnsButton
+                columns={DEFAULT_COLUMNS}
+                selectedColumns={selectedColumns}
+                onSelectionChange={setSelectedColumns}
+                order={columnsOrder}
+                onOrderChange={setColumnsOrder}
+              ></ColumnsButton>
+            </div>
+          </div>
+          <DataTable
+            columns={columns}
+            data={datasets}
+            onRowClick={handleRowClick}
+            sortConfig={sortConfig}
+            resizeConfig={resizeConfig}
+            selectionConfig={{
+              rowSelection,
+              setRowSelection,
+            }}
+            getRowId={getRowId}
+            columnPinning={DEFAULT_COLUMN_PINNING}
+            noData={
+              <DataTableNoData title={noDataText}>
+                {noData && canCreateDatasets && (
+                  <Button variant="link" onClick={handleNewSuiteClick}>
+                    Create test suite
+                  </Button>
+                )}
+              </DataTableNoData>
+            }
+            showLoadingOverlay={isPlaceholderData && isFetching}
+          />
+          <div className="py-4">
+            <DataTablePagination
+              page={page}
+              pageChange={setPage}
+              size={size}
+              sizeChange={setSize}
+              total={total}
+            ></DataTablePagination>
+          </div>
+        </>
+      )}
       <AddTestSuiteSidebar
         open={openDialog}
         setOpen={setOpenDialog}
