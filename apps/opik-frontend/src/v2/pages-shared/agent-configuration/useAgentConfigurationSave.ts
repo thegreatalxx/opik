@@ -16,7 +16,10 @@ import {
 } from "@/types/prompts";
 import { LLMMessage } from "@/types/llm";
 import { NewFieldDraft } from "./NewBlueprintFieldEditor";
-import { validateBlueprintFieldValue } from "./blueprintFieldValidation";
+import {
+  BLUEPRINT_FIELD_NAME_PATTERN,
+  validateBlueprintFieldValue,
+} from "./blueprintFieldValidation";
 
 import type useAgentConfigById from "@/api/agent-configs/useAgentConfigById";
 
@@ -26,8 +29,6 @@ export type AgentConfigPayload = {
   project_id: string;
   blueprint: BlueprintCreate;
 };
-
-const FIELD_NAME_PATTERN = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
 
 const isMessageEmpty = (message: LLMMessage): boolean => {
   const { content } = message;
@@ -48,7 +49,7 @@ const validateNewField = (
 ): string => {
   const key = field.key.trim();
   if (!key) return "Field name is required";
-  if (!FIELD_NAME_PATTERN.test(key))
+  if (!BLUEPRINT_FIELD_NAME_PATTERN.test(key))
     return "Use letters, digits and underscore; start with a letter or underscore";
   if (existingKeys.has(key)) return "A field with this name already exists";
   if (siblingKeys.has(key)) return "Duplicate field name in the new fields";
