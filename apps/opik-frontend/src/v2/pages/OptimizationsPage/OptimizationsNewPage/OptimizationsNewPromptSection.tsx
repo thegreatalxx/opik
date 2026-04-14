@@ -36,6 +36,7 @@ type OptimizationsNewPromptSectionProps = {
   onModelChange: (model: PROVIDER_MODEL_TYPE) => void;
   onModelConfigChange: (configs: Partial<LLMPromptConfigsType>) => void;
   blueprintRef?: BlueprintPromptRef;
+  blueprintPromptName?: string;
   blueprintFieldNames: string[];
   isSavingBlueprint: boolean;
   hasUnsavedBlueprintChanges: boolean;
@@ -57,6 +58,7 @@ const OptimizationsNewPromptSection: React.FC<
   onModelChange,
   onModelConfigChange,
   blueprintRef,
+  blueprintPromptName,
   blueprintFieldNames,
   isSavingBlueprint,
   hasUnsavedBlueprintChanges,
@@ -215,20 +217,22 @@ const OptimizationsNewPromptSection: React.FC<
         <SaveExistingPromptDialog
           open={showSaveExisting}
           onOpenChange={setShowSaveExisting}
-          promptName={blueprintRef.key}
+          promptName={blueprintPromptName ?? blueprintRef.key}
           fieldName={blueprintRef.key}
           isSaving={isSavingBlueprint}
           onSave={handleSaveExisting}
         />
       )}
 
-      <SaveAsNewBlueprintFieldDialog
-        open={showSaveNew}
-        onOpenChange={setShowSaveNew}
-        existingFieldNames={blueprintFieldNames}
-        isSaving={isSavingBlueprint}
-        onSave={handleSaveNew}
-      />
+      {showSaveNew && (
+        <SaveAsNewBlueprintFieldDialog
+          open={showSaveNew}
+          onOpenChange={setShowSaveNew}
+          existingFieldNames={blueprintFieldNames}
+          isSaving={isSavingBlueprint}
+          onSave={handleSaveNew}
+        />
+      )}
     </div>
   );
 };

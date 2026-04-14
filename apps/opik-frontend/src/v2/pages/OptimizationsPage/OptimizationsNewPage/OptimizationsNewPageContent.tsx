@@ -27,6 +27,7 @@ const OptimizationsNewPageContent: React.FC = () => {
     handleNameChange,
     getFirstMetricParamsError,
     blueprintRef,
+    blueprintPromptName,
     blueprintFieldNames,
     isSavingBlueprint,
     hasUnsavedBlueprintChanges,
@@ -56,6 +57,7 @@ const OptimizationsNewPageContent: React.FC = () => {
           onModelChange={handleModelChange}
           onModelConfigChange={handleModelConfigChange}
           blueprintRef={blueprintRef}
+          blueprintPromptName={blueprintPromptName}
           blueprintFieldNames={blueprintFieldNames}
           isSavingBlueprint={isSavingBlueprint}
           hasUnsavedBlueprintChanges={hasUnsavedBlueprintChanges}

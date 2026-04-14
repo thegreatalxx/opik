@@ -27,11 +27,12 @@ import useLLMProviderModelsData from "@/hooks/useLLMProviderModelsData";
 import useDatasetSamplePreview from "./useDatasetSamplePreview";
 import { BlueprintPromptRef } from "@/types/playground";
 import usePromptByCommit from "@/api/prompts/usePromptByCommit";
-import { LLM_MESSAGE_ROLE, LLMMessage } from "@/types/llm";
-import { generateDefaultLLMPromptMessage } from "@/lib/llm";
 import useSavePromptToBlueprint from "@/v2/pages-shared/llm/BlueprintPromptsSelectBox/useSavePromptToBlueprint";
-import { serializeChatTemplate } from "@/lib/chatTemplate";
-import isEqual from "fast-deep-equal";
+import {
+  serializeChatTemplate,
+  chatTemplatesEqual,
+  parseChatTemplateToMessages,
+} from "@/lib/chatTemplate";
 
 const getBreadcrumbTitle = (name: string) =>
   name?.trim() ? `${name} (new)` : "... (new)";
@@ -96,27 +97,13 @@ export const useOptimizationsNewFormHandlers = () => {
     if (!template) return;
 
     try {
-      const parsed = JSON.parse(template) as Array<{
-        role: string;
-        content: unknown;
-      }>;
-      const messages: LLMMessage[] = parsed.map((msg) =>
-        generateDefaultLLMPromptMessage({
-          role: msg.role as LLM_MESSAGE_ROLE,
-          content: msg.content as LLMMessage["content"],
-        }),
-      );
+      const messages = parseChatTemplateToMessages(template);
       form.setValue("messages", messages, { shouldValidate: true });
       loadedCommitRef.current = commitId;
     } catch {
       // ignore parse failures
     }
   }, [commitPromptData, blueprintRef, form]);
-
-  const handleBlueprintRefChange = useCallback(
-    (ref: BlueprintPromptRef) => setBlueprintRef(ref),
-    [],
-  );
 
   const handleBlueprintRefClear = useCallback(() => {
     setBlueprintRef(undefined);
@@ -127,17 +114,7 @@ export const useOptimizationsNewFormHandlers = () => {
   const hasUnsavedBlueprintChanges = useMemo(() => {
     const loadedTemplate = commitPromptData?.requested_version?.template;
     if (!blueprintRef || !loadedTemplate || messages.length === 0) return false;
-    try {
-      const loaded = JSON.parse(loadedTemplate) as Array<{
-        role: string;
-        content: unknown;
-      }>;
-      const normalize = (msgs: Array<{ role: string; content: unknown }>) =>
-        msgs.map(({ role, content }) => ({ role, content }));
-      return !isEqual(normalize(messages), normalize(loaded));
-    } catch {
-      return false;
-    }
+    return !chatTemplatesEqual(serializeChatTemplate(messages), loadedTemplate);
   }, [blueprintRef, commitPromptData, messages]);
 
   const {
@@ -425,10 +402,11 @@ export const useOptimizationsNewFormHandlers = () => {
     handleNameChange,
     getFirstMetricParamsError,
     blueprintRef,
+    blueprintPromptName: commitPromptData?.name,
     blueprintFieldNames,
     isSavingBlueprint,
     hasUnsavedBlueprintChanges,
-    handleBlueprintRefChange,
+    handleBlueprintRefChange: setBlueprintRef,
     handleBlueprintRefClear,
     handleSaveBlueprintExisting,
     handleSaveBlueprintNewField,

@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useRef } from "react";
-import isEqual from "fast-deep-equal";
 
-import { LLM_MESSAGE_ROLE, LLMMessage } from "@/types/llm";
-import { generateDefaultLLMPromptMessage } from "@/lib/llm";
+import { LLMMessage } from "@/types/llm";
 import { BlueprintPromptRef } from "@/types/playground";
 import usePromptByCommit from "@/api/prompts/usePromptByCommit";
 import { PromptByCommit } from "@/types/prompts";
-import { serializeChatTemplate } from "@/lib/chatTemplate";
+import {
+  serializeChatTemplate,
+  chatTemplatesEqual,
+  parseChatTemplateToMessages,
+} from "@/lib/chatTemplate";
 
 interface UseLoadBlueprintPromptOptions {
   selectedRef: BlueprintPromptRef | undefined;
@@ -25,34 +27,6 @@ interface UseLoadBlueprintPromptReturn {
 const refKey = (ref: BlueprintPromptRef): string =>
   `${ref.blueprintId}-${ref.key}-${ref.commitId}`;
 
-const messagesToTemplate = serializeChatTemplate;
-
-const templatesEqual = (a: string, b: string): boolean => {
-  try {
-    const normalize = (raw: string) =>
-      JSON.parse(raw).map(({ role, content }: LLMMessage) => ({
-        role,
-        content,
-      }));
-    return isEqual(normalize(a), normalize(b));
-  } catch {
-    return a === b;
-  }
-};
-
-const parseMessages = (template: string): LLMMessage[] => {
-  const parsed = JSON.parse(template) as Array<{
-    role: string;
-    content: unknown;
-  }>;
-  return parsed.map((msg) =>
-    generateDefaultLLMPromptMessage({
-      role: msg.role as LLM_MESSAGE_ROLE,
-      content: msg.content as LLMMessage["content"],
-    }),
-  );
-};
-
 const useLoadBlueprintPrompt = ({
   selectedRef,
   messages,
@@ -69,11 +43,11 @@ const useLoadBlueprintPrompt = ({
 
   const versionTemplate = prompt?.requested_version?.template;
 
-  const template = useMemo(() => messagesToTemplate(messages), [messages]);
+  const template = useMemo(() => serializeChatTemplate(messages), [messages]);
 
   const hasUnsavedChanges = useMemo(() => {
     if (!selectedRef || !versionTemplate || messages.length === 0) return false;
-    return !templatesEqual(template, versionTemplate);
+    return !chatTemplatesEqual(template, versionTemplate);
   }, [selectedRef, versionTemplate, template, messages.length]);
 
   useEffect(() => {
@@ -93,10 +67,10 @@ const useLoadBlueprintPrompt = ({
     }
 
     try {
-      onMessagesLoaded(parseMessages(versionTemplate), prompt.name);
+      onMessagesLoaded(parseChatTemplateToMessages(versionTemplate), prompt.name);
       loadedRef.current = dedupKey;
-    } catch (error) {
-      console.error("Failed to parse blueprint prompt:", error);
+    } catch {
+      // silently ignore parse failures
     }
   }, [selectedRef, prompt, versionTemplate, onMessagesLoaded, skipInitialLoad]);
 

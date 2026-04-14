@@ -10,13 +10,10 @@ import { parsePromptVersionContent } from "@/lib/llm";
 import { useFetchPrompt } from "@/api/prompts/usePromptById";
 import { useFetchPromptVersion } from "@/api/prompts/usePromptVersionById";
 import { useFetchPromptByCommit } from "@/api/prompts/usePromptByCommit";
-
-type NormalizedMessage = { role: string; content: unknown };
-
-const normalizeForComparison = (
-  messages: Array<{ role: string; content: unknown }>,
-): NormalizedMessage[] =>
-  messages.map(({ role, content }) => ({ role, content }));
+import {
+  serializeChatTemplate,
+  chatTemplatesEqual,
+} from "@/lib/chatTemplate";
 
 const parseTemplateJson = (template: string | undefined): unknown => {
   if (!template) return null;
@@ -25,21 +22,6 @@ const parseTemplateJson = (template: string | undefined): unknown => {
   } catch {
     return template;
   }
-};
-
-// True when the playground messages still match the chat template stored on
-// the loaded prompt version. Returns false if anything fails to parse.
-const matchesChatTemplate = (
-  template: string,
-  current: Array<{ role: string; content: unknown }>,
-): boolean => {
-  let libraryMessages: NormalizedMessage[];
-  try {
-    libraryMessages = normalizeForComparison(JSON.parse(template));
-  } catch {
-    return false;
-  }
-  return isEqual(normalizeForComparison(current), libraryMessages);
 };
 
 interface VersionData {
@@ -89,7 +71,7 @@ export function useHydratePromptMetadata() {
           });
           const version = commitData.requested_version;
           if (!version?.template) return undefined;
-          if (!matchesChatTemplate(version.template, currentMessages))
+          if (!chatTemplatesEqual(serializeChatTemplate(currentMessages), version.template))
             return undefined;
 
           return buildMetadata(
@@ -129,7 +111,7 @@ export function useHydratePromptMetadata() {
           const templateToCompare =
             versionData?.template ?? promptData.latest_version.template;
           if (!templateToCompare) return undefined;
-          if (!matchesChatTemplate(templateToCompare, currentMessages))
+          if (!chatTemplatesEqual(serializeChatTemplate(currentMessages), templateToCompare))
             return undefined;
 
           return buildMetadata(promptData, {

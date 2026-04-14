@@ -69,8 +69,6 @@ const validateNewField = (
   return "";
 };
 
-const buildChatTemplateFromMessages = serializeChatTemplate;
-
 type UseAgentConfigurationSaveParams = {
   agentConfig: AgentConfig | undefined;
   draftValues: Record<string, string>;
@@ -207,7 +205,7 @@ export const useAgentConfigurationSave = ({
           field.promptStructure === PROMPT_TEMPLATE_STRUCTURE.TEXT;
         const template = isTextPrompt
           ? field.value
-          : buildChatTemplateFromMessages(field.messages);
+          : serializeChatTemplate(field.messages);
         try {
           const created = (await createPrompt({
             prompt: {

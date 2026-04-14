@@ -306,13 +306,15 @@ const LLMPromptMessageActions: React.FC<LLMPromptLibraryActionsProps> = ({
           />
         )}
 
-        <SaveAsNewBlueprintFieldDialog
-          open={showSaveNew}
-          onOpenChange={setShowSaveNew}
-          existingFieldNames={existingFieldNames}
-          isSaving={isSaving}
-          onSave={handleSaveNewField}
-        />
+        {showSaveNew && (
+          <SaveAsNewBlueprintFieldDialog
+            open={showSaveNew}
+            onOpenChange={setShowSaveNew}
+            existingFieldNames={existingFieldNames}
+            isSaving={isSaving}
+            onSave={handleSaveNewField}
+          />
+        )}
       </div>
       {improvePromptConfig && (
         <PromptImprovementDialog
