@@ -45,7 +45,8 @@ const AgentRunnerContent: React.FC<AgentRunnerContentProps> = ({
   const agentName = pairing.runner?.agents?.[0]?.name ?? "";
   const isReady = isConnected && Boolean(agentName);
 
-  const { canConfigureWorkspaceSettings } = usePermissions();
+  const { permissions } = usePermissions();
+  const { canConfigureWorkspaceSettings } = permissions;
   const createJobMutation = useSandboxCreateJobMutation();
   const disconnectMutation = useDisconnectRunnerMutation();
 
