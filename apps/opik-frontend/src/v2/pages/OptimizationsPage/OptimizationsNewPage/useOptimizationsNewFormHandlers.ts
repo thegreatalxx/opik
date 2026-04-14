@@ -365,10 +365,11 @@ export const useOptimizationsNewFormHandlers = () => {
   );
 
   const handleSaveBlueprintNewField = useCallback(
-    async (fieldName: string) => {
+    async (fieldName: string, changeDescription: string) => {
       const newRef = await saveBlueprintNewField({
         fieldName,
         template: getBlueprintTemplate(),
+        changeDescription: changeDescription || undefined,
       });
       if (newRef) {
         setBlueprintRef(newRef);
