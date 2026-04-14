@@ -11,7 +11,7 @@ type UsePromptByCommitParams = {
   commitId: string;
 };
 
-const getPromptByCommit = async (
+export const getPromptByCommit = async (
   { signal }: QueryFunctionContext,
   { commitId }: UsePromptByCommitParams,
 ) => {

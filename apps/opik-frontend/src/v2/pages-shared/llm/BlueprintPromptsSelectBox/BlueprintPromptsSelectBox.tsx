@@ -1,6 +1,6 @@
 import React, { useCallback, useMemo, useState } from "react";
 import { FileTerminal, XCircle } from "lucide-react";
-import { useQueries } from "@tanstack/react-query";
+import { QueryFunctionContext, useQueries } from "@tanstack/react-query";
 
 import { Button } from "@/ui/button";
 import LoadableSelectBox from "@/shared/LoadableSelectBox/LoadableSelectBox";
@@ -9,8 +9,8 @@ import useConfigHistoryListInfinite from "@/api/agent-configs/useConfigHistoryLi
 import useAgentConfigById from "@/api/agent-configs/useAgentConfigById";
 import { BlueprintValue, BlueprintValueType } from "@/types/agent-configs";
 import { BlueprintPromptRef } from "@/types/playground";
-import { PROMPT_TEMPLATE_STRUCTURE, PromptByCommit } from "@/types/prompts";
-import api, { PROMPTS_REST_ENDPOINT } from "@/api/api";
+import { PROMPT_TEMPLATE_STRUCTURE } from "@/types/prompts";
+import { getPromptByCommit } from "@/api/prompts/usePromptByCommit";
 
 interface BlueprintPromptsSelectBoxProps {
   projectId: string;
@@ -61,14 +61,7 @@ const LoadedDisplay: React.FC<LoadedDisplayProps> = ({
   </div>
 );
 
-const fetchPromptByCommit = async (
-  commitId: string,
-): Promise<PromptByCommit> => {
-  const { data } = await api.get(
-    `${PROMPTS_REST_ENDPOINT}by-commit/${commitId}`,
-  );
-  return data;
-};
+const PROMPT_COMMIT_STALE_TIME = 5 * 60 * 1000;
 
 const useFilteredPromptValues = (
   promptValues: BlueprintValue[],
@@ -78,8 +71,9 @@ const useFilteredPromptValues = (
     queries: filter
       ? promptValues.map((v) => ({
           queryKey: ["prompt-by-commit", { commitId: v.value }],
-          queryFn: () => fetchPromptByCommit(v.value),
-          staleTime: 5 * 60 * 1000,
+          queryFn: (context: QueryFunctionContext) =>
+            getPromptByCommit(context, { commitId: v.value }),
+          staleTime: PROMPT_COMMIT_STALE_TIME,
           enabled: !!v.value,
         }))
       : [],

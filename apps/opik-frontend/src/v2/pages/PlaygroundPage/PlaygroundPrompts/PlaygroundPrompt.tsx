@@ -149,7 +149,7 @@ const PlaygroundPrompt = ({
     const lastMessage = last(messages);
 
     newMessage.role = lastMessage
-      ? getNextMessageType(lastMessage!)
+      ? getNextMessageType(lastMessage)
       : LLM_MESSAGE_ROLE.system;
 
     updatePrompt(promptId, {
@@ -323,6 +323,27 @@ const PlaygroundPrompt = ({
     [saveAsNewField, blueprintPromptTemplate, updatePrompt, promptId],
   );
 
+  const handleImproveAccept = useCallback(
+    (messageId: string, improvedContent: LLMMessage["content"]) => {
+      const updatedMessages = messages.map((msg) =>
+        msg.id === messageId ? { ...msg, content: improvedContent } : msg,
+      );
+      updatePrompt(promptId, { messages: updatedMessages });
+    },
+    [messages, updatePrompt, promptId],
+  );
+
+  const improvePromptConfig = useMemo(
+    () => ({
+      model,
+      provider,
+      configs,
+      workspaceName,
+      onAccept: handleImproveAccept,
+    }),
+    [model, provider, configs, workspaceName, handleImproveAccept],
+  );
+
   const promptColor =
     PLAYGROUND_PROMPT_COLORS[index % PLAYGROUND_PROMPT_COLORS.length];
 
@@ -418,20 +439,7 @@ const PlaygroundPrompt = ({
           promptVariables={promptVariablesArray}
           jsonTreeData={datasetSampleData}
           hidePromptActions={false}
-          improvePromptConfig={{
-            model,
-            provider,
-            configs,
-            workspaceName,
-            onAccept: (messageId, improvedContent) => {
-              const updatedMessages = messages.map((msg) =>
-                msg.id === messageId
-                  ? { ...msg, content: improvedContent }
-                  : msg,
-              );
-              updatePrompt(promptId, { messages: updatedMessages });
-            },
-          }}
+          improvePromptConfig={improvePromptConfig}
         />
       </div>
 
@@ -446,13 +454,15 @@ const PlaygroundPrompt = ({
         />
       )}
 
-      <SaveAsNewBlueprintFieldDialog
-        open={showSaveAsNewFieldDialog}
-        onOpenChange={setShowSaveAsNewFieldDialog}
-        existingFieldNames={existingFieldNames}
-        isSaving={isSaving}
-        onSave={handleSaveAsNewField}
-      />
+      {showSaveAsNewFieldDialog && (
+        <SaveAsNewBlueprintFieldDialog
+          open={showSaveAsNewFieldDialog}
+          onOpenChange={setShowSaveAsNewFieldDialog}
+          existingFieldNames={existingFieldNames}
+          isSaving={isSaving}
+          onSave={handleSaveAsNewField}
+        />
+      )}
     </div>
   );
 };
