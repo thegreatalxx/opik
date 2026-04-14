@@ -23,11 +23,8 @@ export interface PromptLibraryMetadata {
   };
 }
 
-export interface BlueprintPromptRef {
-  blueprintId: string;
-  key: string;
-  commitId: string;
-}
+import type { BlueprintPromptRef } from "@/types/agent-configs";
+export type { BlueprintPromptRef } from "@/types/agent-configs";
 
 export interface PlaygroundPromptType {
   name: string;

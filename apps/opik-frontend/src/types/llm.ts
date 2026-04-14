@@ -1,5 +1,5 @@
 import { DropdownOption } from "@/types/shared";
-import type { BlueprintPromptRef } from "@/types/playground";
+import type { BlueprintPromptRef } from "@/types/agent-configs";
 
 export enum LLM_MESSAGE_ROLE {
   system = "system",
