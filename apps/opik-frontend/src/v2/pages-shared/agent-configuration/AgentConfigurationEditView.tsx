@@ -8,6 +8,7 @@ import React, {
 } from "react";
 import { Plus, RotateCcw, Trash } from "lucide-react";
 import { Button } from "@/ui/button";
+import { serializeChatTemplate } from "@/lib/chatTemplate";
 import {
   BlueprintValue,
   BlueprintValueType,
@@ -237,7 +238,7 @@ const AgentConfigurationEditView = React.forwardRef<
       for (const field of newFields) {
         if (field.type !== BlueprintValueType.PROMPT) continue;
         const key = field.key.trim();
-        if (key) out[key] = field.value;
+        if (key) out[key] = serializeChatTemplate(field.messages);
       }
       return out;
     }, [dirtyPromptKeys, promptRefs, newFields]);
