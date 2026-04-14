@@ -608,7 +608,7 @@ function DatasetItemsPage(): React.ReactElement {
                 onClick={() => setSettingsDialogOpen(true)}
               >
                 <Settings2 className="size-3.5 shrink-0" />
-                Settings
+                Evaluation settings
               </Button>
             )}
           </div>

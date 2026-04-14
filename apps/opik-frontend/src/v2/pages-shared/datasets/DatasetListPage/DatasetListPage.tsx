@@ -58,6 +58,7 @@ const TYPE_CONFIG = {
     title: "Datasets",
     description:
       "A dataset is a collection of inputs and expected outputs used to evaluate your LLM application.",
+    docsUrl: "/evaluation/manage_datasets",
     entityName: "datasets",
     createButtonText: "Create new",
     noDataText: "There are no datasets yet",
@@ -80,7 +81,9 @@ const TYPE_CONFIG = {
   test_suite: {
     title: "Test suites",
     description:
-      "A test suite is a collection of inputs, expected outputs, and evaluation criteria used to evaluate your LLM application.",
+      "A test suite is a collection of inputs and expected outputs, with their corresponding assertions that will be used to evaluate the performance of your LLM application.",
+    // TODO: replace with test suites documentation URL once it exists
+    docsUrl: "/evaluation/manage_datasets",
     entityName: "test suites",
     createButtonText: "Create new",
     noDataText: "There are no test suites yet",
@@ -419,7 +422,7 @@ const DatasetListPage: React.FunctionComponent<DatasetListPageProps> = ({
       <div className="comet-body-s mb-4 text-muted-slate">
         {config.description}{" "}
         <a
-          href={buildDocsUrl("/evaluation/manage_datasets")}
+          href={buildDocsUrl(config.docsUrl)}
           target="_blank"
           rel="noreferrer"
           className="text-primary"

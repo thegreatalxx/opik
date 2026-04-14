@@ -107,6 +107,7 @@ const AddTestSuiteItemPanel: React.FC<AddTestSuiteItemPanelProps> = ({
     formId={ADD_SUITE_ITEM_FORM_ID}
     open={open}
     onClose={onClose}
+    initialWidth={0.4}
   >
     {({ tags, setHasUnsavedChanges }) => (
       <TestSuiteItemFormContent
