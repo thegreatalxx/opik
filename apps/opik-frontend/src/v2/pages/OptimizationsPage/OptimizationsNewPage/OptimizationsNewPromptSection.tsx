@@ -1,7 +1,9 @@
-import React from "react";
+import React, { useCallback, useState } from "react";
 import { UseFormReturn } from "react-hook-form";
+import { Save } from "lucide-react";
 import { Input } from "@/ui/input";
 import { Label } from "@/ui/label";
+import { Button } from "@/ui/button";
 import {
   FormControl,
   FormField,
@@ -17,28 +19,84 @@ import LLMPromptMessages from "@/v2/pages-shared/llm/LLMPromptMessages/LLMPrompt
 import OptimizationModelSelect from "@/v2/pages-shared/optimizations/OptimizationModelSelect/OptimizationModelSelect";
 import OptimizationTemperatureConfig from "@/v2/pages-shared/optimizations/OptimizationConfigForm/OptimizationTemperatureConfig";
 import { OPTIMIZATION_MESSAGE_TYPE_OPTIONS } from "@/constants/optimizations";
+import BlueprintPromptsSelectBox from "@/v2/pages-shared/llm/BlueprintPromptsSelectBox/BlueprintPromptsSelectBox";
+import SaveExistingPromptDialog from "@/v2/pages-shared/llm/BlueprintPromptsSelectBox/SaveExistingPromptDialog";
+import SaveAsNewBlueprintFieldDialog from "@/v2/pages-shared/llm/BlueprintPromptsSelectBox/SaveAsNewBlueprintFieldDialog";
+import TooltipWrapper from "@/shared/TooltipWrapper/TooltipWrapper";
+import { BlueprintPromptRef } from "@/types/playground";
 
 type OptimizationsNewPromptSectionProps = {
   form: UseFormReturn<OptimizationConfigFormType>;
+  projectId: string;
   model: PROVIDER_MODEL_TYPE | "";
   config: OptimizationConfigFormType["modelConfig"];
   datasetVariables: string[];
   onNameChange: (value: string) => void;
   onModelChange: (model: PROVIDER_MODEL_TYPE) => void;
   onModelConfigChange: (configs: Partial<LLMPromptConfigsType>) => void;
+  blueprintRef?: BlueprintPromptRef;
+  blueprintFieldNames: string[];
+  isSavingBlueprint: boolean;
+  onBlueprintRefChange: (ref: BlueprintPromptRef) => void;
+  onBlueprintRefClear: () => void;
+  onSaveBlueprintExisting: (changeDescription: string) => Promise<unknown>;
+  onSaveBlueprintNewField: (fieldName: string) => Promise<unknown>;
 };
 
 const OptimizationsNewPromptSection: React.FC<
   OptimizationsNewPromptSectionProps
 > = ({
   form,
+  projectId,
   model,
   config,
   datasetVariables,
   onNameChange,
   onModelChange,
   onModelConfigChange,
+  blueprintRef,
+  blueprintFieldNames,
+  isSavingBlueprint,
+  onBlueprintRefChange,
+  onBlueprintRefClear,
+  onSaveBlueprintExisting,
+  onSaveBlueprintNewField,
 }) => {
+  const [showSaveExisting, setShowSaveExisting] = useState(false);
+  const [showSaveNew, setShowSaveNew] = useState(false);
+
+  const hasMessages = form
+    .watch("messages")
+    .some((msg) =>
+      typeof msg.content === "string"
+        ? msg.content.trim()
+        : Array.isArray(msg.content) && msg.content.length > 0,
+    );
+
+  const handleClickSave = useCallback(() => {
+    if (blueprintRef) {
+      setShowSaveExisting(true);
+    } else {
+      setShowSaveNew(true);
+    }
+  }, [blueprintRef]);
+
+  const handleSaveExisting = useCallback(
+    async (changeDescription: string) => {
+      await onSaveBlueprintExisting(changeDescription);
+      setShowSaveExisting(false);
+    },
+    [onSaveBlueprintExisting],
+  );
+
+  const handleSaveNew = useCallback(
+    async (fieldName: string) => {
+      await onSaveBlueprintNewField(fieldName);
+      setShowSaveNew(false);
+    },
+    [onSaveBlueprintNewField],
+  );
+
   return (
     <div className="flex-1 space-y-6">
       <FormField
@@ -62,7 +120,33 @@ const OptimizationsNewPromptSection: React.FC<
 
       <div>
         <div className="mb-2 flex h-8 items-center justify-between">
-          <Label className="comet-body-s-accented">Prompt</Label>
+          <div className="flex items-center gap-1">
+            <Label className="comet-body-s-accented">Prompt</Label>
+            <BlueprintPromptsSelectBox
+              projectId={projectId}
+              value={blueprintRef}
+              onValueChange={onBlueprintRefChange}
+              onClear={onBlueprintRefClear}
+            />
+            {hasMessages && (
+              <TooltipWrapper
+                content={
+                  blueprintRef
+                    ? "Update prompt in agent configuration"
+                    : "Save as new field in agent configuration"
+                }
+              >
+                <Button
+                  variant="minimal"
+                  size="icon-sm"
+                  onClick={handleClickSave}
+                  disabled={isSavingBlueprint}
+                >
+                  <Save />
+                </Button>
+              </TooltipWrapper>
+            )}
+          </div>
           <div className="flex h-full items-center gap-1">
             <FormField
               control={form.control}
@@ -121,6 +205,25 @@ const OptimizationsNewPromptSection: React.FC<
           }}
         />
       </div>
+
+      {blueprintRef && (
+        <SaveExistingPromptDialog
+          open={showSaveExisting}
+          onOpenChange={setShowSaveExisting}
+          promptName={blueprintRef.key}
+          fieldName={blueprintRef.key}
+          isSaving={isSavingBlueprint}
+          onSave={handleSaveExisting}
+        />
+      )}
+
+      <SaveAsNewBlueprintFieldDialog
+        open={showSaveNew}
+        onOpenChange={setShowSaveNew}
+        existingFieldNames={blueprintFieldNames}
+        isSaving={isSavingBlueprint}
+        onSave={handleSaveNew}
+      />
     </div>
   );
 };
