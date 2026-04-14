@@ -26,6 +26,13 @@ const OptimizationsNewPageContent: React.FC = () => {
     handleCancel,
     handleNameChange,
     getFirstMetricParamsError,
+    blueprintRef,
+    blueprintFieldNames,
+    isSavingBlueprint,
+    handleBlueprintRefChange,
+    handleBlueprintRefClear,
+    handleSaveBlueprintExisting,
+    handleSaveBlueprintNewField,
   } = useOptimizationsNewFormHandlers();
 
   return (
@@ -40,12 +47,20 @@ const OptimizationsNewPageContent: React.FC = () => {
       <div className="flex gap-6">
         <OptimizationsNewPromptSection
           form={form}
+          projectId={activeProjectId!}
           model={model}
           config={config}
           datasetVariables={datasetVariables}
           onNameChange={handleNameChange}
           onModelChange={handleModelChange}
           onModelConfigChange={handleModelConfigChange}
+          blueprintRef={blueprintRef}
+          blueprintFieldNames={blueprintFieldNames}
+          isSavingBlueprint={isSavingBlueprint}
+          onBlueprintRefChange={handleBlueprintRefChange}
+          onBlueprintRefClear={handleBlueprintRefClear}
+          onSaveBlueprintExisting={handleSaveBlueprintExisting}
+          onSaveBlueprintNewField={handleSaveBlueprintNewField}
         />
 
         <OptimizationsNewConfigSidebar
