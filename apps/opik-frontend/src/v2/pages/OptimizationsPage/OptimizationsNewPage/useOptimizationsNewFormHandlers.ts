@@ -30,6 +30,7 @@ import usePromptByCommit from "@/api/prompts/usePromptByCommit";
 import { LLM_MESSAGE_ROLE, LLMMessage } from "@/types/llm";
 import { generateDefaultLLMPromptMessage } from "@/lib/llm";
 import useSavePromptToBlueprint from "@/v2/pages-shared/llm/BlueprintPromptsSelectBox/useSavePromptToBlueprint";
+import isEqual from "fast-deep-equal";
 
 const getBreadcrumbTitle = (name: string) =>
   name?.trim() ? `${name} (new)` : "... (new)";
@@ -120,6 +121,23 @@ export const useOptimizationsNewFormHandlers = () => {
     setBlueprintRef(undefined);
     loadedCommitRef.current = null;
   }, []);
+
+  const messages = form.watch("messages");
+  const hasUnsavedBlueprintChanges = useMemo(() => {
+    const loadedTemplate = commitPromptData?.requested_version?.template;
+    if (!blueprintRef || !loadedTemplate || messages.length === 0) return false;
+    try {
+      const loaded = JSON.parse(loadedTemplate) as Array<{
+        role: string;
+        content: unknown;
+      }>;
+      const normalize = (msgs: Array<{ role: string; content: unknown }>) =>
+        msgs.map(({ role, content }) => ({ role, content }));
+      return !isEqual(normalize(messages), normalize(loaded));
+    } catch {
+      return false;
+    }
+  }, [blueprintRef, commitPromptData, messages]);
 
   const {
     existingFieldNames: blueprintFieldNames,
@@ -410,6 +428,7 @@ export const useOptimizationsNewFormHandlers = () => {
     blueprintRef,
     blueprintFieldNames,
     isSavingBlueprint,
+    hasUnsavedBlueprintChanges,
     handleBlueprintRefChange,
     handleBlueprintRefClear,
     handleSaveBlueprintExisting,
