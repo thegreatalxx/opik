@@ -161,7 +161,16 @@ const AgentConfigurationTab: React.FC<AgentConfigurationTabProps> = ({
   }
 
   if (allRows.length === 0) {
-    return <AgentConfigurationEmptyState />;
+    return (
+      <div className="flex min-h-full flex-col px-6 pt-4">
+        <div className="mb-1 flex min-h-7 items-center">
+          <h1 className="comet-title-xs truncate break-words">
+            Agent configuration
+          </h1>
+        </div>
+        <AgentConfigurationEmptyState />
+      </div>
+    );
   }
 
   const selectedItem = allRows[selectedIndex] as ConfigHistoryItem;
@@ -183,7 +192,7 @@ const AgentConfigurationTab: React.FC<AgentConfigurationTabProps> = ({
 
   return (
     <div className="flex flex-col lg:flex-row lg:gap-0">
-      <div className="mx-6 mt-4 flex flex-col gap-4 lg:hidden">
+      <div className="mx-6 mt-5 flex flex-col gap-4 lg:hidden">
         <h1 className="comet-title-xs">Agent configuration</h1>
         <HistoryPopover
           items={allRows}
@@ -193,7 +202,7 @@ const AgentConfigurationTab: React.FC<AgentConfigurationTabProps> = ({
       </div>
 
       <div className="min-w-0 flex-1 [overflow-anchor:none] lg:w-[50vw]">
-        <div className="mx-6 mt-6 hidden lg:block">
+        <div className="mx-6 mt-5 hidden lg:block">
           <h1 className="comet-title-xs">Agent configuration</h1>
         </div>
 
