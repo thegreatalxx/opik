@@ -1,13 +1,16 @@
 import React, { useCallback, useMemo, useState } from "react";
 import { FileTerminal, XCircle } from "lucide-react";
+import { useQueries } from "@tanstack/react-query";
 
 import { Button } from "@/ui/button";
 import LoadableSelectBox from "@/shared/LoadableSelectBox/LoadableSelectBox";
 import TooltipWrapper from "@/shared/TooltipWrapper/TooltipWrapper";
 import useConfigHistoryListInfinite from "@/api/agent-configs/useConfigHistoryListInfinite";
 import useAgentConfigById from "@/api/agent-configs/useAgentConfigById";
-import { BlueprintValueType } from "@/types/agent-configs";
+import { BlueprintValue, BlueprintValueType } from "@/types/agent-configs";
 import { BlueprintPromptRef } from "@/types/playground";
+import { PROMPT_TEMPLATE_STRUCTURE, PromptByCommit } from "@/types/prompts";
+import api, { PROMPTS_REST_ENDPOINT } from "@/api/api";
 
 interface BlueprintPromptsSelectBoxProps {
   projectId: string;
@@ -17,6 +20,7 @@ interface BlueprintPromptsSelectBoxProps {
   onOpenChange?: (open: boolean) => void;
   hasUnsavedChanges?: boolean;
   disabled?: boolean;
+  filterByTemplateStructure?: PROMPT_TEMPLATE_STRUCTURE;
 }
 
 interface LoadedDisplayProps {
@@ -57,6 +61,44 @@ const LoadedDisplay: React.FC<LoadedDisplayProps> = ({
   </div>
 );
 
+const fetchPromptByCommit = async (
+  commitId: string,
+): Promise<PromptByCommit> => {
+  const { data } = await api.get(
+    `${PROMPTS_REST_ENDPOINT}by-commit/${commitId}`,
+  );
+  return data;
+};
+
+const useFilteredPromptValues = (
+  promptValues: BlueprintValue[],
+  filter?: PROMPT_TEMPLATE_STRUCTURE,
+) => {
+  const queries = useQueries({
+    queries: filter
+      ? promptValues.map((v) => ({
+          queryKey: ["prompt-by-commit", { commitId: v.value }],
+          queryFn: () => fetchPromptByCommit(v.value),
+          staleTime: 5 * 60 * 1000,
+          enabled: !!v.value,
+        }))
+      : [],
+  });
+
+  return useMemo(() => {
+    if (!filter) return { values: promptValues, isResolving: false };
+
+    const isResolving = queries.some((q) => q.isLoading);
+    if (isResolving) return { values: [], isResolving: true };
+
+    const filtered = promptValues.filter((_, i) => {
+      const structure = queries[i]?.data?.template_structure;
+      return structure === filter;
+    });
+    return { values: filtered, isResolving: false };
+  }, [filter, promptValues, queries]);
+};
+
 const BlueprintPromptsSelectBox: React.FC<BlueprintPromptsSelectBoxProps> = ({
   projectId,
   value,
@@ -65,6 +107,7 @@ const BlueprintPromptsSelectBox: React.FC<BlueprintPromptsSelectBoxProps> = ({
   onOpenChange,
   hasUnsavedChanges = false,
   disabled = false,
+  filterByTemplateStructure,
 }) => {
   const [open, setOpen] = useState(false);
 
@@ -80,20 +123,23 @@ const BlueprintPromptsSelectBox: React.FC<BlueprintPromptsSelectBoxProps> = ({
     useConfigHistoryListInfinite({ projectId });
   const latestBlueprintId = history?.pages?.[0]?.content?.[0]?.id;
 
-  // The history list returns a summary; fetch the full blueprint to get
-  // PROMPT-typed values, mirroring AgentConfigurationDetailView.
   const { data: blueprint, isLoading: isLoadingBlueprint } = useAgentConfigById(
     { blueprintId: latestBlueprintId ?? "" },
   );
 
-  const isLoading = isLoadingHistory || isLoadingBlueprint;
-
-  const promptValues = useMemo(
+  const allPromptValues = useMemo(
     () =>
       blueprint?.values?.filter((v) => v.type === BlueprintValueType.PROMPT) ??
       [],
     [blueprint],
   );
+
+  const { values: promptValues, isResolving } = useFilteredPromptValues(
+    allPromptValues,
+    filterByTemplateStructure,
+  );
+
+  const isLoading = isLoadingHistory || isLoadingBlueprint || isResolving;
 
   const options = useMemo(
     () => promptValues.map((v) => ({ label: v.key, value: v.key })),
