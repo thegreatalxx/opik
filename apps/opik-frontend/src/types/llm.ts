@@ -29,6 +29,12 @@ export type MessageContent =
   | string
   | Array<TextPart | ImagePart | VideoPart | AudioPart>;
 
+export interface MessageBlueprintRef {
+  blueprintId: string;
+  key: string;
+  commitId: string;
+}
+
 export interface LLMMessage {
   id: string;
   content: MessageContent;
@@ -36,6 +42,7 @@ export interface LLMMessage {
   promptId?: string;
   promptVersionId?: string;
   autoImprove?: boolean;
+  blueprintRef?: MessageBlueprintRef;
 }
 
 export type ProviderMessageType = Omit<LLMMessage, "id"> & {
