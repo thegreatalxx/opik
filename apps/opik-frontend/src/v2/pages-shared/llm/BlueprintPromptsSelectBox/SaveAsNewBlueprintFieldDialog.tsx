@@ -11,8 +11,7 @@ import {
 import { Button } from "@/ui/button";
 import { Input } from "@/ui/input";
 import { Label } from "@/ui/label";
-
-const FIELD_NAME_PATTERN = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
+import { BLUEPRINT_FIELD_NAME_PATTERN } from "@/v2/pages-shared/agent-configuration/blueprintFieldValidation";
 
 interface SaveAsNewBlueprintFieldDialogProps {
   open: boolean;
@@ -24,7 +23,7 @@ interface SaveAsNewBlueprintFieldDialogProps {
 
 const validate = (value: string, existing: Set<string>): string | null => {
   if (!value) return "Field name is required";
-  if (!FIELD_NAME_PATTERN.test(value))
+  if (!BLUEPRINT_FIELD_NAME_PATTERN.test(value))
     return "Use letters, digits and underscore; start with a letter or underscore";
   if (existing.has(value)) return "A field with this name already exists";
   return null;

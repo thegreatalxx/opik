@@ -16,9 +16,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/ui/select";
-import { validateBlueprintFieldValue } from "./blueprintFieldValidation";
-
-const FIELD_NAME_PATTERN = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
+import {
+  BLUEPRINT_FIELD_NAME_PATTERN,
+  validateBlueprintFieldValue,
+} from "./blueprintFieldValidation";
 
 const TYPE_OPTIONS: { value: BlueprintValueType; label: string }[] = [
   { value: BlueprintValueType.STRING, label: "String" },
@@ -80,7 +81,7 @@ const NewBlueprintFieldEditor: React.FC<NewBlueprintFieldEditorProps> = ({
   const trimmedKey = field.key.trim();
   const keyError = useMemo(() => {
     if (!trimmedKey) return null;
-    if (!FIELD_NAME_PATTERN.test(trimmedKey))
+    if (!BLUEPRINT_FIELD_NAME_PATTERN.test(trimmedKey))
       return "Use letters, digits and underscore; start with a letter or underscore";
     if (reservedKeys.has(trimmedKey))
       return "A field with this name already exists";
