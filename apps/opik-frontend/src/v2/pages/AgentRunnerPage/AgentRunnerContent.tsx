@@ -18,6 +18,7 @@ import {
 } from "@/types/agent-sandbox";
 import useTraceById from "@/api/traces/useTraceById";
 import usePairingState from "@/hooks/usePairingState";
+import { usePermissions } from "@/contexts/PermissionsContext";
 import TraceDetailsPanel from "@/v2/pages-shared/traces/TraceDetailsPanel/TraceDetailsPanel";
 import AgentRunnerEmptyState from "./AgentRunnerEmptyState";
 import AgentRunnerConnectedState from "./AgentRunnerConnectedState";
@@ -44,6 +45,7 @@ const AgentRunnerContent: React.FC<AgentRunnerContentProps> = ({
   const agentName = pairing.runner?.agents?.[0]?.name ?? "";
   const isReady = isConnected && Boolean(agentName);
 
+  const { canConfigureWorkspaceSettings } = usePermissions();
   const createJobMutation = useSandboxCreateJobMutation();
   const disconnectMutation = useDisconnectRunnerMutation();
 
@@ -182,21 +184,23 @@ const AgentRunnerContent: React.FC<AgentRunnerContentProps> = ({
                 <RotateCcw className="mr-1 size-3.5" />
                 Reset
               </Button>
-              <TooltipWrapper content="Disconnect agent">
-                <Button
-                  variant="outline"
-                  size="2xs"
-                  disabled={disconnectMutation.isPending}
-                  onClick={() => {
-                    if (pairing.runnerId) {
-                      disconnectMutation.mutate(pairing.runnerId);
-                    }
-                  }}
-                >
-                  <Unplug className="mr-1 size-3.5" />
-                  Disconnect
-                </Button>
-              </TooltipWrapper>
+              {canConfigureWorkspaceSettings && (
+                <TooltipWrapper content="Disconnect agent">
+                  <Button
+                    variant="outline"
+                    size="2xs"
+                    disabled={disconnectMutation.isPending}
+                    onClick={() => {
+                      if (pairing.runnerId) {
+                        disconnectMutation.mutate(pairing.runnerId);
+                      }
+                    }}
+                  >
+                    <Unplug className="mr-1 size-3.5" />
+                    Disconnect
+                  </Button>
+                </TooltipWrapper>
+              )}
             </>
           )}
         </div>

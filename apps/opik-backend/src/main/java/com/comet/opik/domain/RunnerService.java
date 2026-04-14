@@ -359,34 +359,15 @@ class RunnerServiceImpl implements RunnerService {
 
         RMap<String, String> runnerMap = redisClient.getMap(runnerKey(runnerId));
         Map<String, String> fields = runnerMap.readAllMap();
-        if (fields.isEmpty()) {
-            log.info("Runner '{}' map already empty, treating disconnect as no-op", runnerId);
-            return;
-        }
-
+        // fields may be empty if the runner hash was already cleared; cleanup must still run.
         String projectIdStr = fields.get(FIELD_PROJECT_ID);
         String typeStr = fields.get(FIELD_TYPE);
-        RunnerType type = typeStr != null ? RunnerType.fromValue(typeStr) : RunnerType.ENDPOINT;
 
-        redisClient.getBucket(runnerHeartbeatKey(runnerId)).delete();
-        runnerMap.put(FIELD_DISCONNECTED_AT, Instant.now().toString());
-
-        endpointJobService.get().failOrphanedJobs(runnerId);
-        connectBridgeService.get().failOrphanedBridgeCommands(runnerId);
-
-        if (projectIdStr != null) {
-            UUID projectId = UUID.fromString(projectIdStr);
-            RSet<String> projectRunners = redisClient.getSet(projectRunnersKey(workspaceId, projectId));
-            projectRunners.remove(runnerId.toString());
-
-            RBucket<String> userRunnerBucket = redisClient.getBucket(
-                    projectUserRunnerKey(workspaceId, projectId, userName, type));
-            if (runnerId.toString().equals(userRunnerBucket.get())) {
-                userRunnerBucket.delete();
-            }
+        if (!fields.isEmpty()) {
+            runnerMap.put(FIELD_DISCONNECTED_AT, Instant.now().toString());
         }
 
-        removeRunnerFromWorkspace(workspaceId, userName, runnerId);
+        cleanupOrphanedRunner(runnerId, workspaceId, userName, projectIdStr, typeStr);
         log.info("Disconnected runner '{}' in workspace '{}'", runnerId, workspaceId);
     }
 
@@ -400,23 +381,38 @@ class RunnerServiceImpl implements RunnerService {
 
         if (oldRunnerIdStr != null && !oldRunnerIdStr.equals(newRunnerId.toString())) {
             UUID oldRunnerId = UUID.fromString(oldRunnerIdStr);
-            redisClient.getBucket(runnerHeartbeatKey(oldRunnerId)).delete();
 
             RMap<String, String> oldRunnerMap = redisClient.getMap(runnerKey(oldRunnerId));
             if (oldRunnerMap.isExists()) {
                 oldRunnerMap.put(FIELD_DISCONNECTED_AT, Instant.now().toString());
             }
 
-            endpointJobService.get().failOrphanedJobs(oldRunnerId);
-            connectBridgeService.get().failOrphanedBridgeCommands(oldRunnerId);
-
-            RSet<String> projectRunners = redisClient.getSet(projectRunnersKey(workspaceId, projectId));
-            projectRunners.remove(oldRunnerIdStr);
-
-            removeRunnerFromWorkspace(workspaceId, userName, oldRunnerId);
-
+            cleanupOrphanedRunner(oldRunnerId, workspaceId, userName, projectId.toString(), type.getValue());
             log.info("Evicted runner '{}' in workspace '{}'", oldRunnerId, workspaceId);
         }
+    }
+
+    private void cleanupOrphanedRunner(UUID runnerId, String workspaceId, String userName,
+            String projectIdStr, String typeStr) {
+        redisClient.getBucket(runnerHeartbeatKey(runnerId)).delete();
+
+        endpointJobService.get().failOrphanedJobs(runnerId);
+        connectBridgeService.get().failOrphanedBridgeCommands(runnerId);
+
+        if (projectIdStr != null) {
+            UUID projectId = UUID.fromString(projectIdStr);
+            RunnerType type = typeStr != null ? RunnerType.fromValue(typeStr) : RunnerType.ENDPOINT;
+            RSet<String> projectRunners = redisClient.getSet(projectRunnersKey(workspaceId, projectId));
+            projectRunners.remove(runnerId.toString());
+
+            RBucket<String> userRunnerBucket = redisClient.getBucket(
+                    projectUserRunnerKey(workspaceId, projectId, userName, type));
+            if (runnerId.toString().equals(userRunnerBucket.get())) {
+                userRunnerBucket.delete();
+            }
+        }
+
+        removeRunnerFromWorkspace(workspaceId, userName, runnerId);
     }
 
     private void setUserRunner(String workspaceId, UUID projectId, String userName, UUID runnerId, RunnerType type) {

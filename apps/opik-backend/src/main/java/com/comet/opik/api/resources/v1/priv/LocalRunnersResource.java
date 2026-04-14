@@ -112,8 +112,7 @@ public class LocalRunnersResource {
     @DELETE
     @Path("/{runnerId}")
     @Operation(operationId = "disconnectRunner", summary = "Disconnect local runner", description = "Disconnect a local runner, terminating its connection and failing any pending jobs", responses = {
-            @ApiResponse(responseCode = "204", description = "No content"),
-            @ApiResponse(responseCode = "404", description = "Not found", content = @Content(schema = @Schema(implementation = ErrorMessage.class)))})
+            @ApiResponse(responseCode = "204", description = "No content")})
     public Response disconnectRunner(@PathParam("runnerId") UUID runnerId) {
         ensureEnabled();
         runnerService.disconnectRunner(runnerId);
