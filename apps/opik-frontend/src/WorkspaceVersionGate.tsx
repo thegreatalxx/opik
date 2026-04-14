@@ -28,6 +28,7 @@ import useAppStore, { useWorkspaceVersion } from "@/store/AppStore";
 import { fetchWorkspaceVersion } from "@/api/workspaces/useWorkspaceVersion";
 import {
   DEFAULT_WORKSPACE_VERSION,
+  getForcedVersionFromPath,
   getVersionOverride,
   getWorkspaceNameFromPath,
 } from "@/lib/workspaceVersion";
@@ -46,6 +47,12 @@ const WorkspaceVersionGate = () => {
       const override = getVersionOverride();
       if (override) {
         useAppStore.getState().setWorkspaceVersion(override);
+        return;
+      }
+
+      const forced = getForcedVersionFromPath();
+      if (forced) {
+        useAppStore.getState().setWorkspaceVersion(forced);
         return;
       }
 
