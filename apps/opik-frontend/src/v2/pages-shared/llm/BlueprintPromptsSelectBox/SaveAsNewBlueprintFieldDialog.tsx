@@ -11,6 +11,7 @@ import {
 import { Button } from "@/ui/button";
 import { Input } from "@/ui/input";
 import { Label } from "@/ui/label";
+import { Textarea } from "@/ui/textarea";
 import { BLUEPRINT_FIELD_NAME_PATTERN } from "@/v2/pages-shared/agent-configuration/blueprintFieldValidation";
 
 interface SaveAsNewBlueprintFieldDialogProps {
@@ -18,7 +19,7 @@ interface SaveAsNewBlueprintFieldDialogProps {
   onOpenChange: (open: boolean) => void;
   existingFieldNames: string[];
   isSaving: boolean;
-  onSave: (fieldName: string) => void;
+  onSave: (fieldName: string, changeDescription: string) => void;
 }
 
 const validate = (value: string, existing: Set<string>): string | null => {
@@ -33,6 +34,7 @@ const SaveAsNewBlueprintFieldDialog: React.FC<
   SaveAsNewBlueprintFieldDialogProps
 > = ({ open, onOpenChange, existingFieldNames, isSaving, onSave }) => {
   const [fieldName, setFieldName] = useState("");
+  const [changeDescription, setChangeDescription] = useState("");
   const existing = useMemo(
     () => new Set(existingFieldNames),
     [existingFieldNames],
@@ -43,7 +45,10 @@ const SaveAsNewBlueprintFieldDialog: React.FC<
   const canSave = !!trimmed && !error;
 
   const handleClose = (next: boolean) => {
-    if (!next) setFieldName("");
+    if (!next) {
+      setFieldName("");
+      setChangeDescription("");
+    }
     onOpenChange(next);
   };
 
@@ -69,6 +74,18 @@ const SaveAsNewBlueprintFieldDialog: React.FC<
           />
           {error && <p className="comet-body-xs text-destructive">{error}</p>}
         </div>
+        <div className="flex flex-col gap-2 pb-4">
+          <Label htmlFor="changeDescription">
+            Change description (optional)
+          </Label>
+          <Textarea
+            id="changeDescription"
+            value={changeDescription}
+            onChange={(e) => setChangeDescription(e.target.value)}
+            placeholder="What changed in this version?"
+            className="min-h-20"
+          />
+        </div>
         <DialogFooter>
           <DialogClose asChild>
             <Button variant="outline" disabled={isSaving}>
@@ -76,7 +93,7 @@ const SaveAsNewBlueprintFieldDialog: React.FC<
             </Button>
           </DialogClose>
           <Button
-            onClick={() => onSave(trimmed)}
+            onClick={() => onSave(trimmed, changeDescription.trim())}
             disabled={!canSave || isSaving}
           >
             Save to configuration

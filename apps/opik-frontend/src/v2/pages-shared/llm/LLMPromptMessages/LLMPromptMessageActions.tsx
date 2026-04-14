@@ -227,11 +227,12 @@ const LLMPromptMessageActions: React.FC<LLMPromptLibraryActionsProps> = ({
   );
 
   const handleSaveNewField = useCallback(
-    async (fieldName: string) => {
+    async (fieldName: string, changeDescription: string) => {
       const newRef = await saveAsNewField({
         fieldName,
         template: getTextFromMessageContent(content),
         templateStructure: PROMPT_TEMPLATE_STRUCTURE.TEXT,
+        changeDescription: changeDescription || undefined,
       });
       if (newRef) {
         onChangeMessage({ blueprintRef: newRef });

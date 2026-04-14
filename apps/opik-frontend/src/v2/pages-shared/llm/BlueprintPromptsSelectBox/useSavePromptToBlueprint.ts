@@ -32,6 +32,7 @@ interface SaveAsNewFieldArgs {
   fieldName: string;
   template: string;
   templateStructure?: PROMPT_TEMPLATE_STRUCTURE;
+  changeDescription?: string;
 }
 
 interface SaveExistingResult {
@@ -130,7 +131,11 @@ const useSavePromptToBlueprint = (projectId: string) => {
         const { id } = await writeBlueprint({
           agentConfig: {
             project_id: projectId,
-            blueprint: { type: BlueprintType.BLUEPRINT, values },
+            blueprint: {
+              type: BlueprintType.BLUEPRINT,
+              values,
+              ...(changeDescription && { description: changeDescription }),
+            },
           },
         });
         if (!id) return null;
@@ -161,6 +166,7 @@ const useSavePromptToBlueprint = (projectId: string) => {
       fieldName,
       template,
       templateStructure = PROMPT_TEMPLATE_STRUCTURE.CHAT,
+      changeDescription,
     }: SaveAsNewFieldArgs): Promise<BlueprintPromptRef | null> => {
       let createdPrompt: PromptWithLatestVersion;
       try {
@@ -190,7 +196,11 @@ const useSavePromptToBlueprint = (projectId: string) => {
         const { id } = await writeBlueprint({
           agentConfig: {
             project_id: projectId,
-            blueprint: { type: BlueprintType.BLUEPRINT, values },
+            blueprint: {
+              type: BlueprintType.BLUEPRINT,
+              values,
+              ...(changeDescription && { description: changeDescription }),
+            },
           },
         });
         if (!id) return null;
