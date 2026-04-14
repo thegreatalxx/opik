@@ -36,7 +36,7 @@ from .annotation_queue import rest_operations as annotation_queue_rest_operation
 from .attachment import Attachment
 from .attachment import client as attachment_client
 from .attachment import converters as attachment_converters
-from .dataset import evaluation_suite
+from .dataset import test_suite
 from .dataset import execution_policy as dataset_execution_policy
 from .dataset import rest_operations as dataset_rest_operations
 from .experiment import experiments_client
@@ -1178,7 +1178,7 @@ class Opik:
                 )
             raise
 
-    def create_evaluation_suite(
+    def create_test_suite(
         self,
         name: str,
         description: Optional[str] = None,
@@ -1186,16 +1186,16 @@ class Opik:
         execution_policy: Optional[dataset_execution_policy.ExecutionPolicy] = None,
         tags: Optional[List[str]] = None,
         project_name: Optional[str] = None,
-    ) -> evaluation_suite.EvaluationSuite:
+    ) -> test_suite.TestSuite:
         """
-        Create a new evaluation suite for regression testing.
+        Create a new test suite for regression testing.
 
-        Evaluation suites are pre-configured test suites that let you validate
+        Test suites are pre-configured test suites that let you validate
         that prompt changes, model updates, or code modifications don't break
         existing functionality.
 
         Args:
-            name: The name of the evaluation suite.
+            name: The name of the test suite.
             description: Optional description of what this suite tests.
             assertions: Suite-level assertions. Each string describes an
                 expected behavior that will be checked by an LLM.
@@ -1205,10 +1205,10 @@ class Opik:
             project_name: Optional name of the project to associate the suite with.
 
         Returns:
-            EvaluationSuite: The created evaluation suite object.
+            TestSuite: The created test suite object.
 
         Example:
-            >>> suite = client.create_evaluation_suite(
+            >>> suite = client.create_test_suite(
             ...     name="Refund Policy Tests",
             ...     description="Regression tests for refund scenarios",
             ...     project_name="custom-project",
@@ -1234,7 +1234,7 @@ class Opik:
         )
 
         project_name = self._resolve_project_name(project_name)
-        rest_operations.create_evaluation_suite_dataset(
+        rest_operations.create_test_suite_dataset(
             rest_client=self._rest_client,
             dataset_name=name,
             project_name=project_name,
@@ -1251,27 +1251,27 @@ class Opik:
             dataset_items_count=0,
         )
 
-        return evaluation_suite.EvaluationSuite(
+        return test_suite.TestSuite(
             name=name,
             dataset_=suite_dataset,
             client=self,
         )
 
-    def get_evaluation_suite(
+    def get_test_suite(
         self, name: str, project_name: Optional[str] = None
-    ) -> evaluation_suite.EvaluationSuite:
+    ) -> test_suite.TestSuite:
         """
-        Get an existing evaluation suite by name.
+        Get an existing test suite by name.
 
         Retrieves the dataset and its version-level assertions and execution
-        policy from the backend, returning a fully configured EvaluationSuite.
+        policy from the backend, returning a fully configured TestSuite.
 
         Args:
-            name: The name of the evaluation suite.
+            name: The name of the test suite.
             project_name: Optional name of the project the suite is associated with.
 
         Returns:
-            EvaluationSuite: The evaluation suite object.
+            TestSuite: The test suite object.
 
         Raises:
             ApiError: If no dataset with the given name exists (404).
@@ -1288,13 +1288,13 @@ class Opik:
             rest_client=self._rest_client,
         )
 
-        return evaluation_suite.EvaluationSuite(
+        return test_suite.TestSuite(
             name=name,
             dataset_=suite_dataset,
             client=self,
         )
 
-    def get_or_create_evaluation_suite(
+    def get_or_create_test_suite(
         self,
         name: str,
         description: Optional[str] = None,
@@ -1302,16 +1302,16 @@ class Opik:
         execution_policy: Optional[dataset_execution_policy.ExecutionPolicy] = None,
         tags: Optional[List[str]] = None,
         project_name: Optional[str] = None,
-    ) -> evaluation_suite.EvaluationSuite:
+    ) -> test_suite.TestSuite:
         """
-        Get an existing evaluation suite by name or create a new one if it does not exist.
+        Get an existing test suite by name or create a new one if it does not exist.
 
         If the suite already exists and ``assertions``, ``execution_policy``,
         or ``tags`` are provided, the suite is updated accordingly
         (unspecified parameters retain their current values).
 
         Args:
-            name: The name of the evaluation suite.
+            name: The name of the test suite.
             description: Optional description (used only when creating).
             assertions: Suite-level assertions. Each string describes an
                 expected behavior that will be checked by an LLM.
@@ -1320,7 +1320,7 @@ class Opik:
             project_name: Optional name of the project the suite is associated with.
 
         Returns:
-            EvaluationSuite: The evaluation suite object.
+            TestSuite: The test suite object.
         """
         from .dataset import validators
 
@@ -1328,10 +1328,10 @@ class Opik:
             validators.validate_execution_policy(execution_policy)
 
         try:
-            suite = self.get_evaluation_suite(name, project_name=project_name)
+            suite = self.get_test_suite(name, project_name=project_name)
         except ApiError as e:
             if e.status_code == 404:
-                return self.create_evaluation_suite(
+                return self.create_test_suite(
                     name=name,
                     description=description,
                     execution_policy=execution_policy,
@@ -1361,7 +1361,7 @@ class Opik:
         prompt: Optional[prompt_module.base_prompt.BasePrompt] = None,
         prompts: Optional[List[prompt_module.base_prompt.BasePrompt]] = None,
         type: Literal["regular", "trial", "mini-batch"] = "regular",
-        evaluation_method: Literal["dataset", "evaluation_suite"] = "dataset",
+        evaluation_method: Literal["dataset", "test_suite"] = "dataset",
         optimization_id: Optional[str] = None,
         tags: Optional[List[str]] = None,
         dataset_version_id: Optional[str] = None,

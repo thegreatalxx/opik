@@ -5,8 +5,8 @@ from .api_objects.annotation_queue import (
 )
 from .api_objects.attachment import Attachment
 from .api_objects.dataset import Dataset
-from .api_objects.dataset.evaluation_suite import EvaluationSuite
-from .api_objects.dataset.evaluation_suite.types import EvaluationSuiteResult
+from .api_objects.dataset.test_suite import TestSuite
+from .api_objects.dataset.test_suite.types import TestSuiteResult
 from .api_objects.experiment.experiment_item import (
     ExperimentItemContent,
     ExperimentItemReferences,
@@ -67,8 +67,8 @@ __all__ = [
     "Trace",
     "Span",
     "Dataset",
-    "EvaluationSuite",
-    "EvaluationSuiteResult",
+    "TestSuite",
+    "TestSuiteResult",
     "llm_unit",
     "configure",
     "Prompt",
