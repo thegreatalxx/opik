@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { Pause, Play, RotateCcw } from "lucide-react";
+import { Pause, Play, RotateCcw, Unplug } from "lucide-react";
 
 import { Button } from "@/ui/button";
 import { HotkeyDisplay } from "@/ui/hotkey-display";
@@ -11,6 +11,7 @@ import {
 } from "@/ui/resizable";
 import useSandboxCreateJobMutation from "@/api/agent-sandbox/useSandboxCreateJobMutation";
 import useSandboxJobStatus from "@/api/agent-sandbox/useSandboxJobStatus";
+import useDisconnectRunnerMutation from "@/api/agent-sandbox/useDisconnectRunnerMutation";
 import {
   RunnerConnectionStatus,
   SandboxJobStatus,
@@ -44,6 +45,7 @@ const AgentRunnerContent: React.FC<AgentRunnerContentProps> = ({
   const isReady = isConnected && Boolean(agentName);
 
   const createJobMutation = useSandboxCreateJobMutation();
+  const disconnectMutation = useDisconnectRunnerMutation();
 
   const { data: jobData } = useSandboxJobStatus({
     jobId: activeJobId ?? "",
@@ -180,6 +182,21 @@ const AgentRunnerContent: React.FC<AgentRunnerContentProps> = ({
                 <RotateCcw className="mr-1 size-3.5" />
                 Reset
               </Button>
+              <TooltipWrapper content="Disconnect agent">
+                <Button
+                  variant="outline"
+                  size="2xs"
+                  disabled={disconnectMutation.isPending}
+                  onClick={() => {
+                    if (pairing.runnerId) {
+                      disconnectMutation.mutate(pairing.runnerId);
+                    }
+                  }}
+                >
+                  <Unplug className="mr-1 size-3.5" />
+                  Disconnect
+                </Button>
+              </TooltipWrapper>
             </>
           )}
         </div>
