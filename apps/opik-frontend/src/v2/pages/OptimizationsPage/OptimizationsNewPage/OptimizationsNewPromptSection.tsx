@@ -37,6 +37,7 @@ type OptimizationsNewPromptSectionProps = {
   blueprintRef?: BlueprintPromptRef;
   blueprintFieldNames: string[];
   isSavingBlueprint: boolean;
+  hasUnsavedBlueprintChanges: boolean;
   onBlueprintRefChange: (ref: BlueprintPromptRef) => void;
   onBlueprintRefClear: () => void;
   onSaveBlueprintExisting: (changeDescription: string) => Promise<unknown>;
@@ -57,6 +58,7 @@ const OptimizationsNewPromptSection: React.FC<
   blueprintRef,
   blueprintFieldNames,
   isSavingBlueprint,
+  hasUnsavedBlueprintChanges,
   onBlueprintRefChange,
   onBlueprintRefClear,
   onSaveBlueprintExisting,
@@ -120,13 +122,14 @@ const OptimizationsNewPromptSection: React.FC<
 
       <div>
         <div className="mb-2 flex h-8 items-center justify-between">
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-0.5">
             <Label className="comet-body-s-accented">Prompt</Label>
             <BlueprintPromptsSelectBox
               projectId={projectId}
               value={blueprintRef}
               onValueChange={onBlueprintRefChange}
               onClear={onBlueprintRefClear}
+              hasUnsavedChanges={hasUnsavedBlueprintChanges}
             />
             {hasMessages && (
               <TooltipWrapper
