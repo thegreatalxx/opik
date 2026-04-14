@@ -29,6 +29,7 @@ const OptimizationsNewPageContent: React.FC = () => {
     blueprintRef,
     blueprintFieldNames,
     isSavingBlueprint,
+    hasUnsavedBlueprintChanges,
     handleBlueprintRefChange,
     handleBlueprintRefClear,
     handleSaveBlueprintExisting,
@@ -57,6 +58,7 @@ const OptimizationsNewPageContent: React.FC = () => {
           blueprintRef={blueprintRef}
           blueprintFieldNames={blueprintFieldNames}
           isSavingBlueprint={isSavingBlueprint}
+          hasUnsavedBlueprintChanges={hasUnsavedBlueprintChanges}
           onBlueprintRefChange={handleBlueprintRefChange}
           onBlueprintRefClear={handleBlueprintRefClear}
           onSaveBlueprintExisting={handleSaveBlueprintExisting}
