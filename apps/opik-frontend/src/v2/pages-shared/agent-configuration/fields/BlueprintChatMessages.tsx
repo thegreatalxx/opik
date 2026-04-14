@@ -257,7 +257,7 @@ const BlueprintChatMessages: React.FC<BlueprintChatMessagesProps> = ({
           className="w-fit"
         >
           <Plus className="mr-1 size-3" />
-          Add message
+          Message
         </Button>
       )}
     </div>
