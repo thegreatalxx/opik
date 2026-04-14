@@ -34,22 +34,37 @@ You can create new versions through the SDK or the Opik UI. See the [Getting sta
 
 Environments are labels you assign to a specific version to control which configuration your agent fetches at runtime. You can manage environment labels through the Opik UI without touching code.
 
-Supported environment values:
-- **`prod`**: The production version of the configuration (default)
-- **`latest`**: The most recently created version
+Supported environment labels:
+- **`prod`**: The production version of the configuration (default when no `env` or `version` is specified)
 - **Custom labels**: Any label you create in the Opik UI (e.g., `staging`, `canary`)
-- **Specific version**: A pinned version like `v3`
 
 This means you can update your agent's behavior in production by simply moving the `prod` label to a new version in the UI — no redeployment required.
 
+### Fetching by version
+
+Instead of using environment labels, you can also fetch a specific version directly using the `version` parameter:
+
+- **`latest`**: The most recently created version
+- **`v3`** (or any version name): A specific pinned version
+
+<Note>
+  You can specify `env` **or** `version`, but not both. If neither is specified, the SDK defaults to `env="prod"`.
+</Note>
+
 ## Fallback configuration
 
-Every call to `get_or_create_config` / `getOrCreateConfig` requires a `fallback` value. This is the configuration your agent uses when:
+When calling `get_or_create_config` / `getOrCreateConfig`, you can provide a `fallback` value. This is the configuration your agent uses when:
 
 - **Cold start**: The first time your agent runs and no cached value exists yet
 - **Opik unreachable**: If Opik can't be reached and there is no cached value to serve
 
 The SDK caches fetched configurations in memory (default TTL: 5 minutes) and refreshes them in the background, so the fallback is rarely needed in practice. See [Guaranteed availability](/prompt_engineering/advanced/guaranteed-availability) for details.
+
+<Tip>
+  You can check whether the returned configuration is a fallback by inspecting the `is_fallback` property (Python) or `isFallback` property (TypeScript). This is useful for logging or alerting when your agent is running on fallback values.
+</Tip>
+
+If no `fallback` is provided and the backend is unreachable or no configuration exists, the SDK raises a `ConfigNotFound` error.
 
 ## Configuration types
 

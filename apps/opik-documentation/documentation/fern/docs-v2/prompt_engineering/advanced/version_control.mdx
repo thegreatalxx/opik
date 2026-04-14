@@ -91,38 +91,68 @@ After creating a version, you can assign an environment label to control which v
     {/* TODO: Add screenshot of environment label assignment */}
   </Tab>
   <Tab title="Python SDK">
+    Use `set_config_env` to assign an environment label to a specific version:
+
     ```python
-    cfg = client.get_or_create_config(
-      fallback=MyAgentsConfiguration(
-        model="gpt-4o-mini",
-        temperature=0.75,
-        system_prompt=opik.Prompt(name="system_prompt", prompt="You are an AI assistant.")
-      ),
-      project_name="my-agent-name",
+    import opik
+
+    client = opik.Opik()
+
+    # Promote version v2 to production
+    client.set_config_env(
+      version="v2",
       env="prod",
+      project_name="my-agent-name",
+    )
+
+    # Tag version v3 for staging
+    client.set_config_env(
+      version="v3",
+      env="staging",
+      project_name="my-agent-name",
     )
     ```
 
-    The `env` parameter controls which version is fetched:
-    - `prod`: The version labeled as production (default)
-    - `latest`: The most recently created version
-    - Custom labels: Any label you create in the UI (e.g., `staging`, `canary`)
-    - Specific version: A pinned version like `v3`
+    Once a version is tagged, your agent fetches it by environment label:
+    ```python
+    cfg = client.get_or_create_config(
+      fallback=MyAgentsConfiguration(...),
+      project_name="my-agent-name",
+      env="staging",  # fetches v3
+    )
+    ```
   </Tab>
   <Tab title="TypeScript SDK">
+    Use `setConfigEnv` to assign an environment label to a specific version:
+
+    ```ts
+    import Opik from "opik";
+
+    const client = new Opik();
+
+    // Promote version v2 to production
+    await client.setConfigEnv({
+      version: "v2",
+      env: "prod",
+      projectName: "my-agent-name",
+    });
+
+    // Tag version v3 for staging
+    await client.setConfigEnv({
+      version: "v3",
+      env: "staging",
+      projectName: "my-agent-name",
+    });
+    ```
+
+    Once a version is tagged, your agent fetches it by environment label:
     ```ts
     const cfg = await client.getOrCreateConfig({
       fallback: { model: "gpt-4o-mini", temperature: 0.75, system_prompt: systemPrompt },
       projectName: "my-agent-name",
-      env: "prod",
+      env: "staging",  // fetches v3
     });
     ```
-
-    The `env` parameter controls which version is fetched:
-    - `prod`: The version labeled as production (default)
-    - `latest`: The most recently created version
-    - Custom labels: Any label you create in the UI (e.g., `staging`, `canary`)
-    - Specific version: A pinned version like `v3`
   </Tab>
 </Tabs>
 

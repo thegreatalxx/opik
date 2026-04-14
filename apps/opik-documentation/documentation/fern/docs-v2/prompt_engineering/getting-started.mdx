@@ -142,11 +142,11 @@ You can track the following items in Agent Configurations:
       ```
     </CodeBlocks>
 
-    <Tip>
-      When `get_or_create_config` or `getOrCreateConfig` is called inside a tracked function (e.g., a function
-      decorated with `@opik.track`), the configuration version is automatically linked to the trace. This
-      lets you see which configuration was used for each request directly in the Opik dashboard.
-    </Tip>
+    <Warning>
+      `get_or_create_config` / `getOrCreateConfig` **must** be called inside a tracked function (e.g., a function
+      decorated with `@opik.track` in Python or wrapped with `track` in TypeScript). This is required for the SDK
+      to resolve the project context and automatically link the configuration version to the trace.
+    </Warning>
   </Tab>
 </Tabs>
 
@@ -157,13 +157,19 @@ Opik platform and deploy this version to production without needing to trigger a
 
 {/* Add video of the agent configuration UI */}
 
-This is achieved through the `env` tag that you can update through the UI and allows you to control which
-version of the configuration is used. By default the SDK will fetch the `prod` version but this can be
-controlled with the `env` parameter in the SDK which supports:
-* `prod`: Production version of the prompt
-* `latest`: The most recent version of the prompt
-* `<custom_label>`: Custom label created in the Opik UI
-* `<v3>`: Specific version
+This is achieved through environment labels and version pinning. By default the SDK will fetch the version
+tagged with `prod`, but you can control which version is fetched using two separate parameters:
+
+* **`env`** — Fetch by environment label:
+  * `"prod"` (default): The version labeled as production
+  * `"staging"`, `"canary"`, or any custom label created in the Opik UI
+* **`version`** — Fetch by version identifier:
+  * `"latest"`: The most recently created version
+  * `"v3"` (or any version name): A specific pinned version
+
+<Note>
+  You can specify `env` **or** `version`, but not both. If neither is specified, the SDK defaults to `env="prod"`.
+</Note>
 
 Your code becomes:
 
@@ -185,7 +191,7 @@ Your code becomes:
       system_prompt=opik.Prompt(name="system_prompt", prompt="You are an AI assistant.")
     ),
     project_name="my-agent-name",
-    env="latest",
+    version="latest",
   )
 
   print(cfg.model)
@@ -206,7 +212,7 @@ Your code becomes:
   const cfg = await client.getOrCreateConfig({
     fallback: { model: "gpt-4o-mini", temperature: 0.75, system_prompt: systemPrompt },
     projectName: "my-agent-name",
-    env: "latest",
+    version: "latest",
   });
 
   console.log(cfg.model);
@@ -280,10 +286,13 @@ Use strings to version model names, tool definitions, or any other text paramete
   ```
 
   ```ts title="Typescript"
-  const MyAgentsConfiguration = z.object({
-    model: z.string().describe("LLM model to use"), // e.g. "gpt-4o-mini"
-    tool_definition: z.string().describe("JSON schema for the search tool"),
-  });
+  await client.createConfig(
+    {
+      model: "gpt-4o-mini",           // string field
+      tool_definition: "{}",           // string field
+    },
+    { projectName: "my-agent-name" }
+  );
   ```
 </CodeBlocks>
 
@@ -299,9 +308,12 @@ Use floats to version numeric parameters like LLM sampling settings or RAG retri
   ```
 
   ```ts title="Typescript"
-  const MyAgentsConfiguration = z.object({
-    temperature: z.number().describe("Sampling temperature"), // e.g. 0.75
-    similarity_threshold: z.number().describe("Minimum similarity score for RAG retrieval"),
-  });
+  await client.createConfig(
+    {
+      temperature: 0.75,               // float field
+      similarity_threshold: 0.8,       // float field
+    },
+    { projectName: "my-agent-name" }
+  );
   ```
 </CodeBlocks>

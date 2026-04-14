@@ -38,8 +38,8 @@ When building production agents, the parameters that matter most — prompts, te
 
 At a high level, Agent Configuration works in two steps:
 
-1. **Define a schema** — Use the SDK to declare the shape of your configuration (which fields, what types) and push the first version.
-2. **Fetch at runtime** — Your agent calls `get_or_create_config` (Python) or `getOrCreateConfig` (TypeScript) with an environment label. Opik returns the configuration version assigned to that label, or the provided fallback if none exists.
+1. **Define your configuration** — Use the SDK to declare a `Config` subclass (Python) or a plain object (TypeScript) with your fields and default values, then push the first version with `create_config` / `createConfig`.
+2. **Fetch at runtime** — Your agent calls `get_or_create_config` (Python) or `getOrCreateConfig` (TypeScript) with an `env` label or a specific `version`. Opik returns the matching configuration, or the provided fallback if the backend is unreachable.
 
 When you want to update your agent's behavior, create a new version in the Opik UI or SDK and move the `prod` label to it. Your running agent picks up the change on its next fetch — no redeployment needed.
 
