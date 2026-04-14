@@ -1,5 +1,4 @@
 import React, { useCallback, useRef, useState } from "react";
-import { z } from "zod";
 
 import {
   BlueprintCreate,
@@ -16,33 +15,15 @@ import {
   PromptWithLatestVersion,
 } from "@/types/prompts";
 import { NewFieldDraft } from "./NewBlueprintFieldEditor";
+import { validateBlueprintFieldValue } from "./blueprintFieldValidation";
 
 import type useAgentConfigById from "@/api/agent-configs/useAgentConfigById";
 
 type AgentConfig = NonNullable<ReturnType<typeof useAgentConfigById>["data"]>;
 
-const nonEmptyString = z.string().min(1, "Must not be empty");
-
-const FIELD_SCHEMAS: Partial<Record<BlueprintValueType, z.ZodType>> = {
-  [BlueprintValueType.INT]: nonEmptyString.pipe(
-    z.coerce.number().int("Must be an integer"),
-  ),
-  [BlueprintValueType.FLOAT]: nonEmptyString.pipe(
-    z.coerce.number({ message: "Must be a valid number" }),
-  ),
-  [BlueprintValueType.STRING]: nonEmptyString,
-};
-
 export type AgentConfigPayload = {
   project_id: string;
   blueprint: BlueprintCreate;
-};
-
-const validateField = (type: string, value: string): string => {
-  const schema = FIELD_SCHEMAS[type as BlueprintValueType];
-  if (!schema) return "";
-  const result = schema.safeParse(value.trim());
-  return result.success ? "" : result.error.issues[0].message;
 };
 
 type UseAgentConfigurationSaveParams = {
@@ -93,7 +74,7 @@ const validateNewField = (
     return "";
   }
   if (field.type !== BlueprintValueType.BOOLEAN) {
-    const err = validateField(field.type, field.value);
+    const err = validateBlueprintFieldValue(field.type, field.value);
     if (err) return err;
   }
   return "";
@@ -163,7 +144,10 @@ export const useAgentConfigurationSave = ({
             v.type !== BlueprintValueType.BOOLEAN,
         )
         .forEach((v) => {
-          const err = validateField(v.type, draftValues[v.key] ?? "");
+          const err = validateBlueprintFieldValue(
+            v.type,
+            draftValues[v.key] ?? "",
+          );
           if (err) newErrors[v.key] = err;
         });
 
