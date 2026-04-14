@@ -53,6 +53,7 @@ export type AgentConfigurationEditViewState = {
   isDirty: boolean;
   isSaving: boolean;
   hasErrors: boolean;
+  isEmpty: boolean;
   collapsibleKeys: string[];
   hasExpandableFields: boolean;
 };
@@ -247,6 +248,13 @@ const AgentConfigurationEditView = React.forwardRef<
     const hasErrors = Object.values(errors).some(Boolean);
     const isDirty = hasChanges();
 
+    const isEmpty = useMemo(() => {
+      const keptCount =
+        (agentConfig?.values ?? []).filter((v) => !removedKeys.has(v.key))
+          .length + newFields.length;
+      return keptCount === 0;
+    }, [agentConfig, removedKeys, newFields]);
+
     const hasExpandableFields = useMemo(
       () => hasAnyExpandableField(agentConfig?.values ?? []),
       [agentConfig],
@@ -257,6 +265,7 @@ const AgentConfigurationEditView = React.forwardRef<
         isDirty,
         isSaving,
         hasErrors,
+        isEmpty,
         collapsibleKeys,
         hasExpandableFields,
       });
@@ -264,6 +273,7 @@ const AgentConfigurationEditView = React.forwardRef<
       isDirty,
       isSaving,
       hasErrors,
+      isEmpty,
       collapsibleKeys,
       hasExpandableFields,
       onStateChange,

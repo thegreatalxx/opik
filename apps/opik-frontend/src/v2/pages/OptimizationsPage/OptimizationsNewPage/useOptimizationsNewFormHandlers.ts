@@ -91,7 +91,6 @@ export const useOptimizationsNewFormHandlers = () => {
     if (!commitPromptData || !blueprintRef) return;
     const commitId = blueprintRef.commitId;
     if (loadedCommitRef.current === commitId) return;
-    loadedCommitRef.current = commitId;
 
     const template = commitPromptData.requested_version?.template;
     if (!template) return;
@@ -108,6 +107,7 @@ export const useOptimizationsNewFormHandlers = () => {
         }),
       );
       form.setValue("messages", messages, { shouldValidate: true });
+      loadedCommitRef.current = commitId;
     } catch {
       // ignore parse failures
     }

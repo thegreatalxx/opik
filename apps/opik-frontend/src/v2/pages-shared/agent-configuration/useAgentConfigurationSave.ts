@@ -55,6 +55,9 @@ const validateNewField = (
   if (existingKeys.has(key)) return "A field with this name already exists";
   if (siblingKeys.has(key)) return "Duplicate field name in the new fields";
   if (field.type === BlueprintValueType.PROMPT) {
+    if (field.promptStructure === PROMPT_TEMPLATE_STRUCTURE.TEXT) {
+      return field.value.trim() ? "" : "Prompt must not be empty";
+    }
     if (field.messages.length === 0) return "Add at least one message";
     if (field.messages.every(isMessageEmpty))
       return "Messages must not be empty";
@@ -188,7 +191,7 @@ export const useAgentConfigurationSave = ({
     [],
   );
 
-  // Materialize new PROMPT fields by creating brand-new chat prompts in the
+  // Materialize new PROMPT fields by creating brand-new prompts in the
   // library. Scalar fields pass through with their entered value. Returns
   // null if any prompt creation fails.
   const materializeNewFields = useCallback(
@@ -200,12 +203,19 @@ export const useAgentConfigurationSave = ({
           out.push({ key, type: field.type, value: field.value });
           continue;
         }
+        const isTextPrompt =
+          field.promptStructure === PROMPT_TEMPLATE_STRUCTURE.TEXT;
+        const template = isTextPrompt
+          ? field.value
+          : buildChatTemplateFromMessages(field.messages);
         try {
           const created = (await createPrompt({
             prompt: {
               name: key,
-              template: buildChatTemplateFromMessages(field.messages),
-              template_structure: PROMPT_TEMPLATE_STRUCTURE.CHAT,
+              template,
+              template_structure: isTextPrompt
+                ? PROMPT_TEMPLATE_STRUCTURE.TEXT
+                : PROMPT_TEMPLATE_STRUCTURE.CHAT,
               project_id: projectId,
             },
             withResponse: true,
