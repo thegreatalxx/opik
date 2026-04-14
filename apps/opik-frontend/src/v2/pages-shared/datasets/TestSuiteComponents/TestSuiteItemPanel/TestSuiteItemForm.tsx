@@ -32,7 +32,6 @@ interface TestSuiteItemFormProps {
   suiteAssertions: string[];
   suitePolicy: ExecutionPolicy;
   onOpenSettings: () => void;
-  showEvaluationCriteria?: boolean;
 }
 
 const DescriptionSection: React.FC = () => {
@@ -264,22 +263,17 @@ const TestSuiteItemForm: React.FC<TestSuiteItemFormProps> = ({
   suiteAssertions,
   suitePolicy,
   onOpenSettings,
-  showEvaluationCriteria = true,
 }) => {
   return (
     <div className="flex flex-col gap-6 p-6 pt-4">
       <DescriptionSection />
       <DataSection />
-      {showEvaluationCriteria && (
-        <>
-          <Separator />
-          <EvaluationCriteriaSection
-            suiteAssertions={suiteAssertions}
-            suitePolicy={suitePolicy}
-            onOpenSettings={onOpenSettings}
-          />
-        </>
-      )}
+      <Separator />
+      <EvaluationCriteriaSection
+        suiteAssertions={suiteAssertions}
+        suitePolicy={suitePolicy}
+        onOpenSettings={onOpenSettings}
+      />
     </div>
   );
 };
