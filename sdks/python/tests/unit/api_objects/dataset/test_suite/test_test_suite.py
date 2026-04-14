@@ -29,6 +29,7 @@ def _create_mock_dataset():
     )
     mock_dataset.__internal_api__insert_items_as_dataclasses__ = mock.MagicMock()
     mock_dataset.project_name = "test-project"
+    mock_dataset.client = None
     return mock_dataset
 
 
@@ -53,8 +54,8 @@ class TestEvaluatorValidation:
         # Should not raise
         validators.validate_evaluators([llm_judge], "suite-level evaluators")
 
-    def test_init__stores_dataset_reference(self):
-        """Test that suite stores the dataset reference."""
+    def test_init__stores_name(self):
+        """Test that suite stores the name."""
         mock_dataset = _create_mock_dataset()
 
         suite = test_suite.TestSuite(
@@ -62,10 +63,9 @@ class TestEvaluatorValidation:
             dataset_=mock_dataset,
         )
 
-        assert suite.dataset is mock_dataset
         assert suite.name == "test_suite"
 
-    def test_add_item__with_non_llm_judge_evaluator__raises_type_error(self):
+    def test_resolve_evaluators__with_non_llm_judge_evaluator__raises_type_error(self):
         """Test that non-LLMJudge evaluators raise TypeError via resolve_evaluators."""
         equals_metric = metrics.Equals()
 
@@ -78,8 +78,8 @@ class TestEvaluatorValidation:
 
         assert "Test suites only support LLMJudge evaluators" in str(exc_info.value)
 
-    def test_add_item__with_assertions__succeeds(self):
-        """Test that assertions shorthand is accepted in add_item."""
+    def test_insert__with_assertions__succeeds(self):
+        """Test that assertions shorthand is accepted in insert."""
         mock_dataset = _create_mock_dataset()
         suite = test_suite.TestSuite(
             name="test_suite",
@@ -87,12 +87,13 @@ class TestEvaluatorValidation:
         )
 
         # Should not raise
-        suite.add_item(
-            data={"input": "test"},
-            assertions=["Response is polite"],
+        suite.insert(
+            [
+                {"data": {"input": "test"}, "assertions": ["Response is polite"]},
+            ]
         )
 
-    def test_add_item__with_no_evaluators__succeeds(self):
+    def test_insert__with_no_evaluators__succeeds(self):
         """Test that items can be added without evaluators."""
         mock_dataset = _create_mock_dataset()
         suite = test_suite.TestSuite(
@@ -101,7 +102,7 @@ class TestEvaluatorValidation:
         )
 
         # Should not raise
-        suite.add_item(data={"input": "test"})
+        suite.insert([{"data": {"input": "test"}}])
 
     def test_validate_evaluators__with_mixed_evaluators__raises_type_error(self):
         """Test that mixing LLMJudge with other evaluators raises TypeError."""
@@ -115,7 +116,7 @@ class TestEvaluatorValidation:
 
         assert "Test suites only support LLMJudge evaluators" in str(exc_info.value)
 
-    def test_add_item__with_assertions_shorthand__creates_evaluator_items(self):
+    def test_insert__with_assertions_shorthand__creates_evaluator_items(self):
         """Test that assertions shorthand builds LLMJudge and creates evaluator items."""
         mock_dataset = _create_mock_dataset()
         suite = test_suite.TestSuite(
@@ -123,9 +124,13 @@ class TestEvaluatorValidation:
             dataset_=mock_dataset,
         )
 
-        suite.add_item(
-            data={"input": "test"},
-            assertions=["Response is polite", "Response is helpful"],
+        suite.insert(
+            [
+                {
+                    "data": {"input": "test"},
+                    "assertions": ["Response is polite", "Response is helpful"],
+                },
+            ]
         )
 
         mock_dataset.__internal_api__insert_items_as_dataclasses__.assert_called_once()
@@ -682,7 +687,7 @@ class TestInternalRunOptimizationSuite:
         fake_result = mock.MagicMock(spec=suite_types.TestSuiteResult)
 
         with mock.patch(
-            "opik.evaluation.evaluator.evaluate_test_suite",
+            "opik.evaluation.evaluator.__internal_api__run_test_suite__",
             return_value=fake_result,
         ) as mock_run:
             result = suite.__internal_api__run_optimization_suite__(
@@ -702,7 +707,7 @@ class TestInternalRunOptimizationSuite:
         assert call_kwargs["experiment_type"] == "mini-batch"
         assert call_kwargs["dataset_item_ids"] == ["item-1", "item-2"]
         assert call_kwargs["dataset_filter_string"] == 'input = "hello"'
-        assert call_kwargs["dataset"] is mock_dataset
+        assert call_kwargs["suite_dataset"] is mock_dataset
 
     def test_without_optimization_params__defaults_to_none(self):
         mock_dataset = _create_mock_dataset()
@@ -714,7 +719,7 @@ class TestInternalRunOptimizationSuite:
         fake_result = mock.MagicMock(spec=suite_types.TestSuiteResult)
 
         with mock.patch(
-            "opik.evaluation.evaluator.evaluate_test_suite",
+            "opik.evaluation.evaluator.__internal_api__run_test_suite__",
             return_value=fake_result,
         ) as mock_run:
             suite.__internal_api__run_optimization_suite__(
@@ -739,7 +744,7 @@ class TestInternalRunOptimizationSuite:
         fake_result = mock.MagicMock(spec=suite_types.TestSuiteResult)
 
         with mock.patch(
-            "opik.evaluation.evaluator.evaluate_test_suite",
+            "opik.evaluation.evaluator.__internal_api__run_test_suite__",
             return_value=fake_result,
         ) as mock_run:
             suite.__internal_api__run_optimization_suite__(
@@ -752,7 +757,9 @@ class TestInternalRunOptimizationSuite:
         call_kwargs = mock_run.call_args[1]
         assert call_kwargs["client"] is mock_client
 
-    def test_run_delegates_to_internal_api(self):
+    def test_run_tests_delegates_to_internal_api(self):
+        from opik.evaluation.evaluator import run_tests
+
         mock_dataset = _create_mock_dataset()
         suite = test_suite.TestSuite(
             name="test_suite",
@@ -762,10 +769,11 @@ class TestInternalRunOptimizationSuite:
         fake_result = mock.MagicMock(spec=suite_types.TestSuiteResult)
 
         with mock.patch(
-            "opik.evaluation.evaluator.evaluate_test_suite",
+            "opik.evaluation.evaluator.__internal_api__run_test_suite__",
             return_value=fake_result,
         ) as mock_run:
-            result = suite.run(
+            result = run_tests(
+                test_suite=suite,
                 task=lambda data: {"input": data, "output": "resp"},
                 experiment_name="run-exp",
                 verbose=0,
@@ -778,43 +786,95 @@ class TestInternalRunOptimizationSuite:
 class TestTestSuiteResultPassRate:
     """Unit tests for TestSuiteResult.pass_rate property."""
 
-    def test_pass_rate__all_items_pass__returns_1(self):
-        result = suite_types.TestSuiteResult(
-            items_passed=5,
-            items_total=5,
-            item_results={},
-            evaluation_result_=mock.MagicMock(),
+    @staticmethod
+    def _item_result(
+        item_id: str, passed: bool, has_assertions: bool
+    ) -> suite_types.ItemResult:
+        return suite_types.ItemResult(
+            dataset_item_id=item_id,
+            passed=passed,
+            has_assertions=has_assertions,
+            runs_passed=1 if passed else 0,
+            runs_total=1,
+            configured_runs_per_item=1,
+            pass_threshold=1,
+            test_results=[],
         )
 
+    def test_pass_rate__all_items_with_assertions_pass__returns_1(self):
+        item_results = {
+            "a": self._item_result("a", passed=True, has_assertions=True),
+            "b": self._item_result("b", passed=True, has_assertions=True),
+        }
+        result = suite_types.TestSuiteResult(
+            items_passed=2,
+            items_total=2,
+            item_results=item_results,
+            evaluation_result_=mock.MagicMock(),
+        )
         assert result.pass_rate == 1.0
 
-    def test_pass_rate__no_items_pass__returns_0(self):
+    def test_pass_rate__no_items_with_assertions_pass__returns_0(self):
+        item_results = {
+            "a": self._item_result("a", passed=False, has_assertions=True),
+            "b": self._item_result("b", passed=False, has_assertions=True),
+        }
         result = suite_types.TestSuiteResult(
             items_passed=0,
-            items_total=5,
-            item_results={},
+            items_total=2,
+            item_results=item_results,
             evaluation_result_=mock.MagicMock(),
         )
-
         assert result.pass_rate == 0.0
 
     def test_pass_rate__partial_pass__returns_ratio(self):
+        item_results = {
+            "a": self._item_result("a", passed=True, has_assertions=True),
+            "b": self._item_result("b", passed=False, has_assertions=True),
+            "c": self._item_result("c", passed=True, has_assertions=True),
+        }
         result = suite_types.TestSuiteResult(
-            items_passed=3,
-            items_total=10,
-            item_results={},
+            items_passed=2,
+            items_total=3,
+            item_results=item_results,
             evaluation_result_=mock.MagicMock(),
         )
+        assert result.pass_rate == pytest.approx(2 / 3)
 
-        assert result.pass_rate == 0.3
+    def test_pass_rate__items_without_assertions_excluded(self):
+        """Items without assertions should not affect pass_rate."""
+        item_results = {
+            "a": self._item_result("a", passed=True, has_assertions=True),
+            "b": self._item_result("b", passed=True, has_assertions=False),
+            "c": self._item_result("c", passed=False, has_assertions=True),
+        }
+        result = suite_types.TestSuiteResult(
+            items_passed=2,
+            items_total=3,
+            item_results=item_results,
+            evaluation_result_=mock.MagicMock(),
+        )
+        # Only 2 items have assertions: 1 passed, 1 failed -> 50%
+        assert result.pass_rate == 0.5
+
+    def test_pass_rate__no_items_have_assertions__returns_none(self):
+        item_results = {
+            "a": self._item_result("a", passed=True, has_assertions=False),
+            "b": self._item_result("b", passed=True, has_assertions=False),
+        }
+        result = suite_types.TestSuiteResult(
+            items_passed=2,
+            items_total=2,
+            item_results=item_results,
+            evaluation_result_=mock.MagicMock(),
+        )
+        assert result.pass_rate is None
 
     def test_pass_rate__zero_items__returns_none(self):
-        """Edge case: no items evaluated should return None."""
         result = suite_types.TestSuiteResult(
             items_passed=0,
             items_total=0,
             item_results={},
             evaluation_result_=mock.MagicMock(),
         )
-
         assert result.pass_rate is None

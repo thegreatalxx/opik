@@ -1042,6 +1042,7 @@ class Opik:
             dataset_fern=dataset_fern,
             project_name=project_name,
             rest_client=self._rest_client,
+            client=self,
         )
 
     def get_datasets(
@@ -1146,6 +1147,7 @@ class Opik:
             project_name=project_name,
             rest_client=self._rest_client,
             dataset_items_count=0,
+            client=self,
         )
 
         self._display_created_dataset_url(dataset_name=name, dataset_id=result.id)
@@ -1182,8 +1184,10 @@ class Opik:
         self,
         name: str,
         description: Optional[str] = None,
-        assertions: Optional[List[str]] = None,
-        execution_policy: Optional[dataset_execution_policy.ExecutionPolicy] = None,
+        global_assertions: Optional[List[str]] = None,
+        global_execution_policy: Optional[
+            dataset_execution_policy.ExecutionPolicy
+        ] = None,
         tags: Optional[List[str]] = None,
         project_name: Optional[str] = None,
     ) -> test_suite.TestSuite:
@@ -1197,9 +1201,10 @@ class Opik:
         Args:
             name: The name of the test suite.
             description: Optional description of what this suite tests.
-            assertions: Suite-level assertions. Each string describes an
-                expected behavior that will be checked by an LLM.
-            execution_policy: Suite-level execution policy.
+            global_assertions: Suite-level assertions applied to all items.
+                Each string describes an expected behavior that will be
+                checked by an LLM.
+            global_execution_policy: Suite-level execution policy.
                 Example: {"runs_per_item": 3, "pass_threshold": 2}
             tags: Optional list of tags for the suite.
             project_name: Optional name of the project to associate the suite with.
@@ -1212,25 +1217,25 @@ class Opik:
             ...     name="Refund Policy Tests",
             ...     description="Regression tests for refund scenarios",
             ...     project_name="custom-project",
-            ...     assertions=[
+            ...     global_assertions=[
             ...         "No hallucinated information",
             ...         "Response is helpful",
             ...     ],
             ... )
             >>>
-            >>> suite.add_item(
-            ...     data={"user_input": "How do I get a refund?", "user_tier": "premium"},
-            ... )
+            >>> suite.insert([
+            ...     {"data": {"user_input": "How do I get a refund?", "user_tier": "premium"}},
+            ... ])
             >>>
             >>> results = suite.run(task=my_llm_function)
         """
         from .dataset import validators, rest_operations
 
-        if execution_policy is not None:
-            validators.validate_execution_policy(execution_policy)
+        if global_execution_policy is not None:
+            validators.validate_execution_policy(global_execution_policy)
 
         evaluators = validators.resolve_evaluators(
-            assertions, None, "suite-level assertions"
+            global_assertions, None, "suite-level assertions"
         )
 
         project_name = self._resolve_project_name(project_name)
@@ -1240,7 +1245,7 @@ class Opik:
             project_name=project_name,
             description=description,
             evaluators=evaluators,
-            exec_policy=execution_policy,
+            exec_policy=global_execution_policy,
             tags=tags,
         )
         suite_dataset = dataset.Dataset(
@@ -1249,6 +1254,7 @@ class Opik:
             project_name=project_name,
             rest_client=self._rest_client,
             dataset_items_count=0,
+            client=self,
         )
 
         return test_suite.TestSuite(
@@ -1286,6 +1292,7 @@ class Opik:
             dataset_fern=dataset_fern,
             project_name=project_name,
             rest_client=self._rest_client,
+            client=self,
         )
 
         return test_suite.TestSuite(
@@ -1298,60 +1305,117 @@ class Opik:
         self,
         name: str,
         description: Optional[str] = None,
-        assertions: Optional[List[str]] = None,
-        execution_policy: Optional[dataset_execution_policy.ExecutionPolicy] = None,
+        global_assertions: Optional[List[str]] = None,
+        global_execution_policy: Optional[
+            dataset_execution_policy.ExecutionPolicy
+        ] = None,
         tags: Optional[List[str]] = None,
         project_name: Optional[str] = None,
     ) -> test_suite.TestSuite:
         """
         Get an existing test suite by name or create a new one if it does not exist.
 
-        If the suite already exists and ``assertions``, ``execution_policy``,
-        or ``tags`` are provided, the suite is updated accordingly
-        (unspecified parameters retain their current values).
+        If the suite already exists it is returned as-is — the
+        ``global_assertions``, ``global_execution_policy``, ``description``,
+        and ``tags`` parameters are only used when creating a new suite.
+        To modify an existing suite, use :meth:`TestSuite.update` instead.
 
         Args:
             name: The name of the test suite.
             description: Optional description (used only when creating).
-            assertions: Suite-level assertions. Each string describes an
-                expected behavior that will be checked by an LLM.
-            execution_policy: Execution policy for the suite.
-            tags: Optional list of tags for the suite.
+            global_assertions: Suite-level assertions (used only when creating).
+            global_execution_policy: Execution policy (used only when creating).
+            tags: Optional list of tags (used only when creating).
             project_name: Optional name of the project the suite is associated with.
 
         Returns:
             TestSuite: The test suite object.
         """
-        from .dataset import validators
-
-        if execution_policy is not None:
-            validators.validate_execution_policy(execution_policy)
-
         try:
-            suite = self.get_test_suite(name, project_name=project_name)
+            return self.get_test_suite(name, project_name=project_name)
         except ApiError as e:
             if e.status_code == 404:
                 return self.create_test_suite(
                     name=name,
                     description=description,
-                    execution_policy=execution_policy,
-                    assertions=assertions,
+                    global_execution_policy=global_execution_policy,
+                    global_assertions=global_assertions,
                     tags=tags,
                     project_name=project_name,
                 )
             raise
 
-        has_updates = (
-            assertions is not None or execution_policy is not None or tags is not None
-        )
-        if has_updates:
-            suite.update(
-                assertions=assertions,
-                execution_policy=execution_policy,
-                tags=tags,
-            )
+    def delete_test_suite(self, name: str, project_name: Optional[str] = None) -> None:
+        """
+        Delete a test suite by name.
 
-        return suite
+        Args:
+            name: The name of the test suite.
+            project_name: The name of the project the suite belongs to.
+        """
+        project_name = self._resolve_project_name(project_name)
+        self._rest_client.datasets.delete_dataset_by_name(
+            dataset_name=name, project_name=project_name
+        )
+
+    def get_test_suites(
+        self,
+        max_results: int = 100,
+        project_name: Optional[str] = None,
+    ) -> List[test_suite.TestSuite]:
+        """
+        Returns all test suites up to the specified limit.
+
+        Only returns test suites, not regular datasets.
+
+        Args:
+            max_results: The maximum number of test suites to return.
+            project_name: The name of the project the suites belong to.
+
+        Returns:
+            List[TestSuite]: A list of test suite objects.
+        """
+        from .dataset import rest_operations
+
+        return rest_operations.get_test_suites(
+            project_name=self._resolve_project_name(project_name),
+            rest_client=self._rest_client,
+            max_results=max_results,
+            client=self,
+        )
+
+    def get_test_suite_experiments(
+        self,
+        name: str,
+        max_results: int = 100,
+        project_name: Optional[str] = None,
+    ) -> List[experiment.Experiment]:
+        """
+        Returns all experiments for a test suite.
+
+        Args:
+            name: The name of the test suite.
+            max_results: The maximum number of experiments to return.
+            project_name: The name of the project the suite belongs to.
+
+        Returns:
+            List[Experiment]: A list of experiment objects.
+        """
+        from .dataset import rest_operations as dataset_rest_operations
+
+        project_name = self._resolve_project_name(project_name)
+        dataset_id = dataset_rest_operations.get_dataset_id(
+            self._rest_client, dataset_name=name, project_name=project_name
+        )
+
+        experiments_client = self.get_experiments_client()
+        return dataset_rest_operations.get_dataset_experiments(
+            rest_client=self._rest_client,
+            dataset_id=dataset_id,
+            max_results=max_results,
+            streamer=self._streamer,
+            experiments_client=experiments_client,
+        )
 
     def create_experiment(
         self,

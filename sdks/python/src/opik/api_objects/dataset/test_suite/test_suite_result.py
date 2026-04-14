@@ -27,6 +27,9 @@ class ItemResult:
     passed: bool
     """Whether this item passed based on its execution policy."""
 
+    has_assertions: bool
+    """Whether this item had any assertions evaluated."""
+
     runs_passed: int
     """Number of runs that passed for this item."""
 
@@ -89,10 +92,18 @@ class TestSuiteResult:
 
     @property
     def pass_rate(self) -> Optional[float]:
-        """Pass rate: items_passed / items_total (0.0 to 1.0), or None if no items."""
-        if self._items_total == 0:
+        """Pass rate among items that had assertions.
+
+        Items without any assertions are excluded from the calculation.
+        Returns None if no items had assertions.
+        """
+        items_with_assertions = [
+            r for r in self._item_results.values() if r.has_assertions
+        ]
+        if not items_with_assertions:
             return None
-        return self._items_passed / self._items_total
+        passed = sum(1 for r in items_with_assertions if r.passed)
+        return passed / len(items_with_assertions)
 
     @property
     def suite_name(self) -> Optional[str]:

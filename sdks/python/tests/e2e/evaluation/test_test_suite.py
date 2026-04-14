@@ -55,13 +55,17 @@ def test_test_suite__item_level_assertions__feedback_scores_created(
         description="Test item-level assertions",
     )
 
-    suite.add_item(
-        data={"input": {"question": "What is the capital of France?"}},
-        assertions=[geography_assertion],
-    )
-    suite.add_item(
-        data={"input": {"question": "What is 2 + 2?"}},
-        assertions=[math_assertion],
+    suite.insert(
+        [
+            {
+                "data": {"input": {"question": "What is the capital of France?"}},
+                "assertions": [geography_assertion],
+            },
+            {
+                "data": {"input": {"question": "What is 2 + 2?"}},
+                "assertions": [math_assertion],
+            },
+        ]
     )
 
     def task(item: Dict[str, Any]) -> Dict[str, Any]:
@@ -72,7 +76,8 @@ def test_test_suite__item_level_assertions__feedback_scores_created(
             return {"input": item["input"], "output": "2 + 2 equals 4."}
         return {"input": item["input"], "output": "Unknown"}
 
-    suite_result = suite.run(
+    suite_result = opik.run_tests(
+        test_suite=suite,
         task=task,
         experiment_name=experiment_name,
         verbose=0,
@@ -118,15 +123,20 @@ def test_test_suite__multiple_assertions_per_item__all_scores_created(
         project_name=project_name,
     )
 
-    suite.add_item(
-        data={"input": {"question": "What is the capital of France?"}},
-        assertions=[assertion_1, assertion_2],
+    suite.insert(
+        [
+            {
+                "data": {"input": {"question": "What is the capital of France?"}},
+                "assertions": [assertion_1, assertion_2],
+            }
+        ]
     )
 
     def task(item: Dict[str, Any]) -> Dict[str, Any]:
         return {"input": item["input"], "output": "Paris is the capital of France."}
 
-    suite_result = suite.run(
+    suite_result = opik.run_tests(
+        test_suite=suite,
         task=task,
         experiment_name=experiment_name,
         verbose=0,
@@ -160,12 +170,16 @@ def test_test_suite__suite_level_assertions__applied_to_all_items(
     suite = opik_client.create_test_suite(
         name=dataset_name,
         description="Test suite-level assertions",
-        assertions=[suite_assertion],
+        global_assertions=[suite_assertion],
         project_name=project_name,
     )
 
-    suite.add_item(data={"input": {"question": "What is the capital of France?"}})
-    suite.add_item(data={"input": {"question": "What is 2 + 2?"}})
+    suite.insert(
+        [
+            {"data": {"input": {"question": "What is the capital of France?"}}},
+            {"data": {"input": {"question": "What is 2 + 2?"}}},
+        ]
+    )
 
     def task(item: Dict[str, Any]) -> Dict[str, Any]:
         question = item["input"]["question"]
@@ -173,7 +187,8 @@ def test_test_suite__suite_level_assertions__applied_to_all_items(
             return {"input": item["input"], "output": "The capital of France is Paris."}
         return {"input": item["input"], "output": "2 + 2 equals 4."}
 
-    suite_result = suite.run(
+    suite_result = opik.run_tests(
+        test_suite=suite,
         task=task,
         experiment_name=experiment_name,
         verbose=0,
@@ -208,19 +223,24 @@ def test_test_suite__combined_suite_and_item_level_assertions__all_scores_create
     suite = opik_client.create_test_suite(
         name=dataset_name,
         description="Test combined suite and item level assertions",
-        assertions=[suite_assertion],
+        global_assertions=[suite_assertion],
         project_name=project_name,
     )
 
-    suite.add_item(
-        data={"input": {"question": "What is the capital of France?"}},
-        assertions=[item_assertion],
+    suite.insert(
+        [
+            {
+                "data": {"input": {"question": "What is the capital of France?"}},
+                "assertions": [item_assertion],
+            }
+        ]
     )
 
     def task(item: Dict[str, Any]) -> Dict[str, Any]:
         return {"input": item["input"], "output": "The capital of France is Paris."}
 
-    suite_result = suite.run(
+    suite_result = opik.run_tests(
+        test_suite=suite,
         task=task,
         experiment_name=experiment_name,
         verbose=0,
@@ -262,17 +282,21 @@ def test_test_suite__no_assertions_default_policy__items_pass_with_single_run(
         project_name=project_name,
     )
 
-    suite.add_item(
-        data={
-            "input": {"question": "What is the capital of France?"},
-            "reference": "Paris",
-        }
-    )
-    suite.add_item(
-        data={
-            "input": {"question": "What is the capital of Germany?"},
-            "reference": "Berlin",
-        }
+    suite.insert(
+        [
+            {
+                "data": {
+                    "input": {"question": "What is the capital of France?"},
+                    "reference": "Paris",
+                },
+            },
+            {
+                "data": {
+                    "input": {"question": "What is the capital of Germany?"},
+                    "reference": "Berlin",
+                },
+            },
+        ]
     )
 
     call_count = ThreadSafeCounter()
@@ -281,7 +305,8 @@ def test_test_suite__no_assertions_default_policy__items_pass_with_single_run(
         call_count.increment()
         return {"input": item["input"], "output": "Some response"}
 
-    suite_result = suite.run(
+    suite_result = opik.run_tests(
+        test_suite=suite,
         task=task,
         experiment_name=experiment_name,
         verbose=0,
@@ -332,12 +357,16 @@ def test_test_suite__execution_policy_runs_per_item__task_called_multiple_times(
     suite = opik_client.create_test_suite(
         name=dataset_name,
         description="Test runs_per_item execution policy",
-        execution_policy={"runs_per_item": 2, "pass_threshold": 1},
+        global_execution_policy={"runs_per_item": 2, "pass_threshold": 1},
         project_name=project_name,
     )
 
-    suite.add_item(
-        data={"input": {"question": "What is the capital of France?"}},
+    suite.insert(
+        [
+            {
+                "data": {"input": {"question": "What is the capital of France?"}},
+            }
+        ]
     )
 
     call_count = ThreadSafeCounter()
@@ -346,7 +375,8 @@ def test_test_suite__execution_policy_runs_per_item__task_called_multiple_times(
         call_count.increment()
         return {"input": item["input"], "output": "Paris"}
 
-    suite_result = suite.run(
+    suite_result = opik.run_tests(
+        test_suite=suite,
         task=task,
         experiment_name=experiment_name,
         verbose=0,
@@ -390,19 +420,22 @@ def test_test_suite__item_level_execution_policy__overrides_suite_policy(
     suite = opik_client.create_test_suite(
         name=dataset_name,
         description="Test item-level execution policy override",
-        execution_policy={"runs_per_item": 1, "pass_threshold": 1},
+        global_execution_policy={"runs_per_item": 1, "pass_threshold": 1},
         project_name=project_name,
     )
 
     # Item 1: uses suite-level policy (runs_per_item=1)
-    suite.add_item(
-        data={"input": {"question": "What is the capital of France?"}},
-    )
-
     # Item 2: overrides with item-level policy (runs_per_item=3)
-    suite.add_item(
-        data={"input": {"question": "What is the capital of Germany?"}},
-        execution_policy={"runs_per_item": 3, "pass_threshold": 2},
+    suite.insert(
+        [
+            {
+                "data": {"input": {"question": "What is the capital of France?"}},
+            },
+            {
+                "data": {"input": {"question": "What is the capital of Germany?"}},
+                "execution_policy": {"runs_per_item": 3, "pass_threshold": 2},
+            },
+        ]
     )
 
     france_count = ThreadSafeCounter()
@@ -416,7 +449,8 @@ def test_test_suite__item_level_execution_policy__overrides_suite_policy(
             germany_count.increment()
         return {"input": item["input"], "output": "Answer"}
 
-    suite_result = suite.run(
+    suite_result = opik.run_tests(
+        test_suite=suite,
         task=task,
         experiment_name=experiment_name,
         verbose=0,
@@ -477,15 +511,20 @@ def test_test_suite__assertion_fails__item_fails(
         project_name=project_name,
     )
 
-    suite.add_item(
-        data={"input": {"question": "What is 2 + 2?"}},
-        assertions=[failing_assertion],
+    suite.insert(
+        [
+            {
+                "data": {"input": {"question": "What is 2 + 2?"}},
+                "assertions": [failing_assertion],
+            }
+        ]
     )
 
     def task(item: Dict[str, Any]) -> Dict[str, Any]:
         return {"input": item["input"], "output": "2 + 2 equals 4."}
 
-    suite_result = suite.run(
+    suite_result = opik.run_tests(
+        test_suite=suite,
         task=task,
         experiment_name=experiment_name,
         verbose=0,
@@ -532,12 +571,12 @@ def test_test_suite__pass_threshold_not_met__item_fails(
     suite = opik_client.create_test_suite(
         name=dataset_name,
         description="Test pass threshold failure",
-        assertions=["The response correctly states that 2 + 2 equals 4"],
-        execution_policy={"runs_per_item": 3, "pass_threshold": 2},
+        global_assertions=["The response correctly states that 2 + 2 equals 4"],
+        global_execution_policy={"runs_per_item": 3, "pass_threshold": 2},
         project_name=project_name,
     )
 
-    suite.add_item(data={"input": {"question": "What is 2 + 2?"}})
+    suite.insert([{"data": {"input": {"question": "What is 2 + 2?"}}}])
 
     call_count = ThreadSafeCounter()
 
@@ -548,7 +587,8 @@ def test_test_suite__pass_threshold_not_met__item_fails(
             return {"input": item["input"], "output": "2 + 2 equals 4."}
         return {"input": item["input"], "output": "I don't know."}
 
-    suite_result = suite.run(
+    suite_result = opik.run_tests(
+        test_suite=suite,
         task=task,
         experiment_name=experiment_name,
         verbose=0,
@@ -593,17 +633,18 @@ def test_test_suite__multiple_assertions_multiple_runs__pass_threshold_logic(
     suite = opik_client.create_test_suite(
         name=dataset_name,
         description="Test multiple assertions with multiple runs",
-        assertions=[assertion_1, assertion_2, assertion_3],
-        execution_policy={"runs_per_item": 3, "pass_threshold": 2},
+        global_assertions=[assertion_1, assertion_2, assertion_3],
+        global_execution_policy={"runs_per_item": 3, "pass_threshold": 2},
         project_name=project_name,
     )
 
-    suite.add_item(data={"input": {"question": "What is the capital of France?"}})
+    suite.insert([{"data": {"input": {"question": "What is the capital of France?"}}}])
 
     def task(item: Dict[str, Any]) -> Dict[str, Any]:
         return {"input": item["input"], "output": "The capital of France is Paris."}
 
-    suite_result = suite.run(
+    suite_result = opik.run_tests(
+        test_suite=suite,
         task=task,
         experiment_name=experiment_name,
         verbose=0,
@@ -668,19 +709,23 @@ def test_test_suite__create_get_and_run__end_to_end(
     suite = opik_client.create_test_suite(
         name=dataset_name,
         description="Persistence test suite",
-        assertions=[suite_assertion],
-        execution_policy={"runs_per_item": 2, "pass_threshold": 1},
+        global_assertions=[suite_assertion],
+        global_execution_policy={"runs_per_item": 2, "pass_threshold": 1},
         project_name=project_name,
     )
 
-    suite.add_item(
-        data={"input": {"question": "What is the capital of France?"}},
-        assertions=[item_assertion],
-        description="Geography: France capital",
-    )
-    suite.add_item(
-        data={"input": {"question": "What is the capital of Germany?"}},
-        description="Geography: Germany capital",
+    suite.insert(
+        [
+            {
+                "data": {"input": {"question": "What is the capital of France?"}},
+                "assertions": [item_assertion],
+                "description": "Geography: France capital",
+            },
+            {
+                "data": {"input": {"question": "What is the capital of Germany?"}},
+                "description": "Geography: Germany capital",
+            },
+        ]
     )
 
     # 2. Retrieve from backend (simulates a fresh client loading existing suite)
@@ -706,7 +751,8 @@ def test_test_suite__create_get_and_run__end_to_end(
             return {"input": item["input"], "output": "The capital of France is Paris."}
         return {"input": item["input"], "output": "The capital of Germany is Berlin."}
 
-    suite_result = retrieved_suite.run(
+    suite_result = opik.run_tests(
+        test_suite=retrieved_suite,
         task=task,
         experiment_name=experiment_name,
         verbose=0,
@@ -729,45 +775,47 @@ def test_test_suite__create_get_and_run__end_to_end(
         assert item_result.pass_threshold == 1
 
 
-def test_test_suite__delete_items__items_removed(
-    opik_client: opik.Opik, dataset_name: str
-):
+def test_test_suite__delete__items_removed(opik_client: opik.Opik, dataset_name: str):
     """
-    Test that delete_items() removes items from the suite.
+    Test that delete() removes items from the suite.
     """
     suite = opik_client.create_test_suite(
         name=dataset_name,
         description="Test delete items",
     )
 
-    suite.add_item(
-        data={"input": {"question": "Question 1"}},
-        description="First question",
+    suite.insert(
+        [
+            {
+                "data": {"input": {"question": "Question 1"}},
+                "description": "First question",
+            },
+            {
+                "data": {"input": {"question": "Question 2"}},
+                "description": "Second question",
+            },
+            {"data": {"input": {"question": "Question 3"}}},
+        ]
     )
-    suite.add_item(
-        data={"input": {"question": "Question 2"}},
-        description="Second question",
-    )
-    suite.add_item(data={"input": {"question": "Question 3"}})
 
     items = suite.get_items()
     assert len(items) == 3
 
     # Verify descriptions are present before deletion
-    descriptions = {i["description"] for i in items}
+    descriptions = {i.get("description") for i in items}
     assert "First question" in descriptions
     assert "Second question" in descriptions
     assert None in descriptions
 
     item_id_to_delete = items[0]["id"]
 
-    suite.delete_items([item_id_to_delete])
+    suite.delete([item_id_to_delete])
 
     remaining_items = suite.get_items()
     assert len(remaining_items) == 2
 
 
-def test_test_suite__get_assertions__returns_assertion_strings(
+def test_test_suite__get_global_assertions__returns_assertion_strings(
     opik_client: opik.Opik, dataset_name: str
 ):
     """
@@ -776,7 +824,7 @@ def test_test_suite__get_assertions__returns_assertion_strings(
     opik_client.create_test_suite(
         name=dataset_name,
         description="Test get_assertions",
-        assertions=[
+        global_assertions=[
             "Response is helpful",
             "Response is accurate",
             "Response is concise",
@@ -786,7 +834,7 @@ def test_test_suite__get_assertions__returns_assertion_strings(
     # Retrieve from BE to verify persistence
     retrieved_suite = opik_client.get_test_suite(name=dataset_name)
 
-    assertions = retrieved_suite.get_assertions()
+    assertions = retrieved_suite.get_global_assertions()
     assert set(assertions) == {
         "Response is helpful",
         "Response is accurate",
@@ -794,7 +842,7 @@ def test_test_suite__get_assertions__returns_assertion_strings(
     }
 
 
-def test_test_suite__get_execution_policy__returns_persisted_policy(
+def test_test_suite__get_global_execution_policy__returns_persisted_policy(
     opik_client: opik.Opik, dataset_name: str
 ):
     """
@@ -804,7 +852,7 @@ def test_test_suite__get_execution_policy__returns_persisted_policy(
     opik_client.create_test_suite(
         name=dataset_name,
         description="Test get_execution_policy",
-        execution_policy={"runs_per_item": 5, "pass_threshold": 3},
+        global_execution_policy={"runs_per_item": 5, "pass_threshold": 3},
         project_name=project_name,
     )
 
@@ -814,12 +862,12 @@ def test_test_suite__get_execution_policy__returns_persisted_policy(
     )
     assert retrieved_suite.project_name == project_name
 
-    policy = retrieved_suite.get_execution_policy()
+    policy = retrieved_suite.get_global_execution_policy()
     assert policy["runs_per_item"] == 5
     assert policy["pass_threshold"] == 3
 
 
-def test_test_suite__get_execution_policy__default_when_not_set(
+def test_test_suite__get_global_execution_policy__default_when_not_set(
     opik_client: opik.Opik, dataset_name: str
 ):
     """
@@ -830,7 +878,7 @@ def test_test_suite__get_execution_policy__default_when_not_set(
         description="Test default execution policy",
     )
 
-    policy = suite.get_execution_policy()
+    policy = suite.get_global_execution_policy()
     assert policy["runs_per_item"] == 1
     assert policy["pass_threshold"] == 1
 
@@ -844,33 +892,33 @@ def test_test_suite__update__changes_assertions_and_policy(
     suite = opik_client.create_test_suite(
         name=dataset_name,
         description="Test update",
-        assertions=["Response is helpful"],
-        execution_policy={"runs_per_item": 1, "pass_threshold": 1},
+        global_assertions=["Response is helpful"],
+        global_execution_policy={"runs_per_item": 1, "pass_threshold": 1},
     )
 
     # Verify initial state
-    assertions = suite.get_assertions()
+    assertions = suite.get_global_assertions()
     assert set(assertions) == {"Response is helpful"}
 
-    policy = suite.get_execution_policy()
+    policy = suite.get_global_execution_policy()
     assert policy["runs_per_item"] == 1
 
     # Update with new assertions and policy
     suite.update(
-        assertions=["Response is accurate", "Response is concise"],
-        execution_policy={"runs_per_item": 3, "pass_threshold": 2},
+        global_assertions=["Response is accurate", "Response is concise"],
+        global_execution_policy={"runs_per_item": 3, "pass_threshold": 2},
     )
 
     # Retrieve from BE to verify persistence
     retrieved_suite = opik_client.get_test_suite(name=dataset_name)
 
-    updated_assertions = retrieved_suite.get_assertions()
+    updated_assertions = retrieved_suite.get_global_assertions()
     assert set(updated_assertions) == {
         "Response is accurate",
         "Response is concise",
     }
 
-    updated_policy = retrieved_suite.get_execution_policy()
+    updated_policy = retrieved_suite.get_global_execution_policy()
     assert updated_policy["runs_per_item"] == 3
     assert updated_policy["pass_threshold"] == 2
 
@@ -913,59 +961,57 @@ def test_get_or_create_test_suite__new__creates_suite(
     assert retrieved.name == dataset_name
 
 
-def test_get_or_create_test_suite__with_new_assertions__creates_new_version(
+def test_get_or_create_test_suite__existing_with_different_assertions__does_not_modify(
     opik_client: opik.Opik, dataset_name: str
 ):
     """
-    Test that get_or_create_test_suite with new assertions on an
-    existing suite creates a new version with those assertions.
+    Test that get_or_create_test_suite does not modify an existing suite's
+    assertions even when different values are passed.
     """
     opik_client.create_test_suite(
         name=dataset_name,
         description="Original suite",
-        assertions=["Response is helpful"],
+        global_assertions=["Response is helpful"],
     )
 
     opik_client.get_or_create_test_suite(
         name=dataset_name,
-        assertions=["Response is accurate", "Response is concise"],
+        global_assertions=["Response is accurate", "Response is concise"],
     )
 
     retrieved = opik_client.get_test_suite(name=dataset_name)
-    assertions = retrieved.get_assertions()
-    assert set(assertions) == {
-        "Response is accurate",
-        "Response is concise",
-    }
-
-
-def test_get_or_create_test_suite__with_new_policy__creates_new_version(
-    opik_client: opik.Opik, dataset_name: str
-):
-    """
-    Test that get_or_create_test_suite with a new execution_policy
-    on an existing suite creates a new version, keeping existing assertions.
-    """
-    opik_client.create_test_suite(
-        name=dataset_name,
-        description="Original suite",
-        assertions=["Response is helpful"],
-        execution_policy={"runs_per_item": 1, "pass_threshold": 1},
-    )
-
-    opik_client.get_or_create_test_suite(
-        name=dataset_name,
-        execution_policy={"runs_per_item": 5, "pass_threshold": 3},
-    )
-
-    retrieved = opik_client.get_test_suite(name=dataset_name)
-
-    policy = retrieved.get_execution_policy()
-    assert policy["runs_per_item"] == 5
-    assert policy["pass_threshold"] == 3
-
-    assertions = retrieved.get_assertions()
+    assertions = retrieved.get_global_assertions()
     assert set(assertions) == {"Response is helpful"}
+
+
+def test_get_or_create_test_suite__existing_with_different_policy__does_not_modify(
+    opik_client: opik.Opik, dataset_name: str
+):
+    """
+    Test that get_or_create_test_suite does not modify an existing suite's
+    execution policy even when different values are passed.
+    """
+    opik_client.create_test_suite(
+        name=dataset_name,
+        description="Original suite",
+        global_assertions=["Response is helpful"],
+        global_execution_policy={"runs_per_item": 1, "pass_threshold": 1},
+    )
+
+    opik_client.get_or_create_test_suite(
+        name=dataset_name,
+        global_execution_policy={"runs_per_item": 5, "pass_threshold": 3},
+    )
+
+    retrieved = opik_client.get_test_suite(name=dataset_name)
+
+    policy = retrieved.get_global_execution_policy()
+    assert policy["runs_per_item"] == 1
+    assert policy["pass_threshold"] == 1
+
+    assertions = retrieved.get_global_assertions()
+    assert set(assertions) == {"Response is helpful"}
+
 
 
 def test_test_suite__update_assertions_only__keeps_existing_policy(
@@ -977,18 +1023,18 @@ def test_test_suite__update_assertions_only__keeps_existing_policy(
     suite = opik_client.create_test_suite(
         name=dataset_name,
         description="Test partial update",
-        assertions=["Response is helpful"],
-        execution_policy={"runs_per_item": 3, "pass_threshold": 2},
+        global_assertions=["Response is helpful"],
+        global_execution_policy={"runs_per_item": 3, "pass_threshold": 2},
     )
 
-    suite.update(assertions=["Response is accurate"])
+    suite.update(global_assertions=["Response is accurate"])
 
     retrieved = opik_client.get_test_suite(name=dataset_name)
 
-    assertions = retrieved.get_assertions()
+    assertions = retrieved.get_global_assertions()
     assert set(assertions) == {"Response is accurate"}
 
-    policy = retrieved.get_execution_policy()
+    policy = retrieved.get_global_execution_policy()
     assert policy["runs_per_item"] == 3
     assert policy["pass_threshold"] == 2
 
@@ -1002,19 +1048,19 @@ def test_test_suite__update_policy_only__keeps_existing_assertions(
     suite = opik_client.create_test_suite(
         name=dataset_name,
         description="Test partial update",
-        assertions=["Response is helpful", "Response is accurate"],
-        execution_policy={"runs_per_item": 1, "pass_threshold": 1},
+        global_assertions=["Response is helpful", "Response is accurate"],
+        global_execution_policy={"runs_per_item": 1, "pass_threshold": 1},
     )
 
-    suite.update(execution_policy={"runs_per_item": 5, "pass_threshold": 3})
+    suite.update(global_execution_policy={"runs_per_item": 5, "pass_threshold": 3})
 
     retrieved = opik_client.get_test_suite(name=dataset_name)
 
-    policy = retrieved.get_execution_policy()
+    policy = retrieved.get_global_execution_policy()
     assert policy["runs_per_item"] == 5
     assert policy["pass_threshold"] == 3
 
-    assertions = retrieved.get_assertions()
+    assertions = retrieved.get_global_assertions()
     assert set(assertions) == {
         "Response is helpful",
         "Response is accurate",
@@ -1030,18 +1076,18 @@ def test_test_suite__update_with_empty_assertions__clears_assertions(
     suite = opik_client.create_test_suite(
         name=dataset_name,
         description="Test clearing assertions",
-        assertions=["Response is helpful", "Response is accurate"],
-        execution_policy={"runs_per_item": 1, "pass_threshold": 1},
+        global_assertions=["Response is helpful", "Response is accurate"],
+        global_execution_policy={"runs_per_item": 1, "pass_threshold": 1},
     )
 
-    assert len(suite.get_assertions()) == 2
+    assert len(suite.get_global_assertions()) == 2
 
-    suite.update(assertions=[])
+    suite.update(global_assertions=[])
 
     retrieved = opik_client.get_test_suite(name=dataset_name)
-    assert retrieved.get_assertions() == []
+    assert retrieved.get_global_assertions() == []
 
-    policy = retrieved.get_execution_policy()
+    policy = retrieved.get_global_execution_policy()
     assert policy["runs_per_item"] == 1
     assert policy["pass_threshold"] == 1
 
@@ -1091,7 +1137,8 @@ def test_get_or_create_test_suite__with_tags__tags_persisted(
     opik_client: opik.Opik, dataset_name: str
 ):
     """
-    Test that get_or_create passes tags on creation and updates.
+    Test that get_or_create passes tags on creation but does not
+    modify tags on an existing suite.
     """
     opik_client.get_or_create_test_suite(
         name=dataset_name,
@@ -1107,26 +1154,26 @@ def test_get_or_create_test_suite__with_tags__tags_persisted(
     )
 
     suite = opik_client.get_test_suite(dataset_name)
-    assert sorted(suite.get_tags()) == ["production", "v2"]
+    assert suite.get_tags() == ["v1"]
 
 
 @pytest.mark.skipif(
     not environment.has_openai_api_key(), reason="OPENAI_API_KEY is not set"
 )
-def test_test_suite__add_items_batch__all_items_persisted(
+def test_test_suite__insert_batch__all_items_persisted(
     opik_client: opik.Opik, dataset_name: str, experiment_name: str
 ):
     """
-    Test that add_items() adds multiple items in a single batch.
+    Test that insert() adds multiple items in a single batch.
     """
     assertion = "The response is factually correct"
 
     suite = opik_client.create_test_suite(
         name=dataset_name,
-        description="Test batch add_items",
+        description="Test batch insert",
     )
 
-    suite.add_items(
+    suite.insert(
         [
             {
                 "data": {"input": {"question": "What is the capital of France?"}},
@@ -1152,7 +1199,8 @@ def test_test_suite__add_items_batch__all_items_persisted(
         question = item["input"]["question"]
         return {"input": item["input"], "output": answers.get(question, "Unknown")}
 
-    suite_result = suite.run(
+    suite_result = opik.run_tests(
+        test_suite=suite,
         task=task,
         experiment_name=experiment_name,
         verbose=0,
@@ -1168,3 +1216,162 @@ def test_test_suite__add_items_batch__all_items_persisted(
         total_feedback_scores=3,
         expected_score_names={assertion},
     )
+
+
+# =============================================================================
+# CLIENT-LEVEL: delete, list, get_experiments (OPIK-5802)
+# =============================================================================
+
+
+def test_delete_test_suite__removes_suite(opik_client: opik.Opik, dataset_name: str):
+    """
+    Test that delete_test_suite() removes the suite.
+    """
+    opik_client.create_test_suite(name=dataset_name)
+
+    opik_client.delete_test_suite(name=dataset_name)
+
+    with pytest.raises(Exception):
+        opik_client.get_test_suite(name=dataset_name)
+
+
+def test_get_test_suites__returns_only_test_suites(
+    opik_client: opik.Opik, dataset_name: str
+):
+    """
+    Test that get_test_suites() only returns test suites, not regular datasets.
+    """
+    suite_name = dataset_name + "-suite"
+    dataset_regular_name = dataset_name + "-dataset"
+
+    opik_client.create_test_suite(name=suite_name)
+    opik_client.create_dataset(name=dataset_regular_name)
+
+    suites = opik_client.get_test_suites()
+    suite_names = {s.name for s in suites}
+
+    assert suite_name in suite_names
+    assert dataset_regular_name not in suite_names
+
+    # get_datasets() returns all datasets including test suites for backward compat
+    datasets = opik_client.get_datasets()
+    dataset_names = {d.name for d in datasets}
+
+    assert dataset_regular_name in dataset_names
+    assert suite_name in dataset_names
+
+    # cleanup
+    opik_client.delete_test_suite(name=suite_name)
+    opik_client.delete_dataset(name=dataset_regular_name)
+
+
+def test_get_test_suite_experiments__returns_experiments(
+    opik_client: opik.Opik, dataset_name: str, experiment_name: str
+):
+    """
+    Test that get_test_suite_experiments() returns experiments run on the suite.
+    """
+    suite = opik_client.create_test_suite(name=dataset_name)
+    suite.insert([{"data": {"input": {"question": "Hello"}}}])
+
+    def task(item: Dict[str, Any]) -> Dict[str, Any]:
+        return {"input": item["input"], "output": "World"}
+
+    opik.run_tests(
+        test_suite=suite, task=task, experiment_name=experiment_name, verbose=0
+    )
+    opik.flush_tracker()
+
+    experiments = opik_client.get_test_suite_experiments(name=dataset_name)
+    experiment_names = {e.name for e in experiments}
+
+    assert experiment_name in experiment_names
+
+
+# =============================================================================
+# ITEM MANAGEMENT: update_items, update_item_assertions/policy (OPIK-5803)
+# =============================================================================
+
+
+def test_update_items__updates_existing_items(
+    opik_client: opik.Opik, dataset_name: str
+):
+    """
+    Test that update_items() updates data on existing items.
+    """
+    suite = opik_client.create_test_suite(name=dataset_name)
+    suite.insert(
+        [
+            {"data": {"question": "Original question"}},
+        ]
+    )
+
+    items = suite.get_items()
+    assert len(items) == 1
+    item_id = items[0]["id"]
+
+    suite.update_items(
+        [
+            {"id": item_id, "data": {"question": "Updated question"}},
+        ]
+    )
+
+    updated_items = suite.get_items()
+    assert len(updated_items) == 1
+    assert updated_items[0]["data"]["question"] == "Updated question"
+
+
+def test_update_items__missing_id__raises_error(
+    opik_client: opik.Opik, dataset_name: str
+):
+    """
+    Test that update_items() raises error when item has no id.
+    """
+    suite = opik_client.create_test_suite(name=dataset_name)
+
+    with pytest.raises(Exception, match="Missing id"):
+        suite.update_items([{"data": {"question": "No ID"}}])
+
+
+# =============================================================================
+# ITEM MANAGEMENT: clear, get_items params (OPIK-5804)
+# =============================================================================
+
+
+def test_clear__removes_all_items(opik_client: opik.Opik, dataset_name: str):
+    """
+    Test that clear() removes all items from the suite.
+    """
+    suite = opik_client.create_test_suite(name=dataset_name)
+    suite.insert(
+        [
+            {"data": {"question": "Q1"}},
+            {"data": {"question": "Q2"}},
+            {"data": {"question": "Q3"}},
+        ]
+    )
+
+    assert len(suite.get_items()) == 3
+
+    suite.clear()
+
+    assert len(suite.get_items()) == 0
+
+
+def test_get_items__nb_samples__limits_results(
+    opik_client: opik.Opik, dataset_name: str
+):
+    """
+    Test that get_items(nb_samples=N) returns at most N items.
+    """
+    suite = opik_client.create_test_suite(name=dataset_name)
+    suite.insert(
+        [
+            {"data": {"question": "Q1"}},
+            {"data": {"question": "Q2"}},
+            {"data": {"question": "Q3"}},
+        ]
+    )
+
+    items = suite.get_items(nb_samples=2)
+    assert len(items) == 2

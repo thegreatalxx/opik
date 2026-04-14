@@ -13,8 +13,12 @@ __all__ = ["TestSuiteItem", "TestSuiteResult", "ItemResult"]
 
 
 class TestSuiteItem(TypedDict, total=False):
-    """A test case item to add to a test suite."""
+    """A test case item for a test suite.
 
+    Used for both inserting new items and reading existing ones.
+    """
+
+    id: str
     data: Required[Dict[str, Any]]
     assertions: List[str]
     description: str

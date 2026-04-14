@@ -25,6 +25,7 @@ target/
 /apps/opik-python-backend/images/
 
 # Test suite reports
+opik_evaluation_suite_reports/
 opik_test_suite_reports/
 
 # Opik opimizer related
