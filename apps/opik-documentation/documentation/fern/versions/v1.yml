@@ -432,6 +432,9 @@ navigation:
               - page: AG2
                 path: ../docs/tracing/integrations/ag2.mdx
                 slug: ag2
+              - page: Agent Spec
+                path: ../docs/tracing/integrations/agentspec.mdx
+                slug: agentspec
               - page: Agno
                 path: ../docs/tracing/integrations/agno.mdx
                 slug: agno
