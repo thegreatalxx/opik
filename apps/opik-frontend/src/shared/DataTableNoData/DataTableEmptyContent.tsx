@@ -1,5 +1,4 @@
 import React from "react";
-import { ExternalLink } from "lucide-react";
 import { useTheme } from "@/contexts/theme-provider";
 import { THEME_MODE } from "@/constants/theme";
 import defaultLightImageUrl from "/images/empty-table-light.svg";
@@ -10,7 +9,6 @@ type DataTableEmptyContentProps = {
   description: string;
   lightImageUrl?: string;
   darkImageUrl?: string;
-  docsUrl?: string;
   children?: React.ReactNode;
 };
 
@@ -19,7 +17,6 @@ const DataTableEmptyContent: React.FC<DataTableEmptyContentProps> = ({
   description,
   lightImageUrl = defaultLightImageUrl,
   darkImageUrl = defaultDarkImageUrl,
-  docsUrl,
   children,
 }) => {
   const { themeMode } = useTheme();
@@ -35,17 +32,6 @@ const DataTableEmptyContent: React.FC<DataTableEmptyContentProps> = ({
             {description}
           </p>
         </div>
-        {docsUrl && (
-          <a
-            href={docsUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="comet-body-s inline-flex items-center gap-1 underline underline-offset-4 hover:text-primary"
-          >
-            View documentation
-            <ExternalLink className="size-3" />
-          </a>
-        )}
         {children}
       </div>
     </div>

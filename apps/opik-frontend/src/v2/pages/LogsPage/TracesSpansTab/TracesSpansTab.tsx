@@ -11,7 +11,7 @@ import {
   ColumnSort,
   RowSelectionState,
 } from "@tanstack/react-table";
-import { RotateCw } from "lucide-react";
+import { ExternalLink, RotateCw } from "lucide-react";
 import findIndex from "lodash/findIndex";
 import isObject from "lodash/isObject";
 import isNumber from "lodash/isNumber";
@@ -55,6 +55,7 @@ import { convertColumnDataToColumn, migrateSelectedColumns } from "@/lib/table";
 import { getJSONPaths, buildDocsUrl } from "@/lib/utils";
 import { generateSelectColumDef } from "@/shared/DataTable/utils";
 import DataTableEmptyContent from "@/shared/DataTableNoData/DataTableEmptyContent";
+import { useOpenQuickStartDialog } from "@/v2/pages-shared/onboarding/QuickstartDialog/QuickstartDialog";
 import emptyLogsLightUrl from "/images/empty-logs-light.svg";
 import emptyLogsDarkUrl from "/images/empty-logs-dark.svg";
 import SearchInput from "@/shared/SearchInput/SearchInput";
@@ -362,6 +363,7 @@ export const TracesSpansTab: React.FC<TracesSpansTabProps> = ({
   projectId,
   projectName,
 }) => {
+  const { open: openQuickstart } = useOpenQuickStartDialog();
   const truncationEnabled = useTruncationEnabled();
 
   const {
@@ -1372,8 +1374,25 @@ export const TracesSpansTab: React.FC<TracesSpansTabProps> = ({
             } will appear here once your agent starts receiving requests.`}
             lightImageUrl={emptyLogsLightUrl}
             darkImageUrl={emptyLogsDarkUrl}
-            docsUrl={buildDocsUrl("/tracing/log_traces")}
-          />
+          >
+            <div className="flex items-center gap-3">
+              <button
+                onClick={openQuickstart}
+                className="comet-body-s underline underline-offset-4 hover:text-primary"
+              >
+                Quickstart guide
+              </button>
+              <a
+                href={buildDocsUrl("/tracing/log_traces")}
+                target="_blank"
+                rel="noreferrer"
+                className="comet-body-s inline-flex items-center gap-1 underline underline-offset-4 hover:text-primary"
+              >
+                View docs
+                <ExternalLink className="size-3" />
+              </a>
+            </div>
+          </DataTableEmptyContent>
         }
         skeleton
       >

@@ -48,7 +48,9 @@ const ExperimentsPage: React.FC = () => {
           direction="horizontal"
           limitWidth
         >
-          <h1 className="comet-title-xs truncate break-words">Experiments</h1>
+          <h1 className="comet-body-accented truncate break-words">
+            Experiments
+          </h1>
           <Button
             variant="default"
             size="xs"

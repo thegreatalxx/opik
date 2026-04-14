@@ -391,7 +391,7 @@ export const AnnotationQueuesPage: React.FC = () => {
   return (
     <div className="flex min-h-full flex-col pt-4">
       <div className="mb-4 flex min-h-7 items-center justify-between">
-        <h1 className="comet-title-xs truncate break-words">
+        <h1 className="comet-body-accented truncate break-words">
           Annotation queues
         </h1>
         {canCreateAnnotationQueues && (

@@ -338,7 +338,7 @@ const AlertsPage: React.FunctionComponent = () => {
   return (
     <div className="flex min-h-full flex-col pt-4">
       <div className="mb-1 flex min-h-7 items-center justify-between">
-        <h1 className="comet-title-xs">Alerts</h1>
+        <h1 className="comet-body-accented">Alerts</h1>
         {canUpdateAlerts && (
           <Button variant="default" size="xs" onClick={handleNewAlertClick}>
             <Plus className="mr-1 size-4" />
