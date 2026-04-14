@@ -1,5 +1,7 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo } from "react";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import api from "@/api/api";
+import { fetchWorkspaceVersion } from "@/api/workspaces/useWorkspaceVersion";
 
 // ---------------------------------------------------------------------------
 // Binary helpers
@@ -123,23 +125,20 @@ async function deriveBridgeKey(
 // Activate + derive + store — runs once on mount
 // ---------------------------------------------------------------------------
 
-async function activate(payload: PairingPayload): Promise<void> {
-  const workspace = new URLSearchParams(window.location.search).get(
-    "workspace",
-  );
-  if (workspace) {
-    api.defaults.headers.common["Comet-Workspace"] = workspace;
-  }
-
+async function activate(
+  payload: PairingPayload,
+  workspace: string | null,
+): Promise<void> {
   const hmac = await computeActivationHmac(
     payload.activationKey,
     payload.sessionId,
     payload.runnerName,
   );
-  await api.post(`/v1/private/pairing/sessions/${payload.sessionId}/activate`, {
-    runner_name: payload.runnerName,
-    hmac,
-  });
+  await api.post(
+    `/v1/private/pairing/sessions/${payload.sessionId}/activate`,
+    { runner_name: payload.runnerName, hmac },
+    workspace ? { headers: { "Comet-Workspace": workspace } } : undefined,
+  );
 
   // Only CONNECT runners use bridge keys for HMAC-signed file commands.
   // ENDPOINT runners don't need one — storing it would overwrite the
@@ -160,6 +159,8 @@ async function activate(payload: PairingPayload): Promise<void> {
 // Page component
 // ---------------------------------------------------------------------------
 
+type WorkspacePhase = "missing" | "checking" | "ok" | "v1";
+
 const PairingPage: React.FC = () => {
   const fragment = window.location.hash.slice(1);
 
@@ -174,52 +175,80 @@ const PairingPage: React.FC = () => {
     }
   }, [fragment]);
 
-  const [status, setStatus] = useState<"busy" | "done" | "error">(
-    parseError ? "error" : "busy",
+  const workspaceName = useMemo(
+    () => new URLSearchParams(window.location.search).get("workspace"),
+    [],
   );
-  const [error, setError] = useState(parseError ?? "");
 
-  // Auto-activate on mount
+  const versionQuery = useQuery({
+    queryKey: ["pairing-workspace-version", workspaceName],
+    queryFn: ({ signal }) =>
+      fetchWorkspaceVersion({ workspaceName: workspaceName!, signal }),
+    enabled: !!workspaceName,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const workspacePhase: WorkspacePhase = useMemo(() => {
+    if (!workspaceName) return "missing";
+    if (versionQuery.isPending) return "checking";
+    if (versionQuery.data === "v2") return "ok";
+    return "v1";
+  }, [workspaceName, versionQuery.isPending, versionQuery.data]);
+
+  const {
+    mutate: runActivation,
+    isIdle: activationIdle,
+    isError: activationIsError,
+    isSuccess: activationIsSuccess,
+    error: activationError,
+  } = useMutation({
+    mutationFn: async (p: PairingPayload) => {
+      if (!crypto?.subtle) throw new Error("SECURE_CONTEXT_REQUIRED");
+      await activate(p, workspaceName);
+    },
+    onSuccess: () => {
+      setTimeout(() => window.close(), 10000);
+    },
+  });
+
   useEffect(() => {
-    if (!payload) return;
-    if (!crypto?.subtle) {
-      setStatus("error");
-      setError("Pairing requires a secure connection (HTTPS).");
-      return;
+    if (workspacePhase !== "ok" || !payload || !activationIdle) return;
+    runActivation(payload);
+  }, [workspacePhase, payload, activationIdle, runActivation]);
+
+  function getActivationErrorMessage(err: unknown): string {
+    if (err instanceof Error && err.message === "SECURE_CONTEXT_REQUIRED") {
+      return "Pairing requires a secure connection (HTTPS).";
     }
-    activate(payload)
-      .then(() => setStatus("done"))
-      .catch((err: unknown) => {
-        setStatus("error");
-        const s =
-          err && typeof err === "object" && "response" in err
-            ? (err as { response?: { status?: number } }).response?.status
-            : undefined;
-        if (s === 403)
-          setError("This pairing link is invalid or has been tampered with.");
-        else if (s === 404)
-          setError("This pairing link has expired. Run the CLI command again.");
-        else if (s === 409)
-          setError("This runner is already connected. You can close this tab.");
-        else setError("Could not reach Opik. Check your connection.");
-      });
-  }, [payload]);
+    const s =
+      err && typeof err === "object" && "response" in err
+        ? (err as { response?: { status?: number } }).response?.status
+        : undefined;
+    if (s === 403)
+      return "This pairing link is invalid or has been tampered with.";
+    if (s === 404)
+      return "This pairing link has expired. Run the CLI command again.";
+    if (s === 409)
+      return "This runner is already connected. You can close this tab.";
+    return "Could not reach Opik. Check your connection.";
+  }
 
-  // Auto-close on success
-  useEffect(() => {
-    if (status !== "done") return;
-    const t = setTimeout(() => window.close(), 1500);
-    return () => clearTimeout(t);
-  }, [status]);
+  function getMessage(): string {
+    if (workspacePhase === "missing") return "This pairing link is invalid.";
+    if (workspacePhase === "v1") {
+      return "Opik Connect requires Opik 2.0. Please upgrade your workspace to continue.";
+    }
+    if (workspacePhase === "checking") return "Connecting…";
+    if (parseError) return parseError;
+    if (activationIsError) return getActivationErrorMessage(activationError);
+    if (activationIsSuccess) return "Connected ✔";
+    return "Connecting…";
+  }
 
   return (
-    <p>
-      {status === "done"
-        ? "Connected ✔"
-        : status === "error"
-          ? error
-          : "Connecting…"}
-    </p>
+    <div className="flex min-h-screen items-center justify-center p-6">
+      <p className="comet-body text-center text-muted-slate">{getMessage()}</p>
+    </div>
   );
 };
 

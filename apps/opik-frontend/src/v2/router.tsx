@@ -101,7 +101,7 @@ const workspaceGuardEmptyLayoutRoute = createRoute({
 // ----------- pairing (root-level, no layout)
 const pairingRoute = createRoute({
   getParentRoute: () => rootRoute,
-  path: "/opik/pair/v1",
+  path: "/pair/v1",
   component: PairingPage,
 });
 
