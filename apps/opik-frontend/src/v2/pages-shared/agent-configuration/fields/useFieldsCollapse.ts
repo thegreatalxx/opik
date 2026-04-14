@@ -46,6 +46,7 @@ export const useFieldsCollapse = ({
       }
       return next;
     });
+    setBroadcast((prev) => ({ action: null, version: prev.version + 1 }));
   }, []);
 
   const expandAll = useCallback(() => {

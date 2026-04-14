@@ -3,6 +3,7 @@ import capitalize from "lodash/capitalize";
 
 import { LLM_MESSAGE_ROLE_NAME_MAP } from "@/constants/llm";
 import { LLM_MESSAGE_ROLE, LLMMessage } from "@/types/llm";
+import AutoResizeTextarea from "./AutoResizeTextarea";
 import CollapsibleBlock from "./CollapsibleBlock";
 
 const getRoleLabel = (role: string): string => {
@@ -55,20 +56,9 @@ const BlueprintChatMessages: React.FC<BlueprintChatMessagesProps> = ({
             tone={tone}
           >
             {editable ? (
-              <textarea
-                className="comet-body-s w-full resize-none overflow-hidden bg-transparent text-foreground outline-none"
+              <AutoResizeTextarea
                 value={text}
-                onChange={(e) => {
-                  onChangeMessage?.(index, e.target.value);
-                  e.target.style.height = "auto";
-                  e.target.style.height = e.target.scrollHeight + "px";
-                }}
-                ref={(el) => {
-                  if (el) {
-                    el.style.height = "auto";
-                    el.style.height = el.scrollHeight + "px";
-                  }
-                }}
+                onChange={(v) => onChangeMessage?.(index, v)}
               />
             ) : (
               <div className="comet-body-s whitespace-pre-wrap break-words text-foreground">

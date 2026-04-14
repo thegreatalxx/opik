@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from "react";
+import React, { useRef, useState } from "react";
 import { ArrowRight, GitCompare, Pencil, Undo2, X } from "lucide-react";
 
 import { ConfigHistoryItem } from "@/types/agent-configs";
@@ -54,7 +54,7 @@ const AgentConfigurationEditPanel: React.FC<
     setView("edit");
   };
 
-  const title = useMemo(() => `New agent configuration`, []);
+  const title = "New agent configuration";
 
   return (
     <Sheet open={open} onOpenChange={(o) => !o && handleClose()}>

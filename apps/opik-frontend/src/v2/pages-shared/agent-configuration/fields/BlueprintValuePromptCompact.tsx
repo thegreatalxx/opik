@@ -15,6 +15,7 @@ import useCreatePromptVersionMutation from "@/api/prompts/useCreatePromptVersion
 import Loader from "@/shared/Loader/Loader";
 import { parseChatTemplateToLLMMessages } from "@/lib/llm";
 import { BlueprintValuePromptHandle } from "@/v2/pages-shared/traces/ConfigurationTab/BlueprintValuePrompt";
+import AutoResizeTextarea from "./AutoResizeTextarea";
 import BlueprintChatMessages from "./BlueprintChatMessages";
 import CollapsibleBlock from "./CollapsibleBlock";
 import { FieldsCollapseController } from "./useFieldsCollapse";
@@ -87,10 +88,18 @@ const BlueprintValuePromptCompact = forwardRef<
       onDirtyChangeRef.current(currentTemplate !== initialTemplate.current);
     }, [draftTemplate, draftMessages, isChatPrompt]);
 
-    const handleChangeMessage = (index: number, content: string) => {
+    const handleChangeMessage = (index: number, newText: string) => {
       setDraftMessages((prev) => {
         const next = [...prev];
-        next[index] = { ...next[index], content };
+        const existing = next[index].content;
+        if (Array.isArray(existing)) {
+          const updated = existing.map((part) =>
+            part.type === "text" ? { ...part, text: newText } : part,
+          );
+          next[index] = { ...next[index], content: updated };
+        } else {
+          next[index] = { ...next[index], content: newText };
+        }
         return next;
       });
     };
@@ -213,20 +222,9 @@ const BlueprintValuePromptCompact = forwardRef<
         tone={tone}
       >
         {isEditing ? (
-          <textarea
-            className="comet-body-s w-full resize-none overflow-hidden bg-transparent text-foreground outline-none"
+          <AutoResizeTextarea
             value={draftTemplate}
-            onChange={(e) => {
-              setDraftTemplate(e.target.value);
-              e.target.style.height = "auto";
-              e.target.style.height = e.target.scrollHeight + "px";
-            }}
-            ref={(el) => {
-              if (el) {
-                el.style.height = "auto";
-                el.style.height = el.scrollHeight + "px";
-              }
-            }}
+            onChange={setDraftTemplate}
           />
         ) : (
           <div className="comet-body-s whitespace-pre-wrap break-words text-foreground">
