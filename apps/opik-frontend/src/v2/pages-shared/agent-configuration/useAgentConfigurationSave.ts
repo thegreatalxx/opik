@@ -15,6 +15,7 @@ import {
   PromptWithLatestVersion,
 } from "@/types/prompts";
 import { LLMMessage } from "@/types/llm";
+import { serializeChatTemplate } from "@/lib/chatTemplate";
 import { NewFieldDraft } from "./NewBlueprintFieldEditor";
 import {
   BLUEPRINT_FIELD_NAME_PATTERN,
@@ -65,8 +66,7 @@ const validateNewField = (
   return "";
 };
 
-const buildChatTemplateFromMessages = (messages: LLMMessage[]): string =>
-  JSON.stringify(messages.map(({ role, content }) => ({ role, content })));
+const buildChatTemplateFromMessages = serializeChatTemplate;
 
 type UseAgentConfigurationSaveParams = {
   agentConfig: AgentConfig | undefined;
