@@ -19,6 +19,7 @@ import LLMPromptMessages from "@/v2/pages-shared/llm/LLMPromptMessages/LLMPrompt
 import OptimizationModelSelect from "@/v2/pages-shared/optimizations/OptimizationModelSelect/OptimizationModelSelect";
 import OptimizationTemperatureConfig from "@/v2/pages-shared/optimizations/OptimizationConfigForm/OptimizationTemperatureConfig";
 import { OPTIMIZATION_MESSAGE_TYPE_OPTIONS } from "@/constants/optimizations";
+import { PROMPT_TEMPLATE_STRUCTURE } from "@/types/prompts";
 import BlueprintPromptsSelectBox from "@/v2/pages-shared/llm/BlueprintPromptsSelectBox/BlueprintPromptsSelectBox";
 import SaveExistingPromptDialog from "@/v2/pages-shared/llm/BlueprintPromptsSelectBox/SaveExistingPromptDialog";
 import SaveAsNewBlueprintFieldDialog from "@/v2/pages-shared/llm/BlueprintPromptsSelectBox/SaveAsNewBlueprintFieldDialog";
@@ -130,6 +131,7 @@ const OptimizationsNewPromptSection: React.FC<
               onValueChange={onBlueprintRefChange}
               onClear={onBlueprintRefClear}
               hasUnsavedChanges={hasUnsavedBlueprintChanges}
+              filterByTemplateStructure={PROMPT_TEMPLATE_STRUCTURE.CHAT}
             />
             {hasMessages && (
               <TooltipWrapper

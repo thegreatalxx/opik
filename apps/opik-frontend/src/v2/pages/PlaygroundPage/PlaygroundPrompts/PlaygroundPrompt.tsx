@@ -50,6 +50,7 @@ import BlueprintPromptsSelectBox from "@/v2/pages-shared/llm/BlueprintPromptsSel
 import SaveExistingPromptDialog from "@/v2/pages-shared/llm/BlueprintPromptsSelectBox/SaveExistingPromptDialog";
 import SaveAsNewBlueprintFieldDialog from "@/v2/pages-shared/llm/BlueprintPromptsSelectBox/SaveAsNewBlueprintFieldDialog";
 import useSavePromptToBlueprint from "@/v2/pages-shared/llm/BlueprintPromptsSelectBox/useSavePromptToBlueprint";
+import { PROMPT_TEMPLATE_STRUCTURE } from "@/types/prompts";
 import useLoadBlueprintPrompt from "@/hooks/useLoadBlueprintPrompt";
 import { BlueprintPromptRef } from "@/types/playground";
 
@@ -368,6 +369,7 @@ const PlaygroundPrompt = ({
             onValueChange={handleImportBlueprintPrompt}
             onClear={handleDetachPrompt}
             hasUnsavedChanges={hasUnsavedBlueprintChanges}
+            filterByTemplateStructure={PROMPT_TEMPLATE_STRUCTURE.CHAT}
           />
 
           <div className="flex shrink-0 items-center">
