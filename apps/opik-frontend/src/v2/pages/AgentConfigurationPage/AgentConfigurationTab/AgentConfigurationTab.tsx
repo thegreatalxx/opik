@@ -161,7 +161,16 @@ const AgentConfigurationTab: React.FC<AgentConfigurationTabProps> = ({
   }
 
   if (allRows.length === 0) {
-    return <AgentConfigurationEmptyState />;
+    return (
+      <div className="flex min-h-full flex-col px-6 pt-4">
+        <div className="mb-1 flex min-h-7 items-center">
+          <h1 className="comet-title-xs truncate break-words">
+            Agent configuration
+          </h1>
+        </div>
+        <AgentConfigurationEmptyState />
+      </div>
+    );
   }
 
   const selectedItem = allRows[selectedIndex] as ConfigHistoryItem;
