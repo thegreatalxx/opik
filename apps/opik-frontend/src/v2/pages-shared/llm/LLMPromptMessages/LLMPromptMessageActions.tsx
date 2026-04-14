@@ -217,10 +217,9 @@ const LLMPromptMessageActions: React.FC<LLMPromptLibraryActionsProps> = ({
         templateStructure: PROMPT_TEMPLATE_STRUCTURE.TEXT,
         changeDescription: changeDescription || undefined,
       });
-      if (result) {
-        onChangeMessage({ blueprintRef: result.newRef });
-        loadedCommitRef.current = result.newRef.commitId;
-      }
+      if (!result) return;
+      onChangeMessage({ blueprintRef: result.newRef });
+      loadedCommitRef.current = result.newRef.commitId;
       setShowSaveExisting(false);
     },
     [blueprintRef, commitData, content, saveExistingVersion, onChangeMessage],
@@ -234,10 +233,9 @@ const LLMPromptMessageActions: React.FC<LLMPromptLibraryActionsProps> = ({
         templateStructure: PROMPT_TEMPLATE_STRUCTURE.TEXT,
         changeDescription: changeDescription || undefined,
       });
-      if (newRef) {
-        onChangeMessage({ blueprintRef: newRef });
-        loadedCommitRef.current = newRef.commitId;
-      }
+      if (!newRef) return;
+      onChangeMessage({ blueprintRef: newRef });
+      loadedCommitRef.current = newRef.commitId;
       setShowSaveNew(false);
     },
     [content, saveAsNewField, onChangeMessage],

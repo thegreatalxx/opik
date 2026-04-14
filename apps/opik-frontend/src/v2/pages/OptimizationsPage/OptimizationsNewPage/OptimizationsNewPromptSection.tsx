@@ -96,7 +96,8 @@ const OptimizationsNewPromptSection: React.FC<
 
   const handleSaveExisting = useCallback(
     async (changeDescription: string) => {
-      await onSaveBlueprintExisting(changeDescription);
+      const result = await onSaveBlueprintExisting(changeDescription);
+      if (!result) return;
       setShowSaveExisting(false);
     },
     [onSaveBlueprintExisting],
@@ -104,7 +105,11 @@ const OptimizationsNewPromptSection: React.FC<
 
   const handleSaveNew = useCallback(
     async (fieldName: string, changeDescription: string) => {
-      await onSaveBlueprintNewField(fieldName, changeDescription);
+      const result = await onSaveBlueprintNewField(
+        fieldName,
+        changeDescription,
+      );
+      if (!result) return;
       setShowSaveNew(false);
     },
     [onSaveBlueprintNewField],
