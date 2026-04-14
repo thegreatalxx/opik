@@ -14,6 +14,7 @@ import {
   PROMPT_TEMPLATE_STRUCTURE,
   PromptWithLatestVersion,
 } from "@/types/prompts";
+import { LLMMessage } from "@/types/llm";
 import { NewFieldDraft } from "./NewBlueprintFieldEditor";
 import { validateBlueprintFieldValue } from "./blueprintFieldValidation";
 
@@ -26,6 +27,46 @@ export type AgentConfigPayload = {
   blueprint: BlueprintCreate;
 };
 
+const FIELD_NAME_PATTERN = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
+
+const isMessageEmpty = (message: LLMMessage): boolean => {
+  const { content } = message;
+  if (typeof content === "string") return !content.trim();
+  if (Array.isArray(content)) {
+    return content.every(
+      (part) =>
+        part.type === "text" && !(part as { text?: string }).text?.trim(),
+    );
+  }
+  return true;
+};
+
+const validateNewField = (
+  field: NewFieldDraft,
+  existingKeys: ReadonlySet<string>,
+  siblingKeys: ReadonlySet<string>,
+): string => {
+  const key = field.key.trim();
+  if (!key) return "Field name is required";
+  if (!FIELD_NAME_PATTERN.test(key))
+    return "Use letters, digits and underscore; start with a letter or underscore";
+  if (existingKeys.has(key)) return "A field with this name already exists";
+  if (siblingKeys.has(key)) return "Duplicate field name in the new fields";
+  if (field.type === BlueprintValueType.PROMPT) {
+    if (field.messages.length === 0) return "Add at least one message";
+    if (field.messages.every(isMessageEmpty))
+      return "Messages must not be empty";
+    return "";
+  }
+  if (field.type !== BlueprintValueType.BOOLEAN) {
+    return validateBlueprintFieldValue(field.type, field.value);
+  }
+  return "";
+};
+
+const buildChatTemplateFromMessages = (messages: LLMMessage[]): string =>
+  JSON.stringify(messages.map(({ role, content }) => ({ role, content })));
+
 type UseAgentConfigurationSaveParams = {
   agentConfig: AgentConfig | undefined;
   draftValues: Record<string, string>;
@@ -37,53 +78,6 @@ type UseAgentConfigurationSaveParams = {
   removedKeys?: Set<string>;
   newFields?: NewFieldDraft[];
 };
-
-const FIELD_NAME_PATTERN = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
-
-const isMessageEmpty = (message: { content: unknown }): boolean => {
-  const content = message.content;
-  if (typeof content === "string") return !content.trim();
-  if (Array.isArray(content)) {
-    return content.every(
-      (part) =>
-        part &&
-        typeof part === "object" &&
-        "type" in part &&
-        part.type === "text" &&
-        !(part as { text?: string }).text?.trim(),
-    );
-  }
-  return true;
-};
-
-const validateNewField = (
-  field: NewFieldDraft,
-  existingKeys: Set<string>,
-  siblingKeys: Set<string>,
-): string => {
-  const key = field.key.trim();
-  if (!key) return "Field name is required";
-  if (!FIELD_NAME_PATTERN.test(key))
-    return "Use letters, digits and underscore; start with a letter or underscore";
-  if (existingKeys.has(key)) return "A field with this name already exists";
-  if (siblingKeys.has(key)) return "Duplicate field name in the new fields";
-  if (field.type === BlueprintValueType.PROMPT) {
-    if (field.messages.length === 0) return "Add at least one message";
-    if (field.messages.some(isMessageEmpty))
-      return "Messages must not be empty";
-    return "";
-  }
-  if (field.type !== BlueprintValueType.BOOLEAN) {
-    const err = validateBlueprintFieldValue(field.type, field.value);
-    if (err) return err;
-  }
-  return "";
-};
-
-const buildChatTemplateFromMessages = (
-  messages: Array<{ role: string; content: unknown }>,
-): string =>
-  JSON.stringify(messages.map(({ role, content }) => ({ role, content })));
 
 export const useAgentConfigurationSave = ({
   agentConfig,
@@ -120,45 +114,45 @@ export const useAgentConfigurationSave = ({
         originalValues.current !== null &&
         draftValues[key] !== originalValues.current[key],
     );
-    const hasPromptChanges = dirtyPromptKeys
-      ? Object.values(dirtyPromptKeys).some(Boolean)
-      : false;
+    const hasPromptChanges =
+      !!dirtyPromptKeys && Object.values(dirtyPromptKeys).some(Boolean);
     const hasRemovals = (removedKeys?.size ?? 0) > 0;
     const hasAdditions = (newFields?.length ?? 0) > 0;
     return hasScalarChanges || hasPromptChanges || hasRemovals || hasAdditions;
   }, [draftValues, originalValues, dirtyPromptKeys, removedKeys, newFields]);
 
-  const validateAndBuildPayload = useCallback(
-    async (type: BlueprintType): Promise<AgentConfigPayload | null> => {
-      if (!agentConfig) return null;
-
-      const removed = removedKeys ?? new Set<string>();
-      const added = newFields ?? [];
+  // Collect errors for every editable field. Returns the error map; the
+  // caller decides whether to abort the save.
+  const collectValidationErrors = useCallback(
+    (removed: ReadonlySet<string>, added: NewFieldDraft[]) => {
+      if (!agentConfig) return {};
 
       const newErrors: Record<string, string> = {};
-      agentConfig.values
-        .filter(
-          (v) =>
-            !removed.has(v.key) &&
-            v.type !== BlueprintValueType.PROMPT &&
-            v.type !== BlueprintValueType.BOOLEAN,
-        )
-        .forEach((v) => {
-          const err = validateBlueprintFieldValue(
-            v.type,
-            draftValues[v.key] ?? "",
-          );
-          if (err) newErrors[v.key] = err;
-        });
 
-      for (const [key, handle] of Object.entries(promptRefs.current)) {
-        if (removed.has(key)) continue;
-        if (handle) {
-          const err = handle.validate();
-          if (err) newErrors[key] = err;
+      // Existing scalar fields (PROMPT and BOOLEAN don't need value parsing)
+      for (const v of agentConfig.values) {
+        if (
+          removed.has(v.key) ||
+          v.type === BlueprintValueType.PROMPT ||
+          v.type === BlueprintValueType.BOOLEAN
+        ) {
+          continue;
         }
+        const err = validateBlueprintFieldValue(
+          v.type,
+          draftValues[v.key] ?? "",
+        );
+        if (err) newErrors[v.key] = err;
       }
 
+      // Existing prompt fields delegate validation to the editor handle
+      for (const [key, handle] of Object.entries(promptRefs.current)) {
+        if (!handle || removed.has(key)) continue;
+        const err = handle.validate();
+        if (err) newErrors[key] = err;
+      }
+
+      // New fields: key uniqueness + per-type value validation
       const existingKeys = new Set(
         agentConfig.values.filter((v) => !removed.has(v.key)).map((v) => v.key),
       );
@@ -169,20 +163,110 @@ export const useAgentConfigurationSave = ({
         else seenNewKeys.add(field.key.trim());
       }
 
-      if (Object.values(newErrors).some(Boolean)) {
-        setErrors(newErrors);
+      return newErrors;
+    },
+    [agentConfig, draftValues],
+  );
+
+  // Save dirty existing prompts. Returns a key→commit map of any new commits.
+  // Throws on failure (caught by caller).
+  const saveDirtyPromptVersions = useCallback(
+    async (removed: ReadonlySet<string>) => {
+      const results = await Promise.all(
+        Object.entries(promptRefs.current)
+          .filter(([key, handle]) => handle && !removed.has(key))
+          .map(([, handle]) => handle!.saveVersion()),
+      );
+
+      const commits = new Map<string, string>();
+      for (const r of results) {
+        if (r) commits.set(r.key, r.commit);
+      }
+      return commits;
+    },
+    [],
+  );
+
+  // Materialize new PROMPT fields by creating brand-new chat prompts in the
+  // library. Scalar fields pass through with their entered value. Returns
+  // null if any prompt creation fails.
+  const materializeNewFields = useCallback(
+    async (added: NewFieldDraft[]): Promise<BlueprintValue[] | null> => {
+      const out: BlueprintValue[] = [];
+      for (const field of added) {
+        const key = field.key.trim();
+        if (field.type !== BlueprintValueType.PROMPT) {
+          out.push({ key, type: field.type, value: field.value });
+          continue;
+        }
+        try {
+          const created = (await createPrompt({
+            prompt: {
+              name: key,
+              template: buildChatTemplateFromMessages(field.messages),
+              template_structure: PROMPT_TEMPLATE_STRUCTURE.CHAT,
+              project_id: projectId,
+            },
+            withResponse: true,
+          })) as PromptWithLatestVersion;
+          const commit = created?.latest_version?.commit;
+          if (!commit) return null;
+          out.push({ key, type: BlueprintValueType.PROMPT, value: commit });
+        } catch {
+          return null;
+        }
+      }
+      return out;
+    },
+    [createPrompt, projectId],
+  );
+
+  // Build a self-contained list of values for the new blueprint version.
+  // Removed keys are omitted; new fields are appended; PROMPT entries use
+  // newly-created commits when available; scalar entries use the latest
+  // draft value (falling back to the original).
+  const buildBlueprintValues = useCallback(
+    (
+      removed: ReadonlySet<string>,
+      newCommits: ReadonlyMap<string, string>,
+      addedValues: BlueprintValue[],
+    ): BlueprintValue[] => {
+      if (!agentConfig) return addedValues;
+      const kept = agentConfig.values
+        .filter((v) => !removed.has(v.key))
+        .map((v) => {
+          const value =
+            v.type === BlueprintValueType.PROMPT
+              ? newCommits.get(v.key) ?? v.value
+              : draftValues[v.key] ?? v.value;
+          return {
+            key: v.key,
+            type: v.type,
+            value,
+            ...(v.description ? { description: v.description } : {}),
+          };
+        });
+      return [...kept, ...addedValues];
+    },
+    [agentConfig, draftValues],
+  );
+
+  const validateAndBuildPayload = useCallback(
+    async (type: BlueprintType): Promise<AgentConfigPayload | null> => {
+      if (!agentConfig) return null;
+
+      const removed = removedKeys ?? new Set<string>();
+      const added = newFields ?? [];
+
+      const validationErrors = collectValidationErrors(removed, added);
+      if (Object.values(validationErrors).some(Boolean)) {
+        setErrors(validationErrors);
         return null;
       }
 
-      let promptResults: Awaited<
-        ReturnType<BlueprintValuePromptHandle["saveVersion"]>
-      >[];
+      let newCommits: Map<string, string>;
       try {
-        promptResults = await Promise.all(
-          Object.entries(promptRefs.current)
-            .filter(([key, handle]) => handle && !removed.has(key))
-            .map(([, handle]) => handle!.saveVersion()),
-        );
+        newCommits = await saveDirtyPromptVersions(removed);
       } catch {
         toast({
           title: "Failed to save prompt versions",
@@ -192,98 +276,42 @@ export const useAgentConfigurationSave = ({
         return null;
       }
 
-      const newCommits = new Map<string, string>();
-      for (const result of promptResults) {
-        if (result) {
-          newCommits.set(result.key, result.commit);
-        }
-      }
-
-      // Materialize new PROMPT fields by creating brand-new chat prompts in
-      // the library from the user-entered messages.
-      const addedValues: BlueprintValue[] = [];
-      for (const field of added) {
-        const key = field.key.trim();
-        if (field.type === BlueprintValueType.PROMPT) {
-          let created: PromptWithLatestVersion | undefined;
-          try {
-            created = (await createPrompt({
-              prompt: {
-                name: key,
-                template: buildChatTemplateFromMessages(field.messages),
-                template_structure: PROMPT_TEMPLATE_STRUCTURE.CHAT,
-                project_id: projectId,
-              },
-              withResponse: true,
-            })) as PromptWithLatestVersion;
-          } catch {
-            return null;
-          }
-          const commit = created?.latest_version?.commit;
-          if (!commit) return null;
-          addedValues.push({
-            key,
-            type: BlueprintValueType.PROMPT,
-            value: commit,
-          });
-        } else {
-          addedValues.push({ key, type: field.type, value: field.value });
-        }
-      }
-
-      // Always send the full set of values. Removed keys are omitted; new
-      // fields are appended. PROMPT-typed entries use the newly created
-      // commit if one was saved this round, otherwise the existing one.
-      // Scalar entries use the draft value if edited, otherwise the original.
-      const values: BlueprintValue[] = [
-        ...agentConfig.values
-          .filter((v) => !removed.has(v.key))
-          .map((v) => {
-            const isPrompt = v.type === BlueprintValueType.PROMPT;
-            const value = isPrompt
-              ? newCommits.get(v.key) ?? v.value
-              : draftValues[v.key] ?? v.value;
-            return {
-              key: v.key,
-              type: v.type,
-              value,
-              ...(v.description ? { description: v.description } : {}),
-            };
-          }),
-        ...addedValues,
-      ];
+      const addedValues = await materializeNewFields(added);
+      if (addedValues === null) return null;
 
       return {
         project_id: projectId,
         blueprint: {
           description: description || undefined,
           type,
-          values,
+          values: buildBlueprintValues(removed, newCommits, addedValues),
         },
       };
     },
     [
       agentConfig,
-      draftValues,
-      description,
-      projectId,
-      toast,
       removedKeys,
       newFields,
-      createPrompt,
+      collectValidationErrors,
+      saveDirtyPromptVersions,
+      materializeNewFields,
+      buildBlueprintValues,
+      projectId,
+      description,
+      toast,
     ],
   );
 
   const handleSave = useCallback(async () => {
     const payload = await validateAndBuildPayload(BlueprintType.BLUEPRINT);
     if (!payload) return;
-
     createConfig({ agentConfig: payload }, { onSuccess: onSaved });
   }, [validateAndBuildPayload, createConfig, onSaved]);
 
-  const buildMaskPayload = useCallback(async () => {
-    return validateAndBuildPayload(BlueprintType.MASK);
-  }, [validateAndBuildPayload]);
+  const buildMaskPayload = useCallback(
+    () => validateAndBuildPayload(BlueprintType.MASK),
+    [validateAndBuildPayload],
+  );
 
   return {
     handleSave,
