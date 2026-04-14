@@ -36,6 +36,11 @@ export interface LLMMessage {
   promptId?: string;
   promptVersionId?: string;
   autoImprove?: boolean;
+  blueprintRef?: {
+    blueprintId: string;
+    key: string;
+    commitId: string;
+  };
 }
 
 export type ProviderMessageType = Omit<LLMMessage, "id"> & {

@@ -13,7 +13,6 @@ import { StringParam, useQueryParam } from "use-query-params";
 
 import { cn, buildDocsUrl } from "@/lib/utils";
 import { getTimeFromNow } from "@/lib/date";
-import { generateBlueprintDescription } from "@/utils/agent-configurations";
 import Loader from "@/shared/Loader/Loader";
 import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
 import useConfigHistoryListInfinite from "@/api/agent-configs/useConfigHistoryListInfinite";
@@ -77,9 +76,6 @@ const HistoryPopover: React.FC<HistoryPopoverProps> = ({
       >
         {items.map((item, index) => {
           const isSelected = index === selectedIndex;
-          const blueprintDescription =
-            item.description || generateBlueprintDescription(item.values);
-
           return (
             <button
               key={item.id}
@@ -99,14 +95,16 @@ const HistoryPopover: React.FC<HistoryPopoverProps> = ({
                 <AgentConfigTagList tags={item.tags} size="sm" maxWidth={150} />
               </div>
               <div className="mt-1 flex flex-col gap-1 pl-[18px]">
-                <p className="comet-body-xs flex min-w-0 items-center gap-1 text-light-slate">
-                  <FilePen className="size-3 shrink-0" />
-                  <TooltipWrapper content={blueprintDescription}>
-                    <span className="w-fit max-w-full truncate">
-                      {blueprintDescription}
-                    </span>
-                  </TooltipWrapper>
-                </p>
+                {item.description && (
+                  <p className="comet-body-xs flex min-w-0 items-center gap-1 text-light-slate">
+                    <FilePen className="size-3 shrink-0" />
+                    <TooltipWrapper content={item.description}>
+                      <span className="w-fit max-w-full truncate">
+                        {item.description}
+                      </span>
+                    </TooltipWrapper>
+                  </p>
+                )}
                 <div className="comet-body-xs flex items-center gap-1 text-light-slate">
                   <Clock className="size-3 shrink-0" />
                   <span>{getTimeFromNow(item.created_at)}</span>

@@ -6,10 +6,14 @@ import React, {
   useRef,
   useState,
 } from "react";
-import { ArrowUpRight, Info, Save } from "lucide-react";
+import { ArrowUpRight, Info, Plus, RotateCcw, Save, Trash } from "lucide-react";
 import { Tag } from "@/ui/tag";
 
-import { BlueprintValueType, ConfigHistoryItem } from "@/types/agent-configs";
+import {
+  BlueprintValue,
+  BlueprintValueType,
+  ConfigHistoryItem,
+} from "@/types/agent-configs";
 import useAgentConfigById from "@/api/agent-configs/useAgentConfigById";
 import { Button } from "@/ui/button";
 import { Input } from "@/ui/input";
@@ -24,6 +28,10 @@ import {
   AgentConfigPayload,
 } from "./useAgentConfigurationSave";
 import SaveVersionDialog from "./SaveVersionDialog";
+import NewBlueprintFieldEditor, {
+  NewFieldDraft,
+  createNewFieldDraft,
+} from "./NewBlueprintFieldEditor";
 
 export type AgentConfigurationEditViewHandle = {
   hasChanges: () => boolean;
@@ -50,12 +58,17 @@ const AgentConfigurationEditView = React.forwardRef<
   const [dirtyPromptKeys, setDirtyPromptKeys] = useState<
     Record<string, boolean>
   >({});
+  const [removedKeys, setRemovedKeys] = useState<Set<string>>(new Set());
+  const [newFields, setNewFields] = useState<NewFieldDraft[]>([]);
   const originalValues = useRef<Record<string, string>>({});
   const initialized = useRef(false);
+  const newFieldIdRef = useRef(0);
 
   const handleSaveComplete = useCallback(() => {
     originalValues.current = { ...draftValues };
     setDirtyPromptKeys({});
+    setRemovedKeys(new Set());
+    setNewFields([]);
     setDescription("");
     onSaved();
   }, [draftValues, onSaved]);
@@ -76,6 +89,8 @@ const AgentConfigurationEditView = React.forwardRef<
     projectId,
     onSaved: handleSaveComplete,
     dirtyPromptKeys,
+    removedKeys,
+    newFields,
   });
 
   useImperativeHandle(ref, () => ({
@@ -104,12 +119,49 @@ const AgentConfigurationEditView = React.forwardRef<
     }
   };
 
+  const toggleRemoved = useCallback(
+    (key: string) => {
+      setRemovedKeys((prev) => {
+        const next = new Set(prev);
+        if (next.has(key)) next.delete(key);
+        else next.add(key);
+        return next;
+      });
+      clearError(key);
+    },
+    [clearError],
+  );
+
+  const handleAddNewField = useCallback(() => {
+    const id = `new-${++newFieldIdRef.current}`;
+    setNewFields((prev) => [...prev, createNewFieldDraft(id)]);
+  }, []);
+
+  const updateNewField = useCallback(
+    (next: NewFieldDraft) => {
+      setNewFields((prev) => prev.map((f) => (f.id === next.id ? next : f)));
+      if (errors[next.id]) clearError(next.id);
+    },
+    [errors, clearError],
+  );
+
+  const removeNewField = useCallback(
+    (id: string) => {
+      setNewFields((prev) => prev.filter((f) => f.id !== id));
+      clearError(id);
+    },
+    [clearError],
+  );
+
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const [diffPromptTemplates, setDiffPromptTemplates] = useState<
     Record<string, string>
   >({});
 
-  // Snapshot current prompt templates from editors before opening diff
+  // Snapshot current prompt templates from editors before opening diff. This
+  // covers both edited existing prompts and brand-new PROMPT fields whose
+  // commit doesn't exist yet — we serialize their in-memory messages so the
+  // diff view can render them.
   const handleOpenSaveDialog = () => {
     const templates: Record<string, string> = {};
     for (const [key, handle] of Object.entries(promptRefs.current)) {
@@ -117,18 +169,32 @@ const AgentConfigurationEditView = React.forwardRef<
         templates[key] = handle.getCurrentTemplate();
       }
     }
+    for (const field of newFields) {
+      if (field.type !== BlueprintValueType.PROMPT) continue;
+      const key = field.key.trim();
+      if (!key) continue;
+      templates[key] = JSON.stringify(
+        field.messages.map(({ role, content }) => ({ role, content })),
+      );
+    }
     setDiffPromptTemplates(templates);
     setSaveDialogOpen(true);
   };
 
-  const currentValues = useMemo(() => {
+  const currentValues = useMemo<BlueprintValue[]>(() => {
     if (!agentConfig) return [];
-    return agentConfig.values.map((v) =>
-      v.type === BlueprintValueType.PROMPT
-        ? v
-        : { ...v, value: draftValues[v.key] ?? v.value },
-    );
-  }, [agentConfig, draftValues]);
+    const kept = agentConfig.values
+      .filter((v) => !removedKeys.has(v.key))
+      .map((v) =>
+        v.type === BlueprintValueType.PROMPT
+          ? v
+          : { ...v, value: draftValues[v.key] ?? v.value },
+      );
+    const added: BlueprintValue[] = newFields
+      .filter((f) => f.key.trim())
+      .map((f) => ({ key: f.key.trim(), type: f.type, value: f.value }));
+    return [...kept, ...added];
+  }, [agentConfig, draftValues, removedKeys, newFields]);
 
   const hasErrors = Object.values(errors).some(Boolean);
 
@@ -172,16 +238,26 @@ const AgentConfigurationEditView = React.forwardRef<
 
       <div className="flex flex-col">
         {(agentConfig?.values ?? []).map((v) => {
+          const isRemoved = removedKeys.has(v.key);
           const isChanged =
             v.type === BlueprintValueType.PROMPT
               ? !!dirtyPromptKeys[v.key]
               : draftValues[v.key] !== undefined &&
                 draftValues[v.key] !== originalValues.current[v.key];
           return (
-            <div key={v.key} className="flex flex-col gap-2 py-3">
+            <div
+              key={v.key}
+              className={`flex flex-col gap-2 py-3 ${
+                isRemoved ? "opacity-60" : ""
+              }`}
+            >
               <div className="flex items-center gap-2">
                 <BlueprintTypeIcon type={v.type} variant="secondary" />
-                <span className="comet-body-s-accented text-foreground">
+                <span
+                  className={`comet-body-s-accented text-foreground ${
+                    isRemoved ? "line-through" : ""
+                  }`}
+                >
                   {v.key}
                 </span>
                 {v.description && (
@@ -189,11 +265,25 @@ const AgentConfigurationEditView = React.forwardRef<
                     <Info className="size-3.5 cursor-help text-light-slate" />
                   </TooltipWrapper>
                 )}
-                {isChanged && (
+                {(isChanged || isRemoved) && (
                   <span className="size-1.5 rounded-full bg-amber-400" />
                 )}
+                <div className="ml-auto">
+                  <TooltipWrapper
+                    content={isRemoved ? "Restore field" : "Remove field"}
+                  >
+                    <Button
+                      variant="minimal"
+                      size="icon-sm"
+                      onClick={() => toggleRemoved(v.key)}
+                      aria-label={isRemoved ? "Restore field" : "Remove field"}
+                    >
+                      {isRemoved ? <RotateCcw /> : <Trash />}
+                    </Button>
+                  </TooltipWrapper>
+                </div>
               </div>
-              {v.type === BlueprintValueType.PROMPT ? (
+              {isRemoved ? null : v.type === BlueprintValueType.PROMPT ? (
                 <div className="flex flex-col gap-1">
                   <BlueprintValuePrompt
                     key={v.value}
@@ -251,6 +341,39 @@ const AgentConfigurationEditView = React.forwardRef<
             </div>
           );
         })}
+
+        {newFields.length > 0 && (
+          <div className="flex flex-col gap-2 pt-3">
+            {newFields.map((field) => {
+              const reservedKeys = new Set([
+                ...(agentConfig?.values
+                  ?.filter((v) => !removedKeys.has(v.key))
+                  ?.map((v) => v.key) ?? []),
+                ...newFields
+                  .filter((f) => f.id !== field.id)
+                  .map((f) => f.key.trim())
+                  .filter(Boolean),
+              ]);
+              return (
+                <NewBlueprintFieldEditor
+                  key={field.id}
+                  field={field}
+                  reservedKeys={reservedKeys}
+                  onChange={updateNewField}
+                  onRemove={() => removeNewField(field.id)}
+                  error={errors[field.id]}
+                />
+              );
+            })}
+          </div>
+        )}
+
+        <div className="pt-3">
+          <Button variant="outline" size="sm" onClick={handleAddNewField}>
+            <Plus className="mr-1 size-3.5" />
+            Add field
+          </Button>
+        </div>
       </div>
 
       <SaveVersionDialog
