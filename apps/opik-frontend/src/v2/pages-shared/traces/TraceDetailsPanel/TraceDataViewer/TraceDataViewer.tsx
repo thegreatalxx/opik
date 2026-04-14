@@ -16,7 +16,6 @@ import TagList from "../TagList/TagList";
 import MessagesTab from "./MessagesTab";
 import DetailsTab from "./DetailsTab";
 import AgentGraphTab from "./AgentGraphTab";
-import PromptsTab from "./PromptsTab";
 import AgentConfigurationTab, {
   isAgentConfigurationMetadata,
 } from "./AgentConfigurationTab";
@@ -36,8 +35,6 @@ import ExplainerIcon from "@/shared/ExplainerIcon/ExplainerIcon";
 import useTraceFeedbackScoreDeleteMutation from "@/api/traces/useTraceFeedbackScoreDeleteMutation";
 import ConfigurableFeedbackScoreTable from "./FeedbackScoreTable/ConfigurableFeedbackScoreTable";
 import { detectLLMMessages } from "@/shared/PrettyLLMMessage/llmMessages";
-import { useIsFeatureEnabled } from "@/contexts/feature-toggles-provider";
-import { FeatureToggleKeys } from "@/types/feature-toggles";
 import { useUnifiedMedia } from "@/hooks/useUnifiedMedia";
 
 type TraceDataViewerProps = {
@@ -78,15 +75,6 @@ const TraceDataViewer: React.FunctionComponent<TraceDataViewerProps> = ({
   );
   const hasSpanAgentGraph =
     Boolean(agentGraphData) && type !== TRACE_TYPE_FOR_TREE;
-  const showOptimizerPrompts = useIsFeatureEnabled(
-    FeatureToggleKeys.OPTIMIZATION_STUDIO_ENABLED,
-  );
-  const hasPrompts = useMemo(() => {
-    if (!showOptimizerPrompts) return false;
-    const prompts = (data.metadata as Record<string, unknown>)?.opik_prompts;
-    return Array.isArray(prompts) && prompts.length > 0;
-  }, [data.metadata, showOptimizerPrompts]);
-
   const hasAgentConfiguration = useMemo(() => {
     const config = (data.metadata as Record<string, unknown>)?.[
       AGENT_CONFIGURATION_METADATA_KEY
@@ -130,7 +118,6 @@ const TraceDataViewer: React.FunctionComponent<TraceDataViewerProps> = ({
     // Fall back when a tab is not available
     if (normalizedTab === "messages" && !canShowMessagesTab) return "details";
     if (normalizedTab === "graph" && !hasSpanAgentGraph) return defaultTab;
-    if (normalizedTab === "prompts" && !hasPrompts) return defaultTab;
     if (normalizedTab === "configuration" && !hasAgentConfiguration)
       return defaultTab;
 
@@ -140,7 +127,6 @@ const TraceDataViewer: React.FunctionComponent<TraceDataViewerProps> = ({
     defaultTab,
     canShowMessagesTab,
     hasSpanAgentGraph,
-    hasPrompts,
     hasAgentConfiguration,
   ]);
 
@@ -309,11 +295,6 @@ const TraceDataViewer: React.FunctionComponent<TraceDataViewerProps> = ({
                 {...EXPLAINERS_MAP[EXPLAINER_ID.what_are_feedback_scores]}
               />
             </TabsTrigger>
-            {hasPrompts && (
-              <TabsTrigger variant="underline" value="prompts">
-                Prompts
-              </TabsTrigger>
-            )}
             {hasSpanAgentGraph && (
               <TabsTrigger variant="underline" value="graph">
                 Agent graph
@@ -381,11 +362,6 @@ const TraceDataViewer: React.FunctionComponent<TraceDataViewerProps> = ({
               )}
             </div>
           </TabsContent>
-          {hasPrompts && (
-            <TabsContent value="prompts">
-              <PromptsTab data={data} search={search} />
-            </TabsContent>
-          )}
           {hasSpanAgentGraph && (
             <TabsContent value="graph">
               <AgentGraphTab data={agentGraphData} />
