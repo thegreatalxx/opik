@@ -273,3 +273,55 @@ def test_run_tests__explicit_client__used_for_experiment_creation():
             experiment_name="explicit-experiment",
             verbose=0,
         )
+
+    explicit_client.create_experiment.assert_called_once()
+
+
+def test_run_tests__explicit_client__propagated_to_worker_threads(
+    fake_backend,
+):
+    """The suite's client is visible via get_global_client() inside worker threads."""
+    items = [
+        dataset_item.DatasetItem(
+            id="item-1", input={"message": "hello"}, reference="ref"
+        ),
+        dataset_item.DatasetItem(
+            id="item-2", input={"message": "world"}, reference="ref"
+        ),
+    ]
+    mock_dataset = _create_mock_dataset(items=items)
+
+    mock_experiment = mock.Mock()
+    mock_experiment.id = "exp-thread"
+    mock_experiment.name = "thread-test-experiment"
+
+    mock_create_experiment = mock.Mock(return_value=mock_experiment)
+    mock_get_url = mock.Mock(return_value="any_url")
+
+    clients_seen_in_threads = []
+
+    def task_that_captures_client(item):
+        client = opik_client.get_global_client()
+        clients_seen_in_threads.append((threading.current_thread().name, id(client)))
+        return {"input": item, "output": "response"}
+
+    suite = _create_suite(mock_dataset)
+
+    with mock.patch.object(
+        opik_client.Opik, "create_experiment", mock_create_experiment
+    ):
+        with mock.patch.object(url_helpers, "get_experiment_url_by_id", mock_get_url):
+            evaluator_module.run_tests(
+                test_suite=suite,
+                task=task_that_captures_client,
+                experiment_name="thread-test-experiment",
+                verbose=0,
+                worker_threads=2,
+            )
+
+    assert len(clients_seen_in_threads) == 2
+    client_ids = {entry[1] for entry in clients_seen_in_threads}
+    assert len(client_ids) == 1, (
+        f"Worker threads should all see the same client instance, "
+        f"but saw {len(client_ids)} distinct clients"
+    )

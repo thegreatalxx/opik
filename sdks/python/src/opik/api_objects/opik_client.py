@@ -1425,7 +1425,7 @@ class Opik:
         prompt: Optional[prompt_module.base_prompt.BasePrompt] = None,
         prompts: Optional[List[prompt_module.base_prompt.BasePrompt]] = None,
         type: Literal["regular", "trial", "mini-batch"] = "regular",
-        evaluation_method: Literal["dataset", "test_suite"] = "dataset",
+        evaluation_method: Literal["dataset", "evaluation_suite"] = "dataset",
         optimization_id: Optional[str] = None,
         tags: Optional[List[str]] = None,
         dataset_version_id: Optional[str] = None,

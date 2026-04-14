@@ -1013,7 +1013,6 @@ def test_get_or_create_test_suite__existing_with_different_policy__does_not_modi
     assert set(assertions) == {"Response is helpful"}
 
 
-
 def test_test_suite__update_assertions_only__keeps_existing_policy(
     opik_client: opik.Opik, dataset_name: str
 ):
