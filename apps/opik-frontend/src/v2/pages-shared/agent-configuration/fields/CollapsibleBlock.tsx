@@ -10,6 +10,8 @@ type CollapsibleBlockProps = {
   onToggle: () => void;
   active?: boolean;
   tone?: "muted" | "white";
+  trailing?: React.ReactNode;
+  headerPrefix?: React.ReactNode;
   children: React.ReactNode;
   testId?: string;
 };
@@ -21,6 +23,8 @@ const CollapsibleBlock: React.FC<CollapsibleBlockProps> = ({
   onToggle,
   active,
   tone = "muted",
+  trailing,
+  headerPrefix,
   children,
   testId,
 }) => {
@@ -62,6 +66,9 @@ const CollapsibleBlock: React.FC<CollapsibleBlockProps> = ({
             ) : (
               <ChevronRight className="size-3.5 shrink-0 text-light-slate" />
             ))}
+          {headerPrefix && (
+            <div onClick={(e) => e.stopPropagation()}>{headerPrefix}</div>
+          )}
           {label && (
             <span
               className={cn(
@@ -71,6 +78,14 @@ const CollapsibleBlock: React.FC<CollapsibleBlockProps> = ({
             >
               {label}
             </span>
+          )}
+          {trailing && (
+            <div
+              className="ml-auto flex items-center"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {trailing}
+            </div>
           )}
         </div>
       )}

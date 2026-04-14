@@ -13,7 +13,10 @@ import { PROMPT_TEMPLATE_STRUCTURE } from "@/types/prompts";
 import usePromptByCommit from "@/api/prompts/usePromptByCommit";
 import useCreatePromptVersionMutation from "@/api/prompts/useCreatePromptVersionMutation";
 import Loader from "@/shared/Loader/Loader";
-import { parseChatTemplateToLLMMessages } from "@/lib/llm";
+import {
+  generateDefaultLLMPromptMessage,
+  parseChatTemplateToLLMMessages,
+} from "@/lib/llm";
 import { BlueprintValuePromptHandle } from "@/v2/pages-shared/traces/ConfigurationTab/BlueprintValuePrompt";
 import AutoResizeTextarea from "./AutoResizeTextarea";
 import BlueprintChatMessages from "./BlueprintChatMessages";
@@ -102,6 +105,38 @@ const BlueprintValuePromptCompact = forwardRef<
         }
         return next;
       });
+    };
+
+    const handleAddMessage = () => {
+      setDraftMessages((prev) => [...prev, generateDefaultLLMPromptMessage()]);
+    };
+
+    const handleDeleteMessage = (index: number) => {
+      setDraftMessages((prev) => prev.filter((_, i) => i !== index));
+    };
+
+    const handleDuplicateMessage = (index: number) => {
+      setDraftMessages((prev) => {
+        const clone = generateDefaultLLMPromptMessage({
+          role: prev[index].role,
+          content: prev[index].content,
+        });
+        const next = [...prev];
+        next.splice(index + 1, 0, clone);
+        return next;
+      });
+    };
+
+    const handleChangeRole = (index: number, role: LLM_MESSAGE_ROLE) => {
+      setDraftMessages((prev) => {
+        const next = [...prev];
+        next[index] = { ...next[index], role };
+        return next;
+      });
+    };
+
+    const handleReorder = (reordered: LLMMessage[]) => {
+      setDraftMessages(reordered);
     };
 
     const messagesForRead = useMemo<LLMMessage[]>(() => {
@@ -207,6 +242,11 @@ const BlueprintValuePromptCompact = forwardRef<
           onToggle={toggleMessage}
           editable={isEditing}
           onChangeMessage={handleChangeMessage}
+          onChangeRole={isEditing ? handleChangeRole : undefined}
+          onAddMessage={isEditing ? handleAddMessage : undefined}
+          onDeleteMessage={isEditing ? handleDeleteMessage : undefined}
+          onDuplicateMessage={isEditing ? handleDuplicateMessage : undefined}
+          onReorder={isEditing ? handleReorder : undefined}
           tone={tone}
         />
       );
