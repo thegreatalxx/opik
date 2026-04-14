@@ -117,6 +117,11 @@ const useDatasetItemsSave = ({
       changesMutation.mutate(
         buildInitialVersionPayload({ tags, changeDescription }),
         {
+          onError: (error) => {
+            if ((error as AxiosError).response?.status === 409) {
+              setPendingVersionData({ tags, changeDescription });
+            }
+          },
           onSuccess: (initialVersion) => {
             const itemPayload = buildPayload({
               baseVersionOverride: initialVersion?.id,

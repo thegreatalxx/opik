@@ -49,6 +49,8 @@ import useDatasetItemsSave from "./useDatasetItemsSave";
 import DatasetItemsPageHeader from "./DatasetItemsPageHeader";
 import { useState } from "react";
 
+const POLLING_INTERVAL_MS = 3000;
+
 function DatasetItemsPage(): React.ReactElement {
   const datasetId = useDatasetEntityIdFromURL();
   const activeProjectId = useActiveProjectId();
@@ -70,7 +72,9 @@ function DatasetItemsPage(): React.ReactElement {
     {
       refetchInterval: (query) => {
         const status = query.state.data?.status;
-        return status === DATASET_STATUS.processing ? 3000 : false;
+        return status === DATASET_STATUS.processing
+          ? POLLING_INTERVAL_MS
+          : false;
       },
     },
   );
