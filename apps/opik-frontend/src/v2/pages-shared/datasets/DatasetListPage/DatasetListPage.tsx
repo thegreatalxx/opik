@@ -14,10 +14,11 @@ import DataTablePagination from "@/shared/DataTablePagination/DataTablePaginatio
 import DataTableNoData from "@/shared/DataTableNoData/DataTableNoData";
 import PageEmptyState from "@/shared/PageEmptyState/PageEmptyState";
 import useProjectDatasetsList from "@/api/datasets/useProjectDatasetsList";
-import { Dataset, DATASET_TYPE } from "@/types/datasets";
+import { Dataset, DATASET_TYPE, DatasetListType } from "@/types/datasets";
 import Loader from "@/shared/Loader/Loader";
 import AddEditDatasetDialog from "@/v2/pages-shared/datasets/AddEditDatasetDialog/AddEditDatasetDialog";
 import AddEditTestSuiteDialog from "@/v2/pages-shared/datasets/AddEditTestSuiteDialog/AddEditTestSuiteDialog";
+import CreateDatasetSidebar from "@/v2/pages-shared/datasets/CreateDatasetSidebar/CreateDatasetSidebar";
 import DatasetActionsPanel from "@/v2/pages-shared/datasets/DatasetActionsPanel/DatasetActionsPanel";
 import { createDatasetRowActionsCell } from "@/v2/pages-shared/datasets/DatasetRowActionsCell/DatasetRowActionsCell";
 import { Plus } from "lucide-react";
@@ -50,8 +51,6 @@ import { buildDocsUrl } from "@/lib/utils";
 import { Filter } from "@/types/filters";
 import emptyTestSuitesLightUrl from "/images/empty-test-suites-light.svg";
 import emptyTestSuitesDarkUrl from "/images/empty-test-suites-dark.svg";
-
-export type DatasetListType = "dataset" | "test_suite";
 
 type DatasetListPageProps = {
   type: DatasetListType;
@@ -519,19 +518,12 @@ const DatasetListPage: React.FunctionComponent<DatasetListPageProps> = ({
           </div>
         </>
       )}
-      {config.useSimpleDialog ? (
-        <AddEditDatasetDialog
-          open={openDialog}
-          setOpen={setOpenDialog}
-          onDatasetCreated={handleRowClick}
-        />
-      ) : (
-        <AddEditTestSuiteDialog
-          open={openDialog}
-          setOpen={setOpenDialog}
-          onDatasetCreated={handleRowClick}
-        />
-      )}
+      <CreateDatasetSidebar
+        type={type}
+        open={openDialog}
+        setOpen={setOpenDialog}
+        onDatasetCreated={handleRowClick}
+      />
     </div>
   );
 };

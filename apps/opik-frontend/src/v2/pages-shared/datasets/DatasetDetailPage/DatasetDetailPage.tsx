@@ -4,6 +4,7 @@ import {
   Outlet,
   useLocation,
   useMatchRoute,
+  useParams,
 } from "@tanstack/react-router";
 import useDatasetById from "@/api/datasets/useDatasetById";
 import useBreadcrumbsStore from "@/store/BreadcrumbsStore";
@@ -14,22 +15,22 @@ const DatasetDetailPage = () => {
 
   const datasetId = useDatasetEntityIdFromURL();
 
+  const allParams = useParams({ strict: false }) as Record<string, string>;
+  const breadcrumbKey = "datasetId" in allParams ? "datasetId" : "suiteId";
+
   const matchRoute = useMatchRoute();
 
   const pathname = useLocation({
     select: (location) => location.pathname,
   });
 
-  const isDatasetRoute = matchRoute({
-    to: "/$workspaceName/projects/$projectId/datasets/$datasetId",
-  });
-
-  const isSuiteRoute = matchRoute({
-    to: "/$workspaceName/projects/$projectId/test-suites/$suiteId",
-  });
-
-  const isDetailRoot = isDatasetRoute || isSuiteRoute;
-  const breadcrumbKey = isDatasetRoute ? "datasetId" : "suiteId";
+  const isDetailRoot =
+    matchRoute({
+      to: "/$workspaceName/projects/$projectId/datasets/$datasetId",
+    }) ||
+    matchRoute({
+      to: "/$workspaceName/projects/$projectId/test-suites/$suiteId",
+    });
 
   const { data } = useDatasetById({
     datasetId,

@@ -66,6 +66,7 @@ import {
   useIsDraftMode,
   useIsAllItemsSelected,
   useSetIsAllItemsSelected,
+  useDeletedIds,
 } from "@/store/TestSuiteDraftStore";
 import { COLUMN_ID_ID } from "@/types/shared";
 import { DynamicColumn } from "@/types/shared";
@@ -210,6 +211,7 @@ function DatasetItemsTab({
   );
 
   const isDraftMode = useIsDraftMode();
+  const deletedIds = useDeletedIds();
 
   const { data, isPending, isPlaceholderData, isFetching } =
     useDatasetItemsWithDraft(
@@ -315,6 +317,13 @@ function DatasetItemsTab({
   >(storageKeys.columnsWidthKey, {
     defaultValue: {},
   });
+
+  const noDataText = useMemo(() => {
+    if (isDraftMode && deletedIds.size > 0) {
+      return `All ${entityName} items on this page have been deleted`;
+    }
+    return `No ${entityName} items yet`;
+  }, [isDraftMode, deletedIds.size, entityName]);
 
   const handleSearchChange = useCallback(
     (newSearch: string | null) => {
@@ -611,15 +620,21 @@ function DatasetItemsTab({
         columnPinning={DEFAULT_COLUMN_PINNING}
         noData={
           <DataTableEmptyContent
-            title={`No ${entityName} items yet`}
-            description="Add test cases to run evaluations and measure performance."
+            title={noDataText}
+            description={
+              isDraftMode && deletedIds.size > 0
+                ? ""
+                : "Add test cases to run evaluations and measure performance."
+            }
           >
-            <button
-              onClick={handleNewDatasetItemClick}
-              className="comet-body-s underline underline-offset-4 hover:text-primary"
-            >
-              Add new item
-            </button>
+            {!(isDraftMode && deletedIds.size > 0) && (
+              <button
+                onClick={handleNewDatasetItemClick}
+                className="comet-body-s underline underline-offset-4 hover:text-primary"
+              >
+                Add new item
+              </button>
+            )}
           </DataTableEmptyContent>
         }
       />
