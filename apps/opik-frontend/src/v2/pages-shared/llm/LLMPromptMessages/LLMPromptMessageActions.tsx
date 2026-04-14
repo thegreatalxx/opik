@@ -10,6 +10,7 @@ import isEqual from "fast-deep-equal";
 
 import { OnChangeFn } from "@/types/shared";
 import { LLMMessage, MessageContent } from "@/types/llm";
+import { BlueprintPromptRef } from "@/types/playground";
 import { PROMPT_TEMPLATE_STRUCTURE } from "@/types/prompts";
 import { Button } from "@/ui/button";
 import TooltipWrapper from "@/shared/TooltipWrapper/TooltipWrapper";
@@ -31,7 +32,6 @@ import {
 } from "@/lib/llm";
 import usePromptByCommit from "@/api/prompts/usePromptByCommit";
 import useSavePromptToBlueprint from "@/v2/pages-shared/llm/BlueprintPromptsSelectBox/useSavePromptToBlueprint";
-import { BlueprintPromptRef } from "@/types/playground";
 
 export interface ImprovePromptConfig {
   model: string;
@@ -228,13 +228,7 @@ const LLMPromptMessageActions: React.FC<LLMPromptLibraryActionsProps> = ({
         template: convertMessageToMessagesJson(message),
       });
       if (newRef) {
-        onChangeMessage({
-          blueprintRef: {
-            blueprintId: newRef.blueprintId,
-            key: newRef.key,
-            commitId: newRef.commitId,
-          },
-        });
+        onChangeMessage({ blueprintRef: newRef });
         loadedCommitRef.current = newRef.commitId;
       }
       setShowSaveNew(false);
@@ -249,8 +243,8 @@ const LLMPromptMessageActions: React.FC<LLMPromptLibraryActionsProps> = ({
   return (
     <>
       <div className="flex min-w-0 cursor-default flex-nowrap items-center">
-        <div className="shrink-0">
-          {improvePromptConfig && !hasContent && (
+        {improvePromptConfig && (
+          <div className="shrink-0">
             <TooltipWrapper content={promptButtonTooltip}>
               <Button
                 variant="minimal"
@@ -259,28 +253,15 @@ const LLMPromptMessageActions: React.FC<LLMPromptLibraryActionsProps> = ({
                 type="button"
                 disabled={isPromptButtonDisabled}
               >
-                <Sparkles />
+                {hasContent ? <Wand2 /> : <Sparkles />}
               </Button>
             </TooltipWrapper>
-          )}
-          {improvePromptConfig && hasContent && (
-            <TooltipWrapper content={promptButtonTooltip}>
-              <Button
-                variant="minimal"
-                size="icon-sm"
-                onClick={handleOpenWizard}
-                type="button"
-                disabled={isPromptButtonDisabled}
-              >
-                <Wand2 />
-              </Button>
-            </TooltipWrapper>
-          )}
-        </div>
+          </div>
+        )}
 
         <BlueprintPromptsSelectBox
           projectId={activeProjectId!}
-          value={blueprintRef as BlueprintPromptRef | undefined}
+          value={blueprintRef}
           onValueChange={handleSelectRef}
           onClear={handleDetach}
           onOpenChange={onPromptSelectBoxOpenChange}
