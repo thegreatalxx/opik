@@ -285,6 +285,7 @@ const LLMPromptMessageActions: React.FC<LLMPromptLibraryActionsProps> = ({
           onClear={handleDetach}
           onOpenChange={onPromptSelectBoxOpenChange}
           hasUnsavedChanges={hasUnsavedChanges}
+          filterByTemplateStructure={PROMPT_TEMPLATE_STRUCTURE.TEXT}
         />
 
         {hasContent && (
