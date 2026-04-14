@@ -69,7 +69,6 @@ import {
   useIsDraftMode,
   useIsAllItemsSelected,
   useSetIsAllItemsSelected,
-  useDeletedIds,
 } from "@/store/TestSuiteDraftStore";
 
 const getRowId = (d: DatasetItem) => d.id;
@@ -189,7 +188,6 @@ function TestSuiteItemsTab({
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
   const isAllItemsSelected = useIsAllItemsSelected();
   const setIsAllItemsSelected = useSetIsAllItemsSelected();
-  const deletedIds = useDeletedIds();
 
   const [height, setHeight] = useQueryParamAndLocalStorageState<
     string | null | undefined
@@ -288,9 +286,6 @@ function TestSuiteItemsTab({
   >(storageKeys.columnsWidthKey, {
     defaultValue: {},
   });
-
-  const itemLabel = isTestSuite ? "suite items" : "dataset items";
-
 
   const handleSearchChange = useCallback(
     (newSearch: string | null) => {
