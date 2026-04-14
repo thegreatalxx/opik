@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { ChevronRight, ExternalLink } from "lucide-react";
 
 import { Button } from "@/ui/button";
@@ -6,20 +6,24 @@ import { Description } from "@/ui/description";
 import { Input } from "@/ui/input";
 import { Label } from "@/ui/label";
 import { Separator } from "@/ui/separator";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/ui/tabs";
 import { Textarea } from "@/ui/textarea";
-import { cn, buildDocsUrl } from "@/lib/utils";
+import { cn, buildDocsUrl, escapeJsString } from "@/lib/utils";
 import {
   Accordion,
   AccordionContent,
   AccordionItem,
   CustomAccordionTrigger,
 } from "@/ui/accordion";
+import CopyButton from "@/shared/CopyButton/CopyButton";
 import ResizableSidePanel from "@/shared/ResizableSidePanel/ResizableSidePanel";
 import AssertionsField from "@/shared/AssertionField/AssertionsField";
 import ConfirmDialog from "@/shared/ConfirmDialog/ConfirmDialog";
 import UploadField from "@/shared/UploadField/UploadField";
 import CsvUploadDialog from "@/v2/pages-shared/datasets/CsvUploadDialog/CsvUploadDialog";
 import useDatasetForm from "@/v2/pages-shared/datasets/AddEditDatasetDialog/useDatasetForm";
+import useProjectById from "@/api/projects/useProjectById";
+import { useActiveProjectId } from "@/store/AppStore";
 import CreatedSuccess from "./CreatedSuccess";
 import { Dataset, DATASET_TYPE, DatasetListType } from "@/types/datasets";
 import { MAX_RUNS_PER_ITEM } from "@/types/test-suites";
@@ -34,13 +38,11 @@ enum Step {
 
 const TYPE_CONFIG = {
   dataset: {
-    panelTitle: "Create dataset",
     entityName: "Dataset",
     datasetType: DATASET_TYPE.DATASET,
     skipEvaluationCriteria: true,
   },
   test_suite: {
-    panelTitle: "Create test suite",
     entityName: "Test suite",
     datasetType: DATASET_TYPE.TEST_SUITE,
     skipEvaluationCriteria: false,
@@ -58,6 +60,15 @@ const CreateDatasetSidebar: React.FunctionComponent<
   CreateDatasetSidebarProps
 > = ({ type, open, setOpen, onDatasetCreated }) => {
   const config = TYPE_CONFIG[type];
+  const entityLabel =
+    config.entityName[0].toLowerCase() + config.entityName.slice(1);
+
+  const activeProjectId = useActiveProjectId();
+  const { data: activeProject } = useProjectById(
+    { projectId: activeProjectId! },
+    { enabled: !!activeProjectId },
+  );
+  const projectName = activeProject?.name ?? "";
 
   const [step, setStep] = useState<Step>(Step.NAME_DESCRIPTION);
   const [createdName, setCreatedName] = useState("");
@@ -111,12 +122,42 @@ const CreateDatasetSidebar: React.FunctionComponent<
     onCreateSuccess: handleCreateSuccess,
   });
 
+  const [sdkLanguage, setSdkLanguage] = useState<"python" | "typescript">(
+    "python",
+  );
+
+  const escapedProjectName = useMemo(
+    () => projectName.replace(/\\/g, "\\\\").replace(/"/g, '\\"'),
+    [projectName],
+  );
+
+  const pythonSnippet = useMemo(() => {
+    const escapedName = name.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+    if (type === "test_suite") {
+      return `import opik\n\nclient = opik.Opik()\nsuite = client.get_or_create_test_suite(name="${escapedName}", project_name="${escapedProjectName}")`;
+    }
+    return `import opik\n\nclient = opik.Opik()\ndataset = client.get_or_create_dataset(name="${escapedName}", project_name="${escapedProjectName}")`;
+  }, [name, type, escapedProjectName]);
+
+  const typescriptSnippet = useMemo(() => {
+    const escapedName = escapeJsString(name);
+    const jsProjectName = escapeJsString(projectName);
+    if (type === "test_suite") {
+      return `import { Opik } from 'opik';\n\nconst client = new Opik();\nconst suite = await client.getOrCreateTestSuite({ name: "${escapedName}", projectName: "${jsProjectName}" });`;
+    }
+    return `import { Opik } from 'opik';\n\nconst client = new Opik();\nconst dataset = await client.getOrCreateDataset("${escapedName}", undefined, "${jsProjectName}");`;
+  }, [name, type, projectName]);
+
+  const activeSnippet =
+    sdkLanguage === "python" ? pythonSnippet : typescriptSnippet;
+
   useEffect(() => {
     if (!open) {
       const timeout = setTimeout(() => {
         setStep(Step.NAME_DESCRIPTION);
         setCreatedName("");
         setNavigateToEntity(null);
+        setSdkLanguage("python");
       }, 200);
       return () => clearTimeout(timeout);
     }
@@ -139,6 +180,7 @@ const CreateDatasetSidebar: React.FunctionComponent<
     setName("");
     setDescription("");
     setAssertions([]);
+    setSdkLanguage("python");
   }, [setName, setDescription, setAssertions]);
 
   const renderStepNameDescription = () => (
@@ -147,7 +189,7 @@ const CreateDatasetSidebar: React.FunctionComponent<
         <Label htmlFor={`${type}Name`}>Name</Label>
         <Input
           id={`${type}Name`}
-          placeholder="Name"
+          placeholder={`Name your ${entityLabel}...`}
           value={name}
           className={
             nameError && "!border-destructive focus-visible:!border-destructive"
@@ -175,7 +217,7 @@ const CreateDatasetSidebar: React.FunctionComponent<
         <Label htmlFor={`${type}Description`}>Description</Label>
         <Textarea
           id={`${type}Description`}
-          placeholder="Description"
+          placeholder={`Describe your ${entityLabel}...`}
           className="min-h-28"
           value={description}
           onChange={(event) => setDescription(event.target.value)}
@@ -187,9 +229,19 @@ const CreateDatasetSidebar: React.FunctionComponent<
 
   const renderStepUploadAndConfig = () => (
     <>
-      <div className="flex flex-col gap-2 pb-4">
-        <Label>Upload a CSV</Label>
-        <Description className="tracking-normal">
+      <div className="mb-4">
+        <h3 className="comet-body-s-accented">{`Add ${
+          type === "test_suite" ? "test " : ""
+        }data`}</h3>
+        <p className="comet-body-xs text-light-slate">
+          {`Choose how to provide your ${
+            type === "test_suite" ? "test " : ""
+          }data`}
+        </p>
+      </div>
+      <div className="mb-4">
+        <Label className="mb-2 block">Upload CSV</Label>
+        <Description className="mb-2 tracking-normal">
           {isCsvUploadEnabled ? (
             <>
               Your CSV file can be up to {fileSizeLimit}MB in size. The file
@@ -221,6 +273,39 @@ const CreateDatasetSidebar: React.FunctionComponent<
             csvFile && !csvError ? "CSV file ready to upload" : undefined
           }
         />
+      </div>
+      <div className="mb-4">
+        <div className="mb-2 flex items-center justify-between">
+          <Label>Use SDK</Label>
+          <CopyButton
+            text={activeSnippet}
+            tooltipText="Copy code"
+            message="Code copied to clipboard"
+          />
+        </div>
+        <Tabs
+          value={sdkLanguage}
+          onValueChange={(v) => setSdkLanguage(v as "python" | "typescript")}
+        >
+          <TabsList variant="underline" className="mb-0 gap-4">
+            <TabsTrigger variant="underline" size="sm" value="python">
+              Python
+            </TabsTrigger>
+            <TabsTrigger variant="underline" size="sm" value="typescript">
+              TypeScript
+            </TabsTrigger>
+          </TabsList>
+          <TabsContent value="python" className="mt-0">
+            <pre className="overflow-x-auto rounded-b-md border border-t-0 border-border bg-primary-foreground p-3 font-mono text-[13px] leading-relaxed">
+              {pythonSnippet}
+            </pre>
+          </TabsContent>
+          <TabsContent value="typescript" className="mt-0">
+            <pre className="overflow-x-auto rounded-b-md border border-t-0 border-border bg-primary-foreground p-3 font-mono text-[13px] leading-relaxed">
+              {typescriptSnippet}
+            </pre>
+          </TabsContent>
+        </Tabs>
       </div>
       {type === "test_suite" && (
         <Accordion type="single" collapsible>
@@ -376,7 +461,7 @@ const CreateDatasetSidebar: React.FunctionComponent<
         minWidth={450}
         closeButtonPosition="right"
         headerContent={
-          <span className="comet-title-xs">{config.panelTitle}</span>
+          <span className="comet-title-xs">{`Create ${entityLabel}`}</span>
         }
       >
         <div className="flex size-full flex-col">
