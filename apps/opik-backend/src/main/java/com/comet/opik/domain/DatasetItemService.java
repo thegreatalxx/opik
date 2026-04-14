@@ -70,10 +70,12 @@ public interface DatasetItemService {
 
     Mono<Long> saveBatch(UUID datasetId, List<DatasetItem> items);
 
-    Mono<Void> createFromTraces(UUID datasetId, Set<UUID> traceIds, TraceEnrichmentOptions enrichmentOptions);
+    Mono<Void> createFromTraces(UUID datasetId, Set<UUID> traceIds, TraceEnrichmentOptions enrichmentOptions,
+            List<EvaluatorItem> evaluators, ExecutionPolicy executionPolicy);
 
     Mono<Void> createFromSpans(UUID datasetId, Set<UUID> spanIds,
-            SpanEnrichmentOptions enrichmentOptions);
+            SpanEnrichmentOptions enrichmentOptions, List<EvaluatorItem> evaluators,
+            ExecutionPolicy executionPolicy);
 
     Mono<DatasetItem> get(UUID id);
 
@@ -175,7 +177,9 @@ class DatasetItemServiceImpl implements DatasetItemService {
     public Mono<Void> createFromTraces(
             @NonNull UUID datasetId,
             @NonNull Set<UUID> traceIds,
-            @NonNull TraceEnrichmentOptions enrichmentOptions) {
+            @NonNull TraceEnrichmentOptions enrichmentOptions,
+            List<EvaluatorItem> evaluators,
+            ExecutionPolicy executionPolicy) {
 
         log.info("Creating dataset items from '{}' traces for dataset '{}'", traceIds.size(), datasetId);
 
@@ -199,6 +203,8 @@ class DatasetItemServiceImpl implements DatasetItemService {
                                         .source(DatasetItemSource.TRACE)
                                         .traceId(entry.getKey())
                                         .data(filterDataForDatasetType(entry.getValue(), dataset.type()))
+                                        .evaluators(evaluators)
+                                        .executionPolicy(executionPolicy)
                                         .build())
                                 .toList();
 
@@ -224,7 +230,9 @@ class DatasetItemServiceImpl implements DatasetItemService {
     public Mono<Void> createFromSpans(
             @NonNull UUID datasetId,
             @NonNull Set<UUID> spanIds,
-            @NonNull SpanEnrichmentOptions enrichmentOptions) {
+            @NonNull SpanEnrichmentOptions enrichmentOptions,
+            List<EvaluatorItem> evaluators,
+            ExecutionPolicy executionPolicy) {
 
         log.info("Creating dataset items from '{}' spans for dataset '{}'", spanIds.size(), datasetId);
 
@@ -248,6 +256,8 @@ class DatasetItemServiceImpl implements DatasetItemService {
                                         .source(DatasetItemSource.SPAN)
                                         .spanId(entry.getKey())
                                         .data(filterDataForDatasetType(entry.getValue(), dataset.type()))
+                                        .evaluators(evaluators)
+                                        .executionPolicy(executionPolicy)
                                         .build())
                                 .toList();
 
@@ -270,11 +280,11 @@ class DatasetItemServiceImpl implements DatasetItemService {
 
     Map<String, JsonNode> filterDataForDatasetType(
             Map<String, JsonNode> data, DatasetType datasetType) {
-        if (datasetType != DatasetType.EVALUATION_SUITE) {
+        if (datasetType != DatasetType.TEST_SUITE) {
             return data;
         }
 
-        // For evaluation suites, use only the input value as top-level data
+        // For test suites, use only the input value as top-level data
         var inputNode = data.get("input");
         if (inputNode == null || inputNode.isNull()) {
             return Map.of();
@@ -1310,8 +1320,8 @@ class DatasetItemServiceImpl implements DatasetItemService {
             int page, int size, String workspaceId) {
         Optional<UUID> fallbackVersionId = getFallbackVersionId(criteria.datasetId(), workspaceId);
 
-        // When the dataset no longer exists (e.g. evaluation suite deleted), version records are gone from MySQL.
-        // Use an empty string as a harmless placeholder: evaluation suite experiments always carry their own explicit
+        // When the dataset no longer exists (e.g. test suite deleted), version records are gone from MySQL.
+        // Use an empty string as a harmless placeholder: test suite experiments always carry their own explicit
         // dataset_version_id in ClickHouse, so the empty fallback is never used for matching, and assertion_results
         // are still returned correctly via the versioned query.
         String resolvedFallbackVersionId = fallbackVersionId.map(UUID::toString).orElseGet(() -> {

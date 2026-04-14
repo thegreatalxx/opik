@@ -217,6 +217,7 @@ from .complete_multipart_upload_request import CompleteMultipartUploadRequest
 from .complete_multipart_upload_request_entity_type import CompleteMultipartUploadRequestEntityType
 from .completion_tokens_details import CompletionTokensDetails
 from .count_value_stat_public import CountValueStatPublic
+from .create_session_response import CreateSessionResponse
 from .dashboard_page_public import DashboardPagePublic
 from .dashboard_public import DashboardPublic
 from .dashboard_public_scope import DashboardPublicScope
@@ -430,7 +431,6 @@ from .llm_as_judge_output_schema_type import LlmAsJudgeOutputSchemaType
 from .llm_as_judge_output_schema_write import LlmAsJudgeOutputSchemaWrite
 from .llm_as_judge_output_schema_write_type import LlmAsJudgeOutputSchemaWriteType
 from .local_runner import LocalRunner
-from .local_runner_connect_response import LocalRunnerConnectResponse
 from .local_runner_heartbeat_response import LocalRunnerHeartbeatResponse
 from .local_runner_job import LocalRunnerJob
 from .local_runner_job_metadata import LocalRunnerJobMetadata
@@ -438,8 +438,8 @@ from .local_runner_job_page import LocalRunnerJobPage
 from .local_runner_job_status import LocalRunnerJobStatus
 from .local_runner_log_entry import LocalRunnerLogEntry
 from .local_runner_page import LocalRunnerPage
-from .local_runner_pair_response import LocalRunnerPairResponse
 from .local_runner_status import LocalRunnerStatus
+from .local_runner_type import LocalRunnerType
 from .log_item import LogItem
 from .log_item_level import LogItemLevel
 from .log_page import LogPage
@@ -847,6 +847,7 @@ __all__ = [
     "CompleteMultipartUploadRequestEntityType",
     "CompletionTokensDetails",
     "CountValueStatPublic",
+    "CreateSessionResponse",
     "DashboardPagePublic",
     "DashboardPublic",
     "DashboardPublicScope",
@@ -1053,7 +1054,6 @@ __all__ = [
     "LlmAsJudgeOutputSchemaWrite",
     "LlmAsJudgeOutputSchemaWriteType",
     "LocalRunner",
-    "LocalRunnerConnectResponse",
     "LocalRunnerHeartbeatResponse",
     "LocalRunnerJob",
     "LocalRunnerJobMetadata",
@@ -1061,8 +1061,8 @@ __all__ = [
     "LocalRunnerJobStatus",
     "LocalRunnerLogEntry",
     "LocalRunnerPage",
-    "LocalRunnerPairResponse",
     "LocalRunnerStatus",
+    "LocalRunnerType",
     "LogItem",
     "LogItemLevel",
     "LogPage",

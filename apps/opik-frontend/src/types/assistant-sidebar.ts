@@ -1,6 +1,7 @@
 import { RunnerConnectionStatus } from "@/types/agent-sandbox";
 
 export type BridgeTheme = "light" | "dark";
+export type BridgeSurface = "sidebar" | "page";
 export type NotificationType = "success" | "error" | "info";
 
 export interface ProjectStats {
@@ -19,14 +20,13 @@ export interface BridgeContext {
   baseApiUrl: string;
   assistantBackendUrl: string;
   theme: BridgeTheme;
+  surface: BridgeSurface;
   projectStats?: ProjectStats;
 }
 
 export interface RunnerBridgeState {
   projectId: string;
   status: RunnerConnectionStatus;
-  pairCode: string | null;
-  expiresAt: number | null;
   runnerId: string | null;
 }
 
@@ -39,7 +39,11 @@ export interface HostEventMap {
 
 /** Sidebar → Host events */
 export interface SidebarEventMap {
-  navigate: { path: string; search?: Record<string, string> };
+  // `search` values are `unknown` so structured data (filter arrays, sort
+  // specs) can flow through to TanStack Router as real objects. Passing
+  // them as pre-serialized JSON strings triggers TanStack's double-encode
+  // path in stringifySearchWith and breaks use-query-params readers.
+  navigate: { path: string; search?: Record<string, unknown> };
   notification: { message: string; type: NotificationType };
   "sidebar:resized": { width: number };
   "sidebar:request-close": Record<string, never>;

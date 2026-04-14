@@ -14,13 +14,14 @@ interface SideBarMenuItemsProps {
 const SideBarMenuItems: React.FC<SideBarMenuItemsProps> = ({ expanded }) => {
   const activeProjectId = useActiveProjectId();
   const {
-    permissions: { canViewExperiments, canViewDatasets },
+    permissions: { canViewExperiments, canViewDatasets, canUsePlayground },
   } = usePermissions();
 
   const menuItems = getMenuItems({
     projectId: activeProjectId,
     canViewExperiments,
     canViewDatasets,
+    canUsePlayground,
   });
 
   const renderItems = (items: MenuItem[]) => {
@@ -31,7 +32,7 @@ const SideBarMenuItems: React.FC<SideBarMenuItemsProps> = ({ expanded }) => {
 
   return (
     <>
-      {menuItems.map((menuGroup) => (
+      {menuItems.map((menuGroup, index) => (
         <li key={menuGroup.id} className="pb-3">
           {menuGroup.label &&
             (expanded ? (
@@ -40,7 +41,7 @@ const SideBarMenuItems: React.FC<SideBarMenuItemsProps> = ({ expanded }) => {
               </div>
             ) : (
               <div className="pb-[17px] pt-1.5">
-                <Separator />
+                {index > 0 && <Separator />}
               </div>
             ))}
           <ul className="flex flex-col text-foreground">

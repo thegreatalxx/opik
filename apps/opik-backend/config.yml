@@ -593,17 +593,14 @@ onlineScoring:
       streamMaxLen: ${REDIS_SCORING_SPAN_USER_DEFINED_METRIC_PYTHON_STREAM_MAX_LEN:-}
       streamTrimLimit: ${REDIS_SCORING_SPAN_USER_DEFINED_METRIC_PYTHON_STREAM_TRIM_LIMIT:-}
 
-# Configuration for Evaluation Suite assertions
-evalSuite:
-  # Default: gpt-5-nano
-  # Description: Default LLM model used for eval suite assertions when the evaluator config has no model specified
-  defaultModelName: ${EVAL_SUITE_DEFAULT_MODEL_NAME:-gpt-5-nano}
+# Configuration for Test Suite assertions
+testSuite:
   # Default: 1
-  # Description: Number of LLM runs per dataset item during eval suite execution
-  defaultRunsPerItem: ${EVAL_SUITE_DEFAULT_RUNS_PER_ITEM:-1}
+  # Description: Number of LLM runs per dataset item during test suite execution
+  defaultRunsPerItem: ${TEST_SUITE_DEFAULT_RUNS_PER_ITEM:-1}
   # Default: 10
   # Description: Timeout in seconds for fetching dataset evaluators and item evaluators
-  fetchTimeoutSeconds: ${EVAL_SUITE_FETCH_TIMEOUT_SECONDS:-10}
+  fetchTimeoutSeconds: ${TEST_SUITE_FETCH_TIMEOUT_SECONDS:-10}
 
 # Configuration for Experiment Execution (Redis Streams-based processing)
 experimentExecution:
@@ -967,10 +964,19 @@ serviceToggles:
   # Default: false
   # Description: Whether or not Collaborators tab feature is enabled
   collaboratorsTabEnabled: ${TOGGLE_COLLABORATORS_TAB_ENABLED:-"false"}
+  # Default: "" (empty, no allowlisted workspaces)
+  # Description: Comma-separated list of workspace IDs that should always receive V2 navigation.
+  # Valid values: comma-separated workspace IDs (e.g. "ws-id-1,ws-id-2"), or "" (empty, disabled).
+  # Scope: Per-workspace — only listed workspace IDs are affected, all others follow normal determination.
+  # Priority: Highest — overrides forceWorkspaceVersion and all other determination logic for listed workspaces.
+  # Use case: gradual V2 rollout — set forceWorkspaceVersion to "version_1" and allowlist specific workspace IDs for V2.
+  # Operational impact: empty/missing means no allowlisting. Non-allowlisted workspaces are unaffected.
+  v2WorkspaceAllowlist: ${TOGGLE_V2_WORKSPACE_ALLOWLIST:-""}
   # Default: version_1
-  # Description: Forces ALL workspaces to a specific navigation version. Highest priority override.
+  # Description: Forces ALL workspaces to a specific navigation version.
   # Valid values: "disabled" (use version 1 entity check), "version_1" (force legacy), "version_2" (force project-first).
   # Scope: Global — applies to all workspaces regardless of their entity state.
+  # Priority: Second highest — overridden by v2WorkspaceAllowlist for listed workspaces.
   # Overrides: When not "disabled", overrides the version entity check and auth gate entirely.
   # Operational impact: Set to "version_1" until V2 is ready, then change to "disabled" to enable entity-based determination.
   forceWorkspaceVersion: ${TOGGLE_FORCE_WORKSPACE_VERSION:-"version_1"}
@@ -1010,12 +1016,6 @@ localRunner:
   # Default: 5s
   # Description: Extra buffer added to the async response timeout beyond nextJobPollTimeout
   nextJobAsyncTimeoutBuffer: ${OPIK_RUNNER_ASYNC_TIMEOUT_BUFFER:-5s}
-  # Default: 300s
-  # Description: Time-to-live for pairing codes used during runner registration
-  pairingCodeTtl: ${OPIK_RUNNER_PAIRING_CODE_TTL:-1h}
-  # Default: 1h
-  # Description: Time-to-live for runner entries during the pairing process
-  pairingRunnerTtl: ${OPIK_RUNNER_PAIRING_RUNNER_TTL:-1h}
   # Default: 100
   # Description: Maximum number of runners the reaper processes per cycle across all workspaces
   reaperMaxRunnersPerCycle: ${OPIK_RUNNER_REAPER_MAX_RUNNERS_PER_CYCLE:-100}
