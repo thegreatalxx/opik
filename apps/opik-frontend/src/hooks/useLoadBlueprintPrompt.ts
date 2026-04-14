@@ -6,6 +6,7 @@ import { generateDefaultLLMPromptMessage } from "@/lib/llm";
 import { BlueprintPromptRef } from "@/types/playground";
 import usePromptByCommit from "@/api/prompts/usePromptByCommit";
 import { PromptByCommit } from "@/types/prompts";
+import { serializeChatTemplate } from "@/lib/chatTemplate";
 
 interface UseLoadBlueprintPromptOptions {
   selectedRef: BlueprintPromptRef | undefined;
@@ -24,8 +25,7 @@ interface UseLoadBlueprintPromptReturn {
 const refKey = (ref: BlueprintPromptRef): string =>
   `${ref.blueprintId}-${ref.key}-${ref.commitId}`;
 
-const messagesToTemplate = (messages: LLMMessage[]): string =>
-  JSON.stringify(messages.map(({ role, content }) => ({ role, content })));
+const messagesToTemplate = serializeChatTemplate;
 
 const templatesEqual = (a: string, b: string): boolean => {
   try {

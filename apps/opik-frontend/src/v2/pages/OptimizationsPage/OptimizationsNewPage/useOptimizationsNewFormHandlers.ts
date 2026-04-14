@@ -30,6 +30,7 @@ import usePromptByCommit from "@/api/prompts/usePromptByCommit";
 import { LLM_MESSAGE_ROLE, LLMMessage } from "@/types/llm";
 import { generateDefaultLLMPromptMessage } from "@/lib/llm";
 import useSavePromptToBlueprint from "@/v2/pages-shared/llm/BlueprintPromptsSelectBox/useSavePromptToBlueprint";
+import { serializeChatTemplate } from "@/lib/chatTemplate";
 import isEqual from "fast-deep-equal";
 
 const getBreadcrumbTitle = (name: string) =>
@@ -358,12 +359,10 @@ export const useOptimizationsNewFormHandlers = () => {
   }, []);
 
   // Build the chat template string from current form messages
-  const getBlueprintTemplate = useCallback((): string => {
-    const messages = form.getValues("messages");
-    return JSON.stringify(
-      messages.map(({ role, content }) => ({ role, content })),
-    );
-  }, [form]);
+  const getBlueprintTemplate = useCallback(
+    () => serializeChatTemplate(form.getValues("messages")),
+    [form],
+  );
 
   const handleSaveBlueprintExisting = useCallback(
     async (changeDescription: string) => {
