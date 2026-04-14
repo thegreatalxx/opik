@@ -27,7 +27,6 @@ import {
 import { useToast } from "@/ui/use-toast";
 import {
   getTextFromMessageContent,
-  convertMessageToMessagesJson,
   parsePromptVersionContent,
 } from "@/lib/llm";
 import usePromptByCommit from "@/api/prompts/usePromptByCommit";
@@ -209,7 +208,8 @@ const LLMPromptMessageActions: React.FC<LLMPromptLibraryActionsProps> = ({
       const result = await saveExistingVersion({
         ref: blueprintRef,
         promptName: commitData.name,
-        template: convertMessageToMessagesJson(message),
+        template: getTextFromMessageContent(content),
+        templateStructure: PROMPT_TEMPLATE_STRUCTURE.TEXT,
         changeDescription: changeDescription || undefined,
       });
       if (result) {
@@ -218,14 +218,15 @@ const LLMPromptMessageActions: React.FC<LLMPromptLibraryActionsProps> = ({
       }
       setShowSaveExisting(false);
     },
-    [blueprintRef, commitData, message, saveExistingVersion, onChangeMessage],
+    [blueprintRef, commitData, content, saveExistingVersion, onChangeMessage],
   );
 
   const handleSaveNewField = useCallback(
     async (fieldName: string) => {
       const newRef = await saveAsNewField({
         fieldName,
-        template: convertMessageToMessagesJson(message),
+        template: getTextFromMessageContent(content),
+        templateStructure: PROMPT_TEMPLATE_STRUCTURE.TEXT,
       });
       if (newRef) {
         onChangeMessage({ blueprintRef: newRef });
@@ -233,7 +234,7 @@ const LLMPromptMessageActions: React.FC<LLMPromptLibraryActionsProps> = ({
       }
       setShowSaveNew(false);
     },
-    [message, saveAsNewField, onChangeMessage],
+    [content, saveAsNewField, onChangeMessage],
   );
 
   const saveTooltip = blueprintRef
