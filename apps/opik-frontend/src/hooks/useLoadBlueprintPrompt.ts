@@ -93,8 +93,8 @@ const useLoadBlueprintPrompt = ({
     }
 
     try {
-      loadedRef.current = dedupKey;
       onMessagesLoaded(parseMessages(versionTemplate), prompt.name);
+      loadedRef.current = dedupKey;
     } catch (error) {
       console.error("Failed to parse blueprint prompt:", error);
     }
