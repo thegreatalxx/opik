@@ -310,10 +310,11 @@ const PlaygroundPrompt = ({
   );
 
   const handleSaveAsNewField = useCallback(
-    async (fieldName: string) => {
+    async (fieldName: string, changeDescription: string) => {
       const newRef = await saveAsNewField({
         fieldName,
         template: blueprintPromptTemplate,
+        changeDescription: changeDescription || undefined,
       });
       if (!newRef) return;
 

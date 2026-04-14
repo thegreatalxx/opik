@@ -44,7 +44,10 @@ type OptimizationsNewPromptSectionProps = {
   onBlueprintRefChange: (ref: BlueprintPromptRef) => void;
   onBlueprintRefClear: () => void;
   onSaveBlueprintExisting: (changeDescription: string) => Promise<unknown>;
-  onSaveBlueprintNewField: (fieldName: string) => Promise<unknown>;
+  onSaveBlueprintNewField: (
+    fieldName: string,
+    changeDescription: string,
+  ) => Promise<unknown>;
 };
 
 const OptimizationsNewPromptSection: React.FC<
@@ -100,8 +103,8 @@ const OptimizationsNewPromptSection: React.FC<
   );
 
   const handleSaveNew = useCallback(
-    async (fieldName: string) => {
-      await onSaveBlueprintNewField(fieldName);
+    async (fieldName: string, changeDescription: string) => {
+      await onSaveBlueprintNewField(fieldName, changeDescription);
       setShowSaveNew(false);
     },
     [onSaveBlueprintNewField],
