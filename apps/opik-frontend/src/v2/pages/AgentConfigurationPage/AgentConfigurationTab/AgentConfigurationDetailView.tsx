@@ -10,7 +10,6 @@ import {
 
 import { ConfigHistoryItem } from "@/types/agent-configs";
 import { formatDate, getTimeFromNow } from "@/lib/date";
-import { generateBlueprintDescription } from "@/utils/agent-configurations";
 import Loader from "@/shared/Loader/Loader";
 import { Card } from "@/ui/card";
 import { Button } from "@/ui/button";
@@ -71,9 +70,6 @@ const AgentConfigurationDetailView: React.FC<
   const { openItems, setOpenItems, allExpanded, toggleAll } =
     useBlueprintCollapse(blueprintValues);
 
-  const description =
-    item.description || generateBlueprintDescription(item.values);
-
   const handleSelectDiffVersion = (versionItem: ConfigHistoryItem) => {
     setDiffBase({
       label: versionItem.name,
@@ -81,6 +77,8 @@ const AgentConfigurationDetailView: React.FC<
     });
     setDiffOpen(true);
   };
+
+  const description = item.description;
 
   return (
     <>
@@ -131,14 +129,14 @@ const AgentConfigurationDetailView: React.FC<
             </Button>
           </div>
         </div>
-
-        <p className="comet-body-s flex w-full min-w-0 items-start gap-1 overflow-hidden text-light-slate">
-          <FilePen className="mt-1 size-3 shrink-0" />
-          <TooltipWrapper content={description}>
-            <span className="w-fit max-w-full truncate">{description}</span>
-          </TooltipWrapper>
-        </p>
-
+        {description && (
+          <p className="comet-body-s flex w-full min-w-0 items-start gap-1 overflow-hidden text-light-slate">
+            <FilePen className="mt-1 size-3 shrink-0" />
+            <TooltipWrapper content={description}>
+              <span className="w-fit max-w-full truncate">{description}</span>
+            </TooltipWrapper>
+          </p>
+        )}
         <div className="comet-body-s mt-1 flex items-center gap-1 text-light-slate">
           <Clock className="size-3 shrink-0" />
           <TooltipWrapper
