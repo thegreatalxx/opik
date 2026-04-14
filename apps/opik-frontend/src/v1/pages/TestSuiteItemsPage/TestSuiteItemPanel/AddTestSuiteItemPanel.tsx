@@ -17,9 +17,14 @@ import {
   TestSuiteItemFormValues,
   fromFormValues,
 } from "./testSuiteItemFormSchema";
-import { TEST_SUITE_ITEM_PREFILLED_DATA } from "@/constants/test-suites";
 
 const ADD_SUITE_ITEM_FORM_ID = "add-test-suite-item-form";
+
+const DATA_PREFILLED_CONTENT = `{
+  "input": "<user question>",
+  "expected_output": "<expected response>",
+  "<any additional fields>": "<any value>"
+}`;
 
 interface AddTestSuiteItemPanelProps {
   open: boolean;
@@ -49,7 +54,7 @@ const AddTestSuiteItemPanelContent: React.FC<{
   const initialValues: TestSuiteItemFormValues = {
     description: "",
     data: isEmptyDataset
-      ? TEST_SUITE_ITEM_PREFILLED_DATA
+      ? DATA_PREFILLED_CONTENT
       : JSON.stringify(initialData, null, 2),
     assertions: [],
     runsPerItem: suitePolicy.runs_per_item,

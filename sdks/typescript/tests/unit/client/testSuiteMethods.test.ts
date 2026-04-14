@@ -104,8 +104,8 @@ describe("TestSuite static methods", () => {
     it("should create initial version when assertions are provided", async () => {
       const suite = await TestSuite.create(opikClient, {
         name: "my-suite",
-        assertions: ["is accurate"],
-        executionPolicy: { runsPerItem: 3, passThreshold: 2 },
+        globalAssertions: ["is accurate"],
+        globalExecutionPolicy: { runsPerItem: 3, passThreshold: 2 },
       });
 
       expect(suite).toBeInstanceOf(TestSuite);
@@ -129,8 +129,8 @@ describe("TestSuite static methods", () => {
     it("should create suite with assertions shorthand", async () => {
       const suite = await TestSuite.create(opikClient, {
         name: "my-suite",
-        assertions: ["is accurate", "is concise"],
-        executionPolicy: { runsPerItem: 2, passThreshold: 1 },
+        globalAssertions: ["is accurate", "is concise"],
+        globalExecutionPolicy: { runsPerItem: 2, passThreshold: 1 },
       });
 
       expect(suite).toBeInstanceOf(TestSuite);
@@ -235,26 +235,22 @@ describe("TestSuite static methods", () => {
       expect(createDatasetSpy).not.toHaveBeenCalled();
     });
 
-    it("should call update() when existing suite found and options have assertions/tags/executionPolicy", async () => {
+    it("should NOT call update() when existing suite found, even with globalAssertions/tags/globalExecutionPolicy", async () => {
       const updateSpy = vi
         .spyOn(TestSuite.prototype, "update")
         .mockResolvedValue(undefined);
 
       const suite = await TestSuite.getOrCreate(opikClient, {
         name: "test-suite",
-        assertions: ["is accurate"],
+        globalAssertions: ["is accurate"],
         tags: ["prod"],
-        executionPolicy: { runsPerItem: 2, passThreshold: 1 },
+        globalExecutionPolicy: { runsPerItem: 2, passThreshold: 1 },
       });
 
       expect(suite).toBeInstanceOf(TestSuite);
       expect(suite.name).toBe("test-suite");
       expect(createDatasetSpy).not.toHaveBeenCalled();
-      expect(updateSpy).toHaveBeenCalledWith({
-        assertions: ["is accurate"],
-        tags: ["prod"],
-        executionPolicy: { runsPerItem: 2, passThreshold: 1 },
-      });
+      expect(updateSpy).not.toHaveBeenCalled();
     });
 
     it("should create new suite when not found (404)", async () => {
