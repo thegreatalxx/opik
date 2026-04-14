@@ -29,7 +29,14 @@ export function getWorkspaceNameFromPath(): string | null {
 // Returns a version that the current path forces regardless of workspace.
 // Used by WorkspaceVersionGate to short-circuit V2-only routes (e.g. /pair/*)
 // without an API call and without touching localStorage.
+//
+// The pairing URL from the SDK is always of the form `.../opik/pair/v1`.
+// On cloud (VITE_BASE_URL=/opik), the `/opik` prefix is stripped by
+// getRelativePathSegments so the first segment is "pair". On OSS
+// (VITE_BASE_URL=/), nothing is stripped and "opik" remains as the first
+// segment — skip it so detection works in both deployments.
 export function getForcedVersionFromPath(): WorkspaceVersion | null {
-  const [first] = getRelativePathSegments();
-  return first && V2_ONLY_SEGMENTS.has(first) ? "v2" : null;
+  const segments = getRelativePathSegments();
+  const head = segments[0] === "opik" ? segments[1] : segments[0];
+  return head && V2_ONLY_SEGMENTS.has(head) ? "v2" : null;
 }
