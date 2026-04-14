@@ -622,7 +622,9 @@ function DatasetItemsPage(): React.ReactElement {
           {dataset?.created_at && (
             <DateTag
               date={dataset.created_at}
-              resource={RESOURCE_TYPE.testSuite}
+              resource={
+                isTestSuite ? RESOURCE_TYPE.testSuite : RESOURCE_TYPE.dataset
+              }
             />
           )}
           {latestVersion && (

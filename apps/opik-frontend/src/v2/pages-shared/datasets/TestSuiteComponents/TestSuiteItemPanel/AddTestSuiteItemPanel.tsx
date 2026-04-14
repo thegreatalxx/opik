@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useMemo } from "react";
 
 import { DATASET_ITEM_SOURCE, DatasetItemColumn } from "@/types/datasets";
 import useTestSuiteDraftStore, {
@@ -41,18 +41,25 @@ const TestSuiteItemFormContent: React.FC<TestSuiteItemFormContentProps> = ({
   const suiteAssertions = useEffectiveSuiteAssertions(suiteId);
   const suitePolicy = useEffectiveExecutionPolicy(suiteId);
   const isEmptyDataset = columns.length === 0;
-  const initialData = Object.fromEntries(columns.map((col) => [col.name, ""]));
 
-  const initialValues: TestSuiteItemFormValues = {
-    description: "",
-    data: isEmptyDataset
-      ? TEST_SUITE_ITEM_PREFILLED_DATA
-      : JSON.stringify(initialData, null, 2),
-    assertions: [],
-    runsPerItem: suitePolicy.runs_per_item,
-    passThreshold: suitePolicy.pass_threshold,
-    useGlobalPolicy: true,
-  };
+  const initialData = useMemo(
+    () => Object.fromEntries(columns.map((col) => [col.name, ""])),
+    [columns],
+  );
+
+  const initialValues: TestSuiteItemFormValues = useMemo(
+    () => ({
+      description: "",
+      data: isEmptyDataset
+        ? TEST_SUITE_ITEM_PREFILLED_DATA
+        : JSON.stringify(initialData, null, 2),
+      assertions: [],
+      runsPerItem: suitePolicy.runs_per_item,
+      passThreshold: suitePolicy.pass_threshold,
+      useGlobalPolicy: true,
+    }),
+    [isEmptyDataset, initialData, suitePolicy],
+  );
 
   const onValidSubmit = (values: TestSuiteItemFormValues) => {
     const { description, data, assertions, policy } = fromFormValues(values);
