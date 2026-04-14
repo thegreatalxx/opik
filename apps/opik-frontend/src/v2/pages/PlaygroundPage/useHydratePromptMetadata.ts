@@ -10,10 +10,7 @@ import { parsePromptVersionContent } from "@/lib/llm";
 import { useFetchPrompt } from "@/api/prompts/usePromptById";
 import { useFetchPromptVersion } from "@/api/prompts/usePromptVersionById";
 import { useFetchPromptByCommit } from "@/api/prompts/usePromptByCommit";
-import {
-  serializeChatTemplate,
-  chatTemplatesEqual,
-} from "@/lib/chatTemplate";
+import { serializeChatTemplate, chatTemplatesEqual } from "@/lib/chatTemplate";
 
 const parseTemplateJson = (template: string | undefined): unknown => {
   if (!template) return null;
@@ -71,7 +68,12 @@ export function useHydratePromptMetadata() {
           });
           const version = commitData.requested_version;
           if (!version?.template) return undefined;
-          if (!chatTemplatesEqual(serializeChatTemplate(currentMessages), version.template))
+          if (
+            !chatTemplatesEqual(
+              serializeChatTemplate(currentMessages),
+              version.template,
+            )
+          )
             return undefined;
 
           return buildMetadata(
@@ -111,7 +113,12 @@ export function useHydratePromptMetadata() {
           const templateToCompare =
             versionData?.template ?? promptData.latest_version.template;
           if (!templateToCompare) return undefined;
-          if (!chatTemplatesEqual(serializeChatTemplate(currentMessages), templateToCompare))
+          if (
+            !chatTemplatesEqual(
+              serializeChatTemplate(currentMessages),
+              templateToCompare,
+            )
+          )
             return undefined;
 
           return buildMetadata(promptData, {

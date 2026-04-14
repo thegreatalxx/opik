@@ -67,7 +67,10 @@ const useLoadBlueprintPrompt = ({
     }
 
     try {
-      onMessagesLoaded(parseChatTemplateToMessages(versionTemplate), prompt.name);
+      onMessagesLoaded(
+        parseChatTemplateToMessages(versionTemplate),
+        prompt.name,
+      );
       loadedRef.current = dedupKey;
     } catch {
       // silently ignore parse failures

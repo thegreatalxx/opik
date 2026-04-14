@@ -31,6 +31,7 @@ import {
 } from "@/lib/llm";
 import usePromptByCommit from "@/api/prompts/usePromptByCommit";
 import useSavePromptToBlueprint from "@/v2/pages-shared/llm/BlueprintPromptsSelectBox/useSavePromptToBlueprint";
+import { usePermissions } from "@/contexts/PermissionsContext";
 
 export interface ImprovePromptConfig {
   model: string;
@@ -57,6 +58,9 @@ const LLMPromptMessageActions: React.FC<LLMPromptLibraryActionsProps> = ({
 }) => {
   const activeProjectId = useActiveProjectId();
   const { toast } = useToast();
+  const {
+    permissions: { canCreatePrompts },
+  } = usePermissions();
 
   const resetKeyRef = useRef(0);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -107,6 +111,7 @@ const LLMPromptMessageActions: React.FC<LLMPromptLibraryActionsProps> = ({
     loadedCommitRef.current = blueprintRef.commitId;
 
     if (commitData.template_structure === PROMPT_TEMPLATE_STRUCTURE.CHAT) {
+      setIsLoading(false);
       return;
     }
 
@@ -277,7 +282,7 @@ const LLMPromptMessageActions: React.FC<LLMPromptLibraryActionsProps> = ({
                 variant="minimal"
                 size="icon-sm"
                 onClick={handleClickSave}
-                disabled={isSaving}
+                disabled={!canCreatePrompts || isSaving}
               >
                 <Save />
               </Button>
