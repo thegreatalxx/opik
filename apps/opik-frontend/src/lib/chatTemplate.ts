@@ -10,10 +10,12 @@ export const serializeChatTemplate = (
 export const chatTemplatesEqual = (a: string, b: string): boolean => {
   try {
     const normalize = (raw: string) =>
-      JSON.parse(raw).map(({ role, content }: { role: string; content: unknown }) => ({
-        role,
-        content,
-      }));
+      JSON.parse(raw).map(
+        ({ role, content }: { role: string; content: unknown }) => ({
+          role,
+          content,
+        }),
+      );
     return isEqual(normalize(a), normalize(b));
   } catch {
     return a === b;

@@ -9,6 +9,7 @@ import React, {
 import { Plus, RotateCcw, Trash } from "lucide-react";
 import { Button } from "@/ui/button";
 import { serializeChatTemplate } from "@/lib/chatTemplate";
+import { PROMPT_TEMPLATE_STRUCTURE } from "@/types/prompts";
 import {
   BlueprintValue,
   BlueprintValueType,
@@ -239,7 +240,12 @@ const AgentConfigurationEditView = React.forwardRef<
       for (const field of newFields) {
         if (field.type !== BlueprintValueType.PROMPT) continue;
         const key = field.key.trim();
-        if (key) out[key] = serializeChatTemplate(field.messages);
+        if (!key) continue;
+        const isTextPrompt =
+          field.promptStructure === PROMPT_TEMPLATE_STRUCTURE.TEXT;
+        out[key] = isTextPrompt
+          ? field.value
+          : serializeChatTemplate(field.messages);
       }
       return out;
     }, [dirtyPromptKeys, promptRefs, newFields]);

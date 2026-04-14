@@ -105,19 +105,25 @@ const useSavePromptToBlueprint = (projectId: string) => {
       }
       if (!version.commit) return null;
 
-      const values: BlueprintValue[] = latestBlueprint
-        ? latestBlueprint.values.map((v) =>
-            v.key === ref.key
-              ? { ...stripBlueprintValue(v), value: version.commit }
-              : stripBlueprintValue(v),
-          )
-        : [
-            {
-              key: ref.key,
-              type: BlueprintValueType.PROMPT,
-              value: version.commit,
-            },
-          ];
+      const newEntry: BlueprintValue = {
+        key: ref.key,
+        type: BlueprintValueType.PROMPT,
+        value: version.commit,
+      };
+      let values: BlueprintValue[];
+      if (latestBlueprint) {
+        const found = latestBlueprint.values.some((v) => v.key === ref.key);
+        values = latestBlueprint.values.map((v) =>
+          v.key === ref.key
+            ? { ...stripBlueprintValue(v), value: version.commit }
+            : stripBlueprintValue(v),
+        );
+        if (!found) {
+          values.push(newEntry);
+        }
+      } else {
+        values = [newEntry];
+      }
 
       const writeBlueprint = latestBlueprint ? patchBlueprint : postBlueprint;
       try {

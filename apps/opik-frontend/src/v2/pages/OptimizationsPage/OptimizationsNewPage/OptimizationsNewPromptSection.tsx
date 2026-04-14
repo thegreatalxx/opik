@@ -1,6 +1,7 @@
 import React, { useCallback, useState } from "react";
 import { UseFormReturn } from "react-hook-form";
 import { Save } from "lucide-react";
+import { usePermissions } from "@/contexts/PermissionsContext";
 import { Input } from "@/ui/input";
 import { Label } from "@/ui/label";
 import { Button } from "@/ui/button";
@@ -67,6 +68,10 @@ const OptimizationsNewPromptSection: React.FC<
   onSaveBlueprintExisting,
   onSaveBlueprintNewField,
 }) => {
+  const {
+    permissions: { canCreatePrompts },
+  } = usePermissions();
+
   const [showSaveExisting, setShowSaveExisting] = useState(false);
   const [showSaveNew, setShowSaveNew] = useState(false);
 
@@ -147,7 +152,7 @@ const OptimizationsNewPromptSection: React.FC<
                   variant="minimal"
                   size="icon-sm"
                   onClick={handleClickSave}
-                  disabled={isSavingBlueprint}
+                  disabled={!canCreatePrompts || isSavingBlueprint}
                 >
                   <Save />
                 </Button>

@@ -31,7 +31,7 @@ export type AgentConfigPayload = {
   blueprint: BlueprintCreate;
 };
 
-const isMessageEmpty = (message: LLMMessage): boolean => {
+export const isMessageEmpty = (message: LLMMessage): boolean => {
   const { content } = message;
   if (typeof content === "string") return !content.trim();
   if (Array.isArray(content)) {
@@ -43,7 +43,7 @@ const isMessageEmpty = (message: LLMMessage): boolean => {
   return true;
 };
 
-const validateNewField = (
+export const validateNewField = (
   field: NewFieldDraft,
   existingKeys: ReadonlySet<string>,
   siblingKeys: ReadonlySet<string>,
