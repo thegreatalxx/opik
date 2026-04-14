@@ -1,23 +1,19 @@
 ---
 headline: Guaranteed Availability | Opik Documentation
-og:description: Learn how to configure fallback agent configurations in Opik to ensure availability even when the platform is unreachable
+og:description: Learn how Opik's caching and fallback system ensures your agent always
+  has a configuration to work with, even when the platform is unreachable
 og:site_name: Opik Documentation
 og:title: Guaranteed Availability for Agent Configuration
 title: Guaranteed availability
 ---
 
-Opik is a highly reliable platform and we dedicate significant effort to ensure that agent
-configurations are consistently served. The SDK provides two layers of protection against
-unavailability:
+Opik is a highly reliable platform, but your agent shouldn't depend on any single network call to function. The SDK provides two layers of protection — an in-memory cache and a hardcoded fallback — so your agent always has a configuration to work with.
 
 ## Caching layer
 
-The SDK automatically caches the last successfully fetched configuration in memory with a
-default TTL of **300 seconds (5 minutes)**. A background thread proactively refreshes stale
-cache entries before they expire, so your agent never blocks on a network call in steady state.
+The SDK automatically caches the last successfully fetched configuration in memory with a default TTL of **300 seconds (5 minutes)**. A background thread proactively refreshes stale cache entries, so your agent never blocks on a network call in steady state.
 
-If Opik is unreachable during a background refresh, the SDK silently keeps serving the
-last cached value — your agent continues running without interruption.
+If Opik is unreachable during a background refresh, the SDK silently keeps serving the last cached value — your agent continues running without interruption.
 
 You can tune the cache TTL by setting the `OPIK_CONFIG_TTL_SECONDS` environment variable:
 
@@ -27,8 +23,7 @@ OPIK_CONFIG_TTL_SECONDS=60  # refresh every minute
 
 ## Fallback configuration
 
-For the first call (cold start) or if the cache is empty and Opik is unreachable, you can
-provide a hardcoded fallback configuration that the SDK will use instead of raising an error:
+For the very first call (cold start), or if the cache is empty and Opik is unreachable, you can provide a hardcoded fallback that the SDK returns instead of raising an error. This means your agent can start serving requests immediately, even before it has contacted the backend.
 
 <CodeBlocks>
   ```python title="Python"
@@ -36,64 +31,72 @@ provide a hardcoded fallback configuration that the SDK will use instead of rais
 
   client = opik.Opik()
 
-  # Define the schema for my configuration
-  class MyAgentsConfiguration(opik.Config):
+  class MyConfig(opik.Config):
       model: str = "gpt-4o-mini"
-      temperature: float = 0.75
+      temperature: float = 0.7
       system_prompt: opik.Prompt = None
 
-  FALLBACK_CONFIGURATION = MyAgentsConfiguration(
-    model="gpt-4o-mini",
-    temperature=0.75,
-    system_prompt=opik.Prompt(name="system_prompt", prompt="You are an AI assistant.")
+  FALLBACK = MyConfig(
+      model="gpt-4o-mini",
+      temperature=0.7,
+      system_prompt=opik.Prompt(
+          name="system_prompt",
+          prompt="You are an AI assistant.",
+      ),
   )
 
-  cfg = client.get_or_create_config(
-    fallback=FALLBACK_CONFIGURATION,
-    project_name="my-agent-name",
-    version="latest",
-  )
+  @opik.track(project_name="my-agent")
+  def run_agent(user_input: str):
+      cfg = client.get_or_create_config(fallback=FALLBACK)
 
-  # Check if the fallback was used
-  if cfg.is_fallback:
-      print("Warning: using fallback configuration — Opik was unreachable")
+      if cfg.is_fallback:
+          print("Warning: running on fallback configuration")
 
-  print(cfg.model)
-  print(cfg.temperature)
-  print(cfg.system_prompt)
+      response = call_llm(
+          model=cfg.model,
+          temperature=cfg.temperature,
+          system_prompt=str(cfg.system_prompt),
+      )
+      return response
   ```
 
-  ```ts title="Typescript"
-  import Opik, { Prompt } from "opik";
+  ```ts title="TypeScript"
+  import Opik, { track } from "opik";
 
   const client = new Opik();
 
-  const fallbackPrompt = await client.createPrompt({
-    name: "system_prompt",
-    prompt: "You are an AI assistant.",
-  });
+  const FALLBACK = {
+    model: "gpt-4o-mini",
+    temperature: 0.7,
+    system_prompt: "You are an AI assistant.",
+  };
 
-  const cfg = await client.getOrCreateConfig({
-    projectName: "my-agent-name",
-    version: "latest",
-    fallback: {
-      model: "gpt-4o-mini",
-      temperature: 0.75,
-      system_prompt: fallbackPrompt,
-    }
-  });
+  const runAgent = track(
+    { name: "run_agent", projectName: "my-agent" },
+    async (userInput: string) => {
+      const cfg = await client.getOrCreateConfig({ fallback: FALLBACK });
 
-  // Check if the fallback was used
-  if (cfg.isFallback) {
-    console.warn("Warning: using fallback configuration — Opik was unreachable");
-  }
+      if (cfg.isFallback) {
+        console.warn("Warning: running on fallback configuration");
+      }
 
-  console.log(cfg.model);
-  console.log(cfg.temperature);
-  console.log(cfg.system_prompt);
+      const response = await callLlm({
+        model: cfg.model as string,
+        temperature: cfg.temperature as number,
+        systemPrompt: String(cfg.system_prompt),
+      });
+      return response;
+    },
+  );
   ```
 </CodeBlocks>
 
+<Tip>
+  Define your fallback as a top-level constant so it stays consistent across calls and is easy to find in code review.
+</Tip>
+
 ## Detecting fallback usage
 
-The returned configuration object includes an `is_fallback` (Python) / `isFallback` (TypeScript) property that is `true` when the SDK returned the local fallback values instead of a backend-fetched configuration. This is useful for logging, alerting, or degraded-mode behavior in your agent.
+The returned configuration object includes an `is_fallback` (Python) / `isFallback` (TypeScript) property that is `true` when the SDK returned local fallback values instead of a backend-fetched configuration. This is useful for logging, alerting, or triggering degraded-mode behavior in your agent.
+
+In practice, the fallback is rarely needed. Once the first successful fetch populates the cache, the SDK keeps it fresh in the background. The fallback only activates during a true cold start with no backend connectivity.

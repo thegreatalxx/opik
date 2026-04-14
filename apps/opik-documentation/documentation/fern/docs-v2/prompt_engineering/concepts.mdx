@@ -53,18 +53,15 @@ Instead of using environment labels, you can also fetch a specific version direc
 
 ## Fallback configuration
 
-When calling `get_or_create_config` / `getOrCreateConfig`, you can provide a `fallback` value. This is the configuration your agent uses when:
+When calling `get_or_create_config` / `getOrCreateConfig`, you can provide a `fallback` — a set of hardcoded default values that the SDK uses as a safety net.
 
-- **Cold start**: The first time your agent runs and no cached value exists yet
-- **Opik unreachable**: If Opik can't be reached and there is no cached value to serve
+On your first deploy, if no configuration exists yet in the project, the SDK automatically creates one from your fallback values and returns it. Once that initial version is stored, subsequent calls fetch it from the backend. The SDK caches the result in memory (default TTL: 5 minutes) and refreshes it in the background, so your agent never blocks on a network call in steady state. If Opik becomes temporarily unreachable, the SDK serves the cached value — or, as a last resort, your hardcoded fallback.
 
-The SDK caches fetched configurations in memory (default TTL: 5 minutes) and refreshes them in the background, so the fallback is rarely needed in practice. See [Guaranteed availability](/prompt_engineering/advanced/guaranteed-availability) for details.
+You can check whether the returned configuration came from the fallback by inspecting `is_fallback` (Python) or `isFallback` (TypeScript). This is useful for logging or alerting when your agent is running on local defaults rather than a backend-managed version.
 
-<Tip>
-  You can check whether the returned configuration is a fallback by inspecting the `is_fallback` property (Python) or `isFallback` property (TypeScript). This is useful for logging or alerting when your agent is running on fallback values.
-</Tip>
+If no `fallback` is provided and the backend is unreachable or no configuration exists, the SDK raises a `ConfigNotFound` error. For production agents, we recommend always providing a fallback.
 
-If no `fallback` is provided and the backend is unreachable or no configuration exists, the SDK raises a `ConfigNotFound` error.
+See [Guaranteed availability](/prompt_engineering/advanced/guaranteed-availability) for details on caching and fallback behavior.
 
 ## Configuration types
 
