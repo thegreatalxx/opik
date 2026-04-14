@@ -109,7 +109,8 @@ datasets = client.rest_client.datasets.find_datasets(
 # Create a new dataset
 dataset = client.rest_client.datasets.create_dataset(
     name="evaluation-dataset",
-    description="Dataset for model evaluation"
+    description="Dataset for model evaluation",
+    project_name="my-project"
 )
 
 # Add items to the dataset

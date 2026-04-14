@@ -348,6 +348,7 @@ optimizer = ParameterOptimizer(
          prompt=result.prompt,
          dataset=test_dataset,
          scoring_metrics=[my_metric],
+         project_name="my-project",
      )
      print(f"Test score: {test_results.mean_scores}")
      ```

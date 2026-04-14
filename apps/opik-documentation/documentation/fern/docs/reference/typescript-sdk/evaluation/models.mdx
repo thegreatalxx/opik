@@ -7,6 +7,10 @@ og:title: Model Configuration in Opik AI
 title: Models
 ---
 
+<Note>
+  In Opik 2.0, experiments are project-scoped. When using models in evaluations, specify a `projectName` in the `evaluate()` call so results are associated with the correct project.
+</Note>
+
 The TypeScript SDK provides flexible model configuration through direct integration with the Vercel AI SDK. You can use models from multiple providers with a simple, unified interface.
 
 ## Overview
@@ -32,6 +36,7 @@ await evaluatePrompt({
   dataset,
   messages: [{ role: "user", content: "{{input}}" }],
   model: "gpt-5-nano",
+  projectName: "my-project",
 });
 
 // Anthropic model
@@ -39,6 +44,7 @@ await evaluatePrompt({
   dataset,
   messages: [{ role: "user", content: "{{input}}" }],
   model: "claude-3-5-sonnet-latest",
+  projectName: "my-project",
 });
 
 // Google Gemini model
@@ -46,6 +52,7 @@ await evaluatePrompt({
   dataset,
   messages: [{ role: "user", content: "{{input}}" }],
   model: "gemini-2.0-flash",
+  projectName: "my-project",
 });
 
 // Use in metrics
@@ -67,6 +74,7 @@ await evaluatePrompt({
   dataset,
   messages: [{ role: "user", content: "{{input}}" }],
   model: customModel,
+  projectName: "my-project",
 });
 ```
 
@@ -134,6 +142,7 @@ await evaluatePrompt({
       maxTokens: 1000,
     }),
   ],
+  projectName: "my-project",
 });
 ```
 
@@ -162,6 +171,7 @@ await evaluatePrompt({
   dataset,
   messages: [{ role: "user", content: "{{input}}" }],
   model: "gpt-5-nano",
+  projectName: "my-project",
 });
 ```
 
@@ -185,6 +195,7 @@ await evaluatePrompt({
   dataset,
   messages: [{ role: "user", content: "{{input}}" }],
   model: "claude-3-5-sonnet-latest",
+  projectName: "my-project",
 });
 ```
 
@@ -208,6 +219,7 @@ await evaluatePrompt({
   dataset,
   messages: [{ role: "user", content: "{{input}}" }],
   model: "gemini-2.0-flash",
+  projectName: "my-project",
 });
 ```
 
@@ -238,6 +250,7 @@ await evaluatePrompt({
   messages: [{ role: "user", content: "{{input}}" }],
   model: genModel,
   scoringMetrics: [new Hallucination({ model: evalModel })],
+  projectName: "my-project",
 });
 ```
 
@@ -263,6 +276,7 @@ await evaluatePrompt({
   messages: [{ role: "user", content: "{{input}}" }],
   model: "gpt-5-nano",
   scoringMetrics: [hallucinationMetric, relevanceMetric],
+  projectName: "my-project",
 });
 ```
 
@@ -282,6 +296,7 @@ await evaluatePrompt({
   messages: [{ role: "user", content: "{{input}}" }],
   model: "gpt-5-nano",
   scoringMetrics: [metric],
+  projectName: "my-project",
 });
 ```
 
@@ -367,6 +382,7 @@ await evaluatePrompt({
   dataset,
   messages: [{ role: "user", content: "{{input}}" }],
   model: customModel,
+  projectName: "my-project",
 });
 ```
 
@@ -438,6 +454,7 @@ await evaluatePrompt({
   scoringMetrics: [
     new Hallucination({ model: "gpt-5-mini" }), // More accurate for evaluation
   ],
+  projectName: "my-project",
 });
 ```
 
@@ -466,6 +483,7 @@ await evaluatePrompt({
   messages: [{ role: "user", content: "{{input}}" }],
   model: "gpt-5-nano",
   taskWorkers: 5, // Limit parallel requests
+  projectName: "my-project",
 });
 ```
 
@@ -502,6 +520,7 @@ await evaluatePrompt({
   messages: [{ role: "user", content: "{{input}}" }],
   model: "gpt-5-nano",
   taskWorkers: 3, // Reduce from default 10
+  projectName: "my-project",
 });
 ```
 

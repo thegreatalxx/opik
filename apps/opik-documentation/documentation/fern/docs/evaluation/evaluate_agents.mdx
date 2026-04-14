@@ -9,6 +9,10 @@ subtitle: Step-by-step guide on how to evaluate and optimize AI agents throughou
 title: Best practices for evaluating agents
 ---
 
+<Note>
+  In Opik 2.0, datasets and experiments are project-scoped. Make sure to specify a `project_name` when creating datasets and running experiments so they are associated with the correct project.
+</Note>
+
 Building AI agents isn’t just about making them work: it’s about making them reliable, intelligent, and scalable.
 
 As agents reason, act, and interact with real users, treating them like black boxes isn’t enough.
@@ -193,7 +197,7 @@ dataset = client.get_dataset(name="Your_Dataset")
 
 """
 Note: if you don't have a dataset yet, you can easily create it this way:
-dataset = client.get_or_create_dataset(name="My_Dataset")
+dataset = client.get_or_create_dataset(name="My_Dataset", project_name="my-project")
 
 # Define the items
 items = [
@@ -269,7 +273,8 @@ eval_results = evaluate(
   experiment_name="AgentToolSelectionExperiment",
   dataset=dataset,
   task=evaluation_task,
-  scoring_metrics=metrics
+  scoring_metrics=metrics,
+  project_name="my-project"
 )
 
 ```
