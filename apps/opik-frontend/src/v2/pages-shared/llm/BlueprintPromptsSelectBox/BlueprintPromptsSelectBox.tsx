@@ -14,6 +14,7 @@ interface BlueprintPromptsSelectBoxProps {
   value?: BlueprintPromptRef;
   onValueChange: (value: BlueprintPromptRef) => void;
   onClear?: () => void;
+  onOpenChange?: (open: boolean) => void;
   hasUnsavedChanges?: boolean;
   disabled?: boolean;
 }
@@ -61,10 +62,19 @@ const BlueprintPromptsSelectBox: React.FC<BlueprintPromptsSelectBoxProps> = ({
   value,
   onValueChange,
   onClear,
+  onOpenChange,
   hasUnsavedChanges = false,
   disabled = false,
 }) => {
   const [open, setOpen] = useState(false);
+
+  const handleOpenChange = useCallback(
+    (next: boolean) => {
+      setOpen(next);
+      onOpenChange?.(next);
+    },
+    [onOpenChange],
+  );
 
   const { data: history, isLoading: isLoadingHistory } =
     useConfigHistoryListInfinite({ projectId });
@@ -124,7 +134,7 @@ const BlueprintPromptsSelectBox: React.FC<BlueprintPromptsSelectBoxProps> = ({
       searchPlaceholder="Search prompt"
       onChange={handleChange}
       open={open}
-      onOpenChange={setOpen}
+      onOpenChange={handleOpenChange}
       isLoading={isLoading}
       optionsCount={options.length}
       trigger={
