@@ -442,27 +442,32 @@ const AgentConfigurationEditView = React.forwardRef<
           })}
 
           {newFields.length > 0 &&
-            newFields.map((field) => {
-              const reservedKeys = new Set([
-                ...(agentConfig?.values
+            (() => {
+              const existingKeys = new Set(
+                agentConfig?.values
                   ?.filter((v) => !removedKeys.has(v.key))
-                  ?.map((v) => v.key) ?? []),
-                ...newFields
-                  .filter((f) => f.id !== field.id)
-                  .map((f) => f.key.trim())
-                  .filter(Boolean),
-              ]);
-              return (
-                <NewBlueprintFieldEditor
-                  key={field.id}
-                  field={field}
-                  reservedKeys={reservedKeys}
-                  onChange={updateNewField}
-                  onRemove={() => removeNewField(field.id)}
-                  error={errors[field.id]}
-                />
+                  ?.map((v) => v.key) ?? [],
               );
-            })}
+              return newFields.map((field) => {
+                const reservedKeys = new Set([
+                  ...existingKeys,
+                  ...newFields
+                    .filter((f) => f.id !== field.id)
+                    .map((f) => f.key.trim())
+                    .filter(Boolean),
+                ]);
+                return (
+                  <NewBlueprintFieldEditor
+                    key={field.id}
+                    field={field}
+                    reservedKeys={reservedKeys}
+                    onChange={updateNewField}
+                    onRemove={() => removeNewField(field.id)}
+                    error={errors[field.id]}
+                  />
+                );
+              });
+            })()}
 
           <Button variant="outline" size="sm" onClick={handleAddNewField}>
             <Plus className="mr-1 size-3.5" />
