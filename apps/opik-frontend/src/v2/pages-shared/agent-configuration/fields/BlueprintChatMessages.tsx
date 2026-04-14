@@ -117,6 +117,7 @@ const SortableMessage: React.FC<SortableMessageProps> = ({
   const dragHandle =
     editable && messages.length > 1 ? (
       <button
+        type="button"
         className="cursor-grab touch-none text-light-slate hover:text-foreground active:cursor-grabbing"
         {...listeners}
         {...attributes}

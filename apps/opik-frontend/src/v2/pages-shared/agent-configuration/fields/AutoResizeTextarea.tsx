@@ -1,4 +1,4 @@
-import React, { useCallback } from "react";
+import React, { useCallback, useEffect, useRef } from "react";
 
 import { cn } from "@/lib/utils";
 
@@ -15,25 +15,30 @@ const AutoResizeTextarea: React.FC<AutoResizeTextareaProps> = ({
   className,
   readOnly,
 }) => {
-  const ref = useCallback((el: HTMLTextAreaElement | null) => {
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const resize = useCallback(() => {
+    const el = textareaRef.current;
     if (el) {
       el.style.height = "auto";
       el.style.height = el.scrollHeight + "px";
     }
   }, []);
 
+  useEffect(() => {
+    resize();
+  }, [value, resize]);
+
   const handleChange = useCallback(
     (e: React.ChangeEvent<HTMLTextAreaElement>) => {
       onChange(e.target.value);
-      e.target.style.height = "auto";
-      e.target.style.height = e.target.scrollHeight + "px";
     },
     [onChange],
   );
 
   return (
     <textarea
-      ref={ref}
+      ref={textareaRef}
       className={cn(
         "comet-body-s w-full resize-none overflow-hidden bg-transparent text-foreground outline-none",
         className,
