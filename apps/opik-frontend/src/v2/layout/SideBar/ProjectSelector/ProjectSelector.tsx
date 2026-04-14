@@ -96,12 +96,14 @@ const ProjectSelector: React.FC<ProjectSelectorProps> = ({
   );
 
   const renderExpandedLoading = () => (
-    <button className="flex w-full items-center gap-2 rounded-md px-2 py-1.5">
-      <Spinner size="xs" />
-      <span className="comet-body-s flex-1 text-left text-muted-slate">
-        Loading…
-      </span>
-    </button>
+    <PopoverTrigger asChild>
+      <button className="flex w-full items-center gap-2 rounded-md px-2 py-1.5">
+        <Spinner size="xs" />
+        <span className="comet-body-s flex-1 text-left text-muted-slate">
+          Loading…
+        </span>
+      </button>
+    </PopoverTrigger>
   );
 
   const renderProjectLabel = () => (
