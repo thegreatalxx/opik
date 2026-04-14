@@ -32,33 +32,24 @@ interface SaveAsNewFieldArgs {
   template: string;
 }
 
-interface UseSavePromptToBlueprintReturn {
-  existingFieldNames: string[];
-  saveExistingVersion: (args: SaveExistingArgs) => Promise<{
-    version: PromptVersion;
-    newRef: BlueprintPromptRef;
-  } | null>;
-  saveAsNewField: (
-    args: SaveAsNewFieldArgs,
-  ) => Promise<BlueprintPromptRef | null>;
-  isSaving: boolean;
+interface SaveExistingResult {
+  version: PromptVersion;
+  newRef: BlueprintPromptRef;
 }
 
-const stripValueForPayload = (v: BlueprintValue): BlueprintValue => ({
+const stripBlueprintValue = (v: BlueprintValue): BlueprintValue => ({
   key: v.key,
   type: v.type,
   value: v.value,
   ...(v.description ? { description: v.description } : {}),
 });
 
-const useSavePromptToBlueprint = (
-  projectId: string,
-): UseSavePromptToBlueprintReturn => {
+const useSavePromptToBlueprint = (projectId: string) => {
   const queryClient = useQueryClient();
 
   const { data: history } = useConfigHistoryListInfinite({ projectId });
   const latestBlueprintId = history?.pages?.[0]?.content?.[0]?.id;
-  const { data: latestBlueprintFull } = useAgentConfigById({
+  const { data: latestBlueprint } = useAgentConfigById({
     blueprintId: latestBlueprintId ?? "",
   });
 
@@ -88,11 +79,14 @@ const useSavePromptToBlueprint = (
   );
 
   // Updates an existing prompt loaded from a blueprint. The backend
-  // auto-publishes a new blueprint version pinning this commit.
-  const saveExistingVersion = useCallback<
-    UseSavePromptToBlueprintReturn["saveExistingVersion"]
-  >(
-    async ({ ref, promptName, template, changeDescription }) => {
+  // auto-publishes a new blueprint version pinning the new commit.
+  const saveExistingVersion = useCallback(
+    async ({
+      ref,
+      promptName,
+      template,
+      changeDescription,
+    }: SaveExistingArgs): Promise<SaveExistingResult | null> => {
       try {
         const version = await createPromptVersion({
           name: promptName,
@@ -109,7 +103,7 @@ const useSavePromptToBlueprint = (
           newRef: { ...ref, commitId: version.commit },
         };
       } catch {
-        // useCreatePromptVersionMutation already toasts the error
+        // The mutation already toasts the error.
         return null;
       }
     },
@@ -117,16 +111,16 @@ const useSavePromptToBlueprint = (
   );
 
   // Creates a brand-new prompt and either appends it to the latest blueprint
-  // as a new PROMPT-typed value (preserving all existing values) or, if the
-  // project has no blueprint yet, creates the first blueprint with this
-  // single value.
-  const saveAsNewField = useCallback<
-    UseSavePromptToBlueprintReturn["saveAsNewField"]
-  >(
-    async ({ fieldName, template }) => {
-      let newPrompt: PromptWithLatestVersion | undefined;
+  // (PATCH) or, if the project has no blueprint yet, creates the first one
+  // (POST) containing only this single value.
+  const saveAsNewField = useCallback(
+    async ({
+      fieldName,
+      template,
+    }: SaveAsNewFieldArgs): Promise<BlueprintPromptRef | null> => {
+      let createdPrompt: PromptWithLatestVersion;
       try {
-        newPrompt = (await createPrompt({
+        createdPrompt = (await createPrompt({
           prompt: {
             name: fieldName,
             template,
@@ -139,45 +133,31 @@ const useSavePromptToBlueprint = (
         return null;
       }
 
-      const commit = newPrompt?.latest_version?.commit;
-      if (!commit || !newPrompt?.id) return null;
+      const commit = createdPrompt?.latest_version?.commit;
+      if (!commit) return null;
 
-      const newValue: BlueprintValue = {
-        key: fieldName,
-        type: BlueprintValueType.PROMPT,
-        value: commit,
-      };
-
-      const hasExistingBlueprint = !!latestBlueprintFull;
       const values: BlueprintValue[] = [
-        ...(latestBlueprintFull?.values?.map(stripValueForPayload) ?? []),
-        newValue,
+        ...(latestBlueprint?.values?.map(stripBlueprintValue) ?? []),
+        { key: fieldName, type: BlueprintValueType.PROMPT, value: commit },
       ];
 
-      let blueprintIdForRef: string;
+      const writeBlueprint = latestBlueprint ? patchBlueprint : postBlueprint;
       try {
-        const mutation = hasExistingBlueprint ? patchBlueprint : postBlueprint;
-        const { id } = await mutation({
+        const { id } = await writeBlueprint({
           agentConfig: {
             project_id: projectId,
             blueprint: { type: BlueprintType.BLUEPRINT, values },
           },
         });
         if (!id) return null;
-        blueprintIdForRef = id;
+        invalidateAfterSave(commit);
+        return { blueprintId: id, key: fieldName, commitId: commit };
       } catch {
         return null;
       }
-
-      invalidateAfterSave(commit);
-      return {
-        blueprintId: blueprintIdForRef,
-        key: fieldName,
-        commitId: commit,
-      };
     },
     [
-      latestBlueprintFull,
+      latestBlueprint,
       createPrompt,
       patchBlueprint,
       postBlueprint,
@@ -187,7 +167,7 @@ const useSavePromptToBlueprint = (
   );
 
   return {
-    existingFieldNames: latestBlueprintFull?.values?.map((v) => v.key) ?? [],
+    existingFieldNames: latestBlueprint?.values?.map((v) => v.key) ?? [],
     saveExistingVersion,
     saveAsNewField,
     isSaving,
