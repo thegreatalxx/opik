@@ -57,7 +57,7 @@ const TYPE_CONFIG = {
   dataset: {
     title: "Datasets",
     description:
-      "A dataset is a collection of inputs and expected outputs used to evaluate your LLM application.",
+      "A dataset is a collection of inputs and expected outputs used to evaluate your agent.",
     docsUrl: "/evaluation/manage_datasets",
     entityName: "datasets",
     createButtonText: "Create new",
@@ -81,7 +81,7 @@ const TYPE_CONFIG = {
   test_suite: {
     title: "Test suites",
     description:
-      "A test suite is a collection of inputs and expected outputs, with their corresponding assertions that will be used to evaluate the performance of your LLM application.",
+      "A test suite is a collection of inputs and corresponding assertions that will be used to evaluate the performance of your agent.",
     // TODO: replace with test suites documentation URL once it exists
     docsUrl: "/evaluation/manage_datasets",
     entityName: "test suites",
