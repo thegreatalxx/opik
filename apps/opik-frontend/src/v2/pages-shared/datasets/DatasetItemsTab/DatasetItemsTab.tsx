@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useMemo, useRef, useState } from "react";
 import { ColumnPinningState, RowSelectionState } from "@tanstack/react-table";
 import get from "lodash/get";
 import {
@@ -22,23 +22,21 @@ import useDatasetItemsList from "@/api/datasets/useDatasetItemsList";
 import StatusMessage from "@/shared/StatusMessage/StatusMessage";
 import {
   DatasetItem,
+  DatasetItemColumn,
   DatasetItemWithDraft,
   DATASET_ITEM_DRAFT_STATUS,
   DATASET_STATUS,
-  DATASET_TYPE,
 } from "@/types/datasets";
 import { Filters } from "@/types/filters";
 import {
   COLUMN_DATA_ID,
-  COLUMN_ID_ID,
   COLUMN_SELECT_ID,
-  DynamicColumn,
+  ColumnData,
   ROW_HEIGHT,
 } from "@/types/shared";
-import TestSuiteItemPanel from "@/v2/pages/TestSuiteItemsPage/TestSuiteItemPanel/TestSuiteItemPanel";
-import AddTestSuiteItemPanel from "@/v2/pages/TestSuiteItemsPage/TestSuiteItemPanel/AddTestSuiteItemPanel";
-import DatasetItemEditor from "@/v2/pages-shared/datasets/DatasetItemEditor/DatasetItemEditor";
-import DatasetItemsActionsPanel from "@/v2/pages-shared/datasets/DatasetItemsActionsPanel";
+import DatasetItemsActionsPanel, {
+  ExpansionDialogRenderProps,
+} from "@/v2/pages-shared/datasets/DatasetItemsActionsPanel";
 import { DatasetItemRowActionsCell } from "@/v2/pages-shared/datasets/DatasetItemRowActionsCell";
 import DataTableRowHeightSelector from "@/shared/DataTableRowHeightSelector/DataTableRowHeightSelector";
 import SelectAllBanner from "@/shared/SelectAllBanner/SelectAllBanner";
@@ -63,8 +61,7 @@ import {
   generateSelectColumDef,
 } from "@/shared/DataTable/utils";
 import { transformDataColumnFilters } from "@/lib/dataset-items";
-import { useTestSuiteItemsWithDraft } from "./hooks/useMergedTestSuiteItems";
-import { useTestSuiteColumns } from "./useTestSuiteColumns";
+import { useDatasetItemsWithDraft } from "./hooks/useMergedDatasetItems";
 import { usePermissions } from "@/contexts/PermissionsContext";
 import {
   useIsDraftMode,
@@ -72,6 +69,8 @@ import {
   useSetIsAllItemsSelected,
   useDeletedIds,
 } from "@/store/TestSuiteDraftStore";
+import { COLUMN_ID_ID } from "@/types/shared";
+import { DynamicColumn } from "@/types/shared";
 
 const getRowId = (d: DatasetItem) => d.id;
 
@@ -80,23 +79,10 @@ export const DEFAULT_COLUMN_PINNING: ColumnPinningState = {
   right: [],
 };
 
-export const SUITE_DEFAULT_SELECTED_COLUMNS: string[] = [
-  "description",
-  "last_updated_at",
-  "data",
-  "assertions",
-  "execution_policy",
-];
-
-export const DATASET_DEFAULT_SELECTED_COLUMNS: string[] = [
-  COLUMN_ID_ID,
-  "created_at",
-  "tags",
-];
-
-interface StorageKeysConfig {
+export interface StorageKeysConfig {
   selectedColumnsKey: string;
   selectedColumnsMigrationKey?: string;
+  migrationNewColumns?: string[];
   columnsWidthKey: string;
   columnsOrderKey: string;
   dynamicColumnsKey: string;
@@ -104,24 +90,45 @@ interface StorageKeysConfig {
   rowHeightKey: string;
 }
 
-const SUITE_STORAGE_KEYS: StorageKeysConfig = {
-  selectedColumnsKey: "test-suite-items-selected-columns-v2",
-  selectedColumnsMigrationKey: "test-suite-items-selected-columns",
-  columnsWidthKey: "test-suite-items-columns-width",
-  columnsOrderKey: "test-suite-items-columns-order",
-  dynamicColumnsKey: "test-suite-items-dynamic-columns",
-  paginationSizeKey: "test-suite-items-pagination-size",
-  rowHeightKey: "test-suite-items-row-height",
-};
+export interface EditPanelRenderProps {
+  datasetItemId: string;
+  datasetId: string;
+  columns: DatasetItemColumn[];
+  onClose: () => void;
+  isOpen: boolean;
+  rows: DatasetItemWithDraft[];
+  setActiveRowId: (id: string) => void;
+}
 
-const DATASET_STORAGE_KEYS: StorageKeysConfig = {
-  selectedColumnsKey: "dataset-items-selected-columns",
-  columnsWidthKey: "dataset-items-columns-width",
-  columnsOrderKey: "dataset-items-columns-order",
-  dynamicColumnsKey: "dataset-items-dynamic-columns",
-  paginationSizeKey: "dataset-items-pagination-size",
-  rowHeightKey: "dataset-items-row-height",
-};
+export interface AddPanelRenderProps {
+  open: boolean;
+  onClose: () => void;
+  columns: DatasetItemColumn[];
+}
+
+export interface AddDialogRenderProps {
+  key: number;
+  datasetId: string;
+  open: boolean;
+  setOpen: (open: boolean) => void;
+}
+
+interface DatasetItemsTabProps {
+  datasetId: string;
+  datasetName?: string;
+  datasetStatus?: DATASET_STATUS;
+  storageKeys: StorageKeysConfig;
+  defaultSelectedColumns: string[];
+  entityName: string;
+  buildColumns: (
+    datasetColumns: DatasetItemColumn[],
+    dynamicDatasetColumns: DynamicColumn[],
+  ) => ColumnData<DatasetItem>[];
+  renderEditPanel: (props: EditPanelRenderProps) => React.ReactNode;
+  renderAddPanel: (props: AddPanelRenderProps) => React.ReactNode;
+  renderAddDialog?: (props: AddDialogRenderProps) => React.ReactNode;
+  renderExpansionDialog: (props: ExpansionDialogRenderProps) => React.ReactNode;
+}
 
 const POLLING_INTERVAL_MS = 3000;
 
@@ -130,29 +137,23 @@ const DRAFT_STATUS_BORDER_CLASSES: Record<string, string> = {
   [DATASET_ITEM_DRAFT_STATUS.edited]: "border-l-2 border-l-amber-500",
 };
 
-interface TestSuiteItemsTabProps {
-  datasetId: string;
-  datasetName?: string;
-  datasetStatus?: DATASET_STATUS;
-  datasetType?: DATASET_TYPE;
-  suiteAssertions?: string[];
-  onOpenSettings: () => void;
-}
-
-function TestSuiteItemsTab({
+function DatasetItemsTab({
   datasetId,
   datasetName,
   datasetStatus,
-  datasetType,
-  suiteAssertions,
-  onOpenSettings,
-}: TestSuiteItemsTabProps): React.ReactElement | null {
+  storageKeys,
+  defaultSelectedColumns,
+  entityName,
+  buildColumns,
+  renderEditPanel,
+  renderAddPanel,
+  renderAddDialog,
+  renderExpansionDialog,
+}: DatasetItemsTabProps): React.ReactElement | null {
   const {
     permissions: { canEditDatasets },
   } = usePermissions();
 
-  const isTestSuite = datasetType === DATASET_TYPE.TEST_SUITE;
-  const storageKeys = isTestSuite ? SUITE_STORAGE_KEYS : DATASET_STORAGE_KEYS;
   const { isProcessing, showSuccessMessage } = useDatasetLoadingStatus({
     datasetStatus,
   });
@@ -202,6 +203,8 @@ function TestSuiteItemsTab({
   });
 
   const [openCreatePanel, setOpenCreatePanel] = useState<boolean>(false);
+  const [openDialog, setOpenDialog] = useState<boolean>(false);
+  const resetDialogKeyRef = useRef(0);
 
   const transformedFilters = useMemo(
     () => (filters ? transformDataColumnFilters(filters) : filters),
@@ -212,7 +215,7 @@ function TestSuiteItemsTab({
   const deletedIds = useDeletedIds();
 
   const { data, isPending, isPlaceholderData, isFetching } =
-    useTestSuiteItemsWithDraft(
+    useDatasetItemsWithDraft(
       {
         datasetId,
         filters: transformedFilters,
@@ -264,17 +267,43 @@ function TestSuiteItemsTab({
     },
   );
 
+  const dynamicDatasetColumns = useMemo(
+    () =>
+      datasetColumns.map<DynamicColumn>((c) => ({
+        id: `${COLUMN_DATA_ID}.${c.name}`,
+        label: c.name,
+        columnType: mapDynamicColumnTypesToColumnType(c.types),
+      })),
+    [datasetColumns],
+  );
+
+  const dynamicColumnsIds = useMemo(
+    () => dynamicDatasetColumns.map((c) => c.id),
+    [dynamicDatasetColumns],
+  );
+
   const [selectedColumns, setSelectedColumns] = useLocalStorageState<string[]>(
     storageKeys.selectedColumnsKey,
     {
       defaultValue: storageKeys.selectedColumnsMigrationKey
         ? migrateSelectedColumns(
             storageKeys.selectedColumnsMigrationKey,
-            SUITE_DEFAULT_SELECTED_COLUMNS,
-            ["last_updated_at", "assertions"],
+            defaultSelectedColumns,
+            storageKeys.migrationNewColumns ?? [],
           )
-        : DATASET_DEFAULT_SELECTED_COLUMNS,
+        : defaultSelectedColumns,
     },
+  );
+
+  useDynamicColumnsCache({
+    dynamicColumnsKey: storageKeys.dynamicColumnsKey,
+    dynamicColumnsIds,
+    setSelectedColumns,
+  });
+
+  const columnsData = useMemo(
+    () => buildColumns(datasetColumns, dynamicDatasetColumns),
+    [buildColumns, datasetColumns, dynamicDatasetColumns],
   );
 
   const [columnsOrder, setColumnsOrder] = useLocalStorageState<string[]>(
@@ -290,14 +319,12 @@ function TestSuiteItemsTab({
     defaultValue: {},
   });
 
-  const itemLabel = isTestSuite ? "suite items" : "dataset items";
-
   const noDataText = useMemo(() => {
     if (isDraftMode && deletedIds.size > 0 && totalCount !== deletedIds.size) {
-      return `All ${itemLabel} on this page have been deleted`;
+      return `All ${entityName} items on this page have been deleted`;
     }
-    return `There are no ${itemLabel} yet`;
-  }, [isDraftMode, deletedIds.size, totalCount, itemLabel]);
+    return `There are no ${entityName} items yet`;
+  }, [isDraftMode, deletedIds.size, totalCount, entityName]);
 
   const handleSearchChange = useCallback(
     (newSearch: string | null) => {
@@ -322,7 +349,6 @@ function TestSuiteItemsTab({
             ? updaterOrValue(prev)
             : updaterOrValue;
 
-        // Reset isAllItemsSelected if selection count decreases (row deselected)
         if (
           isAllItemsSelected &&
           Object.keys(next).length < Object.keys(prev).length
@@ -370,32 +396,6 @@ function TestSuiteItemsTab({
     rowSelection,
     effectiveIsAllItemsSelected,
   ]);
-
-  const dynamicDatasetColumns = useMemo(
-    () =>
-      datasetColumns.map<DynamicColumn>((c) => ({
-        id: `${COLUMN_DATA_ID}.${c.name}`,
-        label: c.name,
-        columnType: mapDynamicColumnTypesToColumnType(c.types),
-      })),
-    [datasetColumns],
-  );
-
-  const dynamicColumnsIds = useMemo(
-    () => dynamicDatasetColumns.map((c) => c.id),
-    [dynamicDatasetColumns],
-  );
-
-  useDynamicColumnsCache({
-    dynamicColumnsKey: storageKeys.dynamicColumnsKey,
-    dynamicColumnsIds,
-    setSelectedColumns,
-  });
-
-  const columnsData = useTestSuiteColumns({
-    isTestSuite,
-    dynamicDatasetColumns,
-  });
 
   const filtersColumnData = useMemo(
     () => buildDatasetFilterColumns(datasetColumns, true),
@@ -472,8 +472,13 @@ function TestSuiteItemsTab({
   );
 
   const handleNewDatasetItemClick = useCallback(() => {
-    setOpenCreatePanel(true);
-  }, []);
+    if (renderAddDialog && totalCount === 0) {
+      setOpenDialog(true);
+      resetDialogKeyRef.current += 1;
+    } else {
+      setOpenCreatePanel(true);
+    }
+  }, [renderAddDialog, totalCount]);
 
   const handleClose = useCallback(() => setActiveRowId(""), [setActiveRowId]);
 
@@ -549,8 +554,8 @@ function TestSuiteItemsTab({
             search={search ?? ""}
             totalCount={totalCount}
             isDraftMode={isDraftMode}
-            datasetType={datasetType}
-            suiteAssertions={suiteAssertions}
+            entityName={entityName}
+            renderExpansionDialog={renderExpansionDialog}
           />
           <Separator orientation="vertical" className="mx-2 h-4" />
           <DataTableRowHeightSelector
@@ -570,7 +575,7 @@ function TestSuiteItemsTab({
               size="sm"
               onClick={handleNewDatasetItemClick}
             >
-              Add suite item
+              Add item
             </Button>
           )}
         </div>
@@ -579,25 +584,15 @@ function TestSuiteItemsTab({
         <StatusMessage
           icon={Loader2}
           iconClassName="animate-spin"
-          title={
-            isTestSuite
-              ? "Your suite is still loading"
-              : "Your dataset is still loading"
-          }
-          description={`Some results or counts may update as more data becomes available. You can continue exploring while the full ${
-            isTestSuite ? "suite" : "dataset"
-          } loads.`}
+          title={`Your ${entityName} is still loading`}
+          description={`Some results or counts may update as more data becomes available. You can continue exploring while the full ${entityName} loads.`}
           className="mb-4"
         />
       )}
       {showSuccessMessage && (
         <StatusMessage
           icon={Check}
-          title={
-            isTestSuite
-              ? "Your suite fully loaded"
-              : "Your dataset fully loaded"
-          }
+          title={`Your ${entityName} fully loaded`}
           description="All items are now available."
           className="mb-4"
         />
@@ -658,38 +653,28 @@ function TestSuiteItemsTab({
           </div>
         </TooltipWrapper>
       </div>
-      {isTestSuite ? (
-        <TestSuiteItemPanel
-          datasetItemId={activeRowId as string}
-          datasetId={datasetId}
-          columns={datasetColumns}
-          onClose={handleClose}
-          isOpen={Boolean(activeRowId)}
-          rows={rows}
-          setActiveRowId={setActiveRowId}
-          onOpenSettings={onOpenSettings}
-        />
-      ) : (
-        <DatasetItemEditor
-          datasetItemId={activeRowId as string}
-          datasetId={datasetId}
-          columns={datasetColumns}
-          onClose={handleClose}
-          isOpen={Boolean(activeRowId)}
-          rows={rows}
-          setActiveRowId={setActiveRowId}
-        />
-      )}
-
-      <AddTestSuiteItemPanel
-        open={openCreatePanel}
-        onClose={() => setOpenCreatePanel(false)}
-        columns={datasetColumns}
-        onOpenSettings={onOpenSettings}
-        showEvaluationCriteria={isTestSuite}
-      />
+      {renderEditPanel({
+        datasetItemId: activeRowId as string,
+        datasetId,
+        columns: datasetColumns,
+        onClose: handleClose,
+        isOpen: Boolean(activeRowId),
+        rows,
+        setActiveRowId,
+      })}
+      {renderAddPanel({
+        open: openCreatePanel,
+        onClose: () => setOpenCreatePanel(false),
+        columns: datasetColumns,
+      })}
+      {renderAddDialog?.({
+        key: resetDialogKeyRef.current,
+        datasetId,
+        open: openDialog,
+        setOpen: setOpenDialog,
+      })}
     </>
   );
 }
 
-export default TestSuiteItemsTab;
+export default DatasetItemsTab;

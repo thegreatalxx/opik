@@ -24,7 +24,7 @@ import { Separator } from "@/ui/separator";
 import useDatasetById from "@/api/datasets/useDatasetById";
 import useDatasetUpdateMutation from "@/api/datasets/useDatasetUpdateMutation";
 import useDatasetVersionsList from "@/api/datasets/useDatasetVersionsList";
-import { useSuiteIdFromURL } from "@/v2/pages-shared/test-suites/useSuiteIdFromURL";
+import { useDatasetEntityIdFromURL } from "@/v2/hooks/useDatasetEntityIdFromURL";
 import { useClampedIntegerInput } from "@/hooks/useClampedIntegerInput";
 import {
   useSuiteAssertions,
@@ -234,7 +234,7 @@ const SettingsForm: React.FC<SettingsFormProps> = ({
 export const EditTestSuiteSettingsDialog: React.FC<
   EditTestSuiteSettingsDialogProps
 > = ({ open, setOpen }) => {
-  const suiteId = useSuiteIdFromURL();
+  const suiteId = useDatasetEntityIdFromURL();
 
   const { data: suite } = useDatasetById({ datasetId: suiteId });
   const { data: versionsData } = useDatasetVersionsList({
