@@ -3,11 +3,13 @@ import { Trash } from "lucide-react";
 
 import { BlueprintValueType } from "@/types/agent-configs";
 import { LLM_MESSAGE_ROLE, LLMMessage } from "@/types/llm";
+import { PROMPT_TEMPLATE_STRUCTURE } from "@/types/prompts";
 import { generateDefaultLLMPromptMessage } from "@/lib/llm";
 import BlueprintTypeIcon from "@/v2/pages-shared/traces/ConfigurationTab/BlueprintTypeIcon";
 import LLMPromptMessages from "@/v2/pages-shared/llm/LLMPromptMessages/LLMPromptMessages";
 import { Button } from "@/ui/button";
 import { Input } from "@/ui/input";
+import { Textarea } from "@/ui/textarea";
 import { Switch } from "@/ui/switch";
 import {
   Select,
@@ -21,12 +23,17 @@ import {
   validateBlueprintFieldValue,
 } from "./blueprintFieldValidation";
 
-const TYPE_OPTIONS: { value: BlueprintValueType; label: string }[] = [
+// Composite key so the dropdown can distinguish chat vs text prompts
+// while both map to BlueprintValueType.PROMPT on save.
+type FieldTypeOption = BlueprintValueType | "prompt_chat" | "prompt_text";
+
+const TYPE_OPTIONS: { value: FieldTypeOption; label: string }[] = [
   { value: BlueprintValueType.STRING, label: "String" },
   { value: BlueprintValueType.INT, label: "Integer" },
   { value: BlueprintValueType.FLOAT, label: "Float" },
   { value: BlueprintValueType.BOOLEAN, label: "Boolean" },
-  { value: BlueprintValueType.PROMPT, label: "Prompt" },
+  { value: "prompt_chat", label: "Chat prompt" },
+  { value: "prompt_text", label: "Text prompt" },
 ];
 
 export interface NewFieldDraft {
@@ -35,8 +42,10 @@ export interface NewFieldDraft {
   type: BlueprintValueType;
   // Used for scalar types and as the BOOLEAN's "true"/"false".
   value: string;
-  // Used only when type === PROMPT.
+  // Used only when type === PROMPT with chat structure.
   messages: LLMMessage[];
+  // Distinguishes chat vs text prompts.
+  promptStructure?: PROMPT_TEMPLATE_STRUCTURE;
 }
 
 const buildDefaultPromptMessages = (): LLMMessage[] => [
@@ -51,16 +60,35 @@ export const createNewFieldDraft = (id: string): NewFieldDraft => ({
   messages: [],
 });
 
+const fieldTypeToOption = (field: NewFieldDraft): FieldTypeOption => {
+  if (field.type !== BlueprintValueType.PROMPT) return field.type;
+  return field.promptStructure === PROMPT_TEMPLATE_STRUCTURE.TEXT
+    ? "prompt_text"
+    : "prompt_chat";
+};
+
 const initialStateForType = (
   type: BlueprintValueType,
-): Pick<NewFieldDraft, "value" | "messages"> => {
+  promptStructure?: PROMPT_TEMPLATE_STRUCTURE,
+): Pick<NewFieldDraft, "value" | "messages" | "promptStructure"> => {
   if (type === BlueprintValueType.BOOLEAN) {
-    return { value: "false", messages: [] };
+    return { value: "false", messages: [], promptStructure: undefined };
   }
   if (type === BlueprintValueType.PROMPT) {
-    return { value: "", messages: buildDefaultPromptMessages() };
+    if (promptStructure === PROMPT_TEMPLATE_STRUCTURE.TEXT) {
+      return {
+        value: "",
+        messages: [],
+        promptStructure: PROMPT_TEMPLATE_STRUCTURE.TEXT,
+      };
+    }
+    return {
+      value: "",
+      messages: buildDefaultPromptMessages(),
+      promptStructure: PROMPT_TEMPLATE_STRUCTURE.CHAT,
+    };
   }
-  return { value: "", messages: [] };
+  return { value: "", messages: [], promptStructure: undefined };
 };
 
 interface NewBlueprintFieldEditorProps {
@@ -101,11 +129,11 @@ const NewBlueprintFieldEditor: React.FC<NewBlueprintFieldEditorProps> = ({
     return validateBlueprintFieldValue(field.type, field.value) || null;
   }, [field.type, field.value]);
 
-  // For PROMPT, surface a hint when there are no messages or every message is
-  // empty. We don't gate on it (the user may still be drafting) but we do
-  // signal it.
   const promptError = useMemo(() => {
     if (field.type !== BlueprintValueType.PROMPT) return null;
+    if (field.promptStructure === PROMPT_TEMPLATE_STRUCTURE.TEXT) {
+      return !field.value.trim() ? "Prompt must not be empty" : null;
+    }
     if (field.messages.length === 0) return "Add at least one message";
     const allEmpty = field.messages.every((m) => {
       if (typeof m.content === "string") return !m.content.trim();
@@ -118,10 +146,34 @@ const NewBlueprintFieldEditor: React.FC<NewBlueprintFieldEditorProps> = ({
       return true;
     });
     return allEmpty ? "Messages must not be empty" : null;
-  }, [field.type, field.messages]);
+  }, [field.type, field.promptStructure, field.messages, field.value]);
 
-  const handleTypeChange = (next: BlueprintValueType) => {
-    onChange({ ...field, type: next, ...initialStateForType(next) });
+  const handleTypeChange = (next: FieldTypeOption) => {
+    if (next === "prompt_chat") {
+      onChange({
+        ...field,
+        type: BlueprintValueType.PROMPT,
+        ...initialStateForType(
+          BlueprintValueType.PROMPT,
+          PROMPT_TEMPLATE_STRUCTURE.CHAT,
+        ),
+      });
+    } else if (next === "prompt_text") {
+      onChange({
+        ...field,
+        type: BlueprintValueType.PROMPT,
+        ...initialStateForType(
+          BlueprintValueType.PROMPT,
+          PROMPT_TEMPLATE_STRUCTURE.TEXT,
+        ),
+      });
+    } else {
+      onChange({
+        ...field,
+        type: next,
+        ...initialStateForType(next),
+      });
+    }
   };
 
   const handleMessagesChange = useCallback(
@@ -154,7 +206,10 @@ const NewBlueprintFieldEditor: React.FC<NewBlueprintFieldEditorProps> = ({
           placeholder="field_name"
           className="h-8 flex-1"
         />
-        <Select value={field.type} onValueChange={handleTypeChange}>
+        <Select
+          value={fieldTypeToOption(field)}
+          onValueChange={handleTypeChange}
+        >
           <SelectTrigger className="h-8 w-[140px]">
             <SelectValue />
           </SelectTrigger>
@@ -182,6 +237,14 @@ const NewBlueprintFieldEditor: React.FC<NewBlueprintFieldEditorProps> = ({
           onCheckedChange={(checked) =>
             onChange({ ...field, value: String(checked) })
           }
+        />
+      ) : field.type === BlueprintValueType.PROMPT &&
+        field.promptStructure === PROMPT_TEMPLATE_STRUCTURE.TEXT ? (
+        <Textarea
+          className="comet-code min-h-24"
+          value={field.value}
+          onChange={(e) => onChange({ ...field, value: e.target.value })}
+          placeholder="Enter prompt template"
         />
       ) : field.type === BlueprintValueType.PROMPT ? (
         <LLMPromptMessages

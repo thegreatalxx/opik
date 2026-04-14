@@ -106,7 +106,7 @@ const LLMPromptMessageActions: React.FC<LLMPromptLibraryActionsProps> = ({
     if (loadedCommitRef.current === blueprintRef.commitId) return;
     loadedCommitRef.current = blueprintRef.commitId;
 
-    if (commitData.template_structure !== PROMPT_TEMPLATE_STRUCTURE.TEXT) {
+    if (commitData.template_structure === PROMPT_TEMPLATE_STRUCTURE.CHAT) {
       return;
     }
 
