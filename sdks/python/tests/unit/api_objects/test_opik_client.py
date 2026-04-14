@@ -575,7 +575,7 @@ class TestOpikClientCreateTestSuite:
         """Verify assertions are resolved into evaluators and forwarded via apply_dataset_item_changes."""
         self.opik_client_.create_test_suite(
             name="my-suite",
-            assertions=["Response is helpful", "No hallucinations"],
+            global_assertions=["Response is helpful", "No hallucinations"],
         )
 
         apply_request = self.mock_apply_changes.call_args[1]["request"]
@@ -594,7 +594,9 @@ class TestOpikClientCreateTestSuite:
     def test_create_test_suite__with_execution_policy__passes_policy_to_api(self):
         """Verify a valid execution policy is forwarded via apply_dataset_item_changes."""
         policy = {"runs_per_item": 3, "pass_threshold": 2}
-        self.opik_client_.create_test_suite(name="my-suite", execution_policy=policy)
+        self.opik_client_.create_test_suite(
+            name="my-suite", global_execution_policy=policy
+        )
 
         apply_request = self.mock_apply_changes.call_args[1]["request"]
         assert apply_request["execution_policy"] == {
@@ -609,7 +611,7 @@ class TestOpikClientCreateTestSuite:
         with pytest.raises(ValueError):
             self.opik_client_.create_test_suite(
                 name="my-suite",
-                execution_policy={"runs_per_item": 3},  # missing pass_threshold
+                global_execution_policy={"runs_per_item": 3},  # missing pass_threshold
             )
 
         self.mock_create_dataset.assert_not_called()
@@ -778,12 +780,11 @@ class TestOpikClientGetTestSuite:
             yield
 
     def test_get_test_suite__returns_test_suite(self):
-        """Verify get_test_suite returns a TestSuite with the correct name and dataset."""
+        """Verify get_test_suite returns a TestSuite with the correct name."""
         result = self.opik_client_.get_test_suite(name="my-suite")
 
         assert isinstance(result, TestSuite)
         assert result.name == "my-suite"
-        assert result.dataset is not None
 
     def test_get_test_suite__no_project_name__uses_default_project(self):
         """Verify get_test_suite passes the default project name to get_dataset_by_identifier."""

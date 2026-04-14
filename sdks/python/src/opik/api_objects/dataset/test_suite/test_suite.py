@@ -8,25 +8,34 @@ break existing functionality.
 
 from __future__ import annotations
 
-import functools
 import logging
 from typing import Any, Callable, Dict, List, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from opik.api_objects import opik_client as opik_client_module
+    from opik.evaluation.suite_evaluators.llm_judge import LLMJudge
+
+import datetime
 
 from opik import id_helpers
+from opik import exceptions as opik_exceptions
 from opik.api_objects.prompt import base_prompt
 from opik.api_objects.dataset import dataset, dataset_item
-
-from . import types as suite_types
-from .report_processors import displayer, file_writer
+from opik.rest_api.types import dataset_version_public
+from . import types as suite_types, converters
 from .. import validators, execution_policy, rest_operations
 
 
 LOGGER = logging.getLogger(__name__)
 
 LLMTask = Callable[[Dict[str, Any]], Any]
+
+
+def _evaluators_equal(a: List[LLMJudge], b: List[LLMJudge]) -> bool:
+    """Compare two lists of LLMJudge evaluators by their assertion sets."""
+    a_assertions = sorted(assertion for e in a for assertion in e.assertions)
+    b_assertions = sorted(assertion for e in b for assertion in e.assertions)
+    return a_assertions == b_assertions
 
 
 def validate_task_result(
@@ -71,6 +80,118 @@ def validate_task_result(
     return wrapped
 
 
+class TestSuiteVersion:
+    """
+    A read-only view of a specific test suite version.
+
+    Provides access to suite items, assertions, and execution policy at a
+    specific version point in time. Does not allow mutations.
+
+    Obtain an instance via :meth:`TestSuite.get_version_view`.
+    """
+
+    def __init__(
+        self,
+        name: str,
+        dataset_version: dataset.DatasetVersion,
+        version_info: dataset_version_public.DatasetVersionPublic,
+    ) -> None:
+        self._name = name
+        self._dataset_version = dataset_version
+        self._version_info = version_info
+
+    @property
+    def name(self) -> str:
+        """The name of the test suite this version belongs to."""
+        return self._name
+
+    @property
+    def id(self) -> str:
+        """The dataset ID of the test suite."""
+        return self._dataset_version.dataset_id
+
+    @property
+    def version_name(self) -> Optional[str]:
+        """The sequential version name (e.g., 'v1', 'v2')."""
+        return self._version_info.version_name
+
+    @property
+    def version_id(self) -> Optional[str]:
+        """The unique identifier of this specific version."""
+        return self._version_info.id
+
+    @property
+    def is_latest(self) -> Optional[bool]:
+        """Whether this is the latest version."""
+        return self._version_info.is_latest
+
+    @property
+    def items_total(self) -> Optional[int]:
+        """Total number of items in this version."""
+        return self._version_info.items_total
+
+    @property
+    def change_description(self) -> Optional[str]:
+        """Description of changes in this version."""
+        return self._version_info.change_description
+
+    @property
+    def created_at(self) -> Optional[datetime.datetime]:
+        """Timestamp when this version was created."""
+        return self._version_info.created_at
+
+    @property
+    def project_name(self) -> Optional[str]:
+        """The project name associated with the test suite."""
+        return self._dataset_version.project_name
+
+    def get_items(
+        self,
+        nb_samples: Optional[int] = None,
+        filter_string: Optional[str] = None,
+    ) -> List[suite_types.TestSuiteItem]:
+        """
+        Retrieve suite items at this version as a list of dictionaries.
+
+        Args:
+            nb_samples: Maximum number of items to retrieve.
+            filter_string: Optional OQL filter string.
+
+        Returns:
+            A list of item dicts with keys: id, data, description,
+            assertions, execution_policy.
+        """
+        return [
+            converters.dataset_item_to_suite_item_dict(item)
+            for item in self._dataset_version.__internal_api__stream_items_as_dataclasses__(
+                nb_samples=nb_samples,
+                filter_string=filter_string,
+            )
+        ]
+
+    def get_global_assertions(self) -> List[str]:
+        """
+        Get the suite-level assertions stored in this version.
+
+        Returns:
+            List of assertion strings.
+        """
+        return converters.version_evaluators_to_assertions(
+            self._version_info.evaluators
+        )
+
+    def get_global_execution_policy(self) -> execution_policy.ExecutionPolicy:
+        """
+        Get the suite-level execution policy stored in this version.
+
+        Returns:
+            ExecutionPolicy dict with runs_per_item and pass_threshold.
+        """
+        return converters.version_policy_to_execution_policy(
+            self._version_info.execution_policy
+        )
+
+
 class TestSuite:
     """
     A pre-configured regression test suite for LLM applications.
@@ -84,25 +205,27 @@ class TestSuite:
     metadata and read by the evaluation engine when running the suite.
 
     Example:
-        >>> from opik import Opik
+        >>> import opik
         >>>
-        >>> client = Opik()
+        >>> client = opik.Opik()
         >>>
         >>> suite = client.create_test_suite(
         ...     name="Refund Policy Tests",
         ...     description="Regression tests for refund scenarios",
-        ...     assertions=[
+        ...     global_assertions=[
         ...         "Response does not contain hallucinated information",
         ...         "Response is helpful to the user",
         ...     ],
         ... )
         >>>
-        >>> suite.add_item(
-        ...     data={"user_input": "How do I get a refund?", "user_tier": "premium"},
-        ...     assertions=["Response is polite"],
-        ... )
+        >>> suite.insert([
+        ...     {
+        ...         "data": {"user_input": "How do I get a refund?", "user_tier": "premium"},
+        ...         "assertions": ["Response is polite"],
+        ...     },
+        ... ])
         >>>
-        >>> results = suite.run(task=my_llm_function)
+        >>> results = opik.run_tests(test_suite=suite, task=my_llm_function)
     """
 
     def __init__(
@@ -122,6 +245,11 @@ class TestSuite:
         self._client = client
 
     @property
+    def id(self) -> str:
+        """The ID of the test suite."""
+        return self._dataset.id
+
+    @property
     def name(self) -> str:
         """The name of the test suite."""
         return self._name
@@ -130,11 +258,6 @@ class TestSuite:
     def description(self) -> Optional[str]:
         """The description of the test suite."""
         return self._dataset.description
-
-    @property
-    def dataset(self) -> dataset.Dataset:
-        """The underlying dataset storing suite items."""
-        return self._dataset
 
     @property
     def project_name(self) -> Optional[str]:
@@ -150,85 +273,132 @@ class TestSuite:
         """
         return self._dataset.get_tags()
 
-    def get_items(self) -> List[Dict[str, Any]]:
+    def get_current_version_name(self) -> Optional[str]:
+        """
+        Get the current version name of the test suite.
+
+        Returns:
+            The current version name (e.g., 'v1', 'v2'), or None if
+            no version exists.
+        """
+        return self._dataset.get_current_version_name()
+
+    def get_version_info(
+        self,
+    ) -> Optional[dataset_version_public.DatasetVersionPublic]:
+        """
+        Get version information for the current (latest) version.
+
+        Returns:
+            DatasetVersionPublic containing the current version's metadata,
+            or None if no version exists yet.
+        """
+        return self._dataset.get_version_info()
+
+    def get_version_view(self, version_name: str) -> TestSuiteVersion:
+        """
+        Get a read-only view of a specific version.
+
+        Args:
+            version_name: The version name (e.g., 'v1', 'v2').
+
+        Returns:
+            A read-only TestSuiteVersion for accessing the specified
+            version's items, assertions, and execution policy.
+
+        Raises:
+            opik.exceptions.DatasetVersionNotFound: If the version does not
+                exist.
+        """
+        version_info = rest_operations.find_version_by_name(
+            rest_client=self._dataset._rest_client,
+            dataset_id=self._dataset.id,
+            version_name=version_name,
+        )
+        if version_info is None:
+            raise opik_exceptions.DatasetVersionNotFound(
+                f"Version '{version_name}' not found in test suite '{self._name}'"
+            )
+
+        dataset_version = dataset.DatasetVersion(
+            dataset_name=self._name,
+            dataset_id=self._dataset.id,
+            rest_client=self._dataset._rest_client,
+            version_info=version_info,
+            project_name=self._dataset.project_name,
+            client=self._dataset.client,
+        )
+        return TestSuiteVersion(
+            name=self._name,
+            dataset_version=dataset_version,
+            version_info=version_info,
+        )
+
+    def get_items(
+        self,
+        nb_samples: Optional[int] = None,
+        filter_string: Optional[str] = None,
+    ) -> List[suite_types.TestSuiteItem]:
         """
         Retrieve suite items as a list of dictionaries.
 
-        Each item dict has keys:
-        - "id": the dataset item ID (str)
-        - "data": the test case data (dict)
-        - "description": optional item description (str or None)
-        - "assertions": list of assertion strings (or empty list)
-        - "execution_policy": ExecutionPolicyItem or None
+        Each item dict has keys: ``id``, ``data``, ``description``,
+        ``assertions``, ``execution_policy``.
+
+        Args:
+            nb_samples: Maximum number of items to retrieve.
+                If None, all items are returned.
+            filter_string: Optional OQL filter string to filter items.
 
         Returns:
             A list of item dictionaries.
         """
-        from opik.evaluation.suite_evaluators import llm_judge
-        from opik.evaluation.suite_evaluators.llm_judge import (
-            config as llm_judge_config,
-        )
-
-        result = []
-        for item in self._dataset.__internal_api__stream_items_as_dataclasses__():
-            item_assertions: list[str] = []
-            if item.evaluators:
-                for e in item.evaluators:
-                    if e.type == "llm_judge":
-                        cfg = llm_judge_config.LLMJudgeConfig(**e.config)
-                        judge = llm_judge.LLMJudge.from_config(cfg)
-                        item_assertions.extend(judge.assertions)
-
-            result.append(
-                {
-                    "id": item.id,
-                    "data": item.get_content(),
-                    "description": item.description,
-                    "assertions": item_assertions,
-                    "execution_policy": item.execution_policy,
-                }
+        return [
+            converters.dataset_item_to_suite_item_dict(item)
+            for item in self._dataset.__internal_api__stream_items_as_dataclasses__(
+                nb_samples=nb_samples,
+                filter_string=filter_string,
             )
-        return result
+        ]
 
     def update(
         self,
         *,
-        execution_policy: Optional[execution_policy.ExecutionPolicy] = None,
-        assertions: Optional[List[str]] = None,
+        global_execution_policy: Optional[execution_policy.ExecutionPolicy] = None,
+        global_assertions: Optional[List[str]] = None,
         tags: Optional[List[str]] = None,
     ) -> None:
         """
         Update the suite-level assertions, execution policy, and/or tags.
 
         Supports partial updates: any parameter not provided will retain
-        its current value.
+        its current value. If the new values are identical to the current
+        values, no new version is created.
 
         Args:
-            execution_policy: New execution policy for the suite.
+            global_execution_policy: New execution policy for the suite.
                 If not provided, the current policy is kept.
-            assertions: New suite-level assertions. Each string describes
-                an expected behavior that will be checked by an LLM.
-                If not provided, the current assertions are kept.
+            global_assertions: New suite-level assertions. Each string
+                describes an expected behavior that will be checked by an
+                LLM. If not provided, the current assertions are kept.
             tags: Tags for the suite.
 
         Raises:
             ValueError: If nothing to update is provided.
         """
-        if execution_policy is not None:
-            validators.validate_execution_policy(execution_policy)
+        if global_execution_policy is not None:
+            validators.validate_execution_policy(global_execution_policy)
 
         resolved = validators.resolve_evaluators(
-            assertions, None, "suite-level assertions"
+            global_assertions, None, "suite-level assertions"
         )
 
-        if resolved is None and execution_policy is None and tags is None:
+        if resolved is None and global_execution_policy is None and tags is None:
             raise ValueError(
-                "At least one of 'assertions', "
-                "'execution_policy', or 'tags' must be provided."
+                "At least one of 'global_assertions', "
+                "'global_execution_policy', or 'tags' must be provided."
             )
 
-        # Tags are a dataset-level field, so they're updated separately
-        # from assertions/execution_policy which are version-level.
         if tags is not None:
             self._dataset._rest_client.datasets.update_dataset(
                 id=self._dataset.id,
@@ -236,7 +406,9 @@ class TestSuite:
                 tags=tags,
             )
 
-        has_version_updates = resolved is not None or execution_policy is not None
+        has_version_updates = (
+            resolved is not None or global_execution_policy is not None
+        )
         if has_version_updates:
             version_info = self._dataset.get_version_info()
             if version_info is None:
@@ -245,29 +417,59 @@ class TestSuite:
                     "no version info found. Add at least one item first."
                 )
 
-            if resolved is None:
-                resolved = self._dataset.get_evaluators()
-            if execution_policy is None:
-                execution_policy = self.get_execution_policy()
+            current_evaluators = self._dataset.get_evaluators()
+            current_policy = self.get_global_execution_policy()
+
+            new_evaluators = resolved if resolved is not None else current_evaluators
+            new_policy = (
+                global_execution_policy
+                if global_execution_policy is not None
+                else current_policy
+            )
+
+            if (
+                _evaluators_equal(new_evaluators, current_evaluators)
+                and new_policy == current_policy
+            ):
+                return
+
+            change_parts: List[str] = []
+            if resolved is not None:
+                change_parts.append("assertions")
+            if global_execution_policy is not None:
+                change_parts.append("execution policy")
 
             rest_operations.update_test_suite_dataset(
                 rest_client=self._dataset._rest_client,
                 dataset_id=self._dataset.id,
                 base_version_id=version_info.id,
-                evaluators=resolved,
-                exec_policy=execution_policy,
+                evaluators=new_evaluators,
+                exec_policy=new_policy,
+                change_description=f"Updated {' and '.join(change_parts)} via SDK",
             )
 
-    def delete_items(self, item_ids: List[str]) -> None:
+    def delete(self, items_ids: List[str]) -> None:
         """
         Delete items from the test suite by their IDs.
 
         Args:
-            item_ids: List of item IDs to delete.
+            items_ids: List of item IDs to delete.
         """
-        self._dataset.delete(item_ids)
+        self._dataset.delete(items_ids)
 
-    def get_execution_policy(self) -> execution_policy.ExecutionPolicy:
+    def clear(self) -> None:
+        """
+        Delete all items from the test suite.
+        """
+        item_ids = [
+            item.id
+            for item in self._dataset.__internal_api__stream_items_as_dataclasses__()
+            if item.id is not None
+        ]
+        if item_ids:
+            self._dataset.delete(item_ids)
+
+    def get_global_execution_policy(self) -> execution_policy.ExecutionPolicy:
         """
         Get the suite-level execution policy.
 
@@ -276,100 +478,53 @@ class TestSuite:
         """
         return self._dataset.get_execution_policy()
 
-    def get_assertions(self) -> List[str]:
+    def get_global_assertions(self) -> List[str]:
         """
         Get the suite-level assertions.
 
         Returns:
             List of assertion strings.
         """
-        evaluators = self._dataset.get_evaluators()
-        assertions: list[str] = []
-        for evaluator in evaluators:
-            assertions.extend(evaluator.assertions)
-        return assertions
+        return converters.evaluators_to_assertions(self._dataset.get_evaluators())
 
-    def add_item(
-        self,
-        data: Dict[str, Any],
-        *,
-        assertions: Optional[List[str]] = None,
-        description: Optional[str] = None,
-        execution_policy: Optional[execution_policy.ExecutionPolicy] = None,
-    ) -> None:
-        """
-        Add a test case to the test suite.
-
-        Args:
-            data: Dictionary containing the test case data. This is passed to
-                the task function and can contain any fields needed.
-                Example: {"user_input": "How do I get a refund?", "user_tier": "premium"}
-            assertions: Item-specific assertions. Each string describes an
-                expected behavior that will be checked by an LLM.
-            description: Optional description of this test case.
-            execution_policy: Item-specific execution policy override.
-                Example: {"runs_per_item": 3, "pass_threshold": 2}
-
-        Example:
-            >>> suite.add_item(
-            ...     data={"user_input": "How do I get a refund?", "user_tier": "premium"},
-            ...     description="Test refund request from premium user",
-            ...     assertions=["Response is polite"],
-            ... )
-        """
-        if execution_policy is not None:
-            validators.validate_execution_policy(execution_policy)
-
-        evaluators = validators.resolve_evaluators(
-            assertions, None, "item-level assertions"
-        )
-
-        item_id = id_helpers.generate_id()
-
-        # Convert LLMJudge evaluators to EvaluatorItem format for the API
-        evaluator_items = None
-        if evaluators:
-            evaluator_items = [
-                dataset_item.EvaluatorItem(
-                    name=e.name,
-                    type="llm_judge",
-                    config=e.to_config().model_dump(by_alias=True),
-                )
-                for e in evaluators
-            ]
-
-        # Convert execution_policy to ExecutionPolicyItem format for the API
-        execution_policy_item = None
-        if execution_policy:
-            execution_policy_item = dataset_item.ExecutionPolicyItem(
-                runs_per_item=execution_policy.get("runs_per_item"),
-                pass_threshold=execution_policy.get("pass_threshold"),
-            )
-
-        ds_item = dataset_item.DatasetItem(
-            id=item_id,
-            description=description,
-            evaluators=evaluator_items,
-            execution_policy=execution_policy_item,
-            **data,
-        )
-        self._dataset.__internal_api__insert_items_as_dataclasses__([ds_item])
-
-    def add_items(
+    def update_items(
         self,
         items: List[suite_types.TestSuiteItem],
     ) -> None:
         """
-        Add multiple test cases to the test suite in a single batch.
+        Update existing items in the test suite.
 
-        This is more efficient than calling add_item() repeatedly, as it
-        creates only one dataset version for the entire batch.
+        Each item dict must include an ``"id"`` key identifying the item to
+        update.  The remaining keys (``"data"``, ``"assertions"``,
+        ``"description"``, ``"execution_policy"``) replace the previous values.
+
+        Args:
+            items: List of item dicts to update. Each must contain ``"id"``.
+
+        Raises:
+            DatasetItemUpdateOperationRequiresItemId: If any item is missing
+                an ``"id"`` key.
+        """
+        for item in items:
+            if "id" not in item:
+                raise opik_exceptions.DatasetItemUpdateOperationRequiresItemId(
+                    "Missing id for test suite item to update: %s", item
+                )
+
+        self.insert(items)
+
+    def insert(
+        self,
+        items: List[suite_types.TestSuiteItem],
+    ) -> None:
+        """
+        Insert test cases into the test suite.
 
         Args:
             items: List of test case items to add.
 
         Example:
-            >>> suite.add_items([
+            >>> suite.insert([
             ...     {"data": {"question": "How do I get a refund?"}},
             ...     {
             ...         "data": {"question": "Is my account hacked?"},
@@ -407,7 +562,7 @@ class TestSuite:
 
             ds_items.append(
                 dataset_item.DatasetItem(
-                    id=id_helpers.generate_id(),
+                    id=item.get("id", id_helpers.generate_id()),
                     description=item.get("description"),
                     evaluators=evaluator_items,
                     execution_policy=execution_policy_item,
@@ -416,85 +571,6 @@ class TestSuite:
             )
 
         self._dataset.__internal_api__insert_items_as_dataclasses__(ds_items)
-
-    def run(
-        self,
-        task: LLMTask,
-        *,
-        experiment_name_prefix: Optional[str] = None,
-        experiment_name: Optional[str] = None,
-        project_name: Optional[str] = None,
-        experiment_config: Optional[Dict[str, Any]] = None,
-        prompts: Optional[List[base_prompt.BasePrompt]] = None,
-        experiment_tags: Optional[List[str]] = None,
-        verbose: int = 2,
-        worker_threads: int = 16,
-        model: Optional[str] = None,
-        generate_report: bool = True,
-        report_output_path: Optional[str] = None,
-    ) -> suite_types.TestSuiteResult:
-        """
-        Run the test suite against a task function.
-
-        The task function receives each test item's data dict and must return
-        either a dict (with ``"input"`` and ``"output"`` as the supported keys)
-        or any other value, which will be automatically wrapped as
-        ``{"input": <item data>, "output": <returned value>}``.
-
-        Args:
-            task: A callable that takes a dict (the item's data) and returns
-                a dict with ``"input"``/``"output"`` keys, or any other value
-                to be auto-wrapped.
-            experiment_name_prefix: Optional prefix for auto-generated experiment name.
-            experiment_name: Optional explicit name for the experiment.
-            project_name: Optional project name for tracking.
-            experiment_config: Optional configuration dict for the experiment.
-            prompts: Optional list of Prompt objects to associate with the experiment.
-            experiment_tags: Optional list of tags to associate with the experiment.
-            verbose: Verbosity level. 0=silent, 1=summary only (pass/fail,
-                items passed, pass rate), 2=summary + per-assertion pass rates
-                (default).
-            worker_threads: Number of threads for parallel task execution.
-            model: Optional model name to use for checking assertions.
-                If not provided, uses the default model (gpt-5-nano).
-            generate_report: Whether to generate a structured JSON report file
-                after the evaluation completes. Defaults to True.
-            report_output_path: Optional file path for the report. If not
-                provided, a default path is generated under ``opik_test_suite_reports/``.
-
-        Returns:
-            TestSuiteResult with pass/fail status based on execution policy.
-
-        Example:
-            >>> # Simplified: return any value it is auto-wrapped internally
-            >>> def my_llm_task(data: dict) -> str:
-            ...     return call_my_llm(data["user_input"], user_tier=data.get("user_tier"))
-            >>>
-            >>> # Explicit: return a dict with "input" and "output" keys directly
-            >>> def my_llm_task_explicit(data: dict) -> dict:
-            ...     response = call_my_llm(data["user_input"], user_tier=data.get("user_tier"))
-            ...     return {"input": data, "output": response}
-            >>>
-            >>> result = suite.run(task=my_llm_task, model="gpt-4o")
-            >>> print(f"Suite passed: {result.passed}")
-            >>> print(f"Items passed: {result.items_passed}/{result.items_total}")
-        """
-        project_name = project_name or self.project_name
-        return self.__internal_api__run_optimization_suite__(
-            task=task,
-            experiment_name_prefix=experiment_name_prefix,
-            experiment_name=experiment_name,
-            project_name=project_name,
-            experiment_config=experiment_config,
-            prompts=prompts,
-            experiment_tags=experiment_tags,
-            verbose=verbose,
-            worker_threads=worker_threads,
-            model=model,
-            generate_report=generate_report,
-            report_output_path=report_output_path,
-            client=self._client,
-        )
 
     def __internal_api__run_optimization_suite__(
         self,
@@ -513,54 +589,18 @@ class TestSuite:
         experiment_type: Optional[str] = None,
         dataset_item_ids: Optional[List[str]] = None,
         dataset_filter_string: Optional[str] = None,
-        client: Optional[Any] = None,
+        client: Optional["opik_client_module.Opik"] = None,
         generate_report: bool = True,
         report_output_path: Optional[str] = None,
     ) -> suite_types.TestSuiteResult:
         """
-        Run the test suite with optimization-specific parameters.
-
-        This is the internal entry point used by the optimizer framework.
-        It extends the public ``run()`` method with parameters for linking
-        experiments to optimization runs, filtering dataset items, and
-        injecting a pre-configured Opik client.
-
-        Args:
-            task: A callable that takes a dict (the item's data) and returns
-                a dict with ``"input"``/``"output"`` keys, or any other value
-                to be auto-wrapped.
-            experiment_name_prefix: Optional prefix for auto-generated experiment name.
-            experiment_name: Optional explicit name for the experiment.
-            project_name: Optional project name for tracking.
-            experiment_config: Optional configuration dict for the experiment.
-            prompts: Optional list of Prompt objects to associate with the experiment.
-            experiment_tags: Optional list of tags to associate with the experiment.
-            verbose: Verbosity level. 0=silent, 1=summary only, 2=detailed (default).
-            worker_threads: Number of threads for parallel task execution.
-            model: Optional model name to use for checking assertions.
-            optimization_id: Optimization ID to link the experiment to.
-            experiment_type: Experiment type (e.g. "trial", "mini-batch").
-            dataset_item_ids: Subset of dataset item IDs to evaluate.
-            dataset_filter_string: OQL filter string to filter dataset items.
-            client: Opik client instance. If not provided, uses the cached client.
-            generate_report: Whether to generate a structured JSON report file
-                after the evaluation completes. Defaults to True.
-            report_output_path: Optional file path for the report. If not
-                provided, a default path is generated under
-                ``opik_test_suite_reports/``.
-
-        Returns:
-            TestSuiteResult with pass/fail status based on execution policy.
+        Internal entry point used by the optimizer framework.
         """
-        from opik.evaluation import evaluator as opik_evaluator
+        from opik.evaluation.evaluator import __internal_api__run_test_suite__
 
-        @functools.wraps(task)
-        def _validated_task(data: Dict[str, Any]) -> Any:
-            return validate_task_result(task(data), input_data=data)
-
-        suite_result = opik_evaluator.evaluate_test_suite(
-            dataset=self._dataset,
-            task=_validated_task,
+        return __internal_api__run_test_suite__(
+            suite_dataset=self._dataset,
+            task=task,
             client=client,
             dataset_item_ids=dataset_item_ids,
             dataset_filter_string=dataset_filter_string,
@@ -575,26 +615,6 @@ class TestSuite:
             evaluator_model=model,
             optimization_id=optimization_id,
             experiment_type=experiment_type,
+            generate_report=generate_report,
+            report_output_path=report_output_path,
         )
-
-        report_path: Optional[str] = None
-        if generate_report:
-            try:
-                report_path = file_writer.save_report(
-                    suite_result,
-                    output_path=report_output_path,
-                )
-            except Exception:
-                LOGGER.warning(
-                    "Failed to save test suite report file.",
-                    exc_info=True,
-                )
-
-        if verbose >= 1:
-            displayer.display_suite_results(
-                suite_result,
-                verbose=verbose,
-                report_path=report_path,
-            )
-
-        return suite_result

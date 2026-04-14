@@ -59,6 +59,8 @@ def build_suite_result(
             if item.execution_policy.runs_per_item is not None:
                 configured_runs_per_item = item.execution_policy.runs_per_item
 
+        has_assertions = any(r.score_results for r in item_test_results)
+
         runs_passed = sum(
             1
             for r in item_test_results
@@ -73,6 +75,7 @@ def build_suite_result(
         item_results[item_id] = suite_types.ItemResult(
             dataset_item_id=item_id,
             passed=passed,
+            has_assertions=has_assertions,
             runs_passed=runs_passed,
             runs_total=len(item_test_results),
             configured_runs_per_item=configured_runs_per_item,

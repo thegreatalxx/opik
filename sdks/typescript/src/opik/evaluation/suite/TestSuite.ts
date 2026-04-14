@@ -127,6 +127,10 @@ export class TestSuite {
     return this.dataset.id;
   }
 
+  get projectName(): string | undefined {
+    return this.dataset.projectName;
+  }
+
   // ---------------------------------------------------------------------------
   // Static factory methods (replace Client.ts methods — no circular dep)
   // ---------------------------------------------------------------------------
@@ -260,7 +264,7 @@ export class TestSuite {
       dataset: this.dataset,
       task: validatedTask,
       experimentName: options?.experimentName,
-      projectName: options?.projectName,
+      projectName: options?.projectName ?? this.dataset.projectName,
       experimentConfig: options?.experimentConfig,
       prompts: options?.prompts,
       evaluatorModel: options?.model,
@@ -305,6 +309,10 @@ export class TestSuite {
 
   async getTags(): Promise<string[]> {
     return this.dataset.getTags();
+  }
+
+  async getItemsCount(): Promise<number | undefined> {
+    return this.dataset.getItemsCount();
   }
 
   async getExecutionPolicy(): Promise<Required<ExecutionPolicy>> {

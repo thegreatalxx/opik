@@ -20,6 +20,7 @@ from ...rest_api.core.api_error import ApiError
 
 if TYPE_CHECKING:
     from opik.evaluation.suite_evaluators import llm_judge
+    from .test_suite.test_suite import TestSuite
 
 LOGGER = logging.getLogger(__name__)
 
@@ -218,6 +219,60 @@ def get_datasets(
     return datasets
 
 
+def get_test_suites(
+    project_name: Optional[str],
+    rest_client: OpikApi,
+    max_results: int = 1000,
+    client: Optional[Any] = None,
+) -> List[TestSuite]:
+    from .test_suite import test_suite as test_suite_module
+
+    page_size = 100
+    suites: List[test_suite_module.TestSuite] = []
+    page = 1
+
+    project_id = rest_helpers.resolve_project_id_by_name_optional(
+        rest_client, project_name=project_name
+    )
+
+    while len(suites) < max_results:
+        page_datasets = rest_client.datasets.find_datasets(
+            page=page,
+            size=page_size,
+            project_id=project_id,
+        )
+
+        if len(page_datasets.content) == 0:
+            break
+
+        for dataset_fern in page_datasets.content:
+            if len(suites) >= max_results:
+                break
+            if dataset_fern.type != "evaluation_suite":
+                continue
+
+            suite_dataset = dataset.Dataset(
+                name=dataset_fern.name,
+                description=dataset_fern.description,
+                project_name=project_name,
+                rest_client=rest_client,
+                dataset_items_count=dataset_fern.dataset_items_count,
+                client=client,
+            )
+
+            suites.append(
+                test_suite_module.TestSuite(
+                    name=dataset_fern.name,
+                    dataset_=suite_dataset,
+                    client=client,
+                )
+            )
+
+        page += 1
+
+    return suites
+
+
 def get_dataset_id(
     rest_client: OpikApi, dataset_name: str, project_name: Optional[str]
 ) -> str:
@@ -314,7 +369,9 @@ def create_test_suite_dataset(
     )
 
     resolved_policy = exec_policy or execution_policy.DEFAULT_EXECUTION_POLICY.copy()
-    request: Dict[str, Any] = {}
+    request: Dict[str, Any] = {
+        "change_description": "Suite created via SDK",
+    }
     if evaluators:
         request["evaluators"] = [
             {
@@ -341,6 +398,7 @@ def update_test_suite_dataset(
     base_version_id: str,
     evaluators: List[llm_judge.LLMJudge],
     exec_policy: execution_policy.ExecutionPolicy,
+    change_description: Optional[str] = None,
 ) -> None:
     """
     Update suite-level evaluators and execution_policy by creating a new
@@ -352,6 +410,7 @@ def update_test_suite_dataset(
         base_version_id: The current latest version UUID to base the update on.
         evaluators: Suite-level LLMJudge evaluators.
         exec_policy: Execution policy dict.
+        change_description: Optional description of the change for the new version.
     """
     request: Dict[str, Any] = {
         "base_version": base_version_id,
@@ -368,6 +427,8 @@ def update_test_suite_dataset(
             "pass_threshold": exec_policy.get("pass_threshold", 1),
         },
     }
+    if change_description:
+        request["change_description"] = change_description
     rest_client.datasets.apply_dataset_item_changes(
         id=dataset_id, request=request, override=False
     )

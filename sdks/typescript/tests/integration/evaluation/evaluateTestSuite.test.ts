@@ -99,6 +99,7 @@ describe.skipIf(!shouldRunApiTests)("TestSuite Integration", () => {
             passThreshold: 1,
           });
         }
+
       },
       60000
     );
@@ -172,10 +173,13 @@ describe.skipIf(!shouldRunApiTests)("TestSuite Integration", () => {
           assertions: ["Response is helpful"],
         });
 
+        expect(created.projectName).toBeDefined();
+
         const fetched = await TestSuite.get(client, suiteName);
 
         expect(fetched.id).toBe(created.id);
         expect(fetched.name).toBe(suiteName);
+        expect(fetched.projectName).toBe(created.projectName);
       },
       60000
     );
@@ -210,10 +214,13 @@ describe.skipIf(!shouldRunApiTests)("TestSuite Integration", () => {
         const suiteName = `test-suite-run-${Date.now()}`;
         createdDatasetNames.push(suiteName);
 
+        const projectName = `test-project-${Date.now()}`;
+
         const suite = await TestSuite.create(client, {
           name: suiteName,
           assertions: ["Response is helpful"],
           executionPolicy: { runsPerItem: 1, passThreshold: 1 },
+          projectName,
         });
 
         await suite.addItem({ input: "What is 2+2?", expected: "4" });
@@ -224,6 +231,7 @@ describe.skipIf(!shouldRunApiTests)("TestSuite Integration", () => {
 
         await waitForSuiteItems(suite, 2);
 
+        // run() defaults to projectName from the dataset record
         const result = await suite.run(echoTask);
 
         expect(result.experimentId).toBeDefined();

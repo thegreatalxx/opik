@@ -49,8 +49,7 @@ import {
   injectColumnCallback,
   migrateSelectedColumns,
 } from "@/lib/table";
-import { buildDocsUrl } from "@/lib/utils";
-import DataTableNoData from "@/shared/DataTableNoData/DataTableNoData";
+import DataTableEmptyContent from "@/shared/DataTableNoData/DataTableEmptyContent";
 import Loader from "@/shared/Loader/Loader";
 import {
   buildDatasetFilterColumns,
@@ -67,7 +66,6 @@ import {
   useIsDraftMode,
   useIsAllItemsSelected,
   useSetIsAllItemsSelected,
-  useDeletedIds,
 } from "@/store/TestSuiteDraftStore";
 import { COLUMN_ID_ID } from "@/types/shared";
 import { DynamicColumn } from "@/types/shared";
@@ -212,7 +210,6 @@ function DatasetItemsTab({
   );
 
   const isDraftMode = useIsDraftMode();
-  const deletedIds = useDeletedIds();
 
   const { data, isPending, isPlaceholderData, isFetching } =
     useDatasetItemsWithDraft(
@@ -318,13 +315,6 @@ function DatasetItemsTab({
   >(storageKeys.columnsWidthKey, {
     defaultValue: {},
   });
-
-  const noDataText = useMemo(() => {
-    if (isDraftMode && deletedIds.size > 0 && totalCount !== deletedIds.size) {
-      return `All ${entityName} items on this page have been deleted`;
-    }
-    return `There are no ${entityName} items yet`;
-  }, [isDraftMode, deletedIds.size, totalCount, entityName]);
 
   const handleSearchChange = useCallback(
     (newSearch: string | null) => {
@@ -620,20 +610,17 @@ function DatasetItemsTab({
         rowHeight={height as ROW_HEIGHT}
         columnPinning={DEFAULT_COLUMN_PINNING}
         noData={
-          <DataTableNoData title={noDataText}>
-            <Button variant="link">
-              <a
-                href={buildDocsUrl(
-                  "/evaluation/manage_datasets",
-                  "#insert-items",
-                )}
-                target="_blank"
-                rel="noreferrer"
-              >
-                Check our documentation
-              </a>
-            </Button>
-          </DataTableNoData>
+          <DataTableEmptyContent
+            title={`No ${entityName} items yet`}
+            description="Add test cases to run evaluations and measure performance."
+          >
+            <button
+              onClick={() => setOpenCreatePanel(true)}
+              className="comet-body-s underline underline-offset-4 hover:text-primary"
+            >
+              Add new item
+            </button>
+          </DataTableEmptyContent>
         }
       />
       <div className="flex justify-end py-4">

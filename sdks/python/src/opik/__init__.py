@@ -11,9 +11,9 @@ from .api_objects.experiment.experiment_item import (
     ExperimentItemContent,
     ExperimentItemReferences,
 )
-from .api_objects.agent_config import AgentConfig, Blueprint
+from .api_objects.agent_config import Config, Blueprint
 from .api_objects.agent_config.context import agent_config_context
-from .exceptions import AgentConfigNotFound
+from .exceptions import ConfigNotFound, ConfigMismatch
 from .api_objects.opik_client import Opik, get_global_client, set_global_client
 from .api_objects.prompt import Prompt, ChatPrompt
 from .api_objects.prompt.types import PromptType
@@ -26,6 +26,7 @@ from .evaluation import (
     evaluate_experiment,
     evaluate_on_dict_items,
     evaluate_prompt,
+    run_tests,
 )
 from .integrations.sagemaker import auth as sagemaker_auth
 from .plugins.pytest.decorator import llm_unit
@@ -56,6 +57,7 @@ __all__ = [
     "evaluate_prompt",
     "evaluate_experiment",
     "evaluate_on_dict_items",
+    "run_tests",
     "ExperimentItemContent",
     "ExperimentItemReferences",
     "track",
@@ -83,8 +85,9 @@ __all__ = [
     "SimulatedUser",
     "run_simulation",
     "record_traces_locally",
-    "AgentConfig",
-    "AgentConfigNotFound",
+    "Config",
+    "ConfigNotFound",
+    "ConfigMismatch",
     "Blueprint",
     "agent_config_context",
     "update_current_trace",

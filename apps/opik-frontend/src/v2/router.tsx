@@ -188,9 +188,6 @@ const projectHomeRoute = createRoute({
   path: "/home",
   getParentRoute: () => projectScopedRoute,
   component: ProjectHomePage,
-  staticData: {
-    title: "Project home",
-  },
 });
 
 // ----------- logs (project-scoped)
