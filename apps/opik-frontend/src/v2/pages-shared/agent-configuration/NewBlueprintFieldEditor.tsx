@@ -16,6 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/ui/select";
+import { validateBlueprintFieldValue } from "./blueprintFieldValidation";
 
 const FIELD_NAME_PATTERN = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
 
@@ -85,6 +86,38 @@ const NewBlueprintFieldEditor: React.FC<NewBlueprintFieldEditorProps> = ({
       return "A field with this name already exists";
     return null;
   }, [trimmedKey, reservedKeys]);
+
+  // Inline validation for the value field. We only show it once the user has
+  // typed something, to avoid yelling at them about an empty initial value.
+  const valueError = useMemo(() => {
+    if (
+      field.type === BlueprintValueType.PROMPT ||
+      field.type === BlueprintValueType.BOOLEAN
+    ) {
+      return null;
+    }
+    if (!field.value) return null;
+    return validateBlueprintFieldValue(field.type, field.value) || null;
+  }, [field.type, field.value]);
+
+  // For PROMPT, surface a hint when there are no messages or every message is
+  // empty. We don't gate on it (the user may still be drafting) but we do
+  // signal it.
+  const promptError = useMemo(() => {
+    if (field.type !== BlueprintValueType.PROMPT) return null;
+    if (field.messages.length === 0) return "Add at least one message";
+    const allEmpty = field.messages.every((m) => {
+      if (typeof m.content === "string") return !m.content.trim();
+      if (Array.isArray(m.content)) {
+        return m.content.every(
+          (part) =>
+            part.type === "text" && !(part as { text?: string }).text?.trim(),
+        );
+      }
+      return true;
+    });
+    return allEmpty ? "Messages must not be empty" : null;
+  }, [field.type, field.messages]);
 
   const handleTypeChange = (next: BlueprintValueType) => {
     onChange({ ...field, type: next, ...initialStateForType(next) });
@@ -173,9 +206,9 @@ const NewBlueprintFieldEditor: React.FC<NewBlueprintFieldEditorProps> = ({
         />
       )}
 
-      {(keyError || error) && (
+      {(keyError || valueError || promptError || error) && (
         <span className="comet-body-xs text-destructive">
-          {keyError ?? error}
+          {keyError ?? valueError ?? promptError ?? error}
         </span>
       )}
     </div>
