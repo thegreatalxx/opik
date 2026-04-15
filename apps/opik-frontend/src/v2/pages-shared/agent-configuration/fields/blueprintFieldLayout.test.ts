@@ -76,9 +76,9 @@ describe("collectMultiLineKeys", () => {
     expect(collectMultiLineKeys([])).toEqual([]);
   });
 
-  it("excludes PROMPT fields", () => {
+  it("includes PROMPT fields", () => {
     const values = [makeValue({ key: "p", type: BlueprintValueType.PROMPT })];
-    expect(collectMultiLineKeys(values)).toEqual([]);
+    expect(collectMultiLineKeys(values)).toEqual(["p"]);
   });
 
   it("collects STRING fields with long values", () => {
