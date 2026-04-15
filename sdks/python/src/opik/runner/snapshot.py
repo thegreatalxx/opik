@@ -6,7 +6,7 @@ import platform
 import re
 import sys
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional, Set, TypedDict
 
 from ..cli.pairing import RunnerType
 from .bridge_handlers import CommandError, common
@@ -44,6 +44,151 @@ _CONFIGURATION_PATTERNS = [
 
 _ALL_PATTERNS = _TRACING_PATTERNS + _ENTRYPOINT_PATTERNS + _CONFIGURATION_PATTERNS
 
+_IS_WINDOWS = platform.system().lower() == "windows"
+_PYTHON_VENV_RE = re.compile(r"[\\/]bin[\\/]python\d?(?:\.\d+)?$|[\\/]Scripts[\\/]python(?:\d(?:\.\d+)?)?\.exe$")
+
+
+class PythonEnvInfo(TypedDict):
+    python_executable: str
+    python_env_type: str
+    python_env_source: str
+
+
+def _find_venv_python(venv_dir: Path) -> Optional[str]:
+    """Return the Python binary inside a venv directory, or None if not found."""
+    if _IS_WINDOWS:
+        candidate = venv_dir / "Scripts" / "python.exe"
+        if candidate.is_file():
+            return str(candidate)
+    else:
+        candidate = venv_dir / "bin" / "python"
+        if candidate.is_file() and os.access(candidate, os.X_OK):
+            return str(candidate)
+    return None
+
+
+def _classify_env_manager(repo_root: Path) -> Optional[str]:
+    """Detect uv or poetry from lock files / pyproject.toml markers."""
+    if (repo_root / "uv.lock").is_file():
+        return "uv"
+    if (repo_root / "poetry.lock").is_file():
+        return "poetry"
+    pyproject = repo_root / "pyproject.toml"
+    if pyproject.is_file():
+        try:
+            head = pyproject.read_bytes()[:4096].decode("utf-8", errors="replace")
+            if "[tool.uv]" in head:
+                return "uv"
+            if "[tool.poetry]" in head:
+                return "poetry"
+        except OSError:
+            pass
+    return None
+
+
+def _detect_python_env(
+    repo_root: Path, command: Optional[List[str]]
+) -> PythonEnvInfo:
+    """Detect the project's Python environment from multiple signals.
+
+    Returns the best Python executable path, environment type, and how it
+    was detected.  Priority: command argument > env vars > project directory
+    markers > daemon introspection > system fallback.
+    """
+
+    # 1. Command signal — e.g. opik endpoint -- .venv/bin/python app.py
+    if command:
+        first = command[0]
+        if _PYTHON_VENV_RE.search(first):
+            resolved = Path(first)
+            if not resolved.is_absolute():
+                resolved = repo_root / resolved
+            if resolved.is_file():
+                env_type = _classify_env_manager(repo_root) or "venv"
+                return PythonEnvInfo(
+                    python_executable=str(resolved),
+                    python_env_type=env_type,
+                    python_env_source="command",
+                )
+
+    # 2. VIRTUAL_ENV env var — set by venv/virtualenv activation
+    virtual_env = os.environ.get("VIRTUAL_ENV")
+    if virtual_env:
+        python = _find_venv_python(Path(virtual_env))
+        if python:
+            env_type = _classify_env_manager(repo_root) or "venv"
+            return PythonEnvInfo(
+                python_executable=python,
+                python_env_type=env_type,
+                python_env_source="env_var",
+            )
+
+    # 3. CONDA_PREFIX env var — set by conda activate
+    conda_prefix = os.environ.get("CONDA_PREFIX")
+    if conda_prefix:
+        python = _find_venv_python(Path(conda_prefix))
+        if python:
+            return PythonEnvInfo(
+                python_executable=python,
+                python_env_type="conda",
+                python_env_source="env_var",
+            )
+
+    # 4. Package manager markers (uv/poetry) — even without in-project venv
+    manager = _classify_env_manager(repo_root)
+    if manager:
+        # Check for in-project venv first
+        for dirname in (".venv", "venv"):
+            python = _find_venv_python(repo_root / dirname)
+            if python:
+                return PythonEnvInfo(
+                    python_executable=python,
+                    python_env_type=manager,
+                    python_env_source="project_dir",
+                )
+        # Manager detected but venv is external (e.g. poetry cache).
+        # Ollie will use `uv add` / `poetry add` which handle the env.
+        return PythonEnvInfo(
+            python_executable=sys.executable,
+            python_env_type=manager,
+            python_env_source="project_dir",
+        )
+
+    # 5. Project dir .venv/ or venv/ without a known manager
+    for dirname in (".venv", "venv"):
+        python = _find_venv_python(repo_root / dirname)
+        if python:
+            return PythonEnvInfo(
+                python_executable=python,
+                python_env_type="venv",
+                python_env_source="project_dir",
+            )
+
+    # 6. Conda marker file (environment.yml)
+    if (repo_root / "environment.yml").is_file() or (
+        repo_root / "environment.yaml"
+    ).is_file():
+        return PythonEnvInfo(
+            python_executable=sys.executable,
+            python_env_type="conda",
+            python_env_source="project_dir",
+        )
+
+    # 7. Daemon itself is running in a venv
+    if sys.prefix != sys.base_prefix:
+        return PythonEnvInfo(
+            python_executable=sys.executable,
+            python_env_type="venv",
+            python_env_source="daemon",
+        )
+
+    # 8. System Python fallback
+    return PythonEnvInfo(
+        python_executable=sys.executable,
+        python_env_type="system",
+        python_env_source="fallback",
+    )
+
 
 def _git_files(repo_root: Path) -> Optional[Set[str]]:
     try:
@@ -66,12 +211,15 @@ def build_checklist(
     git_files = _git_files(repo_root)
     file_tree = _build_file_tree(repo_root, git_files)
     matches = _find_instrumentation(repo_root, git_files)
+    env_info = _detect_python_env(repo_root, command)
 
     return {
         "runner_type": runner_type,
         "command": " ".join(command) if command else None,
         "platform": platform.system().lower(),
-        "python_executable": sys.executable,
+        "python_executable": env_info["python_executable"],
+        "python_env_type": env_info["python_env_type"],
+        "python_env_source": env_info["python_env_source"],
         "file_tree": file_tree,
         "instrumentation": {
             "tracing": any(_matches_any(line, _TRACING_PATTERNS) for line in matches),
