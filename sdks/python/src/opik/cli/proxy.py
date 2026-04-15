@@ -56,7 +56,7 @@ def proxy(
         import rich  # noqa
     except ImportError:
         raise click.ClickException(
-            "Proxy server dependencies not found. Please install them with: pip install opik[proxy]"
+            "Proxy server dependencies not found. Please install them with: pip install --upgrade opik[proxy]"
         )
 
     if not ollama and not lm_studio:

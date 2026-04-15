@@ -31,7 +31,7 @@ jobs:
                 python-version: 3.12
 
             - name: Install Opik
-              run: pip install opik
+              run: pip install --upgrade opik
 
             - name: Install Test Dependencies
               run: |

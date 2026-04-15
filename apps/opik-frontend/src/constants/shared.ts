@@ -11,7 +11,7 @@ export const SNIPPET_PROJECT_NAME = "my-ai-project";
 export const PROJECT_NAME_PLACEHOLDER = "PROJECT_NAME_PLACEHOLDER";
 export const PLAYGROUND_PROJECT_NAME = "playground";
 export const USER_FEEDBACK_NAME = "User feedback";
-export const PIP_INSTALL_OPIK_COMMAND = "pip install opik";
+export const PIP_INSTALL_OPIK_COMMAND = "pip install --upgrade opik";
 export const INSTALL_OPIK_SECTION_TITLE =
   "1. Install Opik using pip from the command line";
 export const INSTALL_SDK_SECTION_TITLE = "2. Install the SDK";

@@ -108,7 +108,7 @@ Do not write or modify code yet. You must propose me a step-by-step plan includi
 
 After approval:
 
-- Run the package installation command via terminal (pip install opik, npm install opik, etc.).
+- Run the package installation command via terminal (pip install --upgrade opik, npm install opik, etc.).
 - Apply code modifications exactly as described in Step 5.
 - Keep all additions minimal and non-invasive.
   Upon completion, review the changes made and confirm installation success.

@@ -266,7 +266,7 @@ const OPIK_CHATBOT_DATASET_ITEMS: DemoDatasetItem[] = [
   {
     question: "Can Opik integrate with LangChain?",
     answer:
-      "Yes, Opik integrates with LangChain. You can use `OpikTracer` as a callback to automatically trace all LangChain operations. Install with `pip install opik[langchain]`.",
+      "Yes, Opik integrates with LangChain. You can use `OpikTracer` as a callback to automatically trace all LangChain operations. Install with `pip install --upgrade opik[langchain]`.",
     expected_behavior: "answer",
   },
   {
@@ -296,7 +296,7 @@ const OPIK_CHATBOT_DATASET_ITEMS: DemoDatasetItem[] = [
   {
     question: "How do I install the Opik Python SDK?",
     answer:
-      "You can install the Opik Python SDK using pip: `pip install opik`. After installation, configure it with `opik.configure()` to connect to your Opik backend.",
+      "You can install the Opik Python SDK using pip: `pip install --upgrade opik`. After installation, configure it with `opik.configure()` to connect to your Opik backend.",
     expected_behavior: "answer",
   },
 ];

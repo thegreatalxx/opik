@@ -23,10 +23,10 @@ Install the `opik` package using pip or uv:
 
 ```bash
 # using pip
-pip install opik
+pip install --upgrade opik
 
 # using uv (faster)
-uv pip install opik
+uv pip install --upgrade opik
 ```
 
 ## Configuration

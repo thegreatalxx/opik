@@ -501,7 +501,7 @@ print_banner() {
     echo "║                                                                 ║"
     echo "║  🛠️  Install the Python SDK:                                     ║"
     echo "║     \$ python --version                                          ║"
-    echo "║     \$ pip install opik                                          ║"
+    echo "║     \$ pip install --upgrade opik                                ║"
   fi
   echo "║                                                                 ║"
   echo "║  📚 Documentation: https://www.comet.com/docs/opik/             ║"

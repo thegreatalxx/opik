@@ -573,7 +573,7 @@ We created this index for the [Opik Optimizer](https://github.com/comet-ml/opik)
 ## Quick Start
 
 ```python
-pip install opik_optimizer[bm25]
+pip install --upgrade opik_optimizer[bm25]
 ```
 
 ```python

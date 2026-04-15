@@ -21,7 +21,7 @@ Installation
 
 To get start with the package, you can install it using pip::
 
-   pip install opik
+   pip install --upgrade opik
 
 To finish configuring the Opik Python SDK, we recommend running the `opik configure` command from the command line:
 

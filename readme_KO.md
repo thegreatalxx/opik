@@ -167,10 +167,10 @@ Python SDK를 시작하려면 먼저 패키지를 설치하세요:
 
 ```bash
 # pip로 설치
-pip install opik
+pip install --upgrade opik
 
 # 또는 uv로 설치
-uv pip install opik
+uv pip install --upgrade opik
 ```
 
 `opik configure` 명령어를 실행하면 Opik 서버 주소(self-hosted 인스턴스용) 또는 API 키와 workspace(Comet.com용)를 입력하라는 메시지가 표시됩니다:

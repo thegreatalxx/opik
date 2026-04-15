@@ -171,10 +171,10 @@ powershell -ExecutionPolicy ByPass -c ".\\opik.ps1"
 
 ```bash
 # install using pip
-pip install opik
+pip install --upgrade opik
 
 # or install with uv
-uv pip install opik
+uv pip install --upgrade opik
 ```
 
 قم بتكوين python SDK عن طريق تشغيل الأمر `opikconfig`، والذي سيطالبك بعنوان خادم Opik الخاص بك (للمثيلات المستضافة ذاتيًا) أو مفتاح API ومساحة العمل (لـ Comet.com):

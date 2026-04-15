@@ -4,7 +4,7 @@ export const FINAL_LOG_TEMPLATE = "FINAL_LOG_TEMPLATE";
 export const integrationLogsMap: Record<string, string[]> = {
   FunctionDecorators: [
     "Initializing Opik demo console",
-    "%cmd% pip install opik",
+    "%cmd% pip install --upgrade opik",
     "%cmd% python function_decorators_example.py",
     "Hello! I'm here to assist you with any specific information you may be looking for or help you explore topics of interest. How can I assist you today?",
     REAL_LOGS_PLACEHOLDER,

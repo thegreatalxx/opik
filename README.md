@@ -168,10 +168,10 @@ Install the package:
 
 ```bash
 # install using pip
-pip install opik
+pip install --upgrade opik
 
 # or install with uv
-uv pip install opik
+uv pip install --upgrade opik
 ```
 
 Configure the python SDK by running the `opik configure` command, which will prompt you for your Opik server address (for self-hosted instances) or your API key and workspace (for Comet.com):

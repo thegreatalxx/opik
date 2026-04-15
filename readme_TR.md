@@ -171,10 +171,10 @@ Paketi yükleyin:
 
 ```bash
 # install using pip
-pip install opik
+pip install --upgrade opik
 
 # or install with uv
-uv pip install opik
+uv pip install --upgrade opik
 ```
 
 Python SDK'sını, sizden Opik sunucu adresinizi (kendi kendine barındırılan örnekler için) veya API anahtarınızı ve çalışma alanınızı (Comet.com için) isteyecek olan "opik yapılandırma" komutunu çalıştırarak yapılandırın:

@@ -5,7 +5,7 @@ def _get_package_version() -> str:
     try:
         return importlib.metadata.version("opik")
     except importlib.metadata.PackageNotFoundError:
-        return "Please install opik with `pip install opik`"
+        return "Please install opik with `pip install --upgrade opik`"
 
 
 VERSION = _get_package_version()

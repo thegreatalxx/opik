@@ -170,10 +170,10 @@ Instale o pacote:
 
 ```bash
 # instalar usando pip
-pip install opik
+pip install --upgrade opik
 
 # ou instalar com uv
-uv pip install opik
+uv pip install --upgrade opik
 ```
 
 Configure o SDK Python executando o comando `opik configure`, que solicitará o endereço do servidor Opik (para instâncias self-hosted) ou sua chave de API e workspace (para Comet.com):

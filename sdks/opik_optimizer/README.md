@@ -44,10 +44,10 @@ To get started with Opik Optimizer, follow these steps:
 
     ```bash
     # using pip
-    pip install opik-optimizer
+    pip install --upgrade opik-optimizer
 
     # using uv (faster)
-    uv pip install opik-optimizer
+    uv pip install --upgrade opik-optimizer
     ```
 
 2. **Configure Opik (Optional, for advanced features):**
@@ -56,7 +56,7 @@ To get started with Opik Optimizer, follow these steps:
 
     ```bash
     # Install the main Opik CLI (if not already installed)
-    pip install opik
+    pip install --upgrade opik
 
     # Configure your Comet API key and workspace
     opik configure

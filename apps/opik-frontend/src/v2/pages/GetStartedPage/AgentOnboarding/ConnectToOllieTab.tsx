@@ -5,8 +5,7 @@ import { buildDocsUrl, maskAPIKey } from "@/lib/utils";
 import { BASE_API_URL } from "@/api/api";
 import TimelineStep from "@/shared/TimelineStep/TimelineStep";
 import CodeSnippet from "@/shared/CodeSnippet/CodeSnippet";
-
-const INSTALL_COMMAND = "pip install opik";
+import { PIP_INSTALL_OPIK_COMMAND } from "@/constants/shared";
 
 interface ConnectToOllieTabProps {
   connected: boolean;
@@ -44,7 +43,7 @@ const ConnectToOllieTab: React.FC<ConnectToOllieTabProps> = ({ connected }) => {
         <TimelineStep number={1}>
           <div className="flex flex-col gap-2.5">
             <h4 className="comet-body-s-accented">Install Opik</h4>
-            <CodeSnippet title="Terminal" code={INSTALL_COMMAND} />
+            <CodeSnippet title="Terminal" code={PIP_INSTALL_OPIK_COMMAND} />
           </div>
         </TimelineStep>
 

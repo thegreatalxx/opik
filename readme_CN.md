@@ -167,10 +167,10 @@ Opik 提供一系列客户端库和 REST API 与 Opik 服务端交互，包含 P
 
 ```bash
 # 使用 pip 安装
-pip install opik
+pip install --upgrade opik
 
 # 或使用 uv 安装
-uv pip install opik
+uv pip install --upgrade opik
 ```
 
 运行 `opik configure`，并按提示输入 Opik 服务端地址（自托管）或 API key 与 workspace（Comet.com）：

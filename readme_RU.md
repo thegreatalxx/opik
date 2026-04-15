@@ -171,10 +171,10 @@ Opik предоставляет набор клиентских библиоте
 
 ```bash
 # install using pip
-pip install opik
+pip install --upgrade opik
 
 # or install with uv
-uv pip install opik
+uv pip install --upgrade opik
 ```
 
 Настройте SDK Python, выполнив команду opik configure, которая запросит у вас адрес сервера Opik (для автономных экземпляров) или ключ API и рабочую область (для Comet.com):

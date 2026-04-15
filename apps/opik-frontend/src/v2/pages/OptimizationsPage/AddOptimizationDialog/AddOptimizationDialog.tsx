@@ -284,7 +284,7 @@ const AddOptimizationDialog: React.FunctionComponent<
     permissions: { canViewDatasets },
   } = usePermissions();
 
-  const section1 = "pip install opik-optimizer";
+  const section1 = "pip install --upgrade opik-optimizer";
 
   // Get the hardcoded code template for the selected algorithm and inject dynamic values
   const section3 = OPTIMIZATION_CODE_TEMPLATES[selectedModel].replace(
