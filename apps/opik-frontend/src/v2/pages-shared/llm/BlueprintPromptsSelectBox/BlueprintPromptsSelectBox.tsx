@@ -115,7 +115,9 @@ const BlueprintPromptsSelectBox: React.FC<BlueprintPromptsSelectBoxProps> = ({
 
   const { data: history, isLoading: isLoadingHistory } =
     useConfigHistoryListInfinite({ projectId });
-  const latestBlueprintId = history?.pages?.[0]?.content?.[0]?.id;
+  const latestBlueprint = history?.pages?.[0]?.content?.[0];
+  const latestBlueprintId = latestBlueprint?.id;
+  const latestBlueprintName = latestBlueprint?.name;
 
   const { data: blueprint, isLoading: isLoadingBlueprint } = useAgentConfigById(
     { blueprintId: latestBlueprintId ?? "" },
@@ -192,7 +194,8 @@ const BlueprintPromptsSelectBox: React.FC<BlueprintPromptsSelectBoxProps> = ({
         <div className="comet-body-xs flex items-start gap-1.5 border-t border-border px-3 py-2 text-light-slate">
           <Info className="mt-0.5 size-3 shrink-0" />
           <span>
-            Prompts are taken from the latest agent configuration version.
+            Prompts are loaded from the latest agent configuration
+            {latestBlueprintName ? ` (${latestBlueprintName})` : ""}.
           </span>
         </div>
       }

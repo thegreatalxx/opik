@@ -1,10 +1,12 @@
 import { useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "@tanstack/react-router";
 
 import {
   BlueprintType,
   BlueprintValue,
   BlueprintValueType,
+  ConfigHistoryItem,
 } from "@/types/agent-configs";
 import {
   PROMPT_TEMPLATE_STRUCTURE,
@@ -19,6 +21,9 @@ import useCreatePromptVersionMutation from "@/api/prompts/useCreatePromptVersion
 import usePromptCreateMutation from "@/api/prompts/usePromptCreateMutation";
 import { AGENT_CONFIGS_KEY } from "@/api/api";
 import { BlueprintPromptRef } from "@/types/playground";
+import { useActiveWorkspaceName } from "@/store/AppStore";
+import { useToast } from "@/ui/use-toast";
+import { ToastAction } from "@/ui/toast";
 
 interface SaveExistingArgs {
   ref: BlueprintPromptRef;
@@ -49,6 +54,9 @@ const stripBlueprintValue = (v: BlueprintValue): BlueprintValue => ({
 
 const useSavePromptToBlueprint = (projectId: string) => {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
+  const workspaceName = useActiveWorkspaceName();
+  const { toast } = useToast();
 
   const { data: history } = useConfigHistoryListInfinite({ projectId });
   const latestBlueprintId = history?.pages?.[0]?.content?.[0]?.id;
@@ -71,14 +79,54 @@ const useSavePromptToBlueprint = (projectId: string) => {
     isPostingBlueprint ||
     isPatchingBlueprint;
 
-  const invalidateAfterSave = useCallback(
-    (commit: string) => {
+  const showSavedToast = useCallback(
+    (blueprintId: string) => {
+      const data = queryClient.getQueryData<{
+        pages: Array<{ content: ConfigHistoryItem[] }>;
+      }>([AGENT_CONFIGS_KEY, "history", { projectId }]);
+      const newVersion = data?.pages
+        ?.flatMap((p) => p.content)
+        ?.find((c) => c.id === blueprintId);
+      const versionLabel = newVersion?.name;
+      const versionSuffix = versionLabel ? ` (${versionLabel})` : "";
+
+      toast({
+        title: "Prompt saved",
+        description: `The prompt has been updated. A new version of the agent configuration${versionSuffix} is ready. You can edit it or deploy it to any environment.`,
+        actions: workspaceName
+          ? [
+              <ToastAction
+                key="view-agent-configuration"
+                altText="View agent configuration"
+                variant="link"
+                size="sm"
+                className="px-0"
+                onClick={() =>
+                  navigate({
+                    to: "/$workspaceName/projects/$projectId/agent-configuration",
+                    params: { workspaceName, projectId },
+                    search: { configId: blueprintId },
+                  })
+                }
+              >
+                {versionLabel ? `View ${versionLabel}` : "View configuration"}
+              </ToastAction>,
+            ]
+          : undefined,
+      });
+    },
+    [queryClient, projectId, workspaceName, navigate, toast],
+  );
+
+  const finalizeSave = useCallback(
+    async (commit: string, blueprintId: string) => {
       queryClient.invalidateQueries({
         queryKey: ["prompt-by-commit", { commitId: commit }],
       });
-      queryClient.invalidateQueries({ queryKey: [AGENT_CONFIGS_KEY] });
+      await queryClient.invalidateQueries({ queryKey: [AGENT_CONFIGS_KEY] });
+      showSavedToast(blueprintId);
     },
-    [queryClient],
+    [queryClient, showSavedToast],
   );
 
   // Updates an existing prompt version and publishes a new blueprint version
@@ -139,7 +187,7 @@ const useSavePromptToBlueprint = (projectId: string) => {
           },
         });
         if (!id) return null;
-        invalidateAfterSave(version.commit);
+        await finalizeSave(version.commit, id);
         return {
           version,
           newRef: { ...ref, blueprintId: id, commitId: version.commit },
@@ -154,7 +202,7 @@ const useSavePromptToBlueprint = (projectId: string) => {
       patchBlueprint,
       postBlueprint,
       projectId,
-      invalidateAfterSave,
+      finalizeSave,
     ],
   );
 
@@ -204,7 +252,7 @@ const useSavePromptToBlueprint = (projectId: string) => {
           },
         });
         if (!id) return null;
-        invalidateAfterSave(commit);
+        await finalizeSave(commit, id);
         return { blueprintId: id, key: fieldName, commitId: commit };
       } catch {
         return null;
@@ -216,7 +264,7 @@ const useSavePromptToBlueprint = (projectId: string) => {
       patchBlueprint,
       postBlueprint,
       projectId,
-      invalidateAfterSave,
+      finalizeSave,
     ],
   );
 

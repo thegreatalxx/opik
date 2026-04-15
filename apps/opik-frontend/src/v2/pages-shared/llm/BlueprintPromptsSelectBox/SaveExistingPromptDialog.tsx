@@ -46,9 +46,8 @@ const SaveExistingPromptDialog: React.FC<SaveExistingPromptDialogProps> = ({
           <DialogTitle>Update {promptName}</DialogTitle>
         </DialogHeader>
         <p className="comet-body-s pb-4 text-muted-slate">
-          Saves a new version of the prompt and updates the agent configuration
-          field <span className="comet-body-s-accented">{fieldName}</span> to
-          point at it.
+          Creates a new agent configuration version with the updated prompt for
+          field <span className="comet-body-s-accented">{fieldName}</span>.
         </p>
         <div className="flex flex-col gap-2 pb-4">
           <Label htmlFor="changeDescription">
