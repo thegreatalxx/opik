@@ -487,10 +487,12 @@ const AgentConfigurationEditView = React.forwardRef<
               });
             })()}
 
-          <Button variant="outline" size="sm" onClick={handleAddNewField}>
-            <Plus className="mr-1 size-3.5" />
-            Add field
-          </Button>
+          <div className="flex justify-end">
+            <Button variant="outline" size="sm" onClick={handleAddNewField}>
+              <Plus className="mr-1 size-3.5" />
+              Add field
+            </Button>
+          </div>
         </div>
 
         {DialogComponent}
