@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useState } from "react";
-import { FileTerminal, XCircle } from "lucide-react";
+import { FileTerminal, Info, XCircle } from "lucide-react";
 import { QueryFunctionContext, useQueries } from "@tanstack/react-query";
 
 import { Button } from "@/ui/button";
@@ -37,7 +37,7 @@ const LoadedDisplay: React.FC<LoadedDisplayProps> = ({
   <div className="flex min-w-0 items-center px-1">
     <TooltipWrapper content={hasUnsavedChanges ? "Unsaved changes" : promptKey}>
       <div className="flex min-w-0 items-center gap-1">
-        <FileTerminal className="size-3.5 shrink-0 text-[#b8e54a]" />
+        <FileTerminal className="size-3.5 shrink-0 text-library-loaded" />
         <span className="comet-body-xs-accented truncate text-light-slate">
           {promptKey}
         </span>
@@ -188,6 +188,14 @@ const BlueprintPromptsSelectBox: React.FC<BlueprintPromptsSelectBoxProps> = ({
       }
       minWidth={360}
       disabled={isDisabled}
+      actionPanel={
+        <div className="comet-body-xs flex items-start gap-1.5 border-t border-border px-3 py-2 text-light-slate">
+          <Info className="mt-0.5 size-3 shrink-0" />
+          <span>
+            Prompts are taken from the latest agent configuration version.
+          </span>
+        </div>
+      }
     />
   );
 };
