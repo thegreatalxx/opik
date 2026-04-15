@@ -1,5 +1,6 @@
 import React, { useCallback, useMemo } from "react";
 import { Span, Trace } from "@/types/traces";
+import { isObjectSpan } from "@/lib/traces";
 import { usePermissions } from "@/contexts/PermissionsContext";
 import FeedbackScoreTag from "@/shared/FeedbackScoreTag/FeedbackScoreTag";
 import {
@@ -22,16 +23,16 @@ import { Separator } from "@/ui/separator";
 
 type AnnotatePanelProps = {
   data: Trace | Span;
-  spanId?: string;
   traceId: string;
   projectId: string;
   activeSection: DetailsActionSectionValue | null;
   setActiveSection: (v: DetailsActionSectionValue | null) => void;
 };
 
+const isSpan = (d: Trace | Span): d is Span => isObjectSpan(d);
+
 const AnnotatePanel: React.FC<AnnotatePanelProps> = ({
   data,
-  spanId,
   traceId,
   projectId,
   activeSection,
@@ -41,6 +42,7 @@ const AnnotatePanel: React.FC<AnnotatePanelProps> = ({
     permissions: { canAnnotateTraceSpanThread },
   } = usePermissions();
 
+  const spanId = isSpan(data) ? data.id : undefined;
   const isTrace = !spanId;
   const hasFeedbackScores = Boolean(data.feedback_scores?.length);
 
@@ -85,35 +87,35 @@ const AnnotatePanel: React.FC<AnnotatePanelProps> = ({
 
   const onCommentSubmit = useCallback(
     (text: string) => {
-      if (!spanId) {
+      if (!isSpan(data)) {
         createTraceComment({ text, traceId });
         return;
       }
-      createSpanComment({ text, spanId, projectId });
+      createSpanComment({ text, spanId: data.id, projectId });
     },
-    [spanId, traceId, projectId, createTraceComment, createSpanComment],
+    [data, traceId, projectId, createTraceComment, createSpanComment],
   );
 
   const onCommentEdit = useCallback(
     (commentId: string, text: string) => {
-      if (!spanId) {
+      if (!isSpan(data)) {
         updateTraceComment({ text, commentId, traceId });
         return;
       }
       updateSpanComment({ text, commentId, projectId });
     },
-    [spanId, traceId, projectId, updateTraceComment, updateSpanComment],
+    [data, traceId, projectId, updateTraceComment, updateSpanComment],
   );
 
   const onCommentDelete = useCallback(
     (commentId: string) => {
-      if (!spanId) {
+      if (!isSpan(data)) {
         deleteTraceComments({ ids: [commentId], traceId });
         return;
       }
       deleteSpanComments({ ids: [commentId], projectId });
     },
-    [spanId, traceId, projectId, deleteTraceComments, deleteSpanComments],
+    [data, traceId, projectId, deleteTraceComments, deleteSpanComments],
   );
 
   return (

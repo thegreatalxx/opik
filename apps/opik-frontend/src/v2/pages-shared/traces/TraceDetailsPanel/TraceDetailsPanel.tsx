@@ -333,7 +333,6 @@ const TraceDetailsPanel: React.FunctionComponent<TraceDetailsPanelProps> = ({
                   activeSection === DetailsActionSection.Comments) && (
                   <AnnotatePanel
                     data={dataToView}
-                    spanId={spanId}
                     traceId={traceId}
                     projectId={projectId}
                     activeSection={activeSection}
