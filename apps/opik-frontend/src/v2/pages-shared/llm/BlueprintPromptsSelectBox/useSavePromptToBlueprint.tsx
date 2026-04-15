@@ -100,7 +100,7 @@ const useSavePromptToBlueprint = (projectId: string) => {
                 altText="View agent configuration"
                 variant="link"
                 size="sm"
-                className="px-0"
+                className="comet-body-s-accented gap-1.5 px-0"
                 onClick={() =>
                   navigate({
                     to: "/$workspaceName/projects/$projectId/agent-configuration",
