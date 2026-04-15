@@ -438,7 +438,7 @@ const VirtualizedTreeViewer: React.FC<VirtualizedTreeViewerProps> = ({
               ref={rowVirtualizer.measureElement}
               data-index={virtualRow.index}
               className={cn(
-                "absolute left-0 flex w-full flex-col px-2 py-1 cursor-pointer border-l-8 border-transparent",
+                "absolute left-0 flex w-full flex-col py-1 pl-2 pr-4 cursor-pointer border-l-8 border-transparent",
                 "hover:bg-[var(--row-bg)]",
                 {
                   "bg-[var(--row-bg)] border-[var(--row-color)]": isFocused,
@@ -482,7 +482,7 @@ const VirtualizedTreeViewer: React.FC<VirtualizedTreeViewerProps> = ({
                   <TooltipWrapper
                     content={node.data.error_info?.message ?? "Has error"}
                   >
-                    <span className="flex shrink-0 items-center">
+                    <span className="flex size-4 shrink-0 items-center justify-center text-destructive">
                       <ErrorTriangle width={12} height={12} />
                     </span>
                   </TooltipWrapper>
@@ -495,6 +495,7 @@ const VirtualizedTreeViewer: React.FC<VirtualizedTreeViewerProps> = ({
                     <Button
                       variant="ghost"
                       size="icon-3xs"
+                      className="ml-1"
                       onClick={(e) => {
                         e.stopPropagation();
                         toggleExpand(node.id);
@@ -508,7 +509,7 @@ const VirtualizedTreeViewer: React.FC<VirtualizedTreeViewerProps> = ({
                     </Button>
                   </TooltipWrapper>
                 ) : (
-                  <div className="size-4 shrink-0" />
+                  <div className="ml-1 size-4 shrink-0" />
                 )}
               </div>
               {nodeHasDetails(node) && (

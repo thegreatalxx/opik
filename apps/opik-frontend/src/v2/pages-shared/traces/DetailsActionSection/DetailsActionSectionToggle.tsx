@@ -1,5 +1,5 @@
 import TooltipWrapper from "@/shared/TooltipWrapper/TooltipWrapper";
-import { Button } from "@/ui/button";
+import { Button, ButtonProps } from "@/ui/button";
 import { DetailsActionSectionValue, DetailsActionSection } from "./types";
 import { MessageSquareMore, PenLine, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -46,8 +46,9 @@ type DetailsActionSectionToggleProps = {
   type: DetailsActionSectionValue;
   disabled?: boolean;
   tooltipContent?: string;
-  variant?: "outline" | "ghost";
+  variant?: ButtonProps["variant"];
   hotkey?: string;
+  buttonSize?: ButtonProps["size"];
 };
 const DetailsActionSectionToggle: React.FC<DetailsActionSectionToggleProps> = ({
   activeSection,
@@ -59,6 +60,7 @@ const DetailsActionSectionToggle: React.FC<DetailsActionSectionToggleProps> = ({
   tooltipContent,
   variant = "outline",
   hotkey,
+  buttonSize = "sm",
 }) => {
   const showFullActionLabel = isLargeLayout(layoutSize);
 
@@ -67,7 +69,7 @@ const DetailsActionSectionToggle: React.FC<DetailsActionSectionToggleProps> = ({
       <div>
         <Button
           variant={variant}
-          size="sm"
+          size={buttonSize}
           onClick={() => setActiveSection(type)}
           className={cn(
             "gap-1",
@@ -81,7 +83,7 @@ const DetailsActionSectionToggle: React.FC<DetailsActionSectionToggleProps> = ({
           )}
           {Boolean(count) && <div>{formatCounter(layoutSize, count)}</div>}
           {hotkey && (
-            <kbd className="flex h-5 min-w-5 items-center justify-center rounded-sm border px-1 text-xs text-muted-foreground">
+            <kbd className="flex h-5 min-w-5 items-center justify-center rounded-sm border bg-background px-1 text-xs text-muted-foreground">
               {hotkey}
             </kbd>
           )}

@@ -551,7 +551,7 @@ const ThreadDetailsPanel: React.FC<ThreadDetailsPanelProps> = ({
       <div className="flex flex-auto items-center justify-between">
         <div className="flex items-center gap-1 overflow-hidden">
           <TooltipWrapper content="Close panel">
-            <Button variant="ghost" size="icon-2xs" onClick={onClose}>
+            <Button variant="ghost" size="icon-xs" onClick={onClose}>
               <ChevronsRight />
             </Button>
           </TooltipWrapper>
@@ -562,9 +562,26 @@ const ThreadDetailsPanel: React.FC<ThreadDetailsPanelProps> = ({
         </div>
 
         <div className="flex shrink-0 items-center gap-2 pl-4">
+          <AddToDropdown
+            getDataForExport={async () => rows}
+            selectedRows={rows}
+            dataType="threads"
+            buttonVariant="ghost"
+            buttonSize="xs"
+          />
+          <DetailsActionSectionToggle
+            activeSection={null}
+            setActiveSection={setActiveSection}
+            layoutSize={ButtonLayoutSize.Large}
+            type={DetailsActionSection.Annotate}
+            variant="ghost"
+            buttonSize="xs"
+            hotkey="A"
+          />
+
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="icon-sm">
+              <Button variant="outline" size="icon-xs">
                 <span className="sr-only">Actions menu</span>
                 <MoreHorizontal />
               </Button>
@@ -641,26 +658,12 @@ const ThreadDetailsPanel: React.FC<ThreadDetailsPanelProps> = ({
             confirmButtonVariant="destructive"
           />
 
-          <AddToDropdown
-            getDataForExport={async () => rows}
-            selectedRows={rows}
-            dataType="threads"
-          />
-          <DetailsActionSectionToggle
-            activeSection={null}
-            setActiveSection={setActiveSection}
-            layoutSize={ButtonLayoutSize.Large}
-            type={DetailsActionSection.Annotate}
-            variant="outline"
-            hotkey="A"
-          />
-
           {horizontalNavigation && (
             <>
               <Separator orientation="vertical" className="mx-1 h-4" />
               <Button
                 variant="outline"
-                size="sm"
+                size="xs"
                 disabled={!horizontalNavigation.hasPrevious}
                 onClick={() => horizontalNavigation.onChange(-1)}
                 className="gap-2"
@@ -672,7 +675,7 @@ const ThreadDetailsPanel: React.FC<ThreadDetailsPanelProps> = ({
               </Button>
               <Button
                 variant="outline"
-                size="sm"
+                size="xs"
                 disabled={!horizontalNavigation.hasNext}
                 onClick={() => horizontalNavigation.onChange(1)}
                 className="gap-2"
@@ -688,7 +691,7 @@ const ThreadDetailsPanel: React.FC<ThreadDetailsPanelProps> = ({
           <TooltipWrapper content="View all traces for this thread">
             <Button
               variant="outline"
-              size="sm"
+              size="xs"
               onClick={() => {
                 navigate({
                   to: "/$workspaceName/projects/$projectId/logs",

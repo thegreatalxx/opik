@@ -21,16 +21,16 @@ import TooltipWrapper from "@/shared/TooltipWrapper/TooltipWrapper";
 
 const OPTIONS: DropdownOption<TREE_DATABLOCK_TYPE>[] = [
   { label: "Duration", value: TREE_DATABLOCK_TYPE.DURATION },
+  { label: "Cost", value: TREE_DATABLOCK_TYPE.ESTIMATED_COST },
+  { label: "Model", value: TREE_DATABLOCK_TYPE.MODEL },
   { label: "Number of tokens", value: TREE_DATABLOCK_TYPE.NUMBERS_OF_TOKENS },
   { label: "Tokens breakdown", value: TREE_DATABLOCK_TYPE.TOKENS_BREAKDOWN },
-  { label: "Estimated cost", value: TREE_DATABLOCK_TYPE.ESTIMATED_COST },
   { label: "Number of scores", value: TREE_DATABLOCK_TYPE.NUMBER_OF_SCORES },
   {
     label: "Number of comments",
     value: TREE_DATABLOCK_TYPE.NUMBER_OF_COMMENTS,
   },
   { label: "Number of tags", value: TREE_DATABLOCK_TYPE.NUMBER_OF_TAGS },
-  { label: "Model", value: TREE_DATABLOCK_TYPE.MODEL },
 ];
 
 type SpanDetailsButtonProps = {

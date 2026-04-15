@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import { useHotkeys } from "react-hotkeys-hook";
 import { FoldVertical, UnfoldVertical } from "lucide-react";
 import uniq from "lodash/uniq";
@@ -39,7 +39,7 @@ import { TREE_FILTER_COLUMNS } from "@/v2/pages-shared/traces/TraceDetailsPanel/
 import { useIsFeatureEnabled } from "@/contexts/feature-toggles-provider";
 import { FeatureToggleKeys } from "@/types/feature-toggles";
 import { GuardrailResult } from "@/types/guardrails";
-import { getJSONPaths } from "@/lib/utils";
+import { cn, getJSONPaths } from "@/lib/utils";
 import { getSpanTypeFilterConfig } from "@/v2/pages-shared/traces/spanTypeFilter";
 
 // Left toolbar — sits above the tree panel
@@ -69,6 +69,10 @@ export const TraceTreeToolbar: React.FC<TraceTreeToolbarProps> = ({
   const { toggleExpandAll, expandedTreeRows, fullExpandedSet } =
     useTreeDetailsStore();
   const isAllExpanded = expandedTreeRows.size === fullExpandedSet.size;
+
+  const [isSearchExpanded, setIsSearchExpanded] = useState(
+    Boolean(search && search.length),
+  );
 
   const hasSearch = Boolean(search && search.length);
   const hasFilter = Boolean(filters.length);
@@ -184,10 +188,17 @@ export const TraceTreeToolbar: React.FC<TraceTreeToolbarProps> = ({
 
   return (
     <div className="flex h-10 shrink-0 items-center justify-between border-b bg-muted/50 px-4">
-      <span className="comet-body-xs-accented whitespace-nowrap text-muted-foreground">
-        Spans ({spanCount})
-      </span>
-      <div className="flex items-center gap-1 text-muted-foreground">
+      {!isSearchExpanded && (
+        <span className="comet-body-xs-accented whitespace-nowrap text-foreground">
+          Spans ({spanCount})
+        </span>
+      )}
+      <div
+        className={cn(
+          "flex items-center gap-1 text-foreground",
+          isSearchExpanded && "w-full",
+        )}
+      >
         <ExpandableSearchInput
           value={search}
           placeholder="Search by all fields"
@@ -195,6 +206,7 @@ export const TraceTreeToolbar: React.FC<TraceTreeToolbarProps> = ({
           disabled={isSpansLazyLoading}
           buttonVariant="ghost"
           tooltip="Search spans"
+          onExpandedChange={setIsSearchExpanded}
         />
         <FiltersButton
           columns={filtersColumnData}
@@ -270,7 +282,7 @@ export const TraceDataToolbar: React.FC<TraceDataToolbarProps> = ({
 
   return (
     <div className="flex h-10 shrink-0 items-center gap-2 border-b bg-muted/50 px-4">
-      <span className="comet-body-xs whitespace-nowrap text-foreground">
+      <span className="comet-body-xs-accented whitespace-nowrap text-foreground">
         Inspect:
       </span>
       <BaseTraceDataTypeIcon type={inspectType} />
@@ -285,6 +297,7 @@ export const TraceDataToolbar: React.FC<TraceDataToolbarProps> = ({
         selectedRows={rows}
         dataType={dataType}
         buttonVariant="ghost"
+        buttonSize="2xs"
       />
       <DetailsActionSectionToggle
         activeSection={null}
@@ -292,6 +305,7 @@ export const TraceDataToolbar: React.FC<TraceDataToolbarProps> = ({
         layoutSize={ButtonLayoutSize.Large}
         type={DetailsActionSection.Annotate}
         variant="ghost"
+        buttonSize="2xs"
         hotkey="A"
       />
     </div>

@@ -16,8 +16,11 @@ import {
 import uniq from "lodash/uniq";
 import isArray from "lodash/isArray";
 
+import { useNavigate } from "@tanstack/react-router";
+
 import { COLUMN_FEEDBACK_SCORES_ID, OnChangeFn } from "@/types/shared";
 import { BASE_TRACE_DATA_TYPE, Span, Trace } from "@/types/traces";
+import useAppStore, { useActiveProjectId } from "@/store/AppStore";
 import useTraceDeleteMutation from "@/api/traces/useTraceDeleteMutation";
 import { useToast } from "@/ui/use-toast";
 import { Button } from "@/ui/button";
@@ -92,13 +95,23 @@ const TraceDetailsActionsPanel: React.FunctionComponent<
   const isExportEnabled = useIsFeatureEnabled(FeatureToggleKeys.EXPORT_ENABLED);
 
   const {
-    permissions: { canDeleteTraces },
+    permissions: { canDeleteTraces, canViewExperiments },
   } = usePermissions();
 
   const { toast } = useToast();
   const { mutate } = useTraceDeleteMutation();
 
+  const navigate = useNavigate();
+  const workspaceName = useAppStore((state) => state.activeWorkspaceName);
+  const activeProjectId = useActiveProjectId();
+
   const hasThread = Boolean(setThreadId && threadId);
+  const experiment = useMemo(() => {
+    const node = treeData.find((item) => item.id === traceId);
+    return node && "experiment" in node ? node.experiment : undefined;
+  }, [treeData, traceId]);
+  const canNavigateToExperiment =
+    Boolean(experiment) && canViewExperiments && Boolean(activeProjectId);
 
   useHotkeys(
     "j",
@@ -216,7 +229,7 @@ const TraceDetailsActionsPanel: React.FunctionComponent<
     <div className="flex flex-auto items-center justify-between">
       <div className="flex items-center gap-1 overflow-hidden">
         <TooltipWrapper content="Close panel">
-          <Button variant="ghost" size="icon-2xs" onClick={onClose}>
+          <Button variant="ghost" size="icon-xs" onClick={onClose}>
             <ChevronsRight />
           </Button>
         </TooltipWrapper>
@@ -229,7 +242,7 @@ const TraceDetailsActionsPanel: React.FunctionComponent<
           <TooltipWrapper content="Debug your trace with AI assistance (OpikAssist)">
             <Button
               variant="outline"
-              size="sm"
+              size="xs"
               onClick={() =>
                 setActiveSection(DetailsActionSection.AIAssistants)
               }
@@ -242,7 +255,7 @@ const TraceDetailsActionsPanel: React.FunctionComponent<
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="icon-sm">
+            <Button variant="outline" size="icon-xs">
               <span className="sr-only">Actions menu</span>
               <MoreHorizontal />
             </Button>
@@ -338,7 +351,7 @@ const TraceDetailsActionsPanel: React.FunctionComponent<
             <Separator orientation="vertical" className="mx-1 h-4" />
             <Button
               variant="outline"
-              size="sm"
+              size="xs"
               disabled={!horizontalNavigation.hasPrevious}
               onClick={() => horizontalNavigation.onChange(-1)}
               className="gap-2"
@@ -350,7 +363,7 @@ const TraceDetailsActionsPanel: React.FunctionComponent<
             </Button>
             <Button
               variant="outline"
-              size="sm"
+              size="xs"
               disabled={!horizontalNavigation.hasNext}
               onClick={() => horizontalNavigation.onChange(1)}
               className="gap-2"
@@ -363,11 +376,39 @@ const TraceDetailsActionsPanel: React.FunctionComponent<
           </>
         )}
 
+        {canNavigateToExperiment && experiment && (
+          <TooltipWrapper
+            content={`View this item in experiment: ${experiment.name}`}
+          >
+            <Button
+              variant="outline"
+              size="xs"
+              onClick={() =>
+                navigate({
+                  to: "/$workspaceName/projects/$projectId/experiments/$datasetId/compare",
+                  params: {
+                    workspaceName,
+                    projectId: activeProjectId as string,
+                    datasetId: experiment.dataset_id,
+                  },
+                  search: {
+                    experiments: [experiment.id],
+                    row: experiment.dataset_item_id,
+                  },
+                })
+              }
+            >
+              Experiment
+              <ArrowUpRight className="ml-1 size-3.5" />
+            </Button>
+          </TooltipWrapper>
+        )}
+
         {hasThread && (
           <TooltipWrapper content="Go to thread">
             <Button
               variant="outline"
-              size="sm"
+              size="xs"
               onClick={() => setThreadId!(threadId)}
             >
               Thread

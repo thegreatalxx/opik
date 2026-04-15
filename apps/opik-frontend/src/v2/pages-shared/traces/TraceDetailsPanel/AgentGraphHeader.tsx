@@ -1,5 +1,5 @@
 import React from "react";
-import { ChevronDown, Expand } from "lucide-react";
+import { ChevronDown, ChevronUp, Expand } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { Button } from "@/ui/button";
@@ -20,7 +20,7 @@ const AgentGraphHeader: React.FC<AgentGraphHeaderProps> = ({
 }) => (
   <div
     className={cn(
-      "flex h-10 shrink-0 items-center justify-between bg-muted/50 px-3",
+      "flex h-10 shrink-0 items-center justify-between bg-muted/50 px-4",
       border === "top" ? "border-t" : "border-b",
     )}
   >
@@ -33,9 +33,11 @@ const AgentGraphHeader: React.FC<AgentGraphHeaderProps> = ({
       </TooltipWrapper>
       <TooltipWrapper content={isCollapsed ? "Expand graph" : "Collapse graph"}>
         <Button variant="ghost" size="icon-2xs" onClick={onToggleCollapse}>
-          <ChevronDown
-            className={cn("size-3.5", isCollapsed && "-rotate-90")}
-          />
+          {isCollapsed ? (
+            <ChevronUp className="size-3.5" />
+          ) : (
+            <ChevronDown className="size-3.5" />
+          )}
         </Button>
       </TooltipWrapper>
     </div>

@@ -31,6 +31,7 @@ type ExpandableSearchInputProps = {
   tooltip?: string;
   onPrev?: () => void;
   onNext?: () => void;
+  onExpandedChange?: (expanded: boolean) => void;
 };
 
 const ExpandableSearchInput: React.FC<ExpandableSearchInputProps> = ({
@@ -44,6 +45,7 @@ const ExpandableSearchInput: React.FC<ExpandableSearchInputProps> = ({
   tooltip,
   onPrev,
   onNext,
+  onExpandedChange,
 }) => {
   const [isExpanded, setIsExpanded] = useState(Boolean(value) && !disabled);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -56,16 +58,21 @@ const ExpandableSearchInput: React.FC<ExpandableSearchInputProps> = ({
   }, [isExpanded]);
 
   useEffect(() => {
-    setIsExpanded((state) => (isUndefined(value) ? false : state));
-  }, [value]);
+    if (isUndefined(value)) {
+      setIsExpanded(false);
+      onExpandedChange?.(false);
+    }
+  }, [value, onExpandedChange]);
 
   const handleExpand = () => {
     if (disabled) return;
     setIsExpanded(true);
+    onExpandedChange?.(true);
   };
 
   const handleCollapse = () => {
     setIsExpanded(false);
+    onExpandedChange?.(false);
     onChange?.("");
   };
 
