@@ -1,6 +1,5 @@
 """Tests for snapshot.py Python environment detection."""
 
-import os
 import platform
 import sys
 from pathlib import Path
@@ -9,7 +8,6 @@ from unittest.mock import patch
 import pytest
 
 from opik.runner.snapshot import (
-    PythonEnvInfo,
     _classify_env_manager,
     _detect_python_env,
     _find_venv_python,
@@ -238,8 +236,9 @@ def test_detect_conda_via_environment_yaml(tmp_path: Path) -> None:
 
 
 def test_detect_daemon_venv(tmp_path: Path) -> None:
-    with patch.object(sys, "prefix", "/some/venv"), patch.object(
-        sys, "base_prefix", "/usr"
+    with (
+        patch.object(sys, "prefix", "/some/venv"),
+        patch.object(sys, "base_prefix", "/usr"),
     ):
         result = _detect_python_env(tmp_path, None)
     assert result["python_env_type"] == "venv"
@@ -248,9 +247,7 @@ def test_detect_daemon_venv(tmp_path: Path) -> None:
 
 
 def test_detect_system_fallback(tmp_path: Path) -> None:
-    with patch.object(sys, "prefix", "/usr"), patch.object(
-        sys, "base_prefix", "/usr"
-    ):
+    with patch.object(sys, "prefix", "/usr"), patch.object(sys, "base_prefix", "/usr"):
         result = _detect_python_env(tmp_path, None)
     assert result["python_env_type"] == "system"
     assert result["python_env_source"] == "fallback"
