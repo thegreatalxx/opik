@@ -369,7 +369,7 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
                     entity_id,
                     name,
                     value
-                FROM feedback_scores FINAL
+                FROM feedback_scores
                 WHERE entity_type = 'trace'
                 AND workspace_id = :workspace_id
                 AND project_id = :project_id
@@ -378,7 +378,7 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
                     entity_id,
                     name,
                     value
-                FROM authored_feedback_scores FINAL
+                FROM authored_feedback_scores
                 WHERE entity_type = 'trace'
                 AND workspace_id = :workspace_id
                 AND project_id = :project_id
@@ -452,18 +452,15 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
                     SELECT
                         entity_id,
                         name,
-                        passed,
-                        ROW_NUMBER() OVER (
-                            PARTITION BY workspace_id, project_id, entity_id, name, author
-                            ORDER BY last_updated_at DESC
-                        ) as rn
+                        passed
                     FROM assertion_results
                     WHERE entity_type = 'trace'
                     AND workspace_id = :workspace_id
                     AND project_id = :project_id
                     AND entity_id IN (SELECT trace_id FROM experiment_items_scope)
+                    ORDER BY last_updated_at DESC
+                    LIMIT 1 BY workspace_id, project_id, entity_id, name, author
                 )
-                WHERE rn = 1
                 GROUP BY entity_id, name
             ), runs AS (
                 SELECT
@@ -471,9 +468,10 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
                     ei.trace_id,
                     JSONExtractUInt(ei.execution_policy, 'pass_threshold') AS item_pass_threshold,
                     JSONExtractUInt(ed.execution_policy, 'pass_threshold') AS suite_pass_threshold,
+                    countIf(ar.name != '') > 0 AS has_assertions,
                     if(
                         countIf(ar.name != '') = 0,
-                        1,
+                        0,
                         if(minIf(ar.value, ar.name != '') >= 1.0, 1, 0)
                     ) AS run_passed
                 FROM experiment_items_scope ei
@@ -484,6 +482,7 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
             ), items AS (
                 SELECT
                     dataset_item_id,
+                    max(has_assertions) AS has_assertions,
                     if(sum(run_passed) >=
                        if(item_pass_threshold > 0, item_pass_threshold,
                           if(suite_pass_threshold > 0, suite_pass_threshold, 1)),
@@ -493,9 +492,9 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
             )
             SELECT
                 :experiment_id as experiment_id,
-                toDecimal64(if(count(*) = 0, 0, sum(item_passed) / count(*)), 9) AS pass_rate,
-                sum(item_passed) AS passed_count,
-                count(*) AS total_count
+                toDecimal64(ifNull(sumIf(item_passed, has_assertions) / nullIf(toFloat64(countIf(has_assertions)), 0), 0), 9) AS pass_rate,
+                sumIf(item_passed, has_assertions) AS passed_count,
+                countIf(has_assertions) AS total_count
             FROM items
             SETTINGS log_comment = '<log_comment>'
             ;
@@ -704,27 +703,7 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
                 <if(cursor)>AND id > :cursor<endif>
                 ORDER BY id ASC
                 LIMIT :limit
-            ), feedback_scores_combined_raw AS (
-                SELECT
-                    workspace_id,
-                    project_id,
-                    entity_id,
-                    name,
-                    category_name,
-                    value,
-                    reason,
-                    source,
-                    created_by,
-                    last_updated_by,
-                    created_at,
-                    last_updated_at,
-                    feedback_scores.last_updated_by AS author
-                FROM feedback_scores FINAL
-                WHERE entity_type = 'trace'
-                AND workspace_id = :workspace_id
-                AND project_id = :project_id
-                AND entity_id IN (SELECT trace_id FROM experiment_items)
-                UNION ALL
+            ), feedback_scores_deduped AS (
                 SELECT
                     workspace_id,
                     project_id,
@@ -739,63 +718,57 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
                     created_at,
                     last_updated_at,
                     author
-                FROM authored_feedback_scores FINAL
-                WHERE entity_type = 'trace'
-                AND workspace_id = :workspace_id
-                AND project_id = :project_id
-                AND entity_id IN (SELECT trace_id FROM experiment_items)
-            ), feedback_scores_with_ranking AS (
-                SELECT workspace_id,
-                       project_id,
-                       entity_id,
-                       name,
-                       category_name,
-                       value,
-                       reason,
-                       source,
-                       created_by,
-                       last_updated_by,
-                       created_at,
-                       last_updated_at,
-                       author,
-                       ROW_NUMBER() OVER (
-                           PARTITION BY workspace_id, project_id, entity_id, name, author
-                           ORDER BY last_updated_at DESC
-                       ) as rn
-                FROM feedback_scores_combined_raw
-            ), feedback_scores_combined AS (
+                FROM (
+                    SELECT
+                        workspace_id,
+                        project_id,
+                        entity_id,
+                        name,
+                        category_name,
+                        value,
+                        reason,
+                        source,
+                        created_by,
+                        last_updated_by,
+                        created_at,
+                        last_updated_at,
+                        feedback_scores.last_updated_by AS author
+                    FROM feedback_scores
+                    WHERE entity_type = 'trace'
+                    AND workspace_id = :workspace_id
+                    AND project_id = :project_id
+                    AND entity_id IN (SELECT trace_id FROM experiment_items)
+                    UNION ALL
+                    SELECT
+                        workspace_id,
+                        project_id,
+                        entity_id,
+                        name,
+                        category_name,
+                        value,
+                        reason,
+                        source,
+                        created_by,
+                        last_updated_by,
+                        created_at,
+                        last_updated_at,
+                        author
+                    FROM authored_feedback_scores
+                    WHERE entity_type = 'trace'
+                    AND workspace_id = :workspace_id
+                    AND project_id = :project_id
+                    AND entity_id IN (SELECT trace_id FROM experiment_items)
+                )
+                ORDER BY last_updated_at DESC
+                LIMIT 1 BY workspace_id, project_id, entity_id, name, author
+            ), feedback_scores_grouped AS (
                 SELECT
                     workspace_id,
                     project_id,
                     entity_id,
                     name,
-                    category_name,
-                    value,
-                    reason,
-                    source,
-                    created_by,
-                    last_updated_by,
-                    created_at,
-                    last_updated_at,
-                    author
-                FROM feedback_scores_with_ranking
-                WHERE rn = 1
-            ), feedback_scores_combined_grouped AS (
-                SELECT
-                    workspace_id,
-                    project_id,
-                    entity_id,
-                    name,
-                    groupArray(value) AS values,
-                    groupArray(reason) AS reasons,
-                    groupArray(category_name) AS categories,
-                    groupArray(author) AS authors,
-                    groupArray(source) AS sources,
-                    groupArray(created_by) AS created_bies,
-                    groupArray(last_updated_by) AS updated_bies,
-                    groupArray(created_at) AS created_ats,
-                    groupArray(last_updated_at) AS last_updated_ats
-                FROM feedback_scores_combined
+                    groupArray(tuple(value, reason, category_name, source, author, created_by, last_updated_by, created_at, last_updated_at)) AS entries
+                FROM feedback_scores_deduped
                 GROUP BY workspace_id, project_id, entity_id, name
             ), feedback_scores_final AS (
                 SELECT
@@ -803,22 +776,19 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
                     project_id,
                     entity_id,
                     name,
-                    arrayStringConcat(categories, ', ') AS category_name,
-                    IF(length(values) = 1, arrayElement(values, 1), toDecimal64(arrayAvg(values), 9)) AS value,
-                    IF(length(reasons) = 1, arrayElement(reasons, 1), arrayStringConcat(arrayMap(x -> if(x = '', '\\<no reason>', x), reasons), ', ')) AS reason,
-                    arrayElement(sources, 1) AS source,
+                    arrayStringConcat(arrayMap(e -> e.3, entries), ', ') AS category_name,
+                    IF(length(entries) = 1, entries[1].1, toDecimal64(arrayAvg(arrayMap(e -> e.1, entries)), 9)) AS value,
+                    IF(length(entries) = 1, entries[1].2, arrayStringConcat(arrayMap(e -> if(e.2 = '', '\\<no reason>', e.2), entries), ', ')) AS reason,
+                    entries[1].4 AS source,
                     mapFromArrays(
-                        authors,
-                        arrayMap(
-                            i -> tuple(values[i], reasons[i], categories[i], sources[i], last_updated_ats[i]),
-                            arrayEnumerate(values)
-                        )
+                            arrayMap(e -> e.5, entries),
+                            arrayMap(e -> tuple(e.1, e.2, e.3, e.4, e.9), entries)
                     ) AS value_by_author,
-                    arrayStringConcat(created_bies, ', ') AS created_by,
-                    arrayStringConcat(updated_bies, ', ') AS last_updated_by,
-                    arrayMin(created_ats) AS created_at,
-                    arrayMax(last_updated_ats) AS last_updated_at
-                FROM feedback_scores_combined_grouped
+                    arrayStringConcat(arrayMap(e -> e.6, entries), ', ') AS created_by,
+                    arrayStringConcat(arrayMap(e -> e.7, entries), ', ') AS last_updated_by,
+                    arrayMin(arrayMap(e -> e.8, entries)) AS created_at,
+                    arrayMax(arrayMap(e -> e.9, entries)) AS last_updated_at
+                FROM feedback_scores_grouped
             )
             SELECT
                 entity_id as trace_id,
@@ -2307,7 +2277,7 @@ class ExperimentAggregatesDAOImpl implements ExperimentAggregatesDAO {
         Map<String, Double> usageAvg = row.get("usage_avg", Map.class);
 
         // pass_rate fields are non-nullable in experiment_aggregates (DEFAULT 0)
-        // Convert 0 defaults to null for non-evaluation-suite experiments
+        // Convert 0 defaults to null for non-test-suite experiments
         Long totalCount = row.get("total_count", Long.class);
         boolean hasPassRate = totalCount != null && totalCount > 0;
 

@@ -6,6 +6,7 @@ import type { LocalRunnerJobResultRequest } from "@/rest_api/api/resources/runne
 import { OpikApiError } from "@/rest_api/errors/OpikApiError";
 import { GoneError } from "@/rest_api/api/errors/GoneError";
 import { agentConfigContext } from "@/agent-config/configContext";
+import { deserializeValue } from "@/typeHelpers";
 import { flushAll } from "@/utils/flushAll";
 import { logger } from "@/utils/logger";
 import { generateId } from "@/utils/generateId";
@@ -98,6 +99,8 @@ export class InProcessRunnerLoop {
     this.pollTick(1_000);
   }
 
+  private pollFailures = 0;
+
   private pollTick(backoff: number): void {
     if (this.shutdownRequested) return;
 
@@ -107,15 +110,21 @@ export class InProcessRunnerLoop {
       let nextBackoff = backoff;
       try {
         const job = await this.api.runners.nextJob(this.runnerId);
+        this.pollFailures = 0;
         nextBackoff = 1_000;
-        this.spawnJob(job);
-      } catch (err) {
-        if (err instanceof OpikApiError && err.statusCode === 204) {
-          nextBackoff = 1_000;
+        if (job === null) {
           this.scheduleNextPoll(POLL_IDLE_INTERVAL_MS, nextBackoff);
           return;
         }
-        logger.debug("Poll error", { error: err });
+        this.spawnJob(job);
+      } catch (err) {
+        this.pollFailures++;
+        if (this.pollFailures === 1) {
+          const statusCode = err instanceof OpikApiError ? err.statusCode : undefined;
+          logger.warn("Unable to reach Opik server" + (statusCode ? ` (API ${statusCode})` : "") + ". Retrying...", { error: err });
+        } else {
+          logger.debug("Poll error", { error: err });
+        }
         const wait = this.jitteredBackoff(nextBackoff);
         nextBackoff = Math.min(nextBackoff * 2, this.backoffCapMs);
         this.scheduleNextPoll(wait, nextBackoff);
@@ -126,7 +135,12 @@ export class InProcessRunnerLoop {
     };
 
     execute().catch((err) => {
-      logger.debug("Poll tick error", { error: err });
+      this.pollFailures++;
+      if (this.pollFailures === 1) {
+        logger.warn("Unable to reach Opik server. Retrying...", { error: err });
+      } else {
+        logger.debug("Poll tick error", { error: err });
+      }
       this.scheduleNextPoll(
         this.jitteredBackoff(backoff),
         Math.min(backoff * 2, this.backoffCapMs)
@@ -155,6 +169,7 @@ export class InProcessRunnerLoop {
     const agentName = job.agentName ?? "";
 
     if (this.cancelledJobs.has(jobId)) {
+      logger.debug(`Skipping cancelled job ${jobId}`);
       this.cancelledJobs.delete(jobId);
       return;
     }
@@ -185,15 +200,16 @@ export class InProcessRunnerLoop {
       await flushAll().catch(() => {});
       await this.sendJobLogs(jobId);
 
+      const timeout = job.timeout;
       const errorMessage =
         err instanceof TimeoutError
-          ? "Job timed out"
+          ? `Job timed out after ${timeout}s`
           : err instanceof Error
             ? `${err.name}: ${err.message}`
             : String(err);
 
       if (err instanceof TimeoutError) {
-        logger.warn(`Job ${jobId} timed out`);
+        logger.warn(`Job ${jobId} timed out after ${timeout}s`);
       } else {
         logger.error(`Job ${jobId} failed: ${errorMessage}`);
       }
@@ -206,14 +222,15 @@ export class InProcessRunnerLoop {
     const agentName = job.agentName ?? "";
     const inputs = (job.inputs as Record<string, any>) ?? {};
     const maskId = job.maskId;
+    const blueprintName = job.blueprintName;
 
     const entry = getAll().get(agentName)!;
-    const args = entry.params.map((p) => inputs[p.name]);
+    const args = entry.params.map((p) => castInputValue(inputs[p.name], p.type));
 
     const run = () =>
       runWithJobContext({ traceId, jobId }, () => {
-        if (maskId) {
-          return agentConfigContext(maskId, () => entry.func(...args));
+        if (maskId || blueprintName) {
+          return agentConfigContext({ blueprintName, maskId }, () => entry.func(...args));
         }
         return entry.func(...args);
       });
@@ -258,7 +275,7 @@ export class InProcessRunnerLoop {
     try {
       await this.api.runners.reportJobResult(jobId, payload);
     } catch (err) {
-      logger.debug(`Failed to report result for job ${jobId}`, { error: err });
+      logger.warn(`Failed to report result for job ${jobId}`, { error: err });
     }
   }
 
@@ -294,6 +311,30 @@ export class InProcessRunnerLoop {
 
   private jitteredBackoff(backoff: number): number {
     return Math.min(backoff, this.backoffCapMs) * (0.5 + Math.random() * 0.5);
+  }
+}
+
+export function castInputValue(value: unknown, type: string): unknown {
+  if (value === null || value === undefined) return value;
+  switch (type) {
+    case "boolean":
+      if (typeof value === "boolean") return value;
+      return deserializeValue(String(value), "boolean");
+    case "float":
+    case "integer": {
+      if (typeof value === "number") return value;
+      const result = deserializeValue(String(value), "float");
+      if (typeof result === "number" && Number.isNaN(result)) {
+        throw new TypeError(`Cannot cast "${value}" to number`);
+      }
+      return type === "integer" ? Math.trunc(result as number) : result;
+    }
+    case "string":
+    default:
+      if (typeof value === "string") return value;
+      if (Array.isArray(value) || (typeof value === "object" && value !== null))
+        return JSON.stringify(value);
+      return String(value);
   }
 }
 

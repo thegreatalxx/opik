@@ -1,12 +1,5 @@
-export interface SandboxPairCode {
-  pair_code: string;
-  runner_id: string;
-  expires_in_seconds: number;
-  created_at: number;
-}
-
-export enum SandboxConnectionStatus {
-  PAIRING = "pairing",
+export enum RunnerConnectionStatus {
+  IDLE = "idle",
   CONNECTED = "connected",
   DISCONNECTED = "disconnected",
 }
@@ -18,11 +11,14 @@ export interface LocalRunnerAgent {
   params?: { name: string; type: string }[];
 }
 
+export type LocalRunnerType = "connect" | "endpoint";
+
 export interface LocalRunner {
   id: string;
   name?: string;
   project_id: string;
-  status: SandboxConnectionStatus;
+  status: RunnerConnectionStatus;
+  type?: LocalRunnerType;
   connected_at?: string;
   agents?: LocalRunnerAgent[];
 }
@@ -52,4 +48,5 @@ export interface CreateLocalRunnerJobRequest {
   inputs: Record<string, unknown>;
   project_id: string;
   mask_id?: string;
+  blueprint_name?: string;
 }

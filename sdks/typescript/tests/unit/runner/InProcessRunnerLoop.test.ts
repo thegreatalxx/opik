@@ -3,7 +3,6 @@ import { register } from "@/runner/registry";
 import { createMockHttpResponsePromise } from "@tests/mockUtils";
 import type { OpikApiClientTemp } from "@/client/OpikApiClientTemp";
 import type { LocalRunnerJob } from "@/rest_api/api/types/LocalRunnerJob";
-import { OpikApiError } from "@/rest_api/errors/OpikApiError";
 import { GoneError } from "@/rest_api/api/errors/GoneError";
 
 function createMockApi() {
@@ -12,9 +11,7 @@ function createMockApi() {
       heartbeat: vi.fn(() =>
         createMockHttpResponsePromise({ cancelledJobIds: [] })
       ),
-      nextJob: vi.fn(() => {
-        throw new OpikApiError({ statusCode: 204 });
-      }),
+      nextJob: vi.fn(() => createMockHttpResponsePromise(null)),
       reportJobResult: vi.fn(() => createMockHttpResponsePromise(undefined)),
       registerAgents: vi.fn(() => createMockHttpResponsePromise(undefined)),
       appendJobLogs: vi.fn(() => createMockHttpResponsePromise(undefined)),
@@ -120,7 +117,7 @@ describe("InProcessRunnerLoop", () => {
         if (callCount === 1) {
           return createMockHttpResponsePromise(job);
         }
-        throw new OpikApiError({ statusCode: 204 });
+        return createMockHttpResponsePromise(null);
       }
     );
 
@@ -173,7 +170,7 @@ describe("InProcessRunnerLoop", () => {
         if (callCount === 1) {
           return createMockHttpResponsePromise(job);
         }
-        throw new OpikApiError({ statusCode: 204 });
+        return createMockHttpResponsePromise(null);
       }
     );
 
@@ -201,7 +198,7 @@ describe("InProcessRunnerLoop", () => {
         if (callCount === 1) {
           return createMockHttpResponsePromise(job);
         }
-        throw new OpikApiError({ statusCode: 204 });
+        return createMockHttpResponsePromise(null);
       }
     );
 
@@ -244,7 +241,7 @@ describe("InProcessRunnerLoop", () => {
         if (callCount === 1) {
           return createMockHttpResponsePromise(job);
         }
-        throw new OpikApiError({ statusCode: 204 });
+        return createMockHttpResponsePromise(null);
       }
     );
 
@@ -293,7 +290,7 @@ describe("InProcessRunnerLoop", () => {
           await new Promise((resolve) => setTimeout(resolve, 200));
           return { data: job, rawResponse: {} };
         }
-        throw new OpikApiError({ statusCode: 204 });
+        return createMockHttpResponsePromise(null);
       }
     );
 
@@ -313,6 +310,61 @@ describe("InProcessRunnerLoop", () => {
       (call: unknown[]) => call[0] === "cancelled-job-2"
     );
     expect(calledForCancelled).toBe(false);
+  });
+
+  it("casts string-encoded inputs to declared param types before calling the function", async () => {
+    const api = createMockApi();
+    const captured: Record<string, unknown> = {};
+
+    register({
+      func: (query: string, count: number, score: number, active: boolean) => {
+        captured.query = query;
+        captured.count = count;
+        captured.score = score;
+        captured.active = active;
+        return "ok";
+      },
+      name: "typed-agent",
+      project: "default",
+      params: [
+        { name: "query", type: "string" },
+        { name: "count", type: "float" },
+        { name: "score", type: "float" },
+        { name: "active", type: "boolean" },
+      ],
+      docstring: "",
+    });
+
+    const job = createJob({
+      agentName: "typed-agent",
+      inputs: { query: "hello", count: "5", score: "3.14", active: "true" },
+    });
+
+    let callCount = 0;
+    (api.runners.nextJob as ReturnType<typeof vi.fn>).mockImplementation(() => {
+      callCount++;
+      if (callCount === 1) return createMockHttpResponsePromise(job);
+      return createMockHttpResponsePromise(null);
+    });
+
+    const loop = new InProcessRunnerLoop(api, "runner-1");
+    loop.start();
+    await vi.advanceTimersByTimeAsync(0);
+    loop.shutdown();
+
+    expect(api.runners.reportJobResult).toHaveBeenCalledWith(
+      "job-1",
+      expect.objectContaining({ status: "completed" })
+    );
+    expect(captured).toMatchObject({
+      query: "hello",
+      count: 5,
+      score: 3.14,
+      active: true,
+    });
+    expect(typeof captured.count).toBe("number");
+    expect(typeof captured.score).toBe("number");
+    expect(typeof captured.active).toBe("boolean");
   });
 
   it("handles dict result without wrapping", async () => {
@@ -336,7 +388,7 @@ describe("InProcessRunnerLoop", () => {
         if (callCount === 1) {
           return createMockHttpResponsePromise(job);
         }
-        throw new OpikApiError({ statusCode: 204 });
+        return createMockHttpResponsePromise(null);
       }
     );
 
