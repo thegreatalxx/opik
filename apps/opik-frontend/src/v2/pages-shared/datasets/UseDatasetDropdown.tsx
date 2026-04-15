@@ -22,6 +22,7 @@ export interface UseDatasetDropdownProps {
   entityName?: string;
   projectId?: string | null;
   isEmpty?: boolean;
+  isTestSuite?: boolean;
 }
 
 function UseDatasetDropdown({
@@ -32,6 +33,7 @@ function UseDatasetDropdown({
   entityName = "dataset",
   projectId,
   isEmpty = false,
+  isTestSuite = false,
 }: UseDatasetDropdownProps) {
   const resetKeyRef = useRef(0);
   const resetDialogKeyRef = useRef(0);
@@ -51,9 +53,9 @@ function UseDatasetDropdown({
     loadPlayground({
       datasetId,
       datasetVersionId,
-      datasetType: DATASET_TYPE.DATASET,
+      datasetType: isTestSuite ? DATASET_TYPE.TEST_SUITE : DATASET_TYPE.DATASET,
     });
-  }, [loadPlayground, datasetId, datasetVersionId]);
+  }, [loadPlayground, datasetId, datasetVersionId, isTestSuite]);
 
   const handleOpenPlaygroundClick = () => {
     if (isPlaygroundEmpty) {
