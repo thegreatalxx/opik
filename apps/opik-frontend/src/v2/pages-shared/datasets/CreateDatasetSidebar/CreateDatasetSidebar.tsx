@@ -298,7 +298,7 @@ const CreateDatasetSidebar: React.FunctionComponent<
             <div className="overflow-hidden rounded-b-md border border-t-0 border-border">
               <CodeHighlighter
                 data={typescriptSnippet}
-                language={SUPPORTED_LANGUAGE.javascript}
+                language={SUPPORTED_LANGUAGE.python}
               />
             </div>
           </TabsContent>
