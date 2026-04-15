@@ -95,10 +95,15 @@ class ThreadDAOImpl implements ThreadDAO {
                     sumMap(usage) as usage,
                     sum(total_estimated_cost) as total_estimated_cost,
                     arraySort(groupUniqArrayIf(provider, provider != '')) as providers
-                FROM spans final
-                WHERE workspace_id = :workspace_id
-                  AND project_id = :project_id
-                  AND trace_id IN (SELECT DISTINCT id FROM traces_final)
+                FROM (
+                    SELECT *
+                    FROM spans
+                    WHERE workspace_id = :workspace_id
+                      AND project_id = :project_id
+                      AND trace_id IN (SELECT DISTINCT id FROM traces_final)
+                    ORDER BY (workspace_id, project_id, trace_id, parent_span_id, id) DESC, last_updated_at DESC
+                    LIMIT 1 BY id
+                )
                 GROUP BY workspace_id, project_id, trace_id
             ), trace_threads_final AS (
                 SELECT
@@ -385,10 +390,15 @@ class ThreadDAOImpl implements ThreadDAO {
                     sumMap(usage) as usage,
                     sum(total_estimated_cost) as total_estimated_cost,
                     arraySort(groupUniqArrayIf(provider, provider != '')) as providers
-                FROM spans final
-                WHERE workspace_id = :workspace_id
-                  AND project_id = :project_id
-                  AND trace_id IN (SELECT DISTINCT id FROM traces_final)
+                FROM (
+                    SELECT *
+                    FROM spans
+                    WHERE workspace_id = :workspace_id
+                      AND project_id = :project_id
+                      AND trace_id IN (SELECT DISTINCT id FROM traces_final)
+                    ORDER BY (workspace_id, project_id, trace_id, parent_span_id, id) DESC, last_updated_at DESC
+                    LIMIT 1 BY id
+                )
                 GROUP BY workspace_id, project_id, trace_id
             ), trace_threads_final AS (
                 SELECT
@@ -655,10 +665,15 @@ class ThreadDAOImpl implements ThreadDAO {
                     sumMap(usage) as usage,
                     sum(total_estimated_cost) as total_estimated_cost,
                     arraySort(groupUniqArrayIf(provider, provider != '')) as providers
-                FROM spans final
-                WHERE workspace_id = :workspace_id
-                  AND project_id = :project_id
-                  AND trace_id IN (SELECT DISTINCT id FROM traces_ids)
+                FROM (
+                    SELECT *
+                    FROM spans
+                    WHERE workspace_id = :workspace_id
+                      AND project_id = :project_id
+                      AND trace_id IN (SELECT DISTINCT id FROM traces_ids)
+                    ORDER BY (workspace_id, project_id, trace_id, parent_span_id, id) DESC, last_updated_at DESC
+                    LIMIT 1 BY id
+                )
                 GROUP BY workspace_id, project_id, trace_id
             ), trace_threads_ids AS (
                 SELECT
@@ -914,10 +929,15 @@ class ThreadDAOImpl implements ThreadDAO {
                         sumMap(usage) as usage,
                         sum(total_estimated_cost) as total_estimated_cost,
                         arraySort(groupUniqArrayIf(provider, provider != '')) as providers
-                    FROM spans final
-                    WHERE workspace_id = :workspace_id
-                      AND project_id = :project_id
-                      AND trace_id IN (SELECT DISTINCT id FROM traces_final)
+                    FROM (
+                        SELECT *
+                        FROM spans
+                        WHERE workspace_id = :workspace_id
+                          AND project_id = :project_id
+                          AND trace_id IN (SELECT DISTINCT id FROM traces_final)
+                        ORDER BY (workspace_id, project_id, trace_id, parent_span_id, id) DESC, last_updated_at DESC
+                        LIMIT 1 BY id
+                    )
                     GROUP BY workspace_id, project_id, trace_id
                 ), trace_threads_final AS (
                     SELECT
