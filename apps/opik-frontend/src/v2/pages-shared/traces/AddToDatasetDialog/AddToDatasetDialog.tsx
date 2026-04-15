@@ -179,7 +179,7 @@ const AddToDatasetDialog: React.FunctionComponent<AddToDatasetDialogProps> = ({
     },
     {
       placeholderData: keepPreviousData,
-      enabled: !!activeProjectId,
+      enabled: !!activeProjectId && open,
     },
   );
 
