@@ -22,7 +22,7 @@ export interface UseDatasetDropdownProps {
   entityName?: string;
   projectId?: string | null;
   isEmpty?: boolean;
-  isTestSuite?: boolean;
+  isTestSuite: boolean;
 }
 
 function UseDatasetDropdown({
@@ -33,7 +33,7 @@ function UseDatasetDropdown({
   entityName = "dataset",
   projectId,
   isEmpty = false,
-  isTestSuite = false,
+  isTestSuite,
 }: UseDatasetDropdownProps) {
   const resetKeyRef = useRef(0);
   const resetDialogKeyRef = useRef(0);
