@@ -6,6 +6,7 @@ import { EditorState, Extension } from "@codemirror/state";
 import { jsonLanguage } from "@codemirror/lang-json";
 import { yamlLanguage } from "@codemirror/lang-yaml";
 import { pythonLanguage } from "@codemirror/lang-python";
+import { javascriptLanguage } from "@codemirror/lang-javascript";
 import { useCodemirrorTheme } from "@/hooks/useCodemirrorTheme";
 import { useCodemirrorLineHighlight } from "@/hooks/useCodemirrorLineHighlight";
 import CopyButton from "@/shared/CopyButton/CopyButton";
@@ -14,12 +15,14 @@ export enum SUPPORTED_LANGUAGE {
   json = "json",
   yaml = "yaml",
   python = "python",
+  javascript = "javascript",
 }
 
 const PLUGINS_MAP: Record<SUPPORTED_LANGUAGE, Extension> = {
   [SUPPORTED_LANGUAGE.json]: jsonLanguage,
   [SUPPORTED_LANGUAGE.yaml]: yamlLanguage,
   [SUPPORTED_LANGUAGE.python]: pythonLanguage,
+  [SUPPORTED_LANGUAGE.javascript]: javascriptLanguage,
 };
 
 type CodeHighlighterProps = {
