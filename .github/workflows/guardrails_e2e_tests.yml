@@ -18,7 +18,8 @@ on:
       - 'main'
     paths:
       - 'apps/opik-guardrails-backend/**'
-      - 'sdks/python/src/opik/guardrails/**'
+      - 'apps/opik-backend/**'
+      - 'sdks/python/src/opik/**'
       - 'sdks/python/tests/e2e/test_guardrails.py'
       - '.github/workflows/guardrails_e2e_tests.yml'
 
