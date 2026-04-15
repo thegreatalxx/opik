@@ -27,6 +27,10 @@ import { useActiveProjectId } from "@/store/AppStore";
 import CreatedSuccess from "./CreatedSuccess";
 import { Dataset, DATASET_TYPE, DatasetListType } from "@/types/datasets";
 import { MAX_RUNS_PER_ITEM } from "@/types/test-suites";
+import {
+  PASS_CRITERIA_TITLE,
+  PASS_CRITERIA_DESCRIPTION,
+} from "@/constants/test-suites";
 
 const ACCEPTED_TYPE = ".csv";
 
@@ -309,9 +313,9 @@ const CreateDatasetSidebar: React.FunctionComponent<
             <AccordionContent className="pl-6">
               <Separator className="mb-4" />
               <div className="mb-4">
-                <h3 className="comet-body-s-accented">Evaluation criteria</h3>
+                <h3 className="comet-body-s-accented">{PASS_CRITERIA_TITLE}</h3>
                 <p className="comet-body-xs text-light-slate">
-                  Define the conditions required for the evaluation to pass
+                  {PASS_CRITERIA_DESCRIPTION}
                 </p>
               </div>
               <div className="mb-4 flex gap-4">
