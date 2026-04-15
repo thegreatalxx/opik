@@ -5,9 +5,9 @@ import { formatBlueprintValue } from "@/utils/agent-configurations";
 import BlueprintTypeIcon from "./BlueprintTypeIcon";
 import BlueprintValuePromptCompact from "@/v2/pages-shared/agent-configuration/fields/BlueprintValuePromptCompact";
 import FieldSection from "@/v2/pages-shared/agent-configuration/fields/FieldSection";
-import CollapsibleBlock from "@/v2/pages-shared/agent-configuration/fields/CollapsibleBlock";
 import {
   collectMultiLineKeys,
+  collectNonPromptMultiLineKeys,
   isMultiLineField,
 } from "@/v2/pages-shared/agent-configuration/fields/blueprintFieldLayout";
 import {
@@ -31,37 +31,47 @@ const BlueprintValuesList: React.FC<BlueprintValuesListProps> = ({
   controller: externalController,
 }) => {
   const collapsibleKeys = useMemo(() => collectMultiLineKeys(values), [values]);
-  const internalController = useFieldsCollapse({ collapsibleKeys });
+  const initiallyExpandedKeys = useMemo(
+    () => collectNonPromptMultiLineKeys(values),
+    [values],
+  );
+  const internalController = useFieldsCollapse({
+    collapsibleKeys,
+    initiallyExpandedKeys,
+  });
   const controller = externalController ?? internalController;
 
   return (
     <div className="flex flex-col gap-4">
       {values.map((v) => {
         const isPrompt = v.type === BlueprintValueType.PROMPT;
-        const collapsible = !isPrompt && isMultiLineField(v);
+        const fieldExpandable = isMultiLineField(v);
+        const fieldExpanded = fieldExpandable
+          ? controller.isExpanded(v.key)
+          : undefined;
         return (
           <FieldSection
             key={v.key}
             label={v.key}
             description={v.description}
             icon={<BlueprintTypeIcon type={v.type} />}
+            expandable={fieldExpandable}
+            expanded={fieldExpanded}
+            onToggle={
+              fieldExpandable ? () => controller.toggle(v.key) : undefined
+            }
             testId={`field-section-${v.key}`}
           >
             {isPrompt ? (
               <BlueprintValuePromptCompact
                 key={v.value}
                 value={v}
-                controller={controller}
+                expanded={!!fieldExpanded}
               />
-            ) : (
-              <CollapsibleBlock
-                collapsible={collapsible}
-                expanded={controller.isExpanded(v.key)}
-                onToggle={() => controller.toggle(v.key)}
-                testId={`field-block-${v.key}`}
-              >
+            ) : fieldExpandable && !fieldExpanded ? null : (
+              <div className="rounded-md border bg-primary-foreground px-3 py-2">
                 {renderScalarValue(v)}
-              </CollapsibleBlock>
+              </div>
             )}
           </FieldSection>
         );

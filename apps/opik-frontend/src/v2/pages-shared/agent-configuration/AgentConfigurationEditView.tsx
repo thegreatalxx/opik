@@ -20,9 +20,9 @@ import BlueprintTypeIcon from "@/v2/pages-shared/traces/ConfigurationTab/Bluepri
 import BlueprintValuePromptCompact from "./fields/BlueprintValuePromptCompact";
 import useNavigationBlocker from "@/hooks/useNavigationBlocker";
 import FieldSection from "./fields/FieldSection";
-import CollapsibleBlock from "./fields/CollapsibleBlock";
 import {
   collectMultiLineKeys,
+  collectNonPromptMultiLineKeys,
   hasAnyExpandableField,
   isMultiLineField,
 } from "./fields/blueprintFieldLayout";
@@ -47,6 +47,7 @@ export type AgentConfigurationEditViewState = {
   isSaving: boolean;
   hasErrors: boolean;
   collapsibleKeys: string[];
+  initiallyExpandedKeys: string[];
   hasExpandableFields: boolean;
 };
 
@@ -162,8 +163,15 @@ const AgentConfigurationEditView = React.forwardRef<
       () => collectMultiLineKeys(agentConfig?.values ?? []),
       [agentConfig],
     );
+    const initiallyExpandedKeys = useMemo(
+      () => collectNonPromptMultiLineKeys(agentConfig?.values ?? []),
+      [agentConfig],
+    );
 
-    const internalController = useFieldsCollapse({ collapsibleKeys });
+    const internalController = useFieldsCollapse({
+      collapsibleKeys,
+      initiallyExpandedKeys,
+    });
     const controller = externalController ?? internalController;
 
     const currentValues = useMemo<BlueprintValue[]>(() => {
@@ -199,6 +207,7 @@ const AgentConfigurationEditView = React.forwardRef<
         isSaving,
         hasErrors,
         collapsibleKeys,
+        initiallyExpandedKeys,
         hasExpandableFields,
       });
     }, [
@@ -206,6 +215,7 @@ const AgentConfigurationEditView = React.forwardRef<
       isSaving,
       hasErrors,
       collapsibleKeys,
+      initiallyExpandedKeys,
       hasExpandableFields,
       onStateChange,
     ]);
@@ -259,22 +269,47 @@ const AgentConfigurationEditView = React.forwardRef<
                 : draftValues[v.key] !== undefined &&
                   draftValues[v.key] !== originalValues.current[v.key];
 
+            const fieldExpandable = collapsible;
+            const fieldExpanded = fieldExpandable
+              ? controller.isExpanded(v.key)
+              : undefined;
+            const isBoolean = v.type === BlueprintValueType.BOOLEAN;
+
+            const modifiedDot = isChanged ? (
+              <TooltipWrapper content="Modified">
+                <span
+                  className="size-1.5 rounded-full bg-amber-400"
+                  aria-label="Modified"
+                />
+              </TooltipWrapper>
+            ) : null;
+
+            const booleanSwitch = isBoolean ? (
+              <Switch
+                size="sm"
+                checked={draftValues[v.key] === "true"}
+                onCheckedChange={(checked) =>
+                  setDraftValues((prev) => ({
+                    ...prev,
+                    [v.key]: String(checked),
+                  }))
+                }
+              />
+            ) : null;
+
             return (
               <FieldSection
                 key={v.key}
                 label={v.key}
                 icon={<BlueprintTypeIcon type={v.type} variant="secondary" />}
                 description={v.description}
-                trailing={
-                  isChanged ? (
-                    <TooltipWrapper content="Modified">
-                      <span
-                        className="size-1.5 rounded-full bg-amber-400"
-                        aria-label="Modified"
-                      />
-                    </TooltipWrapper>
-                  ) : undefined
+                expandable={fieldExpandable}
+                expanded={fieldExpanded}
+                onToggle={
+                  fieldExpandable ? () => controller.toggle(v.key) : undefined
                 }
+                afterLabel={booleanSwitch}
+                trailing={modifiedDot}
               >
                 {isPrompt ? (
                   <div className="flex flex-col gap-1">
@@ -284,7 +319,7 @@ const AgentConfigurationEditView = React.forwardRef<
                       projectId={projectId}
                       isEditing
                       tone="white"
-                      controller={controller}
+                      expanded={!!fieldExpanded}
                       ref={(el) => {
                         promptRefs.current[v.key] = el;
                       }}
@@ -304,51 +339,37 @@ const AgentConfigurationEditView = React.forwardRef<
                   </div>
                 ) : (
                   (() => {
-                    const scalarEditor =
-                      v.type === BlueprintValueType.BOOLEAN ? (
-                        <Switch
-                          checked={draftValues[v.key] === "true"}
-                          onCheckedChange={(checked) =>
-                            setDraftValues((prev) => ({
-                              ...prev,
-                              [v.key]: String(checked),
-                            }))
-                          }
-                        />
-                      ) : (
-                        <div className="flex flex-col gap-1">
+                    if (isBoolean) return null;
+                    if (fieldExpandable && !fieldExpanded) return null;
+
+                    const inputMode =
+                      v.type === BlueprintValueType.INT
+                        ? "numeric"
+                        : v.type === BlueprintValueType.FLOAT
+                          ? "decimal"
+                          : "text";
+                    const currentValue = draftValues[v.key] ?? "";
+                    const errorLine = errors[v.key] ? (
+                      <span className="comet-body-xs text-destructive">
+                        {errors[v.key]}
+                      </span>
+                    ) : null;
+
+                    return (
+                      <div className="flex flex-col gap-1">
+                        <div className="rounded-md border bg-background px-3 py-2">
                           <Input
-                            inputMode={
-                              v.type === BlueprintValueType.INT
-                                ? "numeric"
-                                : v.type === BlueprintValueType.FLOAT
-                                  ? "decimal"
-                                  : "text"
-                            }
-                            value={draftValues[v.key] ?? ""}
+                            variant="ghost"
+                            className="h-auto p-0"
+                            inputMode={inputMode}
+                            value={currentValue}
                             onChange={(e) =>
                               handleFieldChange(v.key, e.target.value)
                             }
                           />
-                          {errors[v.key] && (
-                            <span className="comet-body-xs text-destructive">
-                              {errors[v.key]}
-                            </span>
-                          )}
                         </div>
-                      );
-
-                    if (!collapsible) return scalarEditor;
-
-                    return (
-                      <CollapsibleBlock
-                        collapsible={collapsible}
-                        expanded={controller.isExpanded(v.key)}
-                        onToggle={() => controller.toggle(v.key)}
-                        active={isChanged}
-                      >
-                        {scalarEditor}
-                      </CollapsibleBlock>
+                        {errorLine}
+                      </div>
                     );
                   })()
                 )}
