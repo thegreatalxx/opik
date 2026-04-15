@@ -18,7 +18,6 @@ env:
   HF_HUB_ENABLE_PROGRESS_BARS: "0"
   HF_HUB_DISABLE_TELEMETRY: "1"
   OPIK_URL_OVERRIDE: http://localhost:8080
-  OPIK_GUARDRAILS_URL_OVERRIDE: http://localhost:5000
   OPIK_CONSOLE_LOGGING_LEVEL: DEBUG
   OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
   OPENAI_ORG_ID: ${{ secrets.OPENAI_ORG_ID }}
@@ -66,7 +65,7 @@ jobs:
             TOGGLE_RUNNERS_ENABLED: "true"
           run: |
             cd ${{ github.workspace }}
-            ./opik.sh --backend --port-mapping --guardrails --build
+            ./opik.sh --backend --port-mapping --build
 
         - name: Check Opik server availability
           shell: bash
