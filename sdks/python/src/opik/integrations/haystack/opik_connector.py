@@ -19,7 +19,7 @@ class OpikConnector:
     Simply add this component to your pipeline, but *do not* connect it to any other component. The OpikConnector
     will automatically trace the operations and data flow within the pipeline.
 
-    In order to configure Opik, you will need to call first install the Opik SDK using `pip install --upgrade opik` and then
+    In order to configure Opik, you will first need to install the Opik SDK using `pip install --upgrade opik` and then
     run `opik configure` from the command line. Alternatively you can configure Opik using environment variables,
     you can find more information about how to configure Opik [here](https://www.comet.com/docs/opik/tracing/sdk_configuration).
 
