@@ -364,10 +364,7 @@ const AgentConfigurationEditView = React.forwardRef<
             ) : null;
 
             return (
-              <div
-                key={v.key}
-                className={isRemoved ? "opacity-60" : undefined}
-              >
+              <div key={v.key} className={isRemoved ? "opacity-60" : undefined}>
                 <FieldSection
                   label={v.key}
                   icon={<BlueprintTypeIcon type={v.type} variant="secondary" />}
