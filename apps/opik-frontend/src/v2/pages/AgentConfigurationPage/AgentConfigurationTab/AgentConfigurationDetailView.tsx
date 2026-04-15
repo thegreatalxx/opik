@@ -75,6 +75,8 @@ const AgentConfigurationDetailView: React.FC<
     setDiffOpen(true);
   };
 
+  const isLatestVersion = versions[0]?.id === item.id;
+
   const description = item.description;
 
   const descriptionIsLong =
@@ -133,10 +135,24 @@ const AgentConfigurationDetailView: React.FC<
                 }}
               />
             )}
-            <Button size="xs" variant="outline" onClick={onEdit}>
-              <Pencil className="mr-1.5 size-3.5 text-light-slate" />
-              Edit configuration
-            </Button>
+            <TooltipWrapper
+              content={
+                isLatestVersion
+                  ? undefined
+                  : "Editing is only available for the latest version"
+              }
+            >
+              <Button
+                size="xs"
+                variant="outline"
+                onClick={onEdit}
+                disabled={!isLatestVersion}
+                style={!isLatestVersion ? { pointerEvents: "auto" } : undefined}
+              >
+                <Pencil className="mr-1.5 size-3.5 text-light-slate" />
+                Edit configuration
+              </Button>
+            </TooltipWrapper>
           </div>
         </div>
         {description && (
