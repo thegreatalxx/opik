@@ -8,6 +8,13 @@ on:
     pull_request:
         paths:
           - 'sdks/opik_optimizer/**'
+          - '.github/workflows/opik-optimizer-e2e-tests.yaml'
+    push:
+        branches:
+          - 'main'
+        paths:
+          - 'sdks/opik_optimizer/**'
+          - '.github/workflows/opik-optimizer-e2e-tests.yaml'
 
 permissions:
   contents: read
