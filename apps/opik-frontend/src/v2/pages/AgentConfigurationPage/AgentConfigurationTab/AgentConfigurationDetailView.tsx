@@ -61,14 +61,14 @@ const AgentConfigurationDetailView: React.FC<
   const hasTraces = (tracesData?.total ?? 0) > 0;
 
   const [diffOpen, setDiffOpen] = useState(false);
-  const [diffBase, setDiffBase] = useState<{
+  const [comparedVersion, setComparedVersion] = useState<{
     label: string;
     blueprintId: string;
   } | null>(null);
   const [notesExpanded, setNotesExpanded] = useState(false);
 
   const handleSelectDiffVersion = (versionItem: ConfigHistoryItem) => {
-    setDiffBase({
+    setComparedVersion({
       label: versionItem.name,
       blueprintId: versionItem.id,
     });
@@ -199,17 +199,17 @@ const AgentConfigurationDetailView: React.FC<
         )}
       </Card>
 
-      {diffBase && (
+      {comparedVersion && (
         <BlueprintDiffDialog
           open={diffOpen}
           setOpen={setDiffOpen}
           base={{
-            label: diffBase.label,
-            blueprintId: diffBase.blueprintId,
-          }}
-          diff={{
             label: item.name,
             blueprintId: item.id,
+          }}
+          diff={{
+            label: comparedVersion.label,
+            blueprintId: comparedVersion.blueprintId,
           }}
         />
       )}

@@ -197,7 +197,7 @@ const NewBlueprintFieldEditor: React.FC<NewBlueprintFieldEditorProps> = ({
   }, [field, onChange]);
 
   return (
-    <div className="flex flex-col gap-2 rounded-md border border-dashed border-amber-400/50 bg-primary-foreground p-3">
+    <div className="flex flex-col gap-2 rounded-md border border-dashed border-warning-box-icon-bg/50 bg-primary-foreground p-3">
       <div className="flex items-center gap-2">
         <BlueprintTypeIcon type={field.type} variant="secondary" />
         <Input
