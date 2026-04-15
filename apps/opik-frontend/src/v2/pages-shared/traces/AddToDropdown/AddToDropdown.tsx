@@ -1,5 +1,5 @@
 import React, { useRef, useState } from "react";
-import { ChevronDown, Database, UserPen } from "lucide-react";
+import { ChevronDown, Database, ListChecks, UserPen } from "lucide-react";
 
 import { Button, ButtonProps } from "@/ui/button";
 import {
@@ -12,6 +12,7 @@ import { Span, Trace, Thread } from "@/types/traces";
 import AddToDatasetDialog from "@/v2/pages-shared/traces/AddToDatasetDialog/AddToDatasetDialog";
 import AddToQueueDialog from "@/v2/pages-shared/traces/AddToQueueDialog/AddToQueueDialog";
 import { usePermissions } from "@/contexts/PermissionsContext";
+import { DATASET_TYPE } from "@/types/datasets";
 
 export type AddToDropdownProps = {
   getDataForExport: () => Promise<Array<Trace | Span | Thread>>;
@@ -50,12 +51,22 @@ const AddToDropdown: React.FunctionComponent<AddToDropdownProps> = (props) => {
   return (
     <>
       {showAddToDataset && (
-        <AddToDatasetDialog
-          key={`dataset-${resetKeyRef.current}`}
-          selectedRows={selectedRows as Array<Trace | Span>}
-          open={open === 1}
-          setOpen={() => setOpen(0)}
-        />
+        <>
+          <AddToDatasetDialog
+            key={`test-suite-${resetKeyRef.current}`}
+            selectedRows={selectedRows as Array<Trace | Span>}
+            datasetType={DATASET_TYPE.TEST_SUITE}
+            open={open === 1}
+            setOpen={() => setOpen(0)}
+          />
+          <AddToDatasetDialog
+            key={`dataset-${resetKeyRef.current}`}
+            selectedRows={selectedRows as Array<Trace | Span>}
+            datasetType={DATASET_TYPE.DATASET}
+            open={open === 3}
+            setOpen={() => setOpen(0)}
+          />
+        </>
       )}
       {showAddToQueue && (
         <AddToQueueDialog
@@ -86,8 +97,20 @@ const AddToDropdown: React.FunctionComponent<AddToDropdownProps> = (props) => {
               }}
               disabled={disabled}
             >
-              <Database className="mr-2 size-4" />
+              <ListChecks className="mr-2 size-4" />
               Test suite
+            </DropdownMenuItem>
+          )}
+          {showAddToDataset && (
+            <DropdownMenuItem
+              onClick={() => {
+                setOpen(3);
+                resetKeyRef.current = resetKeyRef.current + 1;
+              }}
+              disabled={disabled}
+            >
+              <Database className="mr-2 size-4" />
+              Dataset
             </DropdownMenuItem>
           )}
           {showAddToQueue && (
