@@ -49,7 +49,7 @@ const VerticalLine: React.FC<{
   height?: number | string;
 }> = ({ left, top = 0, bottom, height }) => (
   <div
-    className="absolute w-px bg-light-slate/40"
+    className="absolute w-px bg-tree-line"
     style={{ left, top, bottom, height }}
   />
 );
@@ -82,7 +82,7 @@ const TreeConnectors: React.FC<{
               <VerticalLine left={parentCenterX} height="100%" />
             )}
             <div
-              className="absolute rounded-bl-md border-b border-l border-light-slate/40"
+              className="absolute rounded-bl-md border-b border-l border-tree-line"
               style={{
                 left: parentCenterX,
                 top: hasContinuation ? 6 : 0,
