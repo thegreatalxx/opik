@@ -166,9 +166,9 @@ export const EXPLAINERS_MAP: Record<EXPLAINER_ID, Explainer> = {
   },
   [EXPLAINER_ID.i_added_items_to_a_dataset_now_what]: {
     id: EXPLAINER_ID.i_added_items_to_a_dataset_now_what,
-    title: "Traces added to dataset",
+    title: "Items added to dataset",
     description:
-      "Your traces have been added to the dataset and can now be used in experiments to evaluate your agent.",
+      "Your items have been added to the dataset and can now be used in experiments to evaluate your agent.",
     docLink: "/evaluation/overview",
     docHash: "#running-an-evaluation",
   },

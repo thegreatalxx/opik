@@ -9,6 +9,7 @@ import {
 } from "use-query-params";
 import useLocalStorageState from "use-local-storage-state";
 import { keepPreviousData } from "@tanstack/react-query";
+import { Check, Loader2, Plus } from "lucide-react";
 
 import DataTable from "@/shared/DataTable/DataTable";
 import DataTablePagination from "@/shared/DataTablePagination/DataTablePagination";
@@ -43,7 +44,6 @@ import SelectAllBanner from "@/shared/SelectAllBanner/SelectAllBanner";
 import { Button } from "@/ui/button";
 import { Separator } from "@/ui/separator";
 import TooltipWrapper from "@/shared/TooltipWrapper/TooltipWrapper";
-import { Check, Loader2, Plus } from "lucide-react";
 import { useObserveResizeNode } from "@/hooks/useObserveResizeNode";
 import ExpandableSearchInput from "@/shared/ExpandableSearchInput/ExpandableSearchInput";
 import {
