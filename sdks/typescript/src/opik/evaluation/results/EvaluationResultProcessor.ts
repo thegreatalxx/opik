@@ -137,7 +137,6 @@ export class EvaluationResultProcessor {
       experimentId: experiment.id,
       experimentName: experimentName,
       testResults,
-      resultUrl: experimentUrl,
       errors,
     };
   }

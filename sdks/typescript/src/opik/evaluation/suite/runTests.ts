@@ -23,8 +23,6 @@ export interface RunTestsOptions {
   experimentTags?: string[];
   /** Optional model name override for LLMJudge evaluators */
   model?: string;
-  /** Number of concurrent task executions (default: 16, matching Python SDK) */
-  taskThreads?: number;
 }
 
 /**
