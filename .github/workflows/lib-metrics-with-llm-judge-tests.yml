@@ -18,6 +18,12 @@ env:
   OPIK_SENTRY_ENABLE: False
 on:
   workflow_call:
+    inputs:
+      full_matrix:
+        description: "Run all Python versions (true) or only min/max (false)"
+        required: false
+        type: boolean
+        default: true
 
 jobs:
   tests:
@@ -31,7 +37,7 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        python_version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
+        python_version: ${{ inputs.full_matrix && fromJSON(vars.PYTHON_VERSIONS_ALL) || fromJSON(vars.PYTHON_VERSIONS_PR) }}
 
     steps:
       - name: Check out code

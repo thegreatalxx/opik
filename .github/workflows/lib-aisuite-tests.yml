@@ -14,6 +14,12 @@ env:
   OPIK_SENTRY_ENABLE: False
 on:
   workflow_call:
+    inputs:
+      full_matrix:
+        description: "Run all Python versions (true) or only min/max (false)"
+        required: false
+        type: boolean
+        default: true
 
 jobs:
   tests:
@@ -29,7 +35,7 @@ jobs:
       matrix:
         # 3.14 is not supported by aisuite's docstring_parser dependency
         # https://github.com/andrewyng/aisuite/issues/265
-        python_version: ["3.10", "3.11", "3.12", "3.13"]
+        python_version: ${{ inputs.full_matrix && fromJSON('["3.10","3.11","3.12","3.13"]') || fromJSON('["3.10","3.13"]') }}
 
     steps:
       - name: Check out code

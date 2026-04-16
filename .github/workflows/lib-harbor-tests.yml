@@ -11,6 +11,12 @@ env:
   OPIK_SENTRY_ENABLE: False
 on:
   workflow_call:
+    inputs:
+      full_matrix:
+        description: "Run all Python versions (true) or only min/max (false)"
+        required: false
+        type: boolean
+        default: true
 
 jobs:
   tests:
@@ -24,10 +30,8 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        python_version: [
-          "3.12",
-          "3.13"
-        ]
+        # Only 3.12-3.13 supported; already min/max so no reduction on PRs
+        python_version: ["3.12", "3.13"]
 
     steps:
       - name: Check out code

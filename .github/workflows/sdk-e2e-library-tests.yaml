@@ -69,13 +69,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python_version: [
-          "3.10",
-          "3.11",
-          "3.12",
-          "3.13",
-          "3.14",
-        ]
+        python_version: ${{ github.event_name == 'pull_request' && fromJSON(vars.PYTHON_VERSIONS_PR) || fromJSON(vars.PYTHON_VERSIONS_ALL) }}
 
     steps:
       - name: Checkout
