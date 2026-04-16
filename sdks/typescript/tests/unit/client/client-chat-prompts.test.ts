@@ -187,35 +187,20 @@ describe("OpikClient - Chat Prompts", () => {
       );
     });
 
-    it("should return unsynced chat prompt on OpikApiError", async () => {
+    it("should throw on OpikApiError", async () => {
       const messages: ChatMessage[] = [
         { role: "user", content: "Hello {{name}}" },
       ];
+      const apiError = new OpikApiError({ message: "Server error", statusCode: 500 });
 
-      vi.spyOn(client.api.prompts, "retrievePromptVersion").mockRejectedValue(
-        new OpikApiError({
-          message: "Server error",
-          statusCode: 500,
-        })
-      );
+      vi.spyOn(client.api.prompts, "retrievePromptVersion").mockRejectedValue(apiError);
 
-      const result = await client.createChatPrompt({
-        name: "error-chat-prompt",
-        messages,
-        metadata: { key: "value" },
-      });
-
-      expect(result).toBeInstanceOf(ChatPrompt);
-      expect(result.name).toBe("error-chat-prompt");
-      expect(result.messages).toEqual(messages);
-      expect(result.metadata).toEqual({ key: "value" });
-      expect(result.synced).toBe(false);
-      expect(result.id).toBeUndefined();
-      expect(result.versionId).toBeUndefined();
-      expect(result.commit).toBeUndefined();
+      await expect(
+        client.createChatPrompt({ name: "error-chat-prompt", messages })
+      ).rejects.toThrow(apiError);
     });
 
-    it("should return unsynced chat prompt on OpikApiTimeoutError", async () => {
+    it("should throw on OpikApiTimeoutError", async () => {
       const messages: ChatMessage[] = [
         { role: "system", content: "You are helpful" },
         { role: "user", content: "Help with {{task}}" },
@@ -225,16 +210,9 @@ describe("OpikClient - Chat Prompts", () => {
         new OpikApiTimeoutError("Request timed out")
       );
 
-      const result = await client.createChatPrompt({
-        name: "timeout-chat-prompt",
-        messages,
-      });
-
-      expect(result).toBeInstanceOf(ChatPrompt);
-      expect(result.name).toBe("timeout-chat-prompt");
-      expect(result.messages).toEqual(messages);
-      expect(result.synced).toBe(false);
-      expect(result.id).toBeUndefined();
+      await expect(
+        client.createChatPrompt({ name: "timeout-chat-prompt", messages })
+      ).rejects.toThrow(OpikApiTimeoutError);
     });
 
     it("should propagate non-API errors from createChatPrompt", async () => {
@@ -256,24 +234,15 @@ describe("OpikClient - Chat Prompts", () => {
         { role: "user", content: "Hello {{name}}" },
       ];
 
-      // Create unsynced prompt
-      vi.spyOn(client.api.prompts, "retrievePromptVersion").mockRejectedValueOnce(
-        new OpikApiError({ message: "Server error", statusCode: 500 })
-      );
-
-      const unsyncedPrompt = await client.createChatPrompt({
-        name: "retry-chat-prompt",
-        messages,
-      });
-
+      // Create an unsynced instance directly (no client needed at construction time)
+      const unsyncedPrompt = new ChatPrompt({ name: "retry-chat-prompt", messages }, client);
       expect(unsyncedPrompt.synced).toBe(false);
 
       // Spy on createChatPrompt to verify syncWithBackend delegates to it
       const createSpy = vi.spyOn(client, "createChatPrompt");
 
-      // syncWithBackend will call createChatPrompt, which will also fail (no new mocks)
-      // but we just verify it was called with the right args
-      await unsyncedPrompt.syncWithBackend();
+      // syncWithBackend will call createChatPrompt
+      await unsyncedPrompt.syncWithBackend().catch(() => {});
 
       expect(createSpy).toHaveBeenCalledWith(
         expect.objectContaining({
