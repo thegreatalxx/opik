@@ -89,6 +89,8 @@ export function resetDefaultProjectWarning() {
   defaultProjectWarningEmitted = false;
 }
 
+const AGENT_CONFIG_PROMPT_READY_TIMEOUT_MS = 5000;
+
 export class OpikClient {
   public api: OpikApiClientTemp;
   public config: OpikConfig;
@@ -1956,6 +1958,22 @@ export class OpikClient {
     }
   }
 
+  /** Waits for all unsynced BasePrompt values to be ready. Returns true if timed out. */
+  private async _awaitConfigPromptValues(values: Record<string, unknown>): Promise<boolean> {
+    const pending = Object.values(values)
+      .filter((v): v is BasePrompt => v instanceof BasePrompt && !v.synced)
+      .map((v) => v.ready());
+    if (pending.length === 0) return false;
+    const TIMED_OUT = Symbol();
+    const result = await Promise.race([
+      Promise.all(pending).then(() => undefined),
+      new Promise<typeof TIMED_OUT>((resolve) =>
+        setTimeout(() => resolve(TIMED_OUT), AGENT_CONFIG_PROMPT_READY_TIMEOUT_MS)
+      ),
+    ]);
+    return result === TIMED_OUT;
+  }
+
   private _makeFallbackConfig<T extends Record<string, unknown>>(
     fallback: T,
     maskId: string | undefined
@@ -2175,6 +2193,17 @@ export class OpikClient {
     const fallback = options?.fallback;
     const projectName = options?.projectName ?? this.config.projectName;
     const maskId = getActiveConfigMask() ?? undefined;
+
+    // Before hitting the backend, wait for any unsynced prompts in fallback.
+    // If they time out, treat it like a fetch failure and use fallback immediately.
+    if (fallback) {
+      const timedOut = await this._awaitConfigPromptValues(fallback as Record<string, unknown>);
+      if (timedOut) {
+        logger.warn("Timed out waiting for prompt sync before getOrCreateConfig; using fallback values.");
+        return this._makeFallbackConfig(fallback, maskId);
+      }
+    }
+
     const blueprintName = getActiveConfigBlueprintName() ?? undefined;
     // A runner context that pins a blueprint name is an explicit request — no auto-create.
     const isExplicitBlueprintFromContext = blueprintName !== undefined;

@@ -3,11 +3,10 @@ import { BasePrompt } from "@/prompt/BasePrompt";
 import type { SupportedValue } from "@/typeHelpers";
 import { inferBackendType, serializeValue } from "@/typeHelpers";
 
-const AGENT_CONFIG_PROMPT_READY_TIMEOUT_MS = 5000;
-
 function toMetadataValue(value: unknown, backendType: string): unknown {
   if (value === null || value === undefined) return undefined;
   if (backendType === "prompt") {
+    // If the prompt hasn't synced yet (no commit), use undefined as fallback
     return (value as BasePrompt).commit ?? undefined;
   }
   if (backendType === "prompt_commit") {
@@ -84,16 +83,20 @@ export function createTypedConfig<T extends Record<string, unknown>>(
   return proxy as Config<T>;
 }
 
-function buildMetadata(opts: {
+function injectTraceMetadata(opts: {
   blueprintId: string | undefined;
   blueprintVersion: string | undefined;
   maskId: string | undefined;
   fieldNames: Set<string>;
   values: Record<string, unknown>;
-}): Record<string, unknown> {
+}): void {
+  const ctx = getTrackContext();
+  if (!ctx) return;
+
   const { blueprintId, blueprintVersion, maskId, fieldNames, values } = opts;
 
   const valuesMetadata: Record<string, { value: unknown; type: string }> = {};
+
   for (const fieldName of fieldNames) {
     const value = values[fieldName];
     if (value === undefined) continue;
@@ -112,44 +115,8 @@ function buildMetadata(opts: {
   if (maskId !== undefined) {
     agentConfiguration["_mask_id"] = maskId;
   }
-  return { agent_configuration: agentConfiguration };
-}
+  const metadata = { agent_configuration: agentConfiguration };
 
-function injectTraceMetadata(opts: {
-  blueprintId: string | undefined;
-  blueprintVersion: string | undefined;
-  maskId: string | undefined;
-  fieldNames: Set<string>;
-  values: Record<string, unknown>;
-}): void {
-  const ctx = getTrackContext();
-  if (!ctx) return;
-
-  // Collect ready() promises for any prompt fields still syncing
-  const pendingReady: Promise<void>[] = [];
-  for (const fieldName of opts.fieldNames) {
-    const value = opts.values[fieldName];
-    if (value instanceof BasePrompt && !value.synced) {
-      pendingReady.push(value.ready());
-    }
-  }
-
-  if (pendingReady.length > 0) {
-    const timeout = new Promise<void>((resolve) =>
-      setTimeout(resolve, AGENT_CONFIG_PROMPT_READY_TIMEOUT_MS)
-    );
-    // Defer injection until all prompts have synced or timeout elapses; on timeout
-    // use fallback — unsynced prompt fields will have undefined commit in metadata
-    Promise.race([Promise.all(pendingReady), timeout])
-      .then(() => {
-        const metadata = buildMetadata(opts);
-        ctx.span.update({ metadata });
-        ctx.trace.update({ metadata });
-      });
-    return;
-  }
-
-  const metadata = buildMetadata(opts);
   ctx.span.update({ metadata });
   ctx.trace.update({ metadata });
 }

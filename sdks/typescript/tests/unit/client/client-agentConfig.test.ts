@@ -739,3 +739,63 @@ describe("getOrCreateConfig option exclusivity", () => {
     ).rejects.toThrow("Only one of 'version' or 'env'");
   });
 });
+
+describe("getOrCreateConfig — prompt readiness before backend call", () => {
+  let client: Opik;
+
+  beforeEach(() => {
+    client = new Opik({ projectName: "test-project" });
+    vi.spyOn(client.api.projects, "retrieveProject").mockResolvedValue(
+      { id: "project-id", name: "test-project" } as never
+    );
+    vi.spyOn(client.api.agentConfigs, "getLatestBlueprint").mockImplementation(mockAPIFunction);
+    vi.spyOn(client.api.agentConfigs, "getBlueprintByEnv").mockImplementation(mockAPIFunction);
+  });
+
+  function callInsideTrack<T extends Record<string, unknown>>(fallback: T) {
+    return trackStorage.run(
+      { span: { update: vi.fn() }, trace: { update: vi.fn() } } as unknown as Parameters<typeof trackStorage.run>[0],
+      () => client.getOrCreateConfig({ fallback })
+    );
+  }
+
+  function makeSyncedPromptLike(): InstanceType<typeof Prompt> {
+    const obj = Object.create(Prompt.prototype) as InstanceType<typeof Prompt>;
+    Object.defineProperty(obj, "synced", { get: () => true, configurable: true });
+    Object.defineProperty(obj, "commit", { get: () => "commit-abc", configurable: true });
+    return obj;
+  }
+
+  function makeNeverSyncingPromptLike(): InstanceType<typeof Prompt> {
+    const obj = Object.create(Prompt.prototype) as InstanceType<typeof Prompt>;
+    Object.defineProperty(obj, "synced", { get: () => false, configurable: true });
+    Object.defineProperty(obj, "commit", { get: () => undefined, configurable: true });
+    Object.defineProperty(obj, "ready", { value: () => new Promise<void>(() => {}), configurable: true });
+    return obj;
+  }
+
+  it("proceeds to backend when all prompts are already synced", async () => {
+    const prompt = makeSyncedPromptLike();
+    await callInsideTrack({ system_prompt: prompt });
+
+    expect(client.api.agentConfigs.getBlueprintByEnv).toHaveBeenCalled();
+  });
+
+  it("uses fallback immediately when prompt sync times out before backend call", async () => {
+    vi.useFakeTimers();
+
+    const prompt = makeNeverSyncingPromptLike();
+    const promise = callInsideTrack({ system_prompt: prompt });
+
+    // Advance past AGENT_CONFIG_PROMPT_READY_TIMEOUT_MS (5000ms)
+    await vi.advanceTimersByTimeAsync(5001);
+    const config = await promise;
+
+    // Backend was NOT called — timed out before reaching it
+    expect(client.api.agentConfigs.getBlueprintByEnv).not.toHaveBeenCalled();
+    expect(config.isFallback).toBe(true);
+    expect(config.system_prompt).toBe(prompt);
+
+    vi.useRealTimers();
+  });
+});
