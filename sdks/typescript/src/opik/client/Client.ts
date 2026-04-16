@@ -1204,6 +1204,7 @@ export class OpikClient {
             tags: options.tags,
             synced: false,
             projectName: resolvedProjectName,
+            skipAutoSync: true,
           },
           this
         ),
@@ -1272,6 +1273,7 @@ export class OpikClient {
             tags: options.tags,
             synced: false,
             projectName: resolvedProjectName,
+            skipAutoSync: true,
           },
           this
         ),

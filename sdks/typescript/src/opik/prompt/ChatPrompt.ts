@@ -48,36 +48,22 @@ export class ChatPrompt extends BasePrompt {
     this.messages = data.messages;
     this.chatTemplate = new ChatPromptTemplate(data.messages, this.type);
 
-    if (!data.synced) {
+    if (!data.synced && !data.skipAutoSync) {
       this._pendingSync = this._performSync();
     }
   }
 
-  private async _performSync(): Promise<void> {
-    try {
-      const synced = await this.opik.createChatPrompt({
+  private _performSync(): Promise<void> {
+    return this._syncViaCreate(() =>
+      this.opik.createChatPrompt({
         name: this._name,
         messages: structuredClone(this.messages),
         metadata: this._metadata,
         type: this.type,
         description: this._description,
         tags: this._tags.length ? Array.from(this._tags) : undefined,
-      });
-      this.updateSyncState({
-        promptId: synced.id,
-        versionId: synced.versionId,
-        commit: synced.commit,
-        changeDescription: synced.changeDescription,
-        tags: synced.tags ? Array.from(synced.tags) : undefined,
-      });
-    } catch (error) {
-      logger.warn(
-        `Failed to sync chat prompt '${this._name}' with the backend. ` +
-          "The prompt will work locally but is not persisted on the server. " +
-          "You can retry by calling .syncWithBackend().",
-        { error },
-      );
-    }
+      }),
+    );
   }
 
   /**

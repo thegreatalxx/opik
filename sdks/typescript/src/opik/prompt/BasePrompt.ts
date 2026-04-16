@@ -21,6 +21,8 @@ export interface BasePromptData {
   templateStructure?: PromptTemplateStructure;
   synced?: boolean;
   projectName?: string;
+  /** @internal Prevents automatic background sync from firing in the constructor. */
+  skipAutoSync?: boolean;
 }
 
 /**
@@ -90,6 +92,41 @@ export abstract class BasePrompt {
       this._tags = result.tags;
     }
     this._synced = true;
+  }
+
+  /**
+   * Shared background-sync helper for subclass constructors.
+   * Calls the provided create function, then only updates sync state when the
+   * returned instance is truly synced (has id, versionId, and commit populated).
+   * If the create call throws, or returns an unsynced instance, _synced stays false.
+   */
+  protected async _syncViaCreate<T extends BasePrompt>(
+    create: () => Promise<T>,
+  ): Promise<void> {
+    try {
+      const result = await create();
+      if (result.synced && result.id && result.versionId && result.commit) {
+        this.updateSyncState({
+          promptId: result.id,
+          versionId: result.versionId,
+          commit: result.commit,
+          changeDescription: result.changeDescription,
+          tags: result.tags ? Array.from(result.tags) : undefined,
+        });
+      } else {
+        logger.warn(
+          `Prompt '${this._name}' was not persisted on the server. ` +
+            "You can retry by calling .syncWithBackend().",
+        );
+      }
+    } catch (error) {
+      logger.warn(
+        `Failed to sync prompt '${this._name}' with the backend. ` +
+          "The prompt will work locally but is not persisted on the server. " +
+          "You can retry by calling .syncWithBackend().",
+        { error },
+      );
+    }
   }
 
   /**

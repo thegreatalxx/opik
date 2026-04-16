@@ -40,36 +40,22 @@ export class Prompt extends BasePrompt {
     );
     this.prompt = data.prompt;
 
-    if (!data.synced) {
+    if (!data.synced && !data.skipAutoSync) {
       this._pendingSync = this._performSync();
     }
   }
 
-  private async _performSync(): Promise<void> {
-    try {
-      const synced = await this.opik.createPrompt({
+  private _performSync(): Promise<void> {
+    return this._syncViaCreate(() =>
+      this.opik.createPrompt({
         name: this._name,
         prompt: this.prompt,
         metadata: this._metadata,
         type: this.type,
         description: this._description,
         tags: this._tags.length ? Array.from(this._tags) : undefined,
-      });
-      this.updateSyncState({
-        promptId: synced.id,
-        versionId: synced.versionId,
-        commit: synced.commit,
-        changeDescription: synced.changeDescription,
-        tags: synced.tags ? Array.from(synced.tags) : undefined,
-      });
-    } catch (error) {
-      logger.warn(
-        `Failed to sync prompt '${this._name}' with the backend. ` +
-          "The prompt will work locally but is not persisted on the server. " +
-          "You can retry by calling .syncWithBackend().",
-        { error },
-      );
-    }
+      }),
+    );
   }
 
   /**
