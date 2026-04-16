@@ -5,6 +5,12 @@ permissions:
 
 on:
   workflow_call:
+    inputs:
+      include_guardrails:
+        description: "Build and include guardrails-backend image"
+        required: false
+        default: false
+        type: boolean
 
 jobs:
   build:
@@ -12,7 +18,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     concurrency:
-      group: build-e2e-docker-${{ github.sha }}
+      group: build-e2e-docker-${{ github.sha }}${{ inputs.include_guardrails == true && '-guardrails' || '' }}
       cancel-in-progress: false
     steps:
       - name: Restore Docker images from cache
@@ -20,7 +26,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: /tmp/opik-images.tar.gz
-          key: opik-docker-images-${{ github.sha }}
+          key: opik-docker-images-${{ github.sha }}${{ inputs.include_guardrails == true && '-guardrails' || '' }}
 
       - name: Checkout
         if: steps.cache.outputs.cache-hit != 'true'
@@ -31,24 +37,28 @@ jobs:
         env:
           COMPOSE_BAKE: false
         run: |
+          SERVICES="backend python-backend"
+          if [ "${{ inputs.include_guardrails }}" = "true" ]; then
+            SERVICES="$SERVICES guardrails-backend"
+          fi
           docker compose -f deployment/docker-compose/docker-compose.yaml \
-            build backend python-backend guardrails-backend
+            build $SERVICES
 
       - name: Save E2E Docker images
         if: steps.cache.outputs.cache-hit != 'true'
         run: |
-          docker save \
-            ghcr.io/comet-ml/opik/opik-backend:latest \
-            ghcr.io/comet-ml/opik/opik-python-backend:latest \
-            ghcr.io/comet-ml/opik/opik-guardrails-backend:latest \
-            | gzip > /tmp/opik-images.tar.gz
+          IMAGES="ghcr.io/comet-ml/opik/opik-backend:latest ghcr.io/comet-ml/opik/opik-python-backend:latest"
+          if [ "${{ inputs.include_guardrails }}" = "true" ]; then
+            IMAGES="$IMAGES ghcr.io/comet-ml/opik/opik-guardrails-backend:latest"
+          fi
+          docker save $IMAGES | gzip > /tmp/opik-images.tar.gz
 
       - name: Save Docker images to cache
         if: steps.cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
         with:
           path: /tmp/opik-images.tar.gz
-          key: opik-docker-images-${{ github.sha }}
+          key: opik-docker-images-${{ github.sha }}${{ inputs.include_guardrails == true && '-guardrails' || '' }}
 
       - name: Upload E2E Docker images
         uses: actions/upload-artifact@v7
