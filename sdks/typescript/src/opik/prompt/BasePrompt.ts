@@ -21,8 +21,6 @@ export interface BasePromptData {
   templateStructure?: PromptTemplateStructure;
   synced?: boolean;
   projectName?: string;
-  /** @internal Prevents automatic background sync from firing in the constructor. */
-  skipAutoSync?: boolean;
 }
 
 /**

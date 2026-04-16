@@ -40,7 +40,7 @@ export class Prompt extends BasePrompt {
     );
     this.prompt = data.prompt;
 
-    if (!data.synced && !data.skipAutoSync) {
+    if (!data.synced) {
       this._pendingSync = this._performSync();
     }
   }
