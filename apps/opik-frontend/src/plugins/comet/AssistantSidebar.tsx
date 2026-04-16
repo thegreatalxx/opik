@@ -540,6 +540,7 @@ const AssistantSidebar: React.FC<AssistantSidebarProps> = ({
 
   return (
     <iframe
+      key={surface}
       ref={setIframeRef}
       src={meta.shellUrl}
       className="size-full border-none"
