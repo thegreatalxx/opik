@@ -267,14 +267,28 @@ def test_detect_conda_via_environment_yaml(tmp_path: Path) -> None:
 
 
 def test_detect_daemon_venv(tmp_path: Path) -> None:
+    """Daemon venv is accepted when sys.prefix is under repo_root."""
+    daemon_prefix = str(tmp_path / "daemon_venv")
     with (
-        patch.object(sys, "prefix", "/some/venv"),
+        patch.object(sys, "prefix", daemon_prefix),
         patch.object(sys, "base_prefix", "/usr"),
     ):
         result = _detect_python_env(tmp_path, None)
     assert result["python_env_type"] == "venv"
     assert result["python_env_source"] == "daemon"
     assert result["python_executable"] == sys.executable
+
+
+def test_detect_daemon_venv_outside_repo_falls_through(tmp_path: Path) -> None:
+    """Daemon venv outside repo_root (e.g. pipx, uv tool) is not a project env."""
+    with (
+        patch.object(sys, "prefix", "/home/user/.local/share/pipx/venvs/opik"),
+        patch.object(sys, "base_prefix", "/usr"),
+    ):
+        result = _detect_python_env(tmp_path, None)
+    # Should fall through to system, not claim "daemon" venv
+    assert result["python_env_type"] == "system"
+    assert result["python_env_source"] == "fallback"
 
 
 def test_detect_system_fallback(tmp_path: Path) -> None:

@@ -113,6 +113,15 @@ def _detect_python_env(repo_root: Path, command: Optional[List[str]]) -> PythonE
     Returns the best Python executable path, environment type, and how it
     was detected.  Priority: command argument > env vars > project directory
     markers > daemon introspection > system fallback.
+
+    Detection is scoped to *repo_root* (the directory where ``opik connect``
+    or ``opik endpoint`` was launched).  We intentionally do NOT walk parent
+    directories because the bridge sandbox restricts file-tool access
+    (ReadFile, WriteFile, EditFile, ListFiles, SearchFiles) to repo_root
+    and below.  A venv found above repo_root would be unusable: Ollie
+    couldn't read or edit the project files that live alongside it, so
+    instrumentation would fail.  If the user starts ``opik connect`` from
+    a subdirectory, the correct fix is to re-run from the project root.
     """
 
     # 1. Command signal — e.g. opik endpoint -- .venv/bin/python app.py
@@ -196,8 +205,14 @@ def _detect_python_env(repo_root: Path, command: Optional[List[str]]) -> PythonE
             python_env_source="project_dir",
         )
 
-    # 7. Daemon itself is running in a venv
-    if sys.prefix != sys.base_prefix:
+    # 7. Daemon itself is running in a project-local venv
+    #    Only claim "daemon venv" when the venv is under repo_root.  If the
+    #    daemon was installed via pipx or `uv tool install`, sys.prefix
+    #    points to the tool's isolated venv (e.g. ~/.local/share/pipx/venvs/
+    #    opik/) which has nothing to do with the user's project.  Letting
+    #    that fall through to the system fallback is correct — the tool venv
+    #    is not a usable project environment.
+    if sys.prefix != sys.base_prefix and _is_under(Path(sys.prefix), repo_root):
         return PythonEnvInfo(
             python_executable=sys.executable,
             python_env_type="venv",
