@@ -7,9 +7,8 @@ import { PromptVersion } from "@/prompt/PromptVersion";
 
 function makePromptLike(commit: string | undefined): BasePrompt {
   const obj = Object.create(BasePrompt.prototype);
-  // TypeScript `private` fields compile to regular properties at runtime
-  (obj as Record<string, unknown>)["_commit"] = commit;
-  (obj as Record<string, unknown>)["_versionId"] = "version-id-123";
+  Object.defineProperty(obj, "commit", { get: () => commit, configurable: true });
+  Object.defineProperty(obj, "versionId", { get: () => "version-id-123", configurable: true });
   return obj;
 }
 

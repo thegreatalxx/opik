@@ -1,5 +1,5 @@
 import { ConstructorOpikConfig, loadConfig, OpikConfig } from "@/config/Config";
-import { OpikApiError, OpikApiTimeoutError, serialization } from "@/rest_api";
+import { OpikApiError, serialization } from "@/rest_api";
 import type { ExperimentPublic, Trace as ITrace } from "@/rest_api/api";
 import * as OpikApi from "@/rest_api/api";
 import { FeedbackScoreBatchItemSource } from "@/rest_api/api/types/FeedbackScoreBatchItemSource";

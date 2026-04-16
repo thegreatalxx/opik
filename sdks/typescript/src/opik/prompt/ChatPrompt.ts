@@ -28,15 +28,12 @@ export class ChatPrompt extends BasePrompt {
 
   /**
    * Creates a new ChatPrompt instance.
-   *
-   * When called without an `opik` client, the global client is used and the prompt
-   * is synced with the backend in the background. Call `await chatPrompt.ready()` before
-   * using operations that require the prompt to be synced (getVersions, delete, etc.).
-   *
-   * @param opik - @deprecated Pass no client and use `setGlobalClient()` to configure
-   *   the global client instead. When provided, this client is used for all operations
-   *   on this prompt instance (backward-compatible).
+   * The global client is used and the prompt is synced with the backend in the background.
+   * Call `await chatPrompt.ready()` before using operations that require sync (getVersions, delete, etc.).
    */
+  constructor(data: ChatPromptData);
+  /** @deprecated Passing an opik client is deprecated. */
+  constructor(data: ChatPromptData, opik: OpikClient);
   constructor(data: ChatPromptData, opik?: OpikClient) {
     super(
       {

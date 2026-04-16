@@ -21,15 +21,12 @@ export class Prompt extends BasePrompt {
 
   /**
    * Creates a new Prompt instance.
-   *
-   * When called without an `opik` client, the global client is used and the prompt
-   * is synced with the backend in the background. Call `await prompt.ready()` before
-   * using operations that require the prompt to be synced (getVersions, delete, etc.).
-   *
-   * @param opik - @deprecated Pass no client and use `setGlobalClient()` to configure
-   *   the global client instead. When provided, this client is used for all operations
-   *   on this prompt instance (backward-compatible).
+   * The global client is used and the prompt is synced with the backend in the background.
+   * Call `await prompt.ready()` before using operations that require sync (getVersions, delete, etc.).
    */
+  constructor(data: PromptData);
+  /** @deprecated Passing an opik client is deprecated. */
+  constructor(data: PromptData, opik: OpikClient);
   constructor(data: PromptData, opik?: OpikClient) {
     super(
       {

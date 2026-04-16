@@ -111,8 +111,8 @@ describe("Config", () => {
 describe("Config — prompt field serialisation in metadata", () => {
   function makePromptLike(commit: string): BasePrompt {
     const obj = Object.create(BasePrompt.prototype);
-    (obj as Record<string, unknown>)["_commit"] = commit;
-    (obj as Record<string, unknown>)["_versionId"] = "v-id-1";
+    Object.defineProperty(obj, "commit", { get: () => commit, configurable: true });
+    Object.defineProperty(obj, "versionId", { get: () => "v-id-1", configurable: true });
     return obj;
   }
 
