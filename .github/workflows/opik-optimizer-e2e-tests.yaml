@@ -26,8 +26,6 @@ env:
 jobs:
     build-opik:
         uses: ./.github/workflows/build_e2e_docker.yaml
-        with:
-          include_guardrails: true
 
     run-e2e-tests:
         name: Opik Optimizer E2E Tests Python ${{matrix.python_version}}

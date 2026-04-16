@@ -35,8 +35,6 @@ env:
 jobs:
     build-opik:
         uses: ./.github/workflows/build_e2e_docker.yaml
-        with:
-          include_guardrails: true
 
     run-compatibility-v1-e2e:
         name: Python SDK Compatibility V1.x E2E Tests ${{matrix.python_version}}
