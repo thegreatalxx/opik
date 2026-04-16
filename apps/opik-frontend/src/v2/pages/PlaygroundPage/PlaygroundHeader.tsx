@@ -266,6 +266,9 @@ const PlaygroundHeader = ({
           : datasetName
         : "Loading...";
 
+      const TypeIcon =
+        currentDatasetType === DATASET_TYPE.TEST_SUITE ? ListChecks : Database;
+
       return (
         <div className="flex h-6 items-center rounded-md border bg-background">
           <button
@@ -274,11 +277,7 @@ const PlaygroundHeader = ({
               setRunOnDatasetType(currentDatasetType ?? DATASET_TYPE.TEST_SUITE)
             }
           >
-            {currentDatasetType === DATASET_TYPE.TEST_SUITE ? (
-              <ListChecks className="size-3.5 shrink-0 text-library-loaded" />
-            ) : (
-              <Database className="size-3.5 shrink-0 text-library-loaded" />
-            )}
+            <TypeIcon className="size-3.5 shrink-0 text-library-loaded" />
             <span className="comet-body-xs max-w-[200px] truncate">
               {chipLabel}
             </span>
