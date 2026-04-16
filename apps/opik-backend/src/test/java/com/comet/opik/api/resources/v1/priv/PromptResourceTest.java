@@ -1038,7 +1038,10 @@ class PromptResourceTest {
                     .projectId(null)
                     .build();
 
-            Prompt duplicatedPrompt = buildPrompt().build();
+            var projectId = projectResourceClient.createProject(
+                    "project-" + UUID.randomUUID(), API_KEY, TEST_WORKSPACE);
+
+            Prompt duplicatedPrompt = buildPrompt().projectId(projectId).build();
             createPrompt(duplicatedPrompt, API_KEY, TEST_WORKSPACE);
 
             return Stream.of(
@@ -1124,12 +1127,17 @@ class PromptResourceTest {
         @DisplayName("when updating prompt name to an existing one, then return conflict")
         void when__updatingPromptNameToAnExistingOne__thenReturnConflict() {
 
+            var projectId = projectResourceClient.createProject(
+                    "project-" + UUID.randomUUID(), API_KEY, TEST_WORKSPACE);
+
             var prompt = buildPrompt()
+                    .projectId(projectId)
                     .lastUpdatedBy(USER)
                     .createdBy(USER)
                     .build();
 
             var prompt2 = buildPrompt()
+                    .projectId(projectId)
                     .lastUpdatedBy(USER)
                     .createdBy(USER)
                     .build();
