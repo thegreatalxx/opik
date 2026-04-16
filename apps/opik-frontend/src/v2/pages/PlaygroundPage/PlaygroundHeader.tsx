@@ -274,7 +274,7 @@ const PlaygroundHeader = ({
           <button
             className="flex items-center gap-1.5 px-2 text-muted-slate hover:text-primary-hover"
             onClick={() =>
-              setRunOnDatasetType(currentDatasetType ?? DATASET_TYPE.TEST_SUITE)
+              setRunOnDatasetType(currentDatasetType ?? DATASET_TYPE.DATASET)
             }
           >
             <TypeIcon className="size-3.5 shrink-0 text-library-loaded" />
