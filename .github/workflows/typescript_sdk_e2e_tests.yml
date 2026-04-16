@@ -29,8 +29,12 @@ env:
   OPIK_URL_OVERRIDE: http://localhost:8080
   OPIK_CONSOLE_LOGGING_LEVEL: DEBUG
 jobs:
+  build-opik:
+    uses: ./.github/workflows/build_e2e_docker.yaml
+
   run-e2e:
     name: TypeScript SDK E2E Tests Node ${{matrix.node_version}}
+    needs: build-opik
     permissions:
       contents: read
       checks: write
@@ -46,6 +50,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
+      - name: Download Docker images
+        uses: actions/download-artifact@v4
+        with:
+          name: opik-docker-images
+          path: /tmp
+
+      - name: Load Docker images
+        run: docker load < /tmp/opik-images.tar.gz
+
       - name: Set up Node.js ${{matrix.node_version}}
         uses: actions/setup-node@v4.2.0
         with:
@@ -56,9 +69,11 @@ jobs:
           OPIK_USAGE_REPORT_ENABLED: false
           COMPOSE_BAKE: false
           TOGGLE_RUNNERS_ENABLED: "true"
+          OPIK_BACKEND_PULL_POLICY: never
+          PYTHON_BACKEND_PULL_POLICY: never
         run: |
           cd ${{ github.workspace }}
-          ./opik.sh --backend --port-mapping --build
+          ./opik.sh --backend --port-mapping
 
       - name: Check Opik server availability
         shell: bash

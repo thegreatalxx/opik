@@ -1,0 +1,45 @@
+name: Build E2E Docker Images
+
+on:
+  workflow_call:
+    inputs:
+      include_guardrails:
+        description: "Build and include guardrails-backend image"
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  build:
+    name: Build E2E Docker Images
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Build E2E Docker images
+        env:
+          COMPOSE_BAKE: false
+        run: |
+          SERVICES="backend python-backend"
+          if [ "${{ inputs.include_guardrails }}" = "true" ]; then
+            SERVICES="$SERVICES guardrails-backend"
+          fi
+          docker compose -f deployment/docker-compose/docker-compose.yaml \
+            build $SERVICES
+
+      - name: Save E2E Docker images
+        run: |
+          IMAGES="ghcr.io/comet-ml/opik/opik-backend:latest ghcr.io/comet-ml/opik/opik-python-backend:latest"
+          if [ "${{ inputs.include_guardrails }}" = "true" ]; then
+            IMAGES="$IMAGES ghcr.io/comet-ml/opik/opik-guardrails-backend:latest"
+          fi
+          docker save $IMAGES | gzip > /tmp/opik-images.tar.gz
+
+      - name: Upload E2E Docker images
+        uses: actions/upload-artifact@v7
+        with:
+          name: opik-docker-images
+          path: /tmp/opik-images.tar.gz
+          retention-days: 1
