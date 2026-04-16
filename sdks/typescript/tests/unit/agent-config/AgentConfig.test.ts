@@ -113,6 +113,7 @@ describe("Config — prompt field serialisation in metadata", () => {
     const obj = Object.create(BasePrompt.prototype);
     Object.defineProperty(obj, "commit", { get: () => commit, configurable: true });
     Object.defineProperty(obj, "versionId", { get: () => "v-id-1", configurable: true });
+    Object.defineProperty(obj, "synced", { get: () => true, configurable: true });
     return obj;
   }
 
@@ -198,6 +199,47 @@ describe("Config — prompt field serialisation in metadata", () => {
     const call = updateSpy.mock.calls[0][0];
     // undefined values are skipped entirely
     expect(call.metadata.agent_configuration.values["system_prompt"]).toBeUndefined();
+  });
+
+  it("defers metadata injection until ready() resolves for an unsynced prompt", async () => {
+    let resolveReady!: () => void;
+    const readyPromise = new Promise<void>((res) => { resolveReady = res; });
+
+    const unsyncedPrompt = Object.create(BasePrompt.prototype) as BasePrompt;
+    Object.defineProperty(unsyncedPrompt, "commit", { get: () => "commit-deferred", configurable: true });
+    Object.defineProperty(unsyncedPrompt, "versionId", { get: () => "v-id-deferred", configurable: true });
+    Object.defineProperty(unsyncedPrompt, "synced", { get: () => false, configurable: true });
+    Object.defineProperty(unsyncedPrompt, "ready", { value: () => readyPromise, configurable: true });
+
+    const updateSpy = vi.fn();
+    const mockCtx = { span: { update: updateSpy }, trace: { update: updateSpy } };
+    const names = new Set(["system_prompt"]);
+
+    trackStorage.run(mockCtx as unknown as Parameters<typeof trackStorage.run>[0], () => {
+      const cfg = createTypedConfig({
+        values: { system_prompt: unsyncedPrompt },
+        fieldNames: names,
+        blueprintId: "bp-1",
+        blueprintVersion: "v1",
+        isFallback: false,
+        maskId: undefined,
+      });
+      void cfg.system_prompt;
+    });
+
+    // Not yet injected — prompt was still syncing
+    expect(updateSpy).not.toHaveBeenCalled();
+
+    // Simulate sync completing
+    resolveReady();
+    await readyPromise;
+    await Promise.resolve(); // flush microtask
+
+    expect(updateSpy).toHaveBeenCalled();
+    const call = updateSpy.mock.calls[0][0];
+    const fieldEntry = call.metadata.agent_configuration.values["system_prompt"];
+    expect(fieldEntry.type).toBe("prompt");
+    expect(fieldEntry.value).toBe("commit-deferred");
   });
 });
 

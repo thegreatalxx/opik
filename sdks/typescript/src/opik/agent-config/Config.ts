@@ -1,4 +1,5 @@
 import { getTrackContext } from "@/decorators/track";
+import { BasePrompt } from "@/prompt/BasePrompt";
 import type { SupportedValue } from "@/typeHelpers";
 import { inferBackendType, serializeValue } from "@/typeHelpers";
 
@@ -78,20 +79,16 @@ export function createTypedConfig<T extends Record<string, unknown>>(
   return proxy as Config<T>;
 }
 
-function injectTraceMetadata(opts: {
+function buildMetadata(opts: {
   blueprintId: string | undefined;
   blueprintVersion: string | undefined;
   maskId: string | undefined;
   fieldNames: Set<string>;
   values: Record<string, unknown>;
-}): void {
-  const ctx = getTrackContext();
-  if (!ctx) return;
-
+}): Record<string, unknown> {
   const { blueprintId, blueprintVersion, maskId, fieldNames, values } = opts;
 
   const valuesMetadata: Record<string, { value: unknown; type: string }> = {};
-
   for (const fieldName of fieldNames) {
     const value = values[fieldName];
     if (value === undefined) continue;
@@ -110,8 +107,41 @@ function injectTraceMetadata(opts: {
   if (maskId !== undefined) {
     agentConfiguration["_mask_id"] = maskId;
   }
-  const metadata = { agent_configuration: agentConfiguration };
+  return { agent_configuration: agentConfiguration };
+}
 
+function injectTraceMetadata(opts: {
+  blueprintId: string | undefined;
+  blueprintVersion: string | undefined;
+  maskId: string | undefined;
+  fieldNames: Set<string>;
+  values: Record<string, unknown>;
+}): void {
+  const ctx = getTrackContext();
+  if (!ctx) return;
+
+  // Collect ready() promises for any prompt fields still syncing
+  const pendingReady: Promise<void>[] = [];
+  for (const fieldName of opts.fieldNames) {
+    const value = opts.values[fieldName];
+    if (value instanceof BasePrompt && !value.synced) {
+      pendingReady.push(value.ready());
+    }
+  }
+
+  if (pendingReady.length > 0) {
+    // Defer injection until all prompts have synced, using the captured ctx
+    Promise.all(pendingReady)
+      .then(() => {
+        const metadata = buildMetadata(opts);
+        ctx.span.update({ metadata });
+        ctx.trace.update({ metadata });
+      })
+      .catch(() => {});
+    return;
+  }
+
+  const metadata = buildMetadata(opts);
   ctx.span.update({ metadata });
   ctx.trace.update({ metadata });
 }
