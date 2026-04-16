@@ -17,9 +17,6 @@ jobs:
     name: Build E2E Docker Images
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    concurrency:
-      group: build-e2e-docker-${{ github.sha }}${{ inputs.include_guardrails == true && '-guardrails' || '' }}
-      cancel-in-progress: false
     steps:
       - name: Restore Docker images from cache
         id: cache
