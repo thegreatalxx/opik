@@ -102,89 +102,68 @@ jobs:
     if: contains(fromJSON('["openai", "all"]'), needs.init_environment.outputs.LIBS)
     uses: ./.github/workflows/lib-openai-tests.yml
     with:
-      full_matrix: ${{ github.event_name != 'pull_request' }}
       # Run expensive tests on weekly schedule (Sunday) or when manually requested
       run_expensive_tests: ${{ (github.event_name == 'schedule' && github.event.schedule == '0 0 * * 0') || github.event.inputs.run_expensive_tests == 'true' }}
     secrets: inherit
-  
+
   langchain_tests:
     needs: [init_environment]
     if: contains(fromJSON('["langchain", "all"]'), needs.init_environment.outputs.LIBS)
     uses: ./.github/workflows/lib-langchain-tests.yml
-    with:
-      full_matrix: ${{ github.event_name != 'pull_request' }}
     secrets: inherit
   
   langchain_legacy_tests:
     needs: [init_environment]
     if: contains(fromJSON('["langchain_legacy", "all"]'), needs.init_environment.outputs.LIBS)
     uses: ./.github/workflows/lib-langchain-legacy-tests.yml
-    with:
-      full_matrix: ${{ github.event_name != 'pull_request' }}
     secrets: inherit
   
   llama_index_tests:
     needs: [init_environment]
     if: contains(fromJSON('["llama_index", "all"]'), needs.init_environment.outputs.LIBS)
     uses: ./.github/workflows/lib-llama-index-tests.yml
-    with:
-      full_matrix: ${{ github.event_name != 'pull_request' }}
     secrets: inherit
 
   anthropic_tests:
     needs: [init_environment]
     if: contains(fromJSON('["anthropic", "all"]'), needs.init_environment.outputs.LIBS)
     uses: ./.github/workflows/lib-anthropic-tests.yml
-    with:
-      full_matrix: ${{ github.event_name != 'pull_request' }}
     secrets: inherit
 
   aisuite_tests:
     needs: [init_environment]
     if: contains(fromJSON('["aisuite", "all"]'), needs.init_environment.outputs.LIBS)
     uses: ./.github/workflows/lib-aisuite-tests.yml
-    with:
-      full_matrix: ${{ github.event_name != 'pull_request' }}
     secrets: inherit
 
   haystack_tests:
     needs: [init_environment]
     if: contains(fromJSON('["haystack", "all"]'), needs.init_environment.outputs.LIBS)
     uses: ./.github/workflows/lib-haystack-tests.yml
-    with:
-      full_matrix: ${{ github.event_name != 'pull_request' }}
     secrets: inherit
 
   guardrails_tests:
     needs: [init_environment]
     if: contains(fromJSON('["guardrails", "all"]'), needs.init_environment.outputs.LIBS)
     uses: ./.github/workflows/lib-guardrails-tests.yml
-    with:
-      full_matrix: ${{ github.event_name != 'pull_request' }}
     secrets: inherit
 
   dspy_tests:
     needs: [init_environment]
     if: contains(fromJSON('["dspy", "all"]'), needs.init_environment.outputs.LIBS)
     uses: ./.github/workflows/lib-dspy-tests.yml
-    with:
-      full_matrix: ${{ github.event_name != 'pull_request' }}
     secrets: inherit
 
   crewai_v0_tests:
     needs: [init_environment]
     if: contains(fromJSON('["crewai_v0", "all"]'), needs.init_environment.outputs.LIBS)
     uses: ./.github/workflows/lib-crewai-v0-tests.yml
-    with:
-      full_matrix: ${{ github.event_name != 'pull_request' }}
     secrets: inherit
 
   crewai_v1_tests:
     needs: [init_environment]
     if: contains(fromJSON('["crewai_v1", "all"]'), needs.init_environment.outputs.LIBS)
     uses: ./.github/workflows/lib-crewai-v1-tests.yml
-    with:
-      full_matrix: ${{ github.event_name != 'pull_request' }}
     secrets: inherit
   
   genai_tests:
@@ -192,7 +171,6 @@ jobs:
     if: contains(fromJSON('["genai", "all"]'), needs.init_environment.outputs.LIBS)
     uses: ./.github/workflows/lib-genai-tests.yml
     with:
-      full_matrix: ${{ github.event_name != 'pull_request' }}
       # Run expensive tests on weekly schedule (Sunday) or when manually requested
       run_expensive_tests: ${{ (github.event_name == 'schedule' && github.event.schedule == '0 0 * * 0') || github.event.inputs.run_expensive_tests == 'true' }}
     secrets: inherit
@@ -201,48 +179,36 @@ jobs:
     needs: [init_environment]
     if: contains(fromJSON('["adk", "all"]'), needs.init_environment.outputs.LIBS)
     uses: ./.github/workflows/lib-adk-tests.yml
-    with:
-      full_matrix: ${{ github.event_name != 'pull_request' }}
     secrets: inherit
 
   adk_legacy_1_3_0_tests:
     needs: [init_environment]
     if: contains(fromJSON('["adk_legacy_1_3_0", "all"]'), needs.init_environment.outputs.LIBS)
     uses: ./.github/workflows/lib-adk-legacy-1-3-0-tests.yml
-    with:
-      full_matrix: ${{ github.event_name != 'pull_request' }}
     secrets: inherit
 
   evaluation_metrics_tests:
     needs: [init_environment]
     if: contains(fromJSON('["metrics", "all"]'), needs.init_environment.outputs.LIBS)
     uses: ./.github/workflows/lib-metrics-with-llm-judge-tests.yml
-    with:
-      full_matrix: ${{ github.event_name != 'pull_request' }}
     secrets: inherit
 
   bedrock_tests:
     needs: [init_environment]
     if: contains(fromJSON('["bedrock", "all"]'), needs.init_environment.outputs.LIBS)
     uses: ./.github/workflows/lib-bedrock-tests.yml
-    with:
-      full_matrix: ${{ github.event_name != 'pull_request' }}
     secrets: inherit
 
   litellm_tests:
     needs: [init_environment]
     if: contains(fromJSON('["litellm", "all"]'), needs.init_environment.outputs.LIBS)
     uses: ./.github/workflows/lib-litellm-tests.yml
-    with:
-      full_matrix: ${{ github.event_name != 'pull_request' }}
     secrets: inherit
 
   harbor_tests:
     needs: [init_environment]
     if: contains(fromJSON('["harbor", "all"]'), needs.init_environment.outputs.LIBS)
     uses: ./.github/workflows/lib-harbor-tests.yml
-    with:
-      full_matrix: ${{ github.event_name != 'pull_request' }}
     secrets: inherit
 
   # ========================================

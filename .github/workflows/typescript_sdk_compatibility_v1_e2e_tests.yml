@@ -35,7 +35,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        node_version: ${{ github.event_name == 'pull_request' && fromJSON(vars.NODE_VERSIONS_PR) || fromJSON(vars.NODE_VERSIONS_ALL) }}
+        node_version: ${{ fromJSON(vars.NODE_VERSIONS) }}
 
     steps:
       - name: Checkout

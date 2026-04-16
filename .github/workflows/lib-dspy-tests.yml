@@ -13,12 +13,6 @@ env:
   OPIK_SENTRY_ENABLE: False
 on:
   workflow_call:
-    inputs:
-      full_matrix:
-        description: "Run all Python versions (true) or only min/max (false)"
-        required: false
-        type: boolean
-        default: true
 
 jobs:
   tests:
@@ -33,7 +27,7 @@ jobs:
       fail-fast: true
       matrix:
         # 3.14 is supported in 3.1.0b1 and up. Once 3.1.0 is released, we can add 3.14 to the matrix.
-        python_version: ${{ inputs.full_matrix && fromJSON('["3.10","3.11","3.12","3.13"]') || fromJSON('["3.10","3.13"]') }}
+        python_version: ["3.10", "3.11", "3.12", "3.13"]
 
     steps:
       - name: Check out code
