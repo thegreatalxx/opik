@@ -1,5 +1,8 @@
 name: Build E2E Docker Images
 
+permissions:
+  contents: read
+
 on:
   workflow_call:
     inputs:
