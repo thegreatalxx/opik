@@ -32,6 +32,17 @@ import {
   IS_ASSISTANT_DEV,
 } from "@/plugins/comet/constants/assistant";
 
+// DEBUG: temporary — remove after OPIK-5947 is verified
+let _instanceSeq = 0;
+function _dbg(tag: string, ...args: unknown[]) {
+  console.log(
+    `%c[ASB:${tag}]%c`,
+    "color:#e879f9;font-weight:bold",
+    "color:inherit",
+    ...args,
+  );
+}
+
 const BRIDGE_PROTOCOL_VERSION = 1;
 
 const LOADER_DEFAULT_WIDTH = 400;
@@ -364,6 +375,9 @@ const AssistantSidebar: React.FC<AssistantSidebarProps> = ({
   surface = "sidebar",
   onWidthChange,
 }) => {
+  // DEBUG: temporary — remove after OPIK-5947 is verified
+  const [instanceId] = useState(() => ++_instanceSeq);
+
   const {
     backendUrl,
     probeUrl,
@@ -458,21 +472,45 @@ const AssistantSidebar: React.FC<AssistantSidebarProps> = ({
   // switching between sidebar and page surface), it overwrites these globals
   // with its own bridge/meta. A later unmount of the previous instance must
   // NOT clobber the new values — only clear if the global still matches ours.
+  //
+  // React Query caches meta with staleTime: Infinity, so all instances share
+  // the same object reference. Spread into a per-instance copy so the ===
+  // cleanup guard only matches the instance that set it.
+  const instanceMeta = useMemo(
+    () => (meta ? { ...meta } : null),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [meta, instanceId],
+  );
+
   useEffect(() => {
     const bridge = bridgeRef.current;
     window.opikBridge = bridge;
-    if (meta) {
-      window.__opikAssistantMeta__ = meta;
+    if (instanceMeta) {
+      window.__opikAssistantMeta__ = instanceMeta;
     }
+    // DEBUG: temporary — remove after OPIK-5947 is verified
+    _dbg(
+      `#${instanceId}`,
+      "setBridge",
+      `surface="${surface}"`,
+      `meta=${instanceMeta?.version ?? "null"}`,
+      `hasMeta=${!!window.__opikAssistantMeta__}`,
+    );
     return () => {
       if (window.opikBridge === bridge) {
         delete window.opikBridge;
       }
-      if (meta && window.__opikAssistantMeta__ === meta) {
+      if (instanceMeta && window.__opikAssistantMeta__ === instanceMeta) {
         delete window.__opikAssistantMeta__;
       }
+      // DEBUG: temporary — remove after OPIK-5947 is verified
+      _dbg(
+        `#${instanceId}`,
+        "cleanupBridge",
+        `metaDeleted=${!window.__opikAssistantMeta__}`,
+      );
     };
-  }, [meta]);
+  }, [instanceMeta, instanceId, surface]);
 
   // Emit context changes to sidebar listeners
   useEffect(() => {
