@@ -5,6 +5,8 @@ import type * as OpikApi from "@/rest_api/api";
 import { PromptVersion } from "./PromptVersion";
 import { logger } from "@/utils/logger";
 
+const PROMPT_SYNC_TIMEOUT_MS = 5000;
+
 /**
  * Base data interface for all prompt types
  */
@@ -58,6 +60,7 @@ export abstract class BasePrompt {
   get changeDescription(): string | undefined { return this._changeDescription; }
   get projectName(): string | undefined { return this._projectName; }
 
+
   constructor(data: BasePromptData, opik?: OpikClient) {
     this._id = data.promptId;
     this._versionId = data.versionId;
@@ -107,8 +110,12 @@ export abstract class BasePrompt {
   protected async _syncViaCreate<T extends BasePrompt>(
     create: () => Promise<T>,
   ): Promise<void> {
+    const timeoutMs = PROMPT_SYNC_TIMEOUT_MS;
+    const timeout = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error(`Prompt sync timed out after ${timeoutMs}ms`)), timeoutMs)
+    );
     try {
-      const result = await create();
+      const result = await Promise.race([create(), timeout]);
       if (result.synced && result.id && result.versionId && result.commit) {
         this.updateSyncState({
           promptId: result.id,
@@ -125,6 +132,10 @@ export abstract class BasePrompt {
         );
       }
     } catch (error) {
+      if (error instanceof Error && error.message.startsWith("Prompt sync timed out")) {
+        logger.warn(`Prompt '${this._name}' sync timed out. The prompt will work locally but is not persisted on the server.`);
+        throw error;
+      }
       logger.warn(
         `Failed to sync prompt '${this._name}' with the backend. ` +
           "The prompt will work locally but is not persisted on the server. " +

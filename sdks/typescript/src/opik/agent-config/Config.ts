@@ -3,9 +3,14 @@ import { BasePrompt } from "@/prompt/BasePrompt";
 import type { SupportedValue } from "@/typeHelpers";
 import { inferBackendType, serializeValue } from "@/typeHelpers";
 
+const AGENT_CONFIG_PROMPT_READY_TIMEOUT_MS = 5000;
+
 function toMetadataValue(value: unknown, backendType: string): unknown {
   if (value === null || value === undefined) return undefined;
-  if (backendType === "prompt" || backendType === "prompt_commit") {
+  if (backendType === "prompt") {
+    return (value as BasePrompt).commit ?? undefined;
+  }
+  if (backendType === "prompt_commit") {
     return serializeValue(value as SupportedValue, backendType);
   }
   return value;
@@ -130,14 +135,17 @@ function injectTraceMetadata(opts: {
   }
 
   if (pendingReady.length > 0) {
-    // Defer injection until all prompts have synced, using the captured ctx
-    Promise.all(pendingReady)
+    const timeout = new Promise<void>((resolve) =>
+      setTimeout(resolve, AGENT_CONFIG_PROMPT_READY_TIMEOUT_MS)
+    );
+    // Defer injection until all prompts have synced or timeout elapses; on timeout
+    // use fallback — unsynced prompt fields will have undefined commit in metadata
+    Promise.race([Promise.all(pendingReady), timeout])
       .then(() => {
         const metadata = buildMetadata(opts);
         ctx.span.update({ metadata });
         ctx.trace.update({ metadata });
-      })
-      .catch(() => {});
+      });
     return;
   }
 

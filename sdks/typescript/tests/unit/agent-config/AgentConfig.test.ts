@@ -233,13 +233,54 @@ describe("Config — prompt field serialisation in metadata", () => {
     // Simulate sync completing
     resolveReady();
     await readyPromise;
-    await Promise.resolve(); // flush microtask
+    await Promise.resolve(); // Promise.all tick
+    await Promise.resolve(); // Promise.race tick
+    await Promise.resolve(); // .then() tick
 
     expect(updateSpy).toHaveBeenCalled();
     const call = updateSpy.mock.calls[0][0];
     const fieldEntry = call.metadata.agent_configuration.values["system_prompt"];
     expect(fieldEntry.type).toBe("prompt");
     expect(fieldEntry.value).toBe("commit-deferred");
+  });
+
+  it("injects fallback metadata with undefined commit when prompt sync times out", async () => {
+    vi.useFakeTimers();
+
+    // ready() never resolves — simulates a prompt that never syncs
+    const unsyncedPrompt = Object.create(BasePrompt.prototype) as BasePrompt;
+    Object.defineProperty(unsyncedPrompt, "commit", { get: () => undefined, configurable: true });
+    Object.defineProperty(unsyncedPrompt, "synced", { get: () => false, configurable: true });
+    Object.defineProperty(unsyncedPrompt, "ready", { value: () => new Promise(() => {}), configurable: true });
+
+    const updateSpy = vi.fn();
+    const mockCtx = { span: { update: updateSpy }, trace: { update: updateSpy } };
+    const names = new Set(["system_prompt"]);
+
+    trackStorage.run(mockCtx as unknown as Parameters<typeof trackStorage.run>[0], () => {
+      const cfg = createTypedConfig({
+        values: { system_prompt: unsyncedPrompt },
+        fieldNames: names,
+        blueprintId: "bp-1",
+        blueprintVersion: "v1",
+        isFallback: false,
+        maskId: undefined,
+      });
+      void cfg.system_prompt;
+    });
+
+    expect(updateSpy).not.toHaveBeenCalled();
+
+    // Advance past AGENT_CONFIG_PROMPT_READY_TIMEOUT_MS
+    await vi.runAllTimersAsync();
+
+    expect(updateSpy).toHaveBeenCalled();
+    const call = updateSpy.mock.calls[0][0];
+    const fieldEntry = call.metadata.agent_configuration.values["system_prompt"];
+    expect(fieldEntry.type).toBe("prompt");
+    expect(fieldEntry.value).toBeUndefined();
+
+    vi.useRealTimers();
   });
 });
 
