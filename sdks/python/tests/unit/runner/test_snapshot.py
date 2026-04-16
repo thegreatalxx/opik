@@ -41,6 +41,15 @@ def test_find_venv_python_windows(tmp_path: Path) -> None:
     assert _find_venv_python(tmp_path) == str(python)
 
 
+def test_find_venv_python_conda_windows_root(tmp_path: Path) -> None:
+    """Conda on Windows places python.exe at the prefix root."""
+    if not IS_WINDOWS:
+        pytest.skip("Windows-only test")
+    python = tmp_path / "python.exe"
+    python.touch()
+    assert _find_venv_python(tmp_path) == str(python)
+
+
 def test_find_venv_python_missing(tmp_path: Path) -> None:
     assert _find_venv_python(tmp_path) is None
 
@@ -141,6 +150,28 @@ def test_detect_from_command_uv_project(tmp_path: Path) -> None:
     result = _detect_python_env(tmp_path, command)
     assert result["python_env_type"] == "uv"
     assert result["python_env_source"] == "command"
+
+
+def test_detect_from_command_rejects_system_python(
+    tmp_path: Path,
+) -> None:
+    """A system Python like /usr/bin/python must not be classified as venv."""
+    if IS_WINDOWS:
+        pytest.skip("Unix-only test")
+    # Create a fake system Python *outside* the project directory
+    project = tmp_path / "project"
+    project.mkdir()
+    fake_sys = tmp_path / "usr" / "bin"
+    fake_sys.mkdir(parents=True)
+    python = fake_sys / "python"
+    python.touch()
+    python.chmod(0o755)
+    command = [str(python), "app.py"]
+    with patch.object(sys, "prefix", "/usr"), patch.object(sys, "base_prefix", "/usr"):
+        result = _detect_python_env(project, command)
+    # Should NOT be "command" source — system python falls through
+    assert result["python_env_source"] != "command"
+    assert result["python_env_type"] == "system"
 
 
 def test_detect_from_virtual_env_var(
@@ -255,8 +286,9 @@ def test_detect_system_fallback(tmp_path: Path) -> None:
 
 
 def test_build_checklist_includes_env_fields(tmp_path: Path) -> None:
-    """build_checklist returns python_env_type and python_env_source."""
+    """build_checklist propagates env detection values correctly."""
+    env_info = _detect_python_env(tmp_path, None)
     checklist = build_checklist(tmp_path, None)
-    assert "python_env_type" in checklist
-    assert "python_env_source" in checklist
-    assert "python_executable" in checklist
+    assert checklist["python_env_type"] == env_info["python_env_type"]
+    assert checklist["python_env_source"] == env_info["python_env_source"]
+    assert checklist["python_executable"] == env_info["python_executable"]

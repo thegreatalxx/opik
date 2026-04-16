@@ -45,7 +45,10 @@ _CONFIGURATION_PATTERNS = [
 _ALL_PATTERNS = _TRACING_PATTERNS + _ENTRYPOINT_PATTERNS + _CONFIGURATION_PATTERNS
 
 _IS_WINDOWS = platform.system().lower() == "windows"
-_PYTHON_VENV_RE = re.compile(r"[\\/]bin[\\/]python\d?(?:\.\d+)?$|[\\/]Scripts[\\/]python(?:\d(?:\.\d+)?)?\.exe$")
+_PYTHON_VENV_RE = re.compile(
+    r"[\\/]bin[\\/]python\d?(?:\.\d+)?$"
+    r"|[\\/]Scripts[\\/]python(?:\d(?:\.\d+)?)?\.exe$"
+)
 
 
 class PythonEnvInfo(TypedDict):
@@ -55,9 +58,18 @@ class PythonEnvInfo(TypedDict):
 
 
 def _find_venv_python(venv_dir: Path) -> Optional[str]:
-    """Return the Python binary inside a venv directory, or None if not found."""
+    """Return the Python binary inside a venv directory, or None if not found.
+
+    Checks the standard venv/virtualenv layout first (``bin/python`` on Unix,
+    ``Scripts/python.exe`` on Windows).  Falls back to ``python.exe`` at the
+    directory root for conda prefixes on Windows.
+    """
     if _IS_WINDOWS:
         candidate = venv_dir / "Scripts" / "python.exe"
+        if candidate.is_file():
+            return str(candidate)
+        # Conda prefixes on Windows place python.exe at the root
+        candidate = venv_dir / "python.exe"
         if candidate.is_file():
             return str(candidate)
     else:
@@ -86,9 +98,16 @@ def _classify_env_manager(repo_root: Path) -> Optional[str]:
     return None
 
 
-def _detect_python_env(
-    repo_root: Path, command: Optional[List[str]]
-) -> PythonEnvInfo:
+def _is_under(child: Path, parent: Path) -> bool:
+    """Return True if *child* is a descendant of *parent* (resolved)."""
+    try:
+        child.resolve().relative_to(parent.resolve())
+        return True
+    except ValueError:
+        return False
+
+
+def _detect_python_env(repo_root: Path, command: Optional[List[str]]) -> PythonEnvInfo:
     """Detect the project's Python environment from multiple signals.
 
     Returns the best Python executable path, environment type, and how it
@@ -97,13 +116,16 @@ def _detect_python_env(
     """
 
     # 1. Command signal — e.g. opik endpoint -- .venv/bin/python app.py
+    #    Only accept when the Python binary lives under repo_root (i.e. an
+    #    in-project venv).  System paths like /usr/bin/python are skipped so
+    #    they fall through to later detection steps.
     if command:
         first = command[0]
         if _PYTHON_VENV_RE.search(first):
             resolved = Path(first)
             if not resolved.is_absolute():
                 resolved = repo_root / resolved
-            if resolved.is_file():
+            if resolved.is_file() and _is_under(resolved, repo_root):
                 env_type = _classify_env_manager(repo_root) or "venv"
                 return PythonEnvInfo(
                     python_executable=str(resolved),
