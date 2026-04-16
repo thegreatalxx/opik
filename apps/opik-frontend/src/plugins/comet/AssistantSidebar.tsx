@@ -540,9 +540,8 @@ const AssistantSidebar: React.FC<AssistantSidebarProps> = ({
 
   return (
     <iframe
-      key={surface}
       ref={setIframeRef}
-      src={meta.shellUrl}
+      src={`${meta.shellUrl}?surface=${surface}`}
       className="size-full border-none"
       // Radix's DismissableLayer sets pointer-events:none on the body when a
       // modal dialog is open — this keeps the iframe clickable.
