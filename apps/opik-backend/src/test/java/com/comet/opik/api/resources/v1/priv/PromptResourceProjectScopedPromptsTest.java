@@ -300,6 +300,90 @@ class PromptResourceProjectScopedPromptsTest {
     }
 
     @Test
+    @DisplayName("Create prompts with same name in different projects succeeds")
+    void createPromptWithSameNameInDifferentProjects() {
+        String apiKey = UUID.randomUUID().toString();
+        String workspaceName = UUID.randomUUID().toString();
+        String workspaceId = UUID.randomUUID().toString();
+        mockTargetWorkspace(apiKey, workspaceName, workspaceId);
+
+        var projectId1 = projectResourceClient.createProject("project-" + UUID.randomUUID(), apiKey, workspaceName);
+        var projectId2 = projectResourceClient.createProject("project-" + UUID.randomUUID(), apiKey, workspaceName);
+
+        String sharedName = "shared-prompt-" + UUID.randomUUID();
+
+        var prompt1 = buildPrompt()
+                .name(sharedName)
+                .projectId(projectId1)
+                .lastUpdatedBy(USER)
+                .createdBy(USER)
+                .template(null)
+                .versionCount(0L)
+                .templateStructure(TemplateStructure.TEXT)
+                .build();
+
+        var prompt2 = buildPrompt()
+                .name(sharedName)
+                .projectId(projectId2)
+                .lastUpdatedBy(USER)
+                .createdBy(USER)
+                .template(null)
+                .versionCount(0L)
+                .templateStructure(TemplateStructure.TEXT)
+                .build();
+
+        var id1 = createPrompt(prompt1, apiKey, workspaceName);
+        var id2 = createPrompt(prompt2, apiKey, workspaceName);
+
+        var fetched1 = promptResourceClient.getPrompt(id1, apiKey, workspaceName);
+        var fetched2 = promptResourceClient.getPrompt(id2, apiKey, workspaceName);
+
+        assertThat(fetched1.name()).isEqualTo(sharedName);
+        assertThat(fetched2.name()).isEqualTo(sharedName);
+        assertThat(fetched1.projectId()).isEqualTo(projectId1);
+        assertThat(fetched2.projectId()).isEqualTo(projectId2);
+    }
+
+    @Test
+    @DisplayName("Create prompt with duplicate name in same project returns conflict")
+    void createPromptWithDuplicateNameInSameProject() {
+        String apiKey = UUID.randomUUID().toString();
+        String workspaceName = UUID.randomUUID().toString();
+        String workspaceId = UUID.randomUUID().toString();
+        mockTargetWorkspace(apiKey, workspaceName, workspaceId);
+
+        var projectId = projectResourceClient.createProject("project-" + UUID.randomUUID(), apiKey, workspaceName);
+
+        String sharedName = "duplicate-prompt-" + UUID.randomUUID();
+
+        var prompt1 = buildPrompt()
+                .name(sharedName)
+                .projectId(projectId)
+                .build();
+
+        createPrompt(prompt1, apiKey, workspaceName);
+
+        var prompt2 = buildPrompt()
+                .name(sharedName)
+                .projectId(projectId)
+                .build();
+
+        try (var response = client.target(RESOURCE_PATH.formatted(baseURI))
+                .request()
+                .header(HttpHeaders.AUTHORIZATION, apiKey)
+                .header(RequestContext.WORKSPACE_HEADER, workspaceName)
+                .post(Entity.json(prompt2))) {
+
+            assertThat(response.getStatus()).isEqualTo(HttpStatus.SC_CONFLICT);
+
+            var actualBody = response.readEntity(io.dropwizard.jersey.errors.ErrorMessage.class);
+            assertThat(actualBody).isEqualTo(
+                    new io.dropwizard.jersey.errors.ErrorMessage(HttpStatus.SC_CONFLICT,
+                            "Prompt id or name already exists"));
+        }
+    }
+
+    @Test
     @DisplayName("Find prompts filtered by project_id returns only project prompts")
     void findPromptsByProjectId() {
         String apiKey = UUID.randomUUID().toString();
