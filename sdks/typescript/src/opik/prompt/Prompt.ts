@@ -21,9 +21,16 @@ export class Prompt extends BasePrompt {
 
   /**
    * Creates a new Prompt instance.
-   * This should not be created directly, use OpikClient.createPrompt() instead.
+   *
+   * When called without an `opik` client, the global client is used and the prompt
+   * is synced with the backend in the background. Call `await prompt.ready()` before
+   * using operations that require the prompt to be synced (getVersions, delete, etc.).
+   *
+   * @param opik - @deprecated Pass no client and use `setGlobalClient()` to configure
+   *   the global client instead. When provided, this client is used for all operations
+   *   on this prompt instance (backward-compatible).
    */
-  constructor(data: PromptData, opik: OpikClient) {
+  constructor(data: PromptData, opik?: OpikClient) {
     super(
       {
         ...data,
@@ -32,6 +39,37 @@ export class Prompt extends BasePrompt {
       opik,
     );
     this.prompt = data.prompt;
+
+    if (!data.synced) {
+      this._pendingSync = this._performSync();
+    }
+  }
+
+  private async _performSync(): Promise<void> {
+    try {
+      const synced = await this.opik.createPrompt({
+        name: this._name,
+        prompt: this.prompt,
+        metadata: this._metadata,
+        type: this.type,
+        description: this._description,
+        tags: this._tags.length ? Array.from(this._tags) : undefined,
+      });
+      this.updateSyncState({
+        promptId: synced.id,
+        versionId: synced.versionId,
+        commit: synced.commit,
+        changeDescription: synced.changeDescription,
+        tags: synced.tags ? Array.from(synced.tags) : undefined,
+      });
+    } catch (error) {
+      logger.warn(
+        `Failed to sync prompt '${this._name}' with the backend. ` +
+          "The prompt will work locally but is not persisted on the server. " +
+          "You can retry by calling .syncWithBackend().",
+        { error },
+      );
+    }
   }
 
   /**

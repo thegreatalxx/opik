@@ -28,9 +28,16 @@ export class ChatPrompt extends BasePrompt {
 
   /**
    * Creates a new ChatPrompt instance.
-   * This should not be created directly, use OpikClient.createChatPrompt() instead.
+   *
+   * When called without an `opik` client, the global client is used and the prompt
+   * is synced with the backend in the background. Call `await chatPrompt.ready()` before
+   * using operations that require the prompt to be synced (getVersions, delete, etc.).
+   *
+   * @param opik - @deprecated Pass no client and use `setGlobalClient()` to configure
+   *   the global client instead. When provided, this client is used for all operations
+   *   on this prompt instance (backward-compatible).
    */
-  constructor(data: ChatPromptData, opik: OpikClient) {
+  constructor(data: ChatPromptData, opik?: OpikClient) {
     super(
       {
         ...data,
@@ -40,6 +47,37 @@ export class ChatPrompt extends BasePrompt {
     );
     this.messages = data.messages;
     this.chatTemplate = new ChatPromptTemplate(data.messages, this.type);
+
+    if (!data.synced) {
+      this._pendingSync = this._performSync();
+    }
+  }
+
+  private async _performSync(): Promise<void> {
+    try {
+      const synced = await this.opik.createChatPrompt({
+        name: this._name,
+        messages: structuredClone(this.messages),
+        metadata: this._metadata,
+        type: this.type,
+        description: this._description,
+        tags: this._tags.length ? Array.from(this._tags) : undefined,
+      });
+      this.updateSyncState({
+        promptId: synced.id,
+        versionId: synced.versionId,
+        commit: synced.commit,
+        changeDescription: synced.changeDescription,
+        tags: synced.tags ? Array.from(synced.tags) : undefined,
+      });
+    } catch (error) {
+      logger.warn(
+        `Failed to sync chat prompt '${this._name}' with the backend. ` +
+          "The prompt will work locally but is not persisted on the server. " +
+          "You can retry by calling .syncWithBackend().",
+        { error },
+      );
+    }
   }
 
   /**

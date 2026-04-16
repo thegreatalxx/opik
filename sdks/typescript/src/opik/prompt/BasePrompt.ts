@@ -1,4 +1,5 @@
 import type { OpikClient } from "@/client/Client";
+import { getGlobalClient } from "@/client/globalClient";
 import type { PromptType, PromptTemplateStructure } from "./types";
 import type * as OpikApi from "@/rest_api/api";
 import { PromptVersion } from "./PromptVersion";
@@ -27,16 +28,15 @@ export interface BasePromptData {
  * Provides common functionality for versioning, property updates, and deletion.
  */
 export abstract class BasePrompt {
-  public readonly id: string | undefined;
-  public readonly versionId: string | undefined;
-  public readonly commit: string | undefined;
+  private _id: string | undefined;
+  private _versionId: string | undefined;
+  private _commit: string | undefined;
+  private _synced: boolean;
+  private _changeDescription: string | undefined;
+
   public readonly type: PromptType;
-  public readonly changeDescription: string | undefined;
   public readonly templateStructure: PromptTemplateStructure;
   public readonly projectName: string | undefined;
-
-  /** Whether the prompt has been successfully synced with the backend. */
-  public readonly synced: boolean;
 
   // Mutable fields (can be updated via updateProperties)
   protected _name: string;
@@ -46,20 +46,59 @@ export abstract class BasePrompt {
   protected readonly _metadata: OpikApi.JsonNode | undefined;
   protected readonly opik: OpikClient;
 
-  constructor(data: BasePromptData, opik: OpikClient) {
-    this.id = data.promptId;
-    this.versionId = data.versionId;
-    this.commit = data.commit;
+  /** Pending background sync promise, set when constructed without synced:true. */
+  protected _pendingSync: Promise<void> | null = null;
+
+  get id(): string | undefined { return this._id; }
+  get versionId(): string | undefined { return this._versionId; }
+  get commit(): string | undefined { return this._commit; }
+  /** Whether the prompt has been successfully synced with the backend. */
+  get synced(): boolean { return this._synced; }
+  get changeDescription(): string | undefined { return this._changeDescription; }
+
+  constructor(data: BasePromptData, opik?: OpikClient) {
+    this._id = data.promptId;
+    this._versionId = data.versionId;
+    this._commit = data.commit;
     this.type = data.type ?? "mustache";
-    this.changeDescription = data.changeDescription;
+    this._changeDescription = data.changeDescription;
     this.templateStructure = data.templateStructure ?? "text";
-    this.synced = data.synced ?? false;
+    this._synced = data.synced ?? false;
     this._name = data.name;
     this._description = data.description;
     this._tags = data.tags ? [...data.tags] : [];
     this._metadata = data.metadata;
-    this.opik = opik;
+    this.opik = opik ?? getGlobalClient();
     this.projectName = data.projectName;
+  }
+
+  /**
+   * Updates internal state after a successful background sync.
+   */
+  protected updateSyncState(result: {
+    promptId?: string;
+    versionId?: string;
+    commit?: string;
+    changeDescription?: string;
+    tags?: string[];
+  }): void {
+    this._id = result.promptId;
+    this._versionId = result.versionId;
+    this._commit = result.commit;
+    this._changeDescription = result.changeDescription;
+    if (result.tags) {
+      this._tags = result.tags;
+    }
+    this._synced = true;
+  }
+
+  /**
+   * Resolves when the background sync triggered on construction has completed.
+   * Returns immediately if the prompt was already synced (e.g. created via client).
+   * Call this before using operations that require synced: true (getVersions, delete, etc.).
+   */
+  ready(): Promise<void> {
+    return this._pendingSync ?? Promise.resolve();
   }
 
   // Public getters for mutable fields
