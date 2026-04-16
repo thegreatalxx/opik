@@ -34,9 +34,10 @@ export abstract class BasePrompt {
   private _synced: boolean;
   private _changeDescription: string | undefined;
 
+  private _projectName: string | undefined;
+
   public readonly type: PromptType;
   public readonly templateStructure: PromptTemplateStructure;
-  public readonly projectName: string | undefined;
 
   // Mutable fields (can be updated via updateProperties)
   protected _name: string;
@@ -55,6 +56,7 @@ export abstract class BasePrompt {
   /** Whether the prompt has been successfully synced with the backend. */
   get synced(): boolean { return this._synced; }
   get changeDescription(): string | undefined { return this._changeDescription; }
+  get projectName(): string | undefined { return this._projectName; }
 
   constructor(data: BasePromptData, opik?: OpikClient) {
     this._id = data.promptId;
@@ -69,7 +71,7 @@ export abstract class BasePrompt {
     this._tags = data.tags ? [...data.tags] : [];
     this._metadata = data.metadata;
     this.opik = opik ?? getGlobalClient();
-    this.projectName = data.projectName;
+    this._projectName = data.projectName;
   }
 
   /**
@@ -81,6 +83,7 @@ export abstract class BasePrompt {
     commit?: string;
     changeDescription?: string;
     tags?: string[];
+    projectName?: string;
   }): void {
     this._id = result.promptId;
     this._versionId = result.versionId;
@@ -88,6 +91,9 @@ export abstract class BasePrompt {
     this._changeDescription = result.changeDescription;
     if (result.tags) {
       this._tags = result.tags;
+    }
+    if (result.projectName !== undefined) {
+      this._projectName = result.projectName;
     }
     this._synced = true;
   }
@@ -110,6 +116,7 @@ export abstract class BasePrompt {
           commit: result.commit,
           changeDescription: result.changeDescription,
           tags: result.tags ? Array.from(result.tags) : undefined,
+          projectName: result.projectName,
         });
       } else {
         logger.warn(
