@@ -48,7 +48,7 @@ jobs:
           if [ "${{ inputs.include_guardrails }}" = "true" ]; then
             IMAGES="$IMAGES ghcr.io/comet-ml/opik/opik-guardrails-backend:latest"
           fi
-          docker save $IMAGES | gzip > /tmp/opik-images.tar.gz
+          docker save $IMAGES | pigz > /tmp/opik-images.tar.gz
 
       - name: Save Docker images to cache
         if: steps.cache.outputs.cache-hit != 'true'
