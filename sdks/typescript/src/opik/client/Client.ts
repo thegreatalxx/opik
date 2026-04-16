@@ -1,5 +1,5 @@
 import { ConstructorOpikConfig, loadConfig, OpikConfig } from "@/config/Config";
-import { OpikApiError, serialization } from "@/rest_api";
+import { OpikApiError, OpikApiTimeoutError, serialization } from "@/rest_api";
 import type { ExperimentPublic, Trace as ITrace } from "@/rest_api/api";
 import * as OpikApi from "@/rest_api/api";
 import { FeedbackScoreBatchItemSource } from "@/rest_api/api/types/FeedbackScoreBatchItemSource";
@@ -1158,19 +1158,42 @@ export class OpikClient {
     options: CreatePromptOptions
   ): Promise<Prompt> => {
     const resolvedProjectName = this.resolveProjectName(options.projectName);
-    return this.createPromptInternal(
-      options.name,
-      options.prompt,
-      PromptTemplateStructure.Text,
-      options,
-      () => {
-        // No structure validation needed for text prompts
-      },
-      (promptData, versionData) =>
-        Prompt.fromApiResponse(promptData, versionData, this, resolvedProjectName),
-      "prompt",
-      resolvedProjectName
-    );
+    try {
+      return await this.createPromptInternal(
+        options.name,
+        options.prompt,
+        PromptTemplateStructure.Text,
+        options,
+        () => {},
+        (promptData, versionData) =>
+          Prompt.fromApiResponse(promptData, versionData, this, resolvedProjectName),
+        "prompt",
+        resolvedProjectName
+      );
+    } catch (error) {
+      if (error instanceof OpikApiError || error instanceof OpikApiTimeoutError) {
+        logger.warn(
+          `Failed to sync prompt '${options.name}' with the backend. ` +
+            "The prompt will work locally but is not persisted on the server. " +
+            "You can retry by calling .syncWithBackend().",
+          { error }
+        );
+        return new Prompt(
+          {
+            name: options.name,
+            prompt: options.prompt,
+            metadata: options.metadata,
+            type: options.type ?? PromptType.MUSTACHE,
+            description: options.description,
+            tags: options.tags,
+            projectName: resolvedProjectName,
+            synced: false,
+          },
+          this
+        );
+      }
+      throw error;
+    }
   };
 
   /**
@@ -1198,33 +1221,56 @@ export class OpikClient {
     options: CreateChatPromptOptions
   ): Promise<ChatPrompt> => {
     const resolvedProjectName = this.resolveProjectName(options.projectName);
-    // Serialize messages to JSON for backend storage
     const messagesJson = JSON.stringify(options.messages);
 
-    return this.createPromptInternal(
-      options.name,
-      messagesJson,
-      PromptTemplateStructure.Chat,
-      options,
-      (latestVersion) => {
-        // Check for template structure mismatch
-        if (
-          latestVersion &&
-          latestVersion.templateStructure &&
-          latestVersion.templateStructure !== PromptTemplateStructure.Chat
-        ) {
-          throw new PromptTemplateStructureMismatch(
-            options.name,
-            latestVersion.templateStructure,
-            PromptTemplateStructure.Chat
-          );
-        }
-      },
-      (promptData, versionData) =>
-        ChatPrompt.fromApiResponse(promptData, versionData, this, resolvedProjectName),
-      "chat prompt",
-      resolvedProjectName
-    );
+    try {
+      return await this.createPromptInternal(
+        options.name,
+        messagesJson,
+        PromptTemplateStructure.Chat,
+        options,
+        (latestVersion) => {
+          if (
+            latestVersion &&
+            latestVersion.templateStructure &&
+            latestVersion.templateStructure !== PromptTemplateStructure.Chat
+          ) {
+            throw new PromptTemplateStructureMismatch(
+              options.name,
+              latestVersion.templateStructure,
+              PromptTemplateStructure.Chat
+            );
+          }
+        },
+        (promptData, versionData) =>
+          ChatPrompt.fromApiResponse(promptData, versionData, this, resolvedProjectName),
+        "chat prompt",
+        resolvedProjectName
+      );
+    } catch (error) {
+      if (error instanceof OpikApiError || error instanceof OpikApiTimeoutError) {
+        logger.warn(
+          `Failed to sync chat prompt '${options.name}' with the backend. ` +
+            "The prompt will work locally but is not persisted on the server. " +
+            "You can retry by calling .syncWithBackend().",
+          { error }
+        );
+        return new ChatPrompt(
+          {
+            name: options.name,
+            messages: structuredClone(options.messages),
+            metadata: options.metadata,
+            type: options.type ?? PromptType.MUSTACHE,
+            description: options.description,
+            tags: options.tags,
+            projectName: resolvedProjectName,
+            synced: false,
+          },
+          this
+        );
+      }
+      throw error;
+    }
   };
 
   /**

@@ -45,7 +45,7 @@ export class ChatPrompt extends BasePrompt {
     this.messages = data.messages;
     this.chatTemplate = new ChatPromptTemplate(data.messages, this.type);
 
-    if (!data.synced) {
+    if (opik === undefined && !data.synced) {
       this._pendingSync = this._performSync();
     }
   }

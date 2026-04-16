@@ -37,7 +37,7 @@ export class Prompt extends BasePrompt {
     );
     this.prompt = data.prompt;
 
-    if (!data.synced) {
+    if (opik === undefined && !data.synced) {
       this._pendingSync = this._performSync();
     }
   }
