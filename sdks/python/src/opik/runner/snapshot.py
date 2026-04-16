@@ -111,8 +111,10 @@ def _detect_python_env(repo_root: Path, command: Optional[List[str]]) -> PythonE
     """Detect the project's Python environment from multiple signals.
 
     Returns the best Python executable path, environment type, and how it
-    was detected.  Priority: command argument > env vars > project directory
-    markers > daemon introspection > system fallback.
+    was detected.  Priority: command argument > VIRTUAL_ENV > project
+    directory markers > CONDA_PREFIX > daemon introspection > system
+    fallback.  CONDA_PREFIX is checked after project-level signals
+    because conda base env is often activated by default.
 
     Detection is scoped to *repo_root* (the directory where ``opik connect``
     or ``opik endpoint`` was launched).  We intentionally do NOT walk parent
@@ -154,18 +156,7 @@ def _detect_python_env(repo_root: Path, command: Optional[List[str]]) -> PythonE
                 python_env_source="env_var",
             )
 
-    # 3. CONDA_PREFIX env var — set by conda activate
-    conda_prefix = os.environ.get("CONDA_PREFIX")
-    if conda_prefix:
-        python = _find_venv_python(Path(conda_prefix))
-        if python:
-            return PythonEnvInfo(
-                python_executable=python,
-                python_env_type="conda",
-                python_env_source="env_var",
-            )
-
-    # 4. Package manager markers (uv/poetry) — even without in-project venv
+    # 3. Package manager markers (uv/poetry) — even without in-project venv
     manager = _classify_env_manager(repo_root)
     if manager:
         # Check for in-project venv first
@@ -185,7 +176,7 @@ def _detect_python_env(repo_root: Path, command: Optional[List[str]]) -> PythonE
             python_env_source="project_dir",
         )
 
-    # 5. Project dir .venv/ or venv/ without a known manager
+    # 4. Project dir .venv/ or venv/ without a known manager
     for dirname in (".venv", "venv"):
         python = _find_venv_python(repo_root / dirname)
         if python:
@@ -193,6 +184,21 @@ def _detect_python_env(repo_root: Path, command: Optional[List[str]]) -> PythonE
                 python_executable=python,
                 python_env_type="venv",
                 python_env_source="project_dir",
+            )
+
+    # 5. CONDA_PREFIX env var — set by conda activate
+    #    Checked AFTER project-level signals (steps 3-4) because conda
+    #    base env is often activated by default via `conda init` in the
+    #    user's shell profile.  A project-level uv.lock or poetry.lock
+    #    is a stronger signal than a passively inherited CONDA_PREFIX.
+    conda_prefix = os.environ.get("CONDA_PREFIX")
+    if conda_prefix:
+        python = _find_venv_python(Path(conda_prefix))
+        if python:
+            return PythonEnvInfo(
+                python_executable=python,
+                python_env_type="conda",
+                python_env_source="env_var",
             )
 
     # 6. Conda marker file (environment.yml)

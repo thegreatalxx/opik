@@ -211,6 +211,21 @@ def test_detect_from_conda_prefix(
     assert result["python_env_source"] == "env_var"
 
 
+def test_project_manager_takes_priority_over_conda_prefix(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """uv.lock should win over a passively inherited CONDA_PREFIX."""
+    python = _make_venv(tmp_path)
+    (tmp_path / "uv.lock").touch()
+    conda_dir = tmp_path / "conda_env"
+    _make_venv(tmp_path, "conda_env")
+    monkeypatch.setenv("CONDA_PREFIX", str(conda_dir))
+    result = _detect_python_env(tmp_path, None)
+    assert result["python_executable"] == str(python)
+    assert result["python_env_type"] == "uv"
+    assert result["python_env_source"] == "project_dir"
+
+
 def test_detect_uv_with_in_project_venv(tmp_path: Path) -> None:
     python = _make_venv(tmp_path)
     (tmp_path / "uv.lock").touch()
