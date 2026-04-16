@@ -42,6 +42,13 @@ const PageLayout = () => {
 
   const showAssistantSidebar = !!AssistantSidebar && !isProjectHome;
 
+  // DEBUG: trace layout decisions
+  console.log(
+    "%c[PageLayout]%c RENDER isProjectHome=%s showAssistantSidebar=%s hasPlugin=%s",
+    "color:#f472b6;font-weight:bold", "color:inherit",
+    isProjectHome, showAssistantSidebar, !!AssistantSidebar,
+  );
+
   const assistantWidth = showAssistantSidebar ? assistantSidebarWidth : 0;
   const isMobile = useMediaQuery(`(max-width: ${1023 + assistantWidth}px)`);
   const expanded = isMobile ? false : storedExpanded;

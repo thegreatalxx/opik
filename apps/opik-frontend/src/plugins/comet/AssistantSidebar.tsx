@@ -32,6 +32,38 @@ import {
   IS_ASSISTANT_DEV,
 } from "@/plugins/comet/constants/assistant";
 
+// ─── DEBUG INSTRUMENTATION (remove after investigation) ─────────────────────
+let _instanceSeq = 0;
+const _bridgeRegistry = new Map<number, { bridge: AssistantSidebarBridge; surface: string }>();
+
+function _dbg(tag: string, ...args: unknown[]) {
+  console.log(
+    `%c[ASB:${tag}]%c`,
+    "color:#e879f9;font-weight:bold",
+    "color:inherit",
+    ...args,
+  );
+}
+
+// Expose a global helper so you can inspect state from browser console:
+//   __ASB_DEBUG__()
+(window as unknown as Record<string, unknown>).__ASB_DEBUG__ = () => {
+  const bridge = (window as unknown as Record<string, unknown>).opikBridge as AssistantSidebarBridge | undefined;
+  console.group("[ASB] Debug snapshot");
+  console.log("window.opikBridge exists:", !!bridge);
+  if (bridge) {
+    const ctx = bridge.getContext();
+    console.log("bridge.getContext().surface:", ctx.surface);
+    console.log("bridge.getContext().projectId:", ctx.projectId);
+    console.log("bridge.getContext() full:", ctx);
+  }
+  console.log("Active instances:", [..._bridgeRegistry.entries()].map(
+    ([id, r]) => `#${id} surface=${r.surface} sameAsWindow=${r.bridge === bridge}`,
+  ));
+  console.groupEnd();
+};
+// ─── END DEBUG INSTRUMENTATION ──────────────────────────────────────────────
+
 const BRIDGE_PROTOCOL_VERSION = 1;
 
 const LOADER_DEFAULT_WIDTH = 400;
@@ -181,15 +213,21 @@ interface BridgeRefs {
   lastRunnerState: React.MutableRefObject<RunnerBridgeState | null>;
 }
 
-const createBridge = (refs: BridgeRefs): AssistantSidebarBridge => ({
+const createBridge = (refs: BridgeRefs, debugId?: number): AssistantSidebarBridge => ({
   version: BRIDGE_PROTOCOL_VERSION,
-  getContext: () => refs.context.current,
+  getContext: () => {
+    const ctx = refs.context.current;
+    _dbg(`bridge#${debugId}:getContext`, "surface=", ctx.surface, "projectId=", ctx.projectId);
+    return ctx;
+  },
   subscribe: (event, callback) => {
     const set = refs.listeners.current[event as keyof HostEventMap] as
       | Set<typeof callback>
       | undefined;
     if (!set) return () => {};
     set.add(callback);
+
+    _dbg(`bridge#${debugId}:subscribe`, `event="${event}"`, `listenerCount=${set.size}`);
 
     // Replay latest runner state to late subscribers (e.g. Ollie iframe loaded after FE)
     if (event === "runner:state-changed" && refs.lastRunnerState.current) {
@@ -200,9 +238,11 @@ const createBridge = (refs: BridgeRefs): AssistantSidebarBridge => ({
 
     return () => {
       set.delete(callback);
+      _dbg(`bridge#${debugId}:unsubscribe`, `event="${event}"`, `listenerCount=${set.size}`);
     };
   },
   emit: (event, data) => {
+    _dbg(`bridge#${debugId}:emit`, `event="${event}"`, data);
     switch (event) {
       case "navigate": {
         const { path, search } = data as SidebarEventMap["navigate"];
@@ -244,7 +284,10 @@ function emitHostEvent<E extends keyof HostEventMap>(
   listenersRef: React.MutableRefObject<HostListeners>,
   event: E,
   data: HostEventMap[E],
+  debugId?: number,
 ) {
+  const count = listenersRef.current[event].size;
+  _dbg(`instance#${debugId}:emitHostEvent`, `event="${event}"`, `listeners=${count}`, data);
   for (const listener of listenersRef.current[event]) {
     (listener as (d: HostEventMap[E]) => void)(data);
   }
@@ -364,6 +407,10 @@ const AssistantSidebar: React.FC<AssistantSidebarProps> = ({
   surface = "sidebar",
   onWidthChange,
 }) => {
+  const [instanceId] = useState(() => ++_instanceSeq);
+
+  _dbg(`instance#${instanceId}`, "RENDER", `surface="${surface}"`);
+
   const {
     backendUrl,
     probeUrl,
@@ -404,7 +451,7 @@ const AssistantSidebar: React.FC<AssistantSidebarProps> = ({
     projectId: context.projectId,
     onStateChanged: (state) => {
       lastRunnerStateRef.current = state;
-      emitHostEvent(listenersRef, "runner:state-changed", state);
+      emitHostEvent(listenersRef, "runner:state-changed", state, instanceId);
     },
   });
 
@@ -421,7 +468,7 @@ const AssistantSidebar: React.FC<AssistantSidebarProps> = ({
 
   // Best-effort: only effective if the sidebar has subscribed to visibility:changed
   const onRequestVisibilityRef = useLatestRef((open: boolean) => {
-    emitHostEvent(listenersRef, "visibility:changed", { isOpen: open });
+    emitHostEvent(listenersRef, "visibility:changed", { isOpen: open }, instanceId);
   });
 
   /**
@@ -450,8 +497,19 @@ const AssistantSidebar: React.FC<AssistantSidebarProps> = ({
       context: contextRef,
       listeners: listenersRef,
       lastRunnerState: lastRunnerStateRef,
-    }),
+    }, instanceId),
   );
+
+  // Register in debug registry
+  useEffect(() => {
+    _bridgeRegistry.set(instanceId, { bridge: bridgeRef.current, surface });
+    _dbg(`instance#${instanceId}`, "MOUNTED", `surface="${surface}"`);
+    return () => {
+      _bridgeRegistry.delete(instanceId);
+      _dbg(`instance#${instanceId}`, "UNMOUNTED", `surface="${surface}"`);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Expose bridge and meta on window for iframe access.
   // Guard the cleanup: when another AssistantSidebar instance mounts (e.g.
@@ -460,31 +518,50 @@ const AssistantSidebar: React.FC<AssistantSidebarProps> = ({
   // NOT clobber the new values — only clear if the global still matches ours.
   useEffect(() => {
     const bridge = bridgeRef.current;
+    const prevBridge = window.opikBridge;
     window.opikBridge = bridge;
+    _dbg(`instance#${instanceId}`, "EFFECT:setBridge",
+      `prevBridge=${prevBridge ? "existed" : "null"}`,
+      `prevBridge===newBridge: ${prevBridge === bridge}`,
+      `meta=${meta ? meta.version : "null"}`,
+    );
     if (meta) {
       window.__opikAssistantMeta__ = meta;
     }
     return () => {
-      if (window.opikBridge === bridge) {
+      const willDelete = window.opikBridge === bridge;
+      _dbg(`instance#${instanceId}`, "CLEANUP:setBridge",
+        `willDelete=${willDelete}`,
+        `window.opikBridge===ourBridge: ${willDelete}`,
+      );
+      if (willDelete) {
         delete window.opikBridge;
       }
       if (meta && window.__opikAssistantMeta__ === meta) {
         delete window.__opikAssistantMeta__;
       }
     };
-  }, [meta]);
+  }, [meta, instanceId]);
 
   // Emit context changes to sidebar listeners
   useEffect(() => {
-    emitHostEvent(listenersRef, "context:changed", context);
-  }, [context]);
+    _dbg(`instance#${instanceId}`, "EFFECT:contextChanged",
+      `surface="${context.surface}"`,
+      `projectId="${context.projectId}"`,
+      `listenerCount=${listenersRef.current["context:changed"].size}`,
+    );
+    emitHostEvent(listenersRef, "context:changed", context, instanceId);
+  }, [context, instanceId]);
 
   // Notify sidebar of visibility on mount/unmount
   useEffect(() => {
-    emitHostEvent(listenersRef, "visibility:changed", { isOpen: true });
+    _dbg(`instance#${instanceId}`, "EFFECT:visibility", "isOpen=true");
+    emitHostEvent(listenersRef, "visibility:changed", { isOpen: true }, instanceId);
     return () => {
-      emitHostEvent(listenersRef, "visibility:changed", { isOpen: false });
+      _dbg(`instance#${instanceId}`, "CLEANUP:visibility", "isOpen=false");
+      emitHostEvent(listenersRef, "visibility:changed", { isOpen: false }, instanceId);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Prevent host FocusScope from trapping focus when the iframe gains focus.
@@ -499,8 +576,11 @@ const AssistantSidebar: React.FC<AssistantSidebarProps> = ({
     iframeRef.current = node;
     if (node) {
       node.addEventListener("focusin", stopPropagation);
+      _dbg(`instance#${instanceId}`, "IFRAME:attached", `src="${node.src}"`);
+    } else {
+      _dbg(`instance#${instanceId}`, "IFRAME:detached");
     }
-  }, []);
+  }, [instanceId]);
 
   // On the page surface, the iframe fills the whole main area, so clicks
   // inside Ollie never bubble to the parent document. Detect the resulting
@@ -526,6 +606,9 @@ const AssistantSidebar: React.FC<AssistantSidebarProps> = ({
 
   if (!meta || !isBackendReady) {
     if (phase === "disabled") return null;
+    _dbg(`instance#${instanceId}`, "RENDER:loader",
+      `phase="${phase}"`, `isBackendReady=${isBackendReady}`, `meta=${!!meta}`,
+    );
     const effectivePhase = isBackendReady && !meta ? "manifest" : phase;
     return (
       <AssistantSidebarLoader
@@ -538,10 +621,14 @@ const AssistantSidebar: React.FC<AssistantSidebarProps> = ({
     );
   }
 
+  _dbg(`instance#${instanceId}`, "RENDER:iframe",
+    `surface="${surface}"`, `shellUrl="${meta.shellUrl}"`,
+  );
+
   return (
     <iframe
       ref={setIframeRef}
-      src={`${meta.shellUrl}?surface=${surface}`}
+      src={meta.shellUrl}
       className="size-full border-none"
       // Radix's DismissableLayer sets pointer-events:none on the body when a
       // modal dialog is open — this keeps the iframe clickable.
