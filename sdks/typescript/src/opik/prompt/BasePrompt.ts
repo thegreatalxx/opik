@@ -211,7 +211,7 @@ export abstract class BasePrompt {
     tags?: string[];
   }): Promise<this> {
     await this.ready();
-    this.warnIfNotSynced("updateProperties");
+    this.ensureSynced("updateProperties");
     await this.opik.api.prompts.updatePrompt(
       this.id!,
       {
@@ -236,7 +236,7 @@ export abstract class BasePrompt {
    */
   async delete(): Promise<void> {
     await this.ready();
-    this.warnIfNotSynced("delete");
+    this.ensureSynced("delete");
     await this.opik.deletePrompts([this.id!]);
   }
 
@@ -254,7 +254,7 @@ export abstract class BasePrompt {
     filters?: string;
   }): Promise<PromptVersion[]> {
     await this.ready();
-    this.warnIfNotSynced("getVersions");
+    this.ensureSynced("getVersions");
     logger.debug("Getting versions for prompt", {
       promptId: this.id,
       name: this.name,
@@ -317,7 +317,7 @@ export abstract class BasePrompt {
     version: PromptVersion,
   ): Promise<OpikApi.PromptVersionDetail> {
     await this.ready();
-    this.warnIfNotSynced("restoreVersion");
+    this.ensureSynced("restoreVersion");
     logger.debug("Restoring prompt version", {
       promptId: this.id,
       name: this.name,
@@ -390,14 +390,14 @@ export abstract class BasePrompt {
   }
 
   /**
-   * Warns if the prompt has not been synced with the backend.
-   * Used internally after ready() completes to provide visibility if background sync failed.
+   * Throws an error if the prompt has not been successfully synced with the backend.
+   * Used internally before backend operations to ensure we have a valid prompt ID.
    */
-  protected warnIfNotSynced(operation: string): void {
+  protected ensureSynced(operation: string): void {
     if (!this.synced) {
-      logger.warn(
-        `Prompt '${this._name}' is not yet synced with the backend for operation '${operation}'. ` +
-          "The operation may fail. Call .syncWithBackend() if you need to ensure the prompt is persisted.",
+      throw new Error(
+        `Cannot call ${operation}() on a prompt that failed to persist. ` +
+          "Call .syncWithBackend() to retry persisting the prompt.",
       );
     }
   }
