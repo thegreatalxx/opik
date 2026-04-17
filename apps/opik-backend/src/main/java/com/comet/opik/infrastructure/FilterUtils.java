@@ -158,18 +158,16 @@ public class FilterUtils {
     public static void bindTraceThreadSearchCriteria(TraceSearchCriteria traceSearchCriteria, Statement statement) {
         Optional.ofNullable(traceSearchCriteria.filters())
                 .ifPresent(filters -> {
-                    var outerFilters = withoutTraceThreadIdPushdown(filters);
 
-                    FilterQueryBuilder.bind(statement, outerFilters, FilterStrategy.TRACE);
-                    FilterQueryBuilder.bind(statement, outerFilters, FilterStrategy.TRACE_AGGREGATION);
-                    FilterQueryBuilder.bind(statement, outerFilters, FilterStrategy.FEEDBACK_SCORES);
-                    FilterQueryBuilder.bind(statement, outerFilters, FilterStrategy.TRACE_SPAN_FEEDBACK_SCORES);
-                    FilterQueryBuilder.bind(statement, outerFilters, FilterStrategy.ANNOTATION_AGGREGATION);
-                    FilterQueryBuilder.bind(statement, outerFilters, FilterStrategy.EXPERIMENT_AGGREGATION);
-                    FilterQueryBuilder.bind(statement, outerFilters, FilterStrategy.TRACE_THREAD);
-                    FilterQueryBuilder.bind(statement, outerFilters, FilterStrategy.FEEDBACK_SCORES_IS_EMPTY);
-                    FilterQueryBuilder.bind(statement, outerFilters,
-                            FilterStrategy.TRACE_SPAN_FEEDBACK_SCORES_IS_EMPTY);
+                    FilterQueryBuilder.bind(statement, filters, FilterStrategy.TRACE);
+                    FilterQueryBuilder.bind(statement, filters, FilterStrategy.TRACE_AGGREGATION);
+                    FilterQueryBuilder.bind(statement, filters, FilterStrategy.FEEDBACK_SCORES);
+                    FilterQueryBuilder.bind(statement, filters, FilterStrategy.TRACE_SPAN_FEEDBACK_SCORES);
+                    FilterQueryBuilder.bind(statement, filters, FilterStrategy.ANNOTATION_AGGREGATION);
+                    FilterQueryBuilder.bind(statement, filters, FilterStrategy.EXPERIMENT_AGGREGATION);
+                    FilterQueryBuilder.bind(statement, filters, FilterStrategy.TRACE_THREAD);
+                    FilterQueryBuilder.bind(statement, filters, FilterStrategy.FEEDBACK_SCORES_IS_EMPTY);
+                    FilterQueryBuilder.bind(statement, filters, FilterStrategy.TRACE_SPAN_FEEDBACK_SCORES_IS_EMPTY);
 
                     findTraceThreadIdPushdownFilter(filters)
                             .ifPresent(idFilter -> statement.bind("thread_id_pushdown", idFilter.value()));
