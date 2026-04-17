@@ -1,5 +1,5 @@
-import React, { useCallback, useMemo, useRef, useState } from "react";
-import { ChartLine, Info, RotateCw } from "lucide-react";
+import React, { useCallback, useMemo, useState } from "react";
+import { ChartLine, RotateCw } from "lucide-react";
 import { ColumnSort, Row, RowSelectionState } from "@tanstack/react-table";
 import { useNavigate } from "@tanstack/react-router";
 import useLocalStorageState from "use-local-storage-state";
@@ -29,7 +29,7 @@ import { RESOURCE_TYPE } from "@/shared/ResourceLink/ResourceLink";
 import Loader from "@/shared/Loader/Loader";
 import useAppStore, { useActiveProjectId } from "@/store/AppStore";
 import { formatDate } from "@/lib/date";
-import { isEvalSuiteExperiment } from "@/lib/experiments";
+import { isTestSuiteExperiment } from "@/lib/experiments";
 import {
   transformExperimentScores,
   getScoreDisplayName,
@@ -47,7 +47,6 @@ import {
 } from "@/types/shared";
 import { DELETED_ENTITY_LABEL } from "@/constants/groups";
 import ColumnsButton from "@/shared/ColumnsButton/ColumnsButton";
-import AddExperimentDialog from "@/v2/pages-shared/experiments/AddExperimentDialog/AddExperimentDialog";
 import ExperimentsActionsPanel from "@/v2/pages-shared/experiments/ExperimentsActionsPanel/ExperimentsActionsPanel";
 import ExperimentRowActionsCell from "@/v2/pages/ExperimentsPage/ExperimentRowActionsCell";
 import FeedbackScoresChartsWrapper from "@/v2/pages-shared/experiments/FeedbackScoresChartsWrapper/FeedbackScoresChartsWrapper";
@@ -90,10 +89,10 @@ const COLUMNS_SORT_KEY = "experiments-columns-sort";
 export const DEFAULT_SELECTED_COLUMNS: string[] = [
   COLUMN_NAME_ID,
   COLUMN_DATASET_ID,
+  "pass_rate",
   "created_at",
   "duration.p50",
   "total_estimated_cost_avg",
-  "pass_rate",
   COLUMN_FEEDBACK_SCORES_ID,
 ];
 
@@ -102,13 +101,13 @@ const DEFAULT_COLUMNS_ORDER: string[] = [
   COLUMN_NAME_ID,
   COLUMN_DATASET_ID,
   "dataset_version",
+  "pass_rate",
   "trace_count",
   "duration.p50",
   "duration.p90",
   "duration.p99",
   "total_estimated_cost_avg",
   "total_estimated_cost",
-  "pass_rate",
   COLUMN_FEEDBACK_SCORES_ID,
   "created_at",
   "prompt",
@@ -120,17 +119,16 @@ const DEFAULT_COLUMNS_ORDER: string[] = [
 
 export const MAX_EXPANDED_DEEPEST_GROUPS = 5;
 
-const GeneralDatasetsTab: React.FC = () => {
+type GeneralDatasetsTabProps = {
+  onNewExperimentClick?: () => void;
+};
+
+const GeneralDatasetsTab: React.FC<GeneralDatasetsTabProps> = ({
+  onNewExperimentClick,
+}) => {
   const workspaceName = useAppStore((state) => state.activeWorkspaceName);
   const activeProjectId = useActiveProjectId();
   const navigate = useNavigate();
-  const resetDialogKeyRef = useRef(0);
-  const [query] = useQueryParam("new", JsonParam);
-
-  const [openDialog, setOpenDialog] = useState<boolean>(
-    Boolean(query?.experiment),
-  );
-
   const [search = "", setSearch] = useQueryParam("search", StringParam, {
     updateType: "replaceIn",
   });
@@ -188,7 +186,7 @@ const GeneralDatasetsTab: React.FC = () => {
       },
       {
         id: COLUMN_DATASET_ID,
-        label: "Evaluation suite",
+        label: "Test suite",
         type: COLUMN_TYPE.string,
         cell: ResourceCell as never,
         customMeta: {
@@ -199,7 +197,7 @@ const GeneralDatasetsTab: React.FC = () => {
       },
       {
         id: "dataset_version",
-        label: "Evaluation suite version",
+        label: "Test suite version",
         type: COLUMN_TYPE.string,
         iconType: "version" as const,
         accessorFn: (row: GroupedExperiment) =>
@@ -459,11 +457,6 @@ const GeneralDatasetsTab: React.FC = () => {
 
   const hasGroups = Boolean(groups.length);
 
-  const handleNewExperimentClick = useCallback(() => {
-    setOpenDialog(true);
-    resetDialogKeyRef.current = resetDialogKeyRef.current + 1;
-  }, []);
-
   const renderCustomRowCallback = useCallback(
     (row: Row<GroupedExperiment>) => {
       return renderCustomRow(row, setGroupLimit);
@@ -505,7 +498,7 @@ const GeneralDatasetsTab: React.FC = () => {
           id: datasetId,
           name: [
             {
-              label: "Evaluation suite",
+              label: "Test suite",
               value: datasetExperiments[0]?.dataset_name || "Undefined",
             },
           ],
@@ -546,7 +539,7 @@ const GeneralDatasetsTab: React.FC = () => {
                   label: calculateGroupLabel(groups[index]),
                   value:
                     label === DELETED_ENTITY_LABEL
-                      ? "Deleted evaluation suite"
+                      ? "Deleted test suite"
                       : label || value || "Undefined",
                 };
               }),
@@ -579,7 +572,7 @@ const GeneralDatasetsTab: React.FC = () => {
           scores[s.name] = s.value;
         });
         if (
-          isEvalSuiteExperiment(experiment) &&
+          isTestSuiteExperiment(experiment) &&
           isNumber(experiment.pass_rate)
         ) {
           scores[PASS_RATE_LABEL] = experiment.pass_rate;
@@ -700,14 +693,6 @@ const GeneralDatasetsTab: React.FC = () => {
             onOrderChange={setColumnsOrder}
             sections={columnSections}
           ></ColumnsButton>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleNewExperimentClick}
-          >
-            <Info className="mr-1.5 size-3.5" />
-            Create new experiment
-          </Button>
         </div>
       </PageBodyStickyContainer>
       <DataTable
@@ -731,8 +716,8 @@ const GeneralDatasetsTab: React.FC = () => {
         noData={
           <DataTableNoData title={noDataText}>
             {noData && (
-              <Button variant="link" onClick={handleNewExperimentClick}>
-                Create new experiment
+              <Button variant="link" onClick={onNewExperimentClick}>
+                Create experiment
               </Button>
             )}
           </DataTableNoData>
@@ -757,13 +742,6 @@ const GeneralDatasetsTab: React.FC = () => {
           ></DataTablePagination>
         )}
       </PageBodyStickyContainer>
-      <AddExperimentDialog
-        key={resetDialogKeyRef.current}
-        open={openDialog}
-        setOpen={setOpenDialog}
-        datasetName={query?.datasetName}
-        projectId={activeProjectId}
-      />
     </>
   );
 };
