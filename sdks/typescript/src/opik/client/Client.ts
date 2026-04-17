@@ -1084,14 +1084,17 @@ export class OpikClient {
     logger.debug(`Creating ${logContext}`, { name });
 
     try {
+      // Fetch latest version (returns null if prompt doesn't exist yet)
       const latestVersion = await fetchLatestPromptVersion(
         this.api.prompts,
         name,
         this.api.requestOptions
       );
 
+      // Validate template structure against existing prompt
       validateStructure(latestVersion);
 
+      // Determine if we need to create a new version
       const normalizedType = options.type ?? PromptType.MUSTACHE;
       const needsNewVersion = shouldCreateNewVersion(
         { prompt: template, metadata: options.metadata },
@@ -1102,6 +1105,7 @@ export class OpikClient {
       let versionResponse: OpikApi.PromptVersionDetail;
 
       if (needsNewVersion) {
+        // Create new version
         logger.debug(`Creating new ${logContext} version`, { name });
         versionResponse = await this.api.prompts.createPromptVersion(
           {
@@ -1117,10 +1121,12 @@ export class OpikClient {
           this.api.requestOptions
         );
       } else {
+        // Return existing version (idempotent)
         logger.debug(`Returning existing ${logContext} version`, { name });
         versionResponse = latestVersion!;
       }
 
+      // Fetch full prompt data and create instance
       if (!versionResponse.promptId) {
         throw new Error("Invalid API response: missing promptId");
       }
@@ -1134,6 +1140,7 @@ export class OpikClient {
 
       logger.debug(`${logContext} created`, { name });
 
+      // Update properties if provided
       if (options.description || options.tags) {
         return (await promptInstance.updateProperties({
           description: options.description,
@@ -1180,7 +1187,9 @@ export class OpikClient {
       options.prompt,
       PromptTemplateStructure.Text,
       options,
-      () => {},
+      () => {
+        // No structure validation needed for text prompts
+      },
       (promptData, versionData) =>
         Prompt.fromApiResponse(promptData, versionData, this, resolvedProjectName),
       () =>
@@ -1227,6 +1236,7 @@ export class OpikClient {
     options: CreateChatPromptOptions
   ): Promise<ChatPrompt> => {
     const resolvedProjectName = this.resolveProjectName(options.projectName);
+    // Serialize messages to JSON for backend storage
     const messagesJson = JSON.stringify(options.messages);
 
     return this.createPromptInternal(
@@ -1235,6 +1245,7 @@ export class OpikClient {
       PromptTemplateStructure.Chat,
       options,
       (latestVersion) => {
+        // Check for template structure mismatch
         if (
           latestVersion &&
           latestVersion.templateStructure &&
