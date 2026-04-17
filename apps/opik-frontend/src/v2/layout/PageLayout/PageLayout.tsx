@@ -12,6 +12,7 @@ import LayoutDialogs from "@/v2/layout/LayoutDialogs";
 import { PortalContainerProvider } from "@/lib/portal-container";
 import SilentErrorBoundary from "@/shared/SilentErrorBoundary/SilentErrorBoundary";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
+import DemoProjectBanner from "@/v2/layout/DemoProjectBanner/DemoProjectBanner";
 
 const PageLayout = () => {
   const [hostContainer, setHostContainer] = useState<HTMLDivElement | null>(
@@ -19,7 +20,9 @@ const PageLayout = () => {
   );
   const [storedExpanded = true, setStoredExpanded] =
     useLocalStorageState<boolean>("sidebar-expanded");
-  const [bannerHeight, setBannerHeight] = useState(0);
+  const [retentionBannerHeight, setRetentionBannerHeight] = useState(0);
+  const [demoBannerHeight, setDemoBannerHeight] = useState(0);
+  const bannerHeight = retentionBannerHeight + demoBannerHeight;
   const [showWelcomeWizard, setShowWelcomeWizard] = useState(false);
   const [assistantSidebarWidth, setAssistantSidebarWidth] = useState(0);
   const sidebarWrapperRef = useRef<HTMLDivElement>(null);
@@ -92,8 +95,9 @@ const PageLayout = () => {
             className="relative min-w-0 flex-1 overflow-hidden [transform:translateZ(0)]"
           >
             {RetentionBanner ? (
-              <RetentionBanner onChangeHeight={setBannerHeight} />
+              <RetentionBanner onChangeHeight={setRetentionBannerHeight} />
             ) : null}
+            <DemoProjectBanner onChangeHeight={setDemoBannerHeight} />
 
             <SideBar
               expanded={expanded}
