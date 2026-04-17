@@ -1,5 +1,6 @@
 """Shared CLI session runner for connect and endpoint commands."""
 
+import logging
 from typing import List, Optional
 
 import click
@@ -18,6 +19,8 @@ from .pairing import (
     run_pairing,
 )
 
+LOGGER = logging.getLogger(__name__)
+
 
 def _capture_cli_error(
     exception: Exception, error_type: str, **details: object
@@ -34,16 +37,22 @@ def _capture_cli_error(
 
 
 def run_cli_session(
-    ctx: click.Context,
     project_name: str,
     name: Optional[str],
     runner_type: RunnerType,
     command: Optional[List[str]] = None,
     watch: Optional[bool] = None,
     headless: bool = False,
+    api_key: Optional[str] = None,
+    workspace: Optional[str] = None,
 ) -> None:
-    api_key = ctx.obj.get("api_key") if ctx.obj else None
-    client = Opik(api_key=api_key, _show_misconfiguration_message=False)
+    client = Opik(api_key=api_key, workspace=workspace, _show_misconfiguration_message=False)
+
+    if not client.config.config_file_exists:
+        try:
+            client.config.save_to_file()
+        except OSError:
+            LOGGER.debug("Failed to save config file", exc_info=True)
     api = client.rest_client
     tui = RunnerTUI()
 

@@ -30,6 +30,17 @@ def _validate_command(command: Tuple[str, ...]) -> None:
 @click.option("--project", "project_name", required=True, help="Opik project name.")
 @click.option("--name", default=None, help="Runner name.")
 @click.option(
+    "--workspace",
+    default=None,
+    help="Opik workspace name. Overrides OPIK_WORKSPACE and config file.",
+)
+@click.option(
+    "--api-key",
+    "local_api_key",
+    default=None,
+    help="Opik API key. Overrides global --api-key and OPIK_API_KEY env var.",
+)
+@click.option(
     "--watch/--no-watch",
     default=None,
     help="Enable/disable file watcher. Auto-detected from command if omitted.",
@@ -46,6 +57,8 @@ def endpoint(
     ctx: click.Context,
     project_name: str,
     name: Optional[str],
+    workspace: Optional[str],
+    local_api_key: Optional[str],
     watch: Optional[bool],
     headless: bool,
     command: Tuple[str, ...],
@@ -63,12 +76,14 @@ def endpoint(
             "before running 'opik endpoint'."
         )
 
+    api_key = local_api_key or (ctx.obj.get("api_key") if ctx.obj else None)
     run_cli_session(
-        ctx=ctx,
         project_name=project_name,
         name=name,
         runner_type=RunnerType.ENDPOINT,
         command=list(command),
         watch=watch,
         headless=headless,
+        api_key=api_key,
+        workspace=workspace,
     )
