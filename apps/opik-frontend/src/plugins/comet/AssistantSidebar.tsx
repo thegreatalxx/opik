@@ -34,6 +34,7 @@ import {
   ASSISTANT_SIDEBAR_COLLAPSED_WIDTH,
   getStoredAssistantSidebarWidth,
   isAssistantSidebarOpen,
+  setAssistantSidebarOpen,
 } from "@/constants/assistantSidebar";
 
 const BRIDGE_PROTOCOL_VERSION = 1;
@@ -75,7 +76,7 @@ const AssistantSidebarLoader: React.FC<AssistantSidebarLoaderProps> = ({
   const handleToggle = useCallback(() => {
     setIsOpen((prev) => {
       const next = !prev;
-      localStorage.setItem("assistant-sidebar-open", String(next));
+      setAssistantSidebarOpen(next);
       onWidthChange(
         next
           ? getStoredAssistantSidebarWidth()
