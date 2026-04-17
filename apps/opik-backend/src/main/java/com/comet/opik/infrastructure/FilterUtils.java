@@ -1,6 +1,9 @@
 package com.comet.opik.infrastructure;
 
 import com.comet.opik.api.DatasetVersionCreate;
+import com.comet.opik.api.filter.Filter;
+import com.comet.opik.api.filter.Operator;
+import com.comet.opik.api.filter.TraceThreadField;
 import com.comet.opik.domain.IdGenerator;
 import com.comet.opik.domain.TraceSearchCriteria;
 import com.comet.opik.domain.filter.FilterQueryBuilder;
@@ -24,7 +27,7 @@ import java.util.stream.IntStream;
 
 @UtilityClass
 @Slf4j
-public class DatabaseUtils {
+public class FilterUtils {
 
     public static final int ANALYTICS_DELETE_BATCH_SIZE = 10000;
     public static final int UUID_POOL_MULTIPLIER = 2;
@@ -105,32 +108,38 @@ public class DatabaseUtils {
         var template = TemplateUtils.newST(query);
         Optional.ofNullable(traceSearchCriteria.filters())
                 .ifPresent(filters -> {
-                    FilterQueryBuilder.toAnalyticsDbFilters(filters, FilterStrategy.TRACE)
+                    var outerFilters = withoutTraceThreadIdPushdown(filters);
+
+                    FilterQueryBuilder.toAnalyticsDbFilters(outerFilters, FilterStrategy.TRACE)
                             .ifPresent(traceFilters -> template.add("filters", traceFilters));
-                    FilterQueryBuilder.toAnalyticsDbFilters(filters, FilterStrategy.TRACE_AGGREGATION)
+                    FilterQueryBuilder.toAnalyticsDbFilters(outerFilters, FilterStrategy.TRACE_AGGREGATION)
                             .ifPresent(traceAggregationFilters -> template.add("trace_aggregation_filters",
                                     traceAggregationFilters));
-                    FilterQueryBuilder.toAnalyticsDbFilters(filters, FilterStrategy.FEEDBACK_SCORES)
+                    FilterQueryBuilder.toAnalyticsDbFilters(outerFilters, FilterStrategy.FEEDBACK_SCORES)
                             .ifPresent(scoresFilters -> template.add("feedback_scores_filters", scoresFilters));
-                    FilterQueryBuilder.toAnalyticsDbFilters(filters, FilterStrategy.TRACE_SPAN_FEEDBACK_SCORES)
+                    FilterQueryBuilder.toAnalyticsDbFilters(outerFilters, FilterStrategy.TRACE_SPAN_FEEDBACK_SCORES)
                             .ifPresent(spanScoresFilters -> template.add("span_feedback_scores_filters",
                                     spanScoresFilters));
-                    FilterQueryBuilder.toAnalyticsDbFilters(filters, FilterStrategy.ANNOTATION_AGGREGATION)
+                    FilterQueryBuilder.toAnalyticsDbFilters(outerFilters, FilterStrategy.ANNOTATION_AGGREGATION)
                             .ifPresent(traceAnnotationFilters -> template.add("annotation_queue_filters",
                                     traceAnnotationFilters));
-                    FilterQueryBuilder.toAnalyticsDbFilters(filters, FilterStrategy.EXPERIMENT_AGGREGATION)
+                    FilterQueryBuilder.toAnalyticsDbFilters(outerFilters, FilterStrategy.EXPERIMENT_AGGREGATION)
                             .ifPresent(traceExperimentFilters -> template.add("experiment_filters",
                                     traceExperimentFilters));
-                    FilterQueryBuilder.toAnalyticsDbFilters(filters, FilterStrategy.TRACE_THREAD)
+                    FilterQueryBuilder.toAnalyticsDbFilters(outerFilters, FilterStrategy.TRACE_THREAD)
                             .ifPresent(threadFilters -> template.add("trace_thread_filters", threadFilters));
-                    FilterQueryBuilder.toAnalyticsDbFilters(filters, FilterStrategy.FEEDBACK_SCORES_IS_EMPTY)
+                    FilterQueryBuilder.toAnalyticsDbFilters(outerFilters, FilterStrategy.FEEDBACK_SCORES_IS_EMPTY)
                             .ifPresent(feedbackScoreIsEmptyFilters -> template.add("feedback_scores_empty_filters",
                                     feedbackScoreIsEmptyFilters));
-                    FilterQueryBuilder.toAnalyticsDbFilters(filters, FilterStrategy.TRACE_SPAN_FEEDBACK_SCORES_IS_EMPTY)
+                    FilterQueryBuilder.toAnalyticsDbFilters(outerFilters,
+                            FilterStrategy.TRACE_SPAN_FEEDBACK_SCORES_IS_EMPTY)
                             .ifPresent(feedbackScoreIsEmptyFilters -> template.add("span_feedback_scores_empty_filters",
                                     feedbackScoreIsEmptyFilters));
                     FilterQueryBuilder.hasGuardrailsFilter(filters)
                             .ifPresent(hasGuardrailsFilter -> template.add("guardrails_filters", true));
+
+                    findTraceThreadIdPushdownFilter(filters)
+                            .ifPresent(idFilter -> template.add("traces_pushdown_filter", true));
                 });
         Optional.ofNullable(traceSearchCriteria.lastReceivedId())
                 .ifPresent(lastReceivedTraceId -> template.add("last_received_id", lastReceivedTraceId));
@@ -149,16 +158,23 @@ public class DatabaseUtils {
     public static void bindTraceThreadSearchCriteria(TraceSearchCriteria traceSearchCriteria, Statement statement) {
         Optional.ofNullable(traceSearchCriteria.filters())
                 .ifPresent(filters -> {
-                    FilterQueryBuilder.bind(statement, filters, FilterStrategy.TRACE);
-                    FilterQueryBuilder.bind(statement, filters, FilterStrategy.TRACE_AGGREGATION);
-                    FilterQueryBuilder.bind(statement, filters, FilterStrategy.FEEDBACK_SCORES);
-                    FilterQueryBuilder.bind(statement, filters, FilterStrategy.TRACE_SPAN_FEEDBACK_SCORES);
-                    FilterQueryBuilder.bind(statement, filters, FilterStrategy.ANNOTATION_AGGREGATION);
-                    FilterQueryBuilder.bind(statement, filters, FilterStrategy.EXPERIMENT_AGGREGATION);
-                    FilterQueryBuilder.bind(statement, filters, FilterStrategy.TRACE_THREAD);
-                    FilterQueryBuilder.bind(statement, filters, FilterStrategy.FEEDBACK_SCORES_IS_EMPTY);
-                    FilterQueryBuilder.bind(statement, filters, FilterStrategy.TRACE_SPAN_FEEDBACK_SCORES_IS_EMPTY);
+                    var outerFilters = withoutTraceThreadIdPushdown(filters);
+
+                    FilterQueryBuilder.bind(statement, outerFilters, FilterStrategy.TRACE);
+                    FilterQueryBuilder.bind(statement, outerFilters, FilterStrategy.TRACE_AGGREGATION);
+                    FilterQueryBuilder.bind(statement, outerFilters, FilterStrategy.FEEDBACK_SCORES);
+                    FilterQueryBuilder.bind(statement, outerFilters, FilterStrategy.TRACE_SPAN_FEEDBACK_SCORES);
+                    FilterQueryBuilder.bind(statement, outerFilters, FilterStrategy.ANNOTATION_AGGREGATION);
+                    FilterQueryBuilder.bind(statement, outerFilters, FilterStrategy.EXPERIMENT_AGGREGATION);
+                    FilterQueryBuilder.bind(statement, outerFilters, FilterStrategy.TRACE_THREAD);
+                    FilterQueryBuilder.bind(statement, outerFilters, FilterStrategy.FEEDBACK_SCORES_IS_EMPTY);
+                    FilterQueryBuilder.bind(statement, outerFilters,
+                            FilterStrategy.TRACE_SPAN_FEEDBACK_SCORES_IS_EMPTY);
+
+                    findTraceThreadIdPushdownFilter(filters)
+                            .ifPresent(idFilter -> statement.bind("thread_id_pushdown", idFilter.value()));
                 });
+
         Optional.ofNullable(traceSearchCriteria.lastReceivedId())
                 .ifPresent(lastReceivedTraceId -> statement.bind("last_received_id", lastReceivedTraceId));
         // Bind UUID BETWEEN bounds for time-based filtering
@@ -169,6 +185,19 @@ public class DatabaseUtils {
 
         Optional.ofNullable(traceSearchCriteria.searchText())
                 .ifPresent(searchText -> statement.bind("search_text", "%" + searchText + "%"));
+    }
+
+    private static Optional<? extends Filter> findTraceThreadIdPushdownFilter(List<? extends Filter> filters) {
+        return filters.stream()
+                .filter(f -> f.field() == TraceThreadField.ID && f.operator() == Operator.EQUAL)
+                .findFirst();
+    }
+
+    private static List<? extends Filter> withoutTraceThreadIdPushdown(List<? extends Filter> filters) {
+        return findTraceThreadIdPushdownFilter(filters)
+                .<List<? extends Filter>>map(
+                        pushdown -> filters.stream().filter(f -> f != pushdown).collect(Collectors.toList()))
+                .orElse(filters);
     }
 
     public static ST getSTWithLogComment(String query, String queryName, String workspaceId, String userName,

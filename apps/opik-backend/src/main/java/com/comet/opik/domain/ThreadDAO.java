@@ -35,10 +35,9 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
-import static com.comet.opik.domain.AsyncContextUtils.bindWorkspaceIdToFlux;
-import static com.comet.opik.domain.AsyncContextUtils.bindWorkspaceIdToMono;
-import static com.comet.opik.infrastructure.DatabaseUtils.bindTraceThreadSearchCriteria;
-import static com.comet.opik.infrastructure.DatabaseUtils.newTraceThreadFindTemplate;
+import static com.comet.opik.infrastructure.FilterUtils.bindTraceThreadSearchCriteria;
+import static com.comet.opik.infrastructure.FilterUtils.getLogComment;
+import static com.comet.opik.infrastructure.FilterUtils.newTraceThreadFindTemplate;
 import static com.comet.opik.infrastructure.instrumentation.InstrumentAsyncUtils.endSegment;
 import static com.comet.opik.infrastructure.instrumentation.InstrumentAsyncUtils.startSegment;
 import static com.comet.opik.utils.AsyncUtils.makeFluxContextAware;
@@ -74,31 +73,72 @@ class ThreadDAOImpl implements ThreadDAO {
      * Please refer to the SELECT_TRACES_THREAD_BY_ID query for more details.
      ***/
     private static final String SELECT_TRACES_THREADS_BY_PROJECT_IDS = """
-            WITH traces_final AS (
+            WITH traces_final_ids AS (
+                SELECT id, thread_id
+                FROM (
+                    SELECT *
+                    FROM traces
+                    WHERE workspace_id = :workspace_id
+                    AND project_id = :project_id
+                    AND thread_id \\<> ''
+                    <if(uuid_from_time)> AND id >= :uuid_from_time <endif>
+                    <if(uuid_to_time)> AND id \\<= :uuid_to_time <endif>
+                    <if(traces_pushdown_filter)> AND thread_id = :thread_id_pushdown <endif>
+                    ORDER BY (workspace_id, project_id, id) DESC, last_updated_at DESC
+                    LIMIT 1 BY id
+                )
+                WHERE 1 = 1
+                <if(filters)> AND <filters> <endif>
+                <if(search_text)> AND <search_text> <endif>
+            ), traces_final AS (
                 SELECT
-                    *,
+                    id,
+                    workspace_id,
+                    project_id,
+                    thread_id,
+                    start_time,
+                    end_time,
+                    input,
+                    output,
                     truncated_input,
                     truncated_output,
                     input_length,
-                    output_length
-                FROM traces final
+                    output_length,
+                    truncation_threshold,
+                    last_updated_at,
+                    last_updated_by,
+                    created_by,
+                    created_at
+                FROM traces
                 WHERE workspace_id = :workspace_id
                   AND project_id = :project_id
-                  AND thread_id \\<> ''
-                  <if(uuid_from_time)> AND id >= :uuid_from_time <endif>
-                  <if(uuid_to_time)> AND id \\<= :uuid_to_time <endif>
-                  <if(search_text)> AND <search_text> <endif>
-                  <if(filters)> AND <filters> <endif>
+                  AND id IN (SELECT id FROM traces_final_ids)
+                ORDER BY (workspace_id, project_id, id) DESC, last_updated_at DESC
+                LIMIT 1 BY id
+            ), spans_deduped AS (
+                SELECT
+                    workspace_id,
+                    project_id,
+                    trace_id,
+                    parent_span_id,
+                    id,
+                    last_updated_at,
+                    usage,
+                    total_estimated_cost,
+                    provider
+                FROM spans
+                WHERE workspace_id = :workspace_id
+                  AND project_id = :project_id
+                  AND trace_id IN (SELECT id FROM traces_final_ids)
+                ORDER BY (workspace_id, project_id, trace_id, parent_span_id, id) DESC, last_updated_at DESC
+                LIMIT 1 BY (workspace_id, project_id, trace_id, parent_span_id, id)
             ), spans_agg AS (
                 SELECT
                     trace_id,
                     sumMap(usage) as usage,
                     sum(total_estimated_cost) as total_estimated_cost,
                     arraySort(groupUniqArrayIf(provider, provider != '')) as providers
-                FROM spans final
-                WHERE workspace_id = :workspace_id
-                  AND project_id = :project_id
-                  AND trace_id IN (SELECT DISTINCT id FROM traces_final)
+                FROM spans_deduped
                 GROUP BY workspace_id, project_id, trace_id
             ), trace_threads_final AS (
                 SELECT
@@ -112,15 +152,18 @@ class ThreadDAOImpl implements ThreadDAO {
                     last_updated_by,
                     created_at,
                     last_updated_at
-                FROM trace_threads final
+                FROM trace_threads
                 WHERE workspace_id = :workspace_id
                 AND project_id = :project_id
                 <if(uuid_from_time)>
                     AND id >= :uuid_from_time
                     <if(uuid_to_time)>AND id \\<= :uuid_to_time<endif>
                 <else>
-                AND thread_id IN (SELECT thread_id FROM traces_final)
+                AND thread_id IN (SELECT thread_id FROM traces_final_ids)
                 <endif>
+                <if(traces_pushdown_filter)> AND thread_id = :thread_id_pushdown <endif>
+                ORDER BY (workspace_id, project_id, thread_id, id) DESC, last_updated_at DESC
+                LIMIT 1 BY (workspace_id, project_id, thread_id, id)
             ), feedback_scores_deduped AS (
                 SELECT *
                 FROM (
@@ -359,6 +402,7 @@ class ThreadDAOImpl implements ThreadDAO {
             <if(sort_fields)> ORDER BY <sort_fields>, last_updated_at DESC <else> ORDER BY last_updated_at DESC, start_time ASC, end_time DESC <endif>
             <endif>
             LIMIT :limit <if(offset)>OFFSET :offset<endif>
+            SETTINGS log_comment = '<log_comment>'
             ;
             """;
 
@@ -368,27 +412,67 @@ class ThreadDAOImpl implements ThreadDAO {
      * Please refer to the SELECT_TRACES_THREAD_BY_ID query for more details.
      ***/
     private static final String SELECT_COUNT_TRACES_THREADS_BY_PROJECT_IDS = """
-            WITH traces_final AS (
+            WITH traces_final_ids AS (
+                SELECT id, thread_id
+                FROM (
+                    SELECT *
+                    FROM traces
+                    WHERE workspace_id = :workspace_id
+                    AND project_id = :project_id
+                    AND thread_id \\<> ''
+                    <if(uuid_from_time)> AND id >= :uuid_from_time <endif>
+                    <if(uuid_to_time)> AND id \\<= :uuid_to_time <endif>
+                    <if(traces_pushdown_filter)> AND thread_id = :thread_id_pushdown <endif>
+                    ORDER BY (workspace_id, project_id, id) DESC, last_updated_at DESC
+                    LIMIT 1 BY id
+                )
+                WHERE 1 = 1
+                <if(filters)> AND <filters> <endif>
+                <if(search_text)> AND <search_text> <endif>
+            ), traces_final AS (
                 SELECT
-                    *
-                FROM traces final
+                    id,
+                    workspace_id,
+                    project_id,
+                    thread_id,
+                    start_time,
+                    end_time,
+                    input,
+                    output,
+                    last_updated_at,
+                    last_updated_by,
+                    created_by,
+                    created_at
+                FROM traces
                 WHERE workspace_id = :workspace_id
                   AND project_id = :project_id
-                  AND thread_id \\<> ''
-                  <if(uuid_from_time)> AND id >= :uuid_from_time <endif>
-                  <if(uuid_to_time)> AND id \\<= :uuid_to_time <endif>
-                  <if(search_text)> AND <search_text> <endif>
-                  <if(filters)> AND <filters> <endif>
+                  AND id IN (SELECT id FROM traces_final_ids)
+                ORDER BY (workspace_id, project_id, id) DESC, last_updated_at DESC
+                LIMIT 1 BY id
+            ), spans_deduped AS (
+                SELECT
+                    workspace_id,
+                    project_id,
+                    trace_id,
+                    parent_span_id,
+                    id,
+                    last_updated_at,
+                    usage,
+                    total_estimated_cost,
+                    provider
+                FROM spans
+                WHERE workspace_id = :workspace_id
+                  AND project_id = :project_id
+                  AND trace_id IN (SELECT id FROM traces_final_ids)
+                ORDER BY (workspace_id, project_id, trace_id, parent_span_id, id) DESC, last_updated_at DESC
+                LIMIT 1 BY (workspace_id, project_id, trace_id, parent_span_id, id)
             ), spans_agg AS (
                 SELECT
                     trace_id,
                     sumMap(usage) as usage,
                     sum(total_estimated_cost) as total_estimated_cost,
                     arraySort(groupUniqArrayIf(provider, provider != '')) as providers
-                FROM spans final
-                WHERE workspace_id = :workspace_id
-                  AND project_id = :project_id
-                  AND trace_id IN (SELECT DISTINCT id FROM traces_final)
+                FROM spans_deduped
                 GROUP BY workspace_id, project_id, trace_id
             ), trace_threads_final AS (
                 SELECT
@@ -402,15 +486,17 @@ class ThreadDAOImpl implements ThreadDAO {
                     last_updated_by,
                     created_at,
                     last_updated_at
-                FROM trace_threads final
+                FROM trace_threads
                 WHERE workspace_id = :workspace_id
                 AND project_id = :project_id
                 <if(uuid_from_time)>
                     AND id >= :uuid_from_time
                     <if(uuid_to_time)>AND id \\<= :uuid_to_time<endif>
                 <else>
-                AND thread_id IN (SELECT thread_id FROM traces_final)
+                AND thread_id IN (SELECT thread_id FROM traces_final_ids)
                 <endif>
+                ORDER BY (workspace_id, project_id, thread_id, id) DESC, last_updated_at DESC
+                LIMIT 1 BY (workspace_id, project_id, thread_id, id)
             ), feedback_scores_deduped AS (
                 SELECT *
                 FROM (
@@ -613,6 +699,7 @@ class ThreadDAOImpl implements ThreadDAO {
                 <if(trace_thread_filters)>AND<trace_thread_filters><endif>
                 <if(annotation_queue_filters)> AND <annotation_queue_filters> <endif>
             ) AS t
+            SETTINGS log_comment = '<log_comment>'
             """;
 
     /***
@@ -859,6 +946,7 @@ class ThreadDAOImpl implements ThreadDAO {
             LEFT JOIN trace_threads_final AS tt ON t.workspace_id = tt.workspace_id AND t.project_id = tt.project_id AND t.thread_id = tt.thread_id
             LEFT JOIN feedback_scores_agg fsagg ON fsagg.entity_id = tt.thread_model_id
             LEFT JOIN comments_final c ON c.entity_id = tt.thread_model_id
+            SETTINGS log_comment = '<log_comment>'
             """;
 
     /***
@@ -907,6 +995,7 @@ class ThreadDAOImpl implements ThreadDAO {
                     <if(search_text)> AND <search_text> <endif>
                     <if(uuid_from_time)>AND id >= :uuid_from_time<endif>
                     <if(uuid_to_time)>AND id \\<= :uuid_to_time<endif>
+                    <if(traces_pushdown_filter)> AND thread_id = :thread_id_pushdown <endif>
                     <if(filters)> AND <filters> <endif>
                 ), spans_agg AS (
                     SELECT
@@ -1122,6 +1211,7 @@ class ThreadDAOImpl implements ThreadDAO {
                 <if(annotation_queue_filters)> AND <annotation_queue_filters> <endif>
             ) AS threads
             GROUP BY threads.workspace_id, threads.project_id
+            SETTINGS log_comment = '<log_comment>'
             ;
             """;
 
@@ -1133,65 +1223,73 @@ class ThreadDAOImpl implements ThreadDAO {
     @WithSpan
     public Mono<TraceThread.TraceThreadPage> find(int size, int page, @NonNull TraceSearchCriteria criteria) {
 
-        return asyncTemplate.nonTransaction(connection -> countThreadTotal(criteria, connection)
-                .flatMap(count -> {
+        return makeMonoContextAware((userName, workspaceId) -> asyncTemplate
+                .nonTransaction(connection -> countThreadTotal(criteria, connection, userName, workspaceId)
+                        .flatMap(count -> {
 
-                    int offset = (page - 1) * size;
+                            int offset = (page - 1) * size;
 
-                    var template = newTraceThreadFindTemplate(SELECT_TRACES_THREADS_BY_PROJECT_IDS, criteria,
-                            THREAD_SEARCH_CLAUSE);
+                            var template = newTraceThreadFindTemplate(SELECT_TRACES_THREADS_BY_PROJECT_IDS, criteria,
+                                    THREAD_SEARCH_CLAUSE);
 
-                    template = ImageUtils.addTruncateToTemplate(template, criteria.truncate());
+                            template = ImageUtils.addTruncateToTemplate(template, criteria.truncate());
 
-                    template = template.add("offset", offset);
+                            template = template.add("offset", offset)
+                                    .add("log_comment", getLogComment("find_threads_by_project", workspaceId, userName,
+                                            "page:" + page + ":size:" + size));
 
-                    var finalTemplate = template;
-                    Optional.ofNullable(sortingQueryBuilder.toOrderBySql(criteria.sortingFields()))
-                            .ifPresent(sortFields -> finalTemplate.add("sort_fields", sortFields));
+                            var finalTemplate = template;
+                            Optional.ofNullable(sortingQueryBuilder.toOrderBySql(criteria.sortingFields()))
+                                    .ifPresent(sortFields -> finalTemplate.add("sort_fields", sortFields));
 
-                    var hasDynamicKeys = sortingQueryBuilder.hasDynamicKeys(criteria.sortingFields());
+                            var hasDynamicKeys = sortingQueryBuilder.hasDynamicKeys(criteria.sortingFields());
 
-                    var statement = connection.createStatement(template.render())
-                            .bind("project_id", criteria.projectId())
-                            .bind("limit", size)
-                            .bind("offset", offset);
+                            var statement = connection.createStatement(template.render())
+                                    .bind("project_id", criteria.projectId())
+                                    .bind("limit", size)
+                                    .bind("offset", offset)
+                                    .bind("workspace_id", workspaceId);
 
-                    if (hasDynamicKeys) {
-                        statement = sortingQueryBuilder.bindDynamicKeys(statement, criteria.sortingFields());
-                    }
+                            if (hasDynamicKeys) {
+                                statement = sortingQueryBuilder.bindDynamicKeys(statement, criteria.sortingFields());
+                            }
 
-                    bindTraceThreadSearchCriteria(criteria, statement);
+                            bindTraceThreadSearchCriteria(criteria, statement);
 
-                    InstrumentAsyncUtils.Segment segment = startSegment("threads", "Clickhouse", "findThreads");
+                            InstrumentAsyncUtils.Segment segment = startSegment("threads", "Clickhouse", "findThreads");
 
-                    return makeFluxContextAware(bindWorkspaceIdToFlux(statement))
-                            .flatMap(this::mapThreadToDto)
-                            .collectList()
-                            .doFinally(signalType -> endSegment(segment))
-                            .map(threads -> new TraceThread.TraceThreadPage(page, threads.size(), count, threads,
-                                    traceThreadSortingFactory.getSortableFields()))
-                            .defaultIfEmpty(TraceThread.TraceThreadPage.empty(page,
-                                    traceThreadSortingFactory.getSortableFields()));
-                }));
+                            return Flux.from(statement.execute())
+                                    .flatMap(this::mapThreadToDto)
+                                    .collectList()
+                                    .doFinally(signalType -> endSegment(segment))
+                                    .map(threads -> new TraceThread.TraceThreadPage(page, threads.size(), count,
+                                            threads,
+                                            traceThreadSortingFactory.getSortableFields()))
+                                    .defaultIfEmpty(TraceThread.TraceThreadPage.empty(page,
+                                            traceThreadSortingFactory.getSortableFields()));
+                        })));
     }
 
     @Override
     public Mono<TraceThread> findById(@NonNull UUID projectId, @NonNull String threadId, boolean truncate) {
-        return asyncTemplate.nonTransaction(connection -> {
+        return makeMonoContextAware((userName, workspaceId) -> asyncTemplate.nonTransaction(connection -> {
             var template = TemplateUtils.newST(SELECT_TRACES_THREAD_BY_ID);
-            template.add("truncate", truncate);
+            template.add("truncate", truncate)
+                    .add("log_comment",
+                            getLogComment("find_thread_by_id", workspaceId, userName, threadId));
 
             var statement = connection.createStatement(template.render())
                     .bind("project_id", projectId)
-                    .bind("thread_id", threadId);
+                    .bind("thread_id", threadId)
+                    .bind("workspace_id", workspaceId);
 
             InstrumentAsyncUtils.Segment segment = startSegment("threads", "Clickhouse", "findThreadById");
 
-            return makeMonoContextAware(bindWorkspaceIdToMono(statement))
+            return Mono.from(statement.execute())
                     .flatMapMany(this::mapThreadToDto)
                     .singleOrEmpty()
                     .doFinally(signalType -> endSegment(segment));
-        });
+        }));
     }
 
     @Override
@@ -1199,26 +1297,29 @@ class ThreadDAOImpl implements ThreadDAO {
     public Flux<TraceThread> search(int limit, @NonNull TraceSearchCriteria criteria) {
         Preconditions.checkArgument(limit > 0, "limit must be greater than 0");
 
-        return asyncTemplate.stream(connection -> {
+        return makeFluxContextAware((userName, workspaceId) -> asyncTemplate.stream(connection -> {
 
             var template = newTraceThreadFindTemplate(SELECT_TRACES_THREADS_BY_PROJECT_IDS, criteria,
                     THREAD_SEARCH_CLAUSE);
             template = ImageUtils.addTruncateToTemplate(template, criteria.truncate());
 
             template.add("limit", limit)
-                    .add("stream", true);
+                    .add("stream", true)
+                    .add("log_comment", getLogComment("search_threads", workspaceId, userName,
+                            "limit:" + limit));
 
             var statement = connection.createStatement(template.render())
                     .bind("project_id", criteria.projectId())
-                    .bind("limit", limit);
+                    .bind("limit", limit)
+                    .bind("workspace_id", workspaceId);
 
             bindTraceThreadSearchCriteria(criteria, statement);
 
             InstrumentAsyncUtils.Segment segment = startSegment("threads", "Clickhouse", "threadsSearch");
 
-            return makeFluxContextAware(bindWorkspaceIdToFlux(statement))
+            return Flux.from(statement.execute())
                     .doFinally(signalType -> endSegment(segment));
-        })
+        }))
                 .flatMap(this::mapThreadToDto)
                 .buffer(limit > 100 ? limit / 2 : limit)
                 .concatWith(Mono.just(List.of()))
@@ -1228,40 +1329,45 @@ class ThreadDAOImpl implements ThreadDAO {
 
     @Override
     public Mono<ProjectStats> getThreadStats(@NonNull TraceSearchCriteria criteria) {
-        return asyncTemplate.nonTransaction(connection -> {
+        return makeMonoContextAware((userName, workspaceId) -> asyncTemplate.nonTransaction(connection -> {
 
             var statsSQL = newTraceThreadFindTemplate(SELECT_TRACE_THREADS_STATS, criteria, THREAD_SEARCH_CLAUSE);
+            statsSQL.add("log_comment", getLogComment("thread_stats", workspaceId, userName, ""));
 
             var statement = connection.createStatement(statsSQL.render())
-                    .bind("project_id", criteria.projectId());
+                    .bind("project_id", criteria.projectId())
+                    .bind("workspace_id", workspaceId);
 
             bindTraceThreadSearchCriteria(criteria, statement);
 
             InstrumentAsyncUtils.Segment segment = startSegment("threads", "Clickhouse", "stats");
 
-            return makeFluxContextAware(bindWorkspaceIdToFlux(statement))
+            return Flux.from(statement.execute())
                     .doFinally(signalType -> endSegment(segment))
                     .flatMap(
                             result -> result
                                     .map((row, rowMetadata) -> StatsMapper.mapProjectStats(row, "thread_count")))
                     .singleOrEmpty();
-        });
+        }));
     }
 
-    private Mono<Long> countThreadTotal(TraceSearchCriteria traceSearchCriteria, Connection connection) {
+    private Mono<Long> countThreadTotal(TraceSearchCriteria traceSearchCriteria, Connection connection,
+            String userName, String workspaceId) {
         var template = newTraceThreadFindTemplate(SELECT_COUNT_TRACES_THREADS_BY_PROJECT_IDS, traceSearchCriteria,
                 THREAD_SEARCH_CLAUSE);
+        template.add("log_comment", getLogComment("count_threads_by_project", workspaceId, userName, ""));
 
         var statement = connection.createStatement(template.render())
-                .bind("project_id", traceSearchCriteria.projectId());
+                .bind("project_id", traceSearchCriteria.projectId())
+                .bind("workspace_id", workspaceId);
 
         bindTraceThreadSearchCriteria(traceSearchCriteria, statement);
 
         InstrumentAsyncUtils.Segment segment = startSegment("threads", "Clickhouse", "countThreads");
 
-        return makeMonoContextAware(bindWorkspaceIdToMono(statement))
+        return Flux.from(statement.execute())
                 .doFinally(signalType -> endSegment(segment))
-                .flatMapMany(result -> result.map((row, rowMetadata) -> row.get("count", Long.class)))
+                .flatMap(result -> result.map((row, rowMetadata) -> row.get("count", Long.class)))
                 .reduce(0L, Long::sum);
     }
 
