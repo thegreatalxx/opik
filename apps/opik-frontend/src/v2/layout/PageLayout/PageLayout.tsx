@@ -58,9 +58,14 @@ const PageLayout = () => {
 
   const isAssistantOpen =
     assistantSidebarWidth > ASSISTANT_SIDEBAR_COLLAPSED_WIDTH;
-
-  const assistantWrapperWidth =
-    isPhone && isAssistantOpen ? "100vw" : `${assistantSidebarWidth}px`;
+  // On phones when the assistant is open, render it as a fixed overlay so it
+  // doesn't consume flex-row width and collapse main content. The layout var
+  // stays 0px so `.comet-content-inset`'s calc resolves correctly.
+  const isPhoneAssistantOverlay = isPhone && isAssistantOpen;
+  const layoutAssistantWidth =
+    showAssistantSidebar && !isPhoneAssistantOverlay
+      ? `${assistantSidebarWidth}px`
+      : "0px";
 
   const expanded = isPhone
     ? false
@@ -102,9 +107,7 @@ const PageLayout = () => {
         {
           "--banner-height": `${bannerHeight}px`,
           "--sidebar-width": expanded ? "240px" : "54px",
-          "--assistant-sidebar-width": showAssistantSidebar
-            ? assistantWrapperWidth
-            : "0px",
+          "--assistant-sidebar-width": layoutAssistantWidth,
         } as React.CSSProperties
       }
     >
@@ -141,8 +144,16 @@ const PageLayout = () => {
 
         {showAssistantSidebar ? (
           <div
-            className="relative z-[1] shrink-0"
-            style={{ width: assistantWrapperWidth }}
+            className={
+              isPhoneAssistantOverlay
+                ? "fixed inset-0 z-40"
+                : "relative z-[1] shrink-0"
+            }
+            style={
+              isPhoneAssistantOverlay
+                ? undefined
+                : { width: `${assistantSidebarWidth}px` }
+            }
           >
             <SilentErrorBoundary>
               <AssistantSidebar onWidthChange={setAssistantSidebarWidth} />
