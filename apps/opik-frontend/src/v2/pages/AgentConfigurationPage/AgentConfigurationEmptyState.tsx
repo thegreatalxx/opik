@@ -62,7 +62,7 @@ const AgentConfigurationEmptyState: React.FC = () => {
         <Button variant="outline" size="sm" asChild>
           <a
             // TODO: Add correct URL when docs ready
-            href={buildDocsUrl()}
+            href={buildDocsUrl("/development/agent-configuration/overview")}
             target="_blank"
             rel="noreferrer"
           >
