@@ -375,7 +375,7 @@ const DashboardsPage: React.FunctionComponent = () => {
           }
           primaryActionLabel="Create your first dashboard"
           onPrimaryAction={handleNewDashboardClick}
-          docsUrl={buildDocsUrl("/production/dashboards")}
+          docsUrl={buildDocsUrl("/tracing/dashboards/dashboards")}
         />
       ) : (
         <>

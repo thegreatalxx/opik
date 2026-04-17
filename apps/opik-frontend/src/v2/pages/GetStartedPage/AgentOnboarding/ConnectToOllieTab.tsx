@@ -81,7 +81,7 @@ const ConnectToOllieTab: React.FC<ConnectToOllieTabProps> = ({ connected }) => {
                   Run the command above in your repo. Once connected, Ollie can
                   inspect your code and help finish setup.{" "}
                   <a
-                    href={buildDocsUrl("/agents/local-runner#troubleshooting")}
+                    href={buildDocsUrl("/faq#troubleshooting")}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="underline hover:text-foreground"
