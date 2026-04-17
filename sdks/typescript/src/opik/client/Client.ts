@@ -1958,25 +1958,35 @@ export class OpikClient {
     }
   }
 
-  /** Waits for all unsynced BasePrompt values to be ready. Returns true if timed out. */
-  private async _awaitConfigPromptValues(values: Record<string, unknown>): Promise<boolean> {
-    const pending = Object.values(values)
-      .filter((v): v is BasePrompt => v instanceof BasePrompt && !v.synced)
-      .map((v) => v.ready());
-    if (pending.length === 0) return false;
+  /**
+   * Waits for all unsynced BasePrompt values in `values` to finish syncing,
+   * with a timeout. Returns true only when every prompt is synced.
+   */
+  private async _allPromptsSynced(values: Record<string, unknown>): Promise<boolean> {
+    const prompts = Object.values(values).filter(
+      (v): v is BasePrompt => v instanceof BasePrompt && !v.synced
+    );
+    if (prompts.length === 0) return true;
+
     const TIMED_OUT = Symbol();
     let timerId: ReturnType<typeof setTimeout> | undefined;
     try {
       const result = await Promise.race([
-        Promise.allSettled(pending).then(() => undefined),
+        Promise.allSettled(prompts.map((v) => v.ready())).then(() => undefined),
         new Promise<typeof TIMED_OUT>((resolve) => {
           timerId = setTimeout(() => resolve(TIMED_OUT), AGENT_CONFIG_PROMPT_READY_TIMEOUT_MS);
         }),
       ]);
-      return result === TIMED_OUT;
+      if (result === TIMED_OUT) {
+        logger.debug("Timed out waiting for prompt sync before creating config.");
+        return false;
+      }
     } finally {
       clearTimeout(timerId);
     }
+
+    // ready() resolved, but some prompts may have failed to sync.
+    return prompts.every((v) => v.synced);
   }
 
   private _makeFallbackConfig<T extends Record<string, unknown>>(
@@ -2121,9 +2131,8 @@ export class OpikClient {
 
     // Before auto-creating from fallback, wait for any unsynced prompts to finish syncing.
     // Unsynced prompts lack commit/id, which would produce broken blueprint values.
-    const timedOut = await this._awaitConfigPromptValues(fallback as Record<string, unknown>);
-    if (timedOut) {
-      logger.warn("Timed out waiting for prompt sync before creating config; using fallback values.");
+    const allSynced = await this._allPromptsSynced(fallback as Record<string, unknown>);
+    if (!allSynced) {
       return this._makeFallbackConfig(fallback, maskId);
     }
 

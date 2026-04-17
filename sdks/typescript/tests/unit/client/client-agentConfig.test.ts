@@ -825,4 +825,23 @@ describe("getOrCreateConfig — prompt readiness before auto-create", () => {
 
     vi.useRealTimers();
   });
+
+  it("returns fallback when prompt sync failed (ready resolved but synced is false)", async () => {
+    // Empty project: both env and latest return 404
+    vi.spyOn(client.api.agentConfigs, "getBlueprintByEnv").mockRejectedValue(notFound);
+    vi.spyOn(client.api.agentConfigs, "getLatestBlueprint").mockRejectedValue(notFound);
+    const createSpy = vi.spyOn(client.api.agentConfigs, "createAgentConfig").mockImplementation(mockAPIFunction);
+
+    // Prompt whose ready() resolves immediately but synced stays false (sync failed)
+    const prompt = Object.create(Prompt.prototype) as InstanceType<typeof Prompt>;
+    Object.defineProperty(prompt, "synced", { get: () => false, configurable: true });
+    Object.defineProperty(prompt, "commit", { get: () => undefined, configurable: true });
+    Object.defineProperty(prompt, "ready", { value: () => Promise.resolve(), configurable: true });
+
+    const config = await callInsideTrack({ system_prompt: prompt });
+
+    expect(createSpy).not.toHaveBeenCalled();
+    expect(config.isFallback).toBe(true);
+    expect(config.system_prompt).toBe(prompt);
+  });
 });
