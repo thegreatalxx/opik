@@ -806,24 +806,37 @@ describe("getOrCreateConfig — prompt readiness before auto-create", () => {
   it("returns fallback when prompt sync times out before auto-creating config", async () => {
     vi.useFakeTimers();
 
-    // Empty project: both env and latest return 404
-    vi.spyOn(client.api.agentConfigs, "getBlueprintByEnv").mockRejectedValue(notFound);
-    vi.spyOn(client.api.agentConfigs, "getLatestBlueprint").mockRejectedValue(notFound);
-    const createSpy = vi.spyOn(client.api.agentConfigs, "createAgentConfig").mockImplementation(mockAPIFunction);
+    try {
+      // Empty project: both env and latest return 404
+      vi.spyOn(client.api.agentConfigs, "getBlueprintByEnv").mockRejectedValue(notFound);
+      vi.spyOn(client.api.agentConfigs, "getLatestBlueprint").mockRejectedValue(notFound);
+      const createSpy = vi.spyOn(client.api.agentConfigs, "createAgentConfig").mockImplementation(mockAPIFunction);
 
-    const prompt = makeNeverSyncingPromptLike();
-    const promise = callInsideTrack({ system_prompt: prompt });
+      // Prompt with ready() that never resolves (simulates sync hanging indefinitely)
+      const prompt = makeNeverSyncingPromptLike();
 
-    // Advance past AGENT_CONFIG_PROMPT_READY_TIMEOUT_MS (5000ms)
-    await vi.advanceTimersByTimeAsync(5001);
-    const config = await promise;
+      const promise = callInsideTrack({ system_prompt: prompt });
 
-    // Unsynced prompts were not persisted to backend
-    expect(createSpy).not.toHaveBeenCalled();
-    expect(config.isFallback).toBe(true);
-    expect(config.system_prompt).toBe(prompt);
+      // Advance timers in chunks past AGENT_CONFIG_PROMPT_READY_TIMEOUT_MS (5500ms).
+      // IMPORTANT: We use chunked advancement with vi.advanceTimersByTimeAsync() instead of a single
+      // large advance. This is necessary due to a Vitest fake timer edge case with Promise.allSettled():
+      // _allPromptsSynced() uses Promise.race([Promise.allSettled(prompts.map(v => v.ready())), timeout]).
+      // When advancing timers in one large chunk, the microtask queue (Promise.then callbacks) doesn't
+      // fully flush before the race evaluates, causing the promise chain to hang. Chunked advancement
+      // allows the event loop to fully process microtasks between each timer advance, avoiding the issue.
+      await vi.advanceTimersByTimeAsync(2000);
+      await vi.advanceTimersByTimeAsync(2000);
+      await vi.advanceTimersByTimeAsync(2000);
 
-    vi.useRealTimers();
+      const config = await promise;
+
+      // Unsynced prompts were not persisted to backend due to timeout
+      expect(createSpy).not.toHaveBeenCalled();
+      expect(config.isFallback).toBe(true);
+      expect(config.system_prompt).toBe(prompt);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("returns fallback when prompt sync failed (ready resolved but synced is false)", async () => {

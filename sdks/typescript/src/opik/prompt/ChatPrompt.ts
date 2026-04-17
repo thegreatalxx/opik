@@ -264,7 +264,7 @@ export class ChatPrompt extends BasePrompt {
       logger.warn(
         `Failed to sync chat prompt '${this.name}' with the backend. ` +
           "The prompt will work locally but is not persisted on the server. " +
-          "You can retry by calling .syncWithBackend().",
+          "Await prompt.ready(), then retry by calling .syncWithBackend() if prompt.synced is still false.",
         { error },
       );
       return this;

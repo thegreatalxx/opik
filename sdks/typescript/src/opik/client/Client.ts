@@ -31,7 +31,7 @@ import {
   PromptType,
 } from "@/prompt";
 import { ChatPrompt } from "@/prompt/ChatPrompt";
-import { BasePrompt } from "@/prompt/BasePrompt";
+import { BasePrompt, PROMPT_SYNC_TIMEOUT_MS } from "@/prompt/BasePrompt";
 import { PromptTemplateStructure, type CreateChatPromptOptions, type CommonPromptOptions } from "@/prompt/types";
 import { PromptTemplateStructureMismatch } from "@/prompt/errors";
 import {
@@ -89,7 +89,7 @@ export function resetDefaultProjectWarning() {
   defaultProjectWarningEmitted = false;
 }
 
-const AGENT_CONFIG_PROMPT_READY_TIMEOUT_MS = 5000;
+const AGENT_CONFIG_PROMPT_READY_TIMEOUT_MS = PROMPT_SYNC_TIMEOUT_MS + 500;
 
 export class OpikClient {
   public api: OpikApiClientTemp;

@@ -5,7 +5,7 @@ import type * as OpikApi from "@/rest_api/api";
 import { PromptVersion } from "./PromptVersion";
 import { logger } from "@/utils/logger";
 
-const PROMPT_SYNC_TIMEOUT_MS = 5000;
+export const PROMPT_SYNC_TIMEOUT_MS = 5000;
 
 /**
  * Base data interface for all prompt types
@@ -116,12 +116,18 @@ export abstract class BasePrompt {
       timerId = setTimeout(() => resolve(TIMED_OUT), PROMPT_SYNC_TIMEOUT_MS);
     });
     try {
-      const result = await Promise.race([create(), timeout]);
+      const createPromise = create().catch((error) => {
+        // Swallow late rejection after timeout wins the race, so it does not become unhandled.
+        // The catch block below already logs the real failure.
+        logger.debug(`Prompt '${this._name}' sync rejected after timeout`, { error });
+        return undefined;
+      });
+      const result = await Promise.race([createPromise, timeout]);
       if (result === TIMED_OUT) {
         logger.warn(
           `Prompt '${this._name}' sync timed out after ${PROMPT_SYNC_TIMEOUT_MS}ms. ` +
             "The prompt will work locally but is not persisted on the server. " +
-            "You can retry by calling .syncWithBackend().",
+            "Await prompt.ready(), then retry by calling .syncWithBackend() if prompt.synced is still false.",
         );
         return;
       }
@@ -137,14 +143,14 @@ export abstract class BasePrompt {
       } else {
         logger.warn(
           `Prompt '${this._name}' was not persisted on the server. ` +
-            "You can retry by calling .syncWithBackend().",
+            "Await prompt.ready(), then retry by calling .syncWithBackend() if prompt.synced is still false.",
         );
       }
     } catch (error) {
       logger.warn(
         `Failed to sync prompt '${this._name}' with the backend. ` +
           "The prompt will work locally but is not persisted on the server. " +
-          "You can retry by calling .syncWithBackend().",
+          "Await prompt.ready(), then retry by calling .syncWithBackend() if prompt.synced is still false.",
         { error },
       );
     } finally {
@@ -374,13 +380,13 @@ export abstract class BasePrompt {
 
   /**
    * Throws an error if the prompt has not been synced with the backend.
-   * Call syncWithBackend() first to sync.
+   * Await prompt.ready() first, then call syncWithBackend() if still not synced.
    */
   protected requireSynced(operation: string): void {
     if (!this.synced) {
       throw new Error(
         `Cannot call ${operation}() on an unsynced prompt. ` +
-          "Call syncWithBackend() first to sync the prompt with the backend.",
+          "Await prompt.ready() first, then call .syncWithBackend() if prompt.synced is still false.",
       );
     }
   }
