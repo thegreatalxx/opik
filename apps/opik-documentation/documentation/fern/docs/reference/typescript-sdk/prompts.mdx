@@ -7,6 +7,10 @@ og:title: Manage Prompts Efficiently with Opik
 title: Prompts
 ---
 
+<Note>
+  In Opik 2.0, prompts are project-scoped. Make sure to specify a `projectName` when creating prompts so they are associated with the correct project.
+</Note>
+
 The Opik TypeScript SDK provides comprehensive prompt management functionality for versioning, storing, and formatting your LLM prompt templates. Prompts in Opik are versioned automatically, allowing you to track changes over time while seamlessly integrating with your codebase.
 
 ## Introduction
@@ -212,7 +216,7 @@ if (prompt) {
 
 #### Searching with Opik Query Language
 
-Search and filter prompts using [Opik Query Language (OQL)](/docs/opik/reference/typescript-sdk/opik-query-language) - a powerful SQL-like syntax for finding exactly the prompts you need.
+Search and filter prompts using [Opik Query Language (OQL)](/reference/typescript-sdk/opik-query-language) - a powerful SQL-like syntax for finding exactly the prompts you need.
 
 **Supported Fields:**
 
