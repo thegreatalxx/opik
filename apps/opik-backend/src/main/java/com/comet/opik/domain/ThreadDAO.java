@@ -37,8 +37,8 @@ import java.util.stream.Collectors;
 
 import static com.comet.opik.domain.AsyncContextUtils.bindWorkspaceIdToFlux;
 import static com.comet.opik.domain.AsyncContextUtils.bindWorkspaceIdToMono;
-import static com.comet.opik.infrastructure.DatabaseUtils.bindTraceThreadSearchCriteria;
-import static com.comet.opik.infrastructure.DatabaseUtils.newTraceThreadFindTemplate;
+import static com.comet.opik.infrastructure.FilterUtils.bindTraceThreadSearchCriteria;
+import static com.comet.opik.infrastructure.FilterUtils.newTraceThreadFindTemplate;
 import static com.comet.opik.infrastructure.instrumentation.InstrumentAsyncUtils.endSegment;
 import static com.comet.opik.infrastructure.instrumentation.InstrumentAsyncUtils.startSegment;
 import static com.comet.opik.utils.AsyncUtils.makeFluxContextAware;
@@ -74,31 +74,72 @@ class ThreadDAOImpl implements ThreadDAO {
      * Please refer to the SELECT_TRACES_THREAD_BY_ID query for more details.
      ***/
     private static final String SELECT_TRACES_THREADS_BY_PROJECT_IDS = """
-            WITH traces_final AS (
+            WITH traces_final_ids AS (
+                SELECT id, thread_id
+                FROM (
+                    SELECT *
+                    FROM traces
+                    WHERE workspace_id = :workspace_id
+                    AND project_id = :project_id
+                    AND thread_id \\<> ''
+                    <if(uuid_from_time)> AND id >= :uuid_from_time <endif>
+                    <if(uuid_to_time)> AND id \\<= :uuid_to_time <endif>
+                    <if(traces_pushdown_filter)> AND thread_id = :thread_id_pushdown <endif>
+                    ORDER BY (workspace_id, project_id, id) DESC, last_updated_at DESC
+                    LIMIT 1 BY id
+                )
+                WHERE 1 = 1
+                <if(filters)> AND <filters> <endif>
+                <if(search_text)> AND <search_text> <endif>
+            ), traces_final AS (
                 SELECT
-                    *,
+                    id,
+                    workspace_id,
+                    project_id,
+                    thread_id,
+                    start_time,
+                    end_time,
+                    input,
+                    output,
                     truncated_input,
                     truncated_output,
                     input_length,
-                    output_length
-                FROM traces final
+                    output_length,
+                    truncation_threshold,
+                    last_updated_at,
+                    last_updated_by,
+                    created_by,
+                    created_at
+                FROM traces
                 WHERE workspace_id = :workspace_id
                   AND project_id = :project_id
-                  AND thread_id \\<> ''
-                  <if(uuid_from_time)> AND id >= :uuid_from_time <endif>
-                  <if(uuid_to_time)> AND id \\<= :uuid_to_time <endif>
-                  <if(search_text)> AND <search_text> <endif>
-                  <if(filters)> AND <filters> <endif>
+                  AND id IN (SELECT id FROM traces_final_ids)
+                ORDER BY (workspace_id, project_id, id) DESC, last_updated_at DESC
+                LIMIT 1 BY id
+            ), spans_deduped AS (
+                SELECT
+                    workspace_id,
+                    project_id,
+                    trace_id,
+                    parent_span_id,
+                    id,
+                    last_updated_at,
+                    usage,
+                    total_estimated_cost,
+                    provider
+                FROM spans
+                WHERE workspace_id = :workspace_id
+                  AND project_id = :project_id
+                  AND trace_id IN (SELECT id FROM traces_final_ids)
+                ORDER BY (workspace_id, project_id, trace_id, parent_span_id, id) DESC, last_updated_at DESC
+                LIMIT 1 BY (workspace_id, project_id, trace_id, parent_span_id, id)
             ), spans_agg AS (
                 SELECT
                     trace_id,
                     sumMap(usage) as usage,
                     sum(total_estimated_cost) as total_estimated_cost,
                     arraySort(groupUniqArrayIf(provider, provider != '')) as providers
-                FROM spans final
-                WHERE workspace_id = :workspace_id
-                  AND project_id = :project_id
-                  AND trace_id IN (SELECT DISTINCT id FROM traces_final)
+                FROM spans_deduped
                 GROUP BY workspace_id, project_id, trace_id
             ), trace_threads_final AS (
                 SELECT
@@ -112,15 +153,18 @@ class ThreadDAOImpl implements ThreadDAO {
                     last_updated_by,
                     created_at,
                     last_updated_at
-                FROM trace_threads final
+                FROM trace_threads
                 WHERE workspace_id = :workspace_id
                 AND project_id = :project_id
                 <if(uuid_from_time)>
                     AND id >= :uuid_from_time
                     <if(uuid_to_time)>AND id \\<= :uuid_to_time<endif>
                 <else>
-                AND thread_id IN (SELECT thread_id FROM traces_final)
+                AND thread_id IN (SELECT thread_id FROM traces_final_ids)
                 <endif>
+                <if(traces_pushdown_filter)> AND thread_id = :thread_id_pushdown <endif>
+                ORDER BY (workspace_id, project_id, thread_id, id) DESC, last_updated_at DESC
+                LIMIT 1 BY (workspace_id, project_id, thread_id, id)
             ), feedback_scores_deduped AS (
                 SELECT *
                 FROM (
@@ -368,27 +412,67 @@ class ThreadDAOImpl implements ThreadDAO {
      * Please refer to the SELECT_TRACES_THREAD_BY_ID query for more details.
      ***/
     private static final String SELECT_COUNT_TRACES_THREADS_BY_PROJECT_IDS = """
-            WITH traces_final AS (
+            WITH traces_final_ids AS (
+                SELECT id, thread_id
+                FROM (
+                    SELECT *
+                    FROM traces
+                    WHERE workspace_id = :workspace_id
+                    AND project_id = :project_id
+                    AND thread_id \\<> ''
+                    <if(uuid_from_time)> AND id >= :uuid_from_time <endif>
+                    <if(uuid_to_time)> AND id \\<= :uuid_to_time <endif>
+                    <if(traces_pushdown_filter)> AND thread_id = :thread_id_pushdown <endif>
+                    ORDER BY (workspace_id, project_id, id) DESC, last_updated_at DESC
+                    LIMIT 1 BY id
+                )
+                WHERE 1 = 1
+                <if(filters)> AND <filters> <endif>
+                <if(search_text)> AND <search_text> <endif>
+            ), traces_final AS (
                 SELECT
-                    *
-                FROM traces final
+                    id,
+                    workspace_id,
+                    project_id,
+                    thread_id,
+                    start_time,
+                    end_time,
+                    input,
+                    output,
+                    last_updated_at,
+                    last_updated_by,
+                    created_by,
+                    created_at
+                FROM traces
                 WHERE workspace_id = :workspace_id
                   AND project_id = :project_id
-                  AND thread_id \\<> ''
-                  <if(uuid_from_time)> AND id >= :uuid_from_time <endif>
-                  <if(uuid_to_time)> AND id \\<= :uuid_to_time <endif>
-                  <if(search_text)> AND <search_text> <endif>
-                  <if(filters)> AND <filters> <endif>
+                  AND id IN (SELECT id FROM traces_final_ids)
+                ORDER BY (workspace_id, project_id, id) DESC, last_updated_at DESC
+                LIMIT 1 BY id
+            ), spans_deduped AS (
+                SELECT
+                    workspace_id,
+                    project_id,
+                    trace_id,
+                    parent_span_id,
+                    id,
+                    last_updated_at,
+                    usage,
+                    total_estimated_cost,
+                    provider
+                FROM spans
+                WHERE workspace_id = :workspace_id
+                  AND project_id = :project_id
+                  AND trace_id IN (SELECT id FROM traces_final_ids)
+                ORDER BY (workspace_id, project_id, trace_id, parent_span_id, id) DESC, last_updated_at DESC
+                LIMIT 1 BY (workspace_id, project_id, trace_id, parent_span_id, id)
             ), spans_agg AS (
                 SELECT
                     trace_id,
                     sumMap(usage) as usage,
                     sum(total_estimated_cost) as total_estimated_cost,
                     arraySort(groupUniqArrayIf(provider, provider != '')) as providers
-                FROM spans final
-                WHERE workspace_id = :workspace_id
-                  AND project_id = :project_id
-                  AND trace_id IN (SELECT DISTINCT id FROM traces_final)
+                FROM spans_deduped
                 GROUP BY workspace_id, project_id, trace_id
             ), trace_threads_final AS (
                 SELECT
@@ -402,15 +486,17 @@ class ThreadDAOImpl implements ThreadDAO {
                     last_updated_by,
                     created_at,
                     last_updated_at
-                FROM trace_threads final
+                FROM trace_threads
                 WHERE workspace_id = :workspace_id
                 AND project_id = :project_id
                 <if(uuid_from_time)>
                     AND id >= :uuid_from_time
                     <if(uuid_to_time)>AND id \\<= :uuid_to_time<endif>
                 <else>
-                AND thread_id IN (SELECT thread_id FROM traces_final)
+                AND thread_id IN (SELECT thread_id FROM traces_final_ids)
                 <endif>
+                ORDER BY (workspace_id, project_id, thread_id, id) DESC, last_updated_at DESC
+                LIMIT 1 BY (workspace_id, project_id, thread_id, id)
             ), feedback_scores_deduped AS (
                 SELECT *
                 FROM (
@@ -907,6 +993,7 @@ class ThreadDAOImpl implements ThreadDAO {
                     <if(search_text)> AND <search_text> <endif>
                     <if(uuid_from_time)>AND id >= :uuid_from_time<endif>
                     <if(uuid_to_time)>AND id \\<= :uuid_to_time<endif>
+                    <if(traces_pushdown_filter)> AND thread_id = :thread_id_pushdown <endif>
                     <if(filters)> AND <filters> <endif>
                 ), spans_agg AS (
                     SELECT
