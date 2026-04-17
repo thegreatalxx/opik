@@ -131,6 +131,14 @@ export abstract class BasePrompt {
         );
         return;
       }
+      if (!result) {
+        logger.warn(
+          `Prompt '${this._name}' sync failed (rejected after timeout). ` +
+            "The prompt will work locally but is not persisted on the server. " +
+            "Await prompt.ready(), then retry by calling .syncWithBackend() if prompt.synced is still false.",
+        );
+        return;
+      }
       if (result.synced && result.id && result.versionId && result.commit) {
         this.updateSyncState({
           promptId: result.id,
