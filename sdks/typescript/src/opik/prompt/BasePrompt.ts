@@ -159,9 +159,8 @@ export abstract class BasePrompt {
   }
 
   /**
-   * Resolves when the background sync triggered on construction has completed.
-   * Returns immediately if the prompt was already synced (e.g. created via client).
-   * Call this before using operations that require synced: true (getVersions, delete, etc.).
+   * Resolves when initialization completes.
+   * Returns immediately if the prompt was already persisted (e.g. retrieved from backend).
    */
   ready(): Promise<void> {
     return this._pendingSync ?? Promise.resolve();
@@ -203,7 +202,8 @@ export abstract class BasePrompt {
     description?: string;
     tags?: string[];
   }): Promise<this> {
-    this.requireSynced("updateProperties");
+    await this.ready();
+    this.warnIfNotSynced("updateProperties");
     await this.opik.api.prompts.updatePrompt(
       this.id!,
       {
@@ -227,7 +227,8 @@ export abstract class BasePrompt {
    * Performs immediate deletion (no batching).
    */
   async delete(): Promise<void> {
-    this.requireSynced("delete");
+    await this.ready();
+    this.warnIfNotSynced("delete");
     await this.opik.deletePrompts([this.id!]);
   }
 
@@ -244,7 +245,8 @@ export abstract class BasePrompt {
     sorting?: string;
     filters?: string;
   }): Promise<PromptVersion[]> {
-    this.requireSynced("getVersions");
+    await this.ready();
+    this.warnIfNotSynced("getVersions");
     logger.debug("Getting versions for prompt", {
       promptId: this.id,
       name: this.name,
@@ -306,7 +308,8 @@ export abstract class BasePrompt {
   protected async restoreVersion(
     version: PromptVersion,
   ): Promise<OpikApi.PromptVersionDetail> {
-    this.requireSynced("restoreVersion");
+    await this.ready();
+    this.warnIfNotSynced("restoreVersion");
     logger.debug("Restoring prompt version", {
       promptId: this.id,
       name: this.name,
@@ -379,14 +382,14 @@ export abstract class BasePrompt {
   }
 
   /**
-   * Throws an error if the prompt has not been synced with the backend.
-   * Await prompt.ready() first, then call syncWithBackend() if still not synced.
+   * Warns if the prompt has not been synced with the backend.
+   * Used internally after ready() completes to provide visibility if background sync failed.
    */
-  protected requireSynced(operation: string): void {
+  protected warnIfNotSynced(operation: string): void {
     if (!this.synced) {
-      throw new Error(
-        `Cannot call ${operation}() on an unsynced prompt. ` +
-          "Await prompt.ready() first, then call .syncWithBackend() if prompt.synced is still false.",
+      logger.warn(
+        `Prompt '${this._name}' is not yet synced with the backend for operation '${operation}'. ` +
+          "The operation may fail. Call .syncWithBackend() if you need to ensure the prompt is persisted.",
       );
     }
   }
