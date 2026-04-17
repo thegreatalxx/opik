@@ -17,6 +17,7 @@ import {
   EXPERIMENT_STATUS,
   ExperimentsCompare,
 } from "@/types/datasets";
+import { extractAssertions } from "@/lib/assertion-converters";
 import { LogExperiment } from "@/types/playground";
 import useRunExperimentExecution from "@/api/playground/useRunExperimentExecution";
 import usePlaygroundStore, {
@@ -276,25 +277,34 @@ const useActionButtonActions = ({
           );
 
           const rows: ExperimentsCompare[] = data?.content ?? [];
-          const totalItems = (data?.total ?? 0) * experimentIds.length;
 
           let scoredItems = 0;
+          let totalExperimentItems = 0;
 
           for (const row of rows) {
             const experimentItems = row.experiment_items ?? [];
+            const evaluators = row.evaluators;
+            const hasNoEvaluators =
+              evaluators != null && evaluators.length === 0;
+            const expectedCount = extractAssertions(evaluators ?? []).length;
+
             for (const ei of experimentItems) {
-              if (ei.status != null) {
+              totalExperimentItems++;
+
+              if (hasNoEvaluators || expectedCount === 0) {
+                scoredItems++;
+              } else if ((ei.assertion_results?.length ?? 0) >= expectedCount) {
                 scoredItems++;
               }
             }
           }
 
-          if (totalItems > 0) {
-            setProgress(scoredItems, totalItems);
+          if (totalExperimentItems > 0) {
+            setProgress(scoredItems, totalExperimentItems);
           }
 
-          if (totalItems > 0 && scoredItems >= totalItems) {
-            setProgress(totalItems, totalItems);
+          if (totalExperimentItems > 0 && scoredItems >= totalExperimentItems) {
+            setProgress(totalExperimentItems, totalExperimentItems);
             clearRunningMap();
             isToStopRef.current = false;
             queryClient.invalidateQueries({ queryKey: ["experiments"] });
