@@ -1014,7 +1014,7 @@ class TestImportExport:
 
         mock_dataset.__internal_api__insert_items_as_dataclasses__.assert_called_once()
 
-    def test_read_jsonl_from_file__delegates_to_converters_and_insert(self):
+    def test_insert_from_jsonl_file__delegates_to_converters_and_insert(self):
         mock_dataset = _create_mock_dataset()
         suite = test_suite.TestSuite(name="test_suite", dataset_=mock_dataset)
 
@@ -1023,7 +1023,7 @@ class TestImportExport:
             temp_path = f.name
 
         try:
-            suite.read_jsonl_from_file(temp_path)
+            suite.insert_from_jsonl_file(temp_path)
         finally:
             os.unlink(temp_path)
 

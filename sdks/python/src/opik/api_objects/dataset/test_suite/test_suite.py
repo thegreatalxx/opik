@@ -479,7 +479,7 @@ class TestSuite:
 
         self.insert(converters.from_pandas(dataframe, keys_mapping, ignore_keys))
 
-    def read_jsonl_from_file(
+    def insert_from_jsonl_file(
         self,
         file_path: str,
         keys_mapping: Optional[Dict[str, str]] = None,
