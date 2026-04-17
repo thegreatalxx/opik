@@ -84,6 +84,8 @@ component:
       name: opik-backend
     metrics:
       enabled: false
+      portName: admin
+      path: /metrics
     image:
       repository: opik-backend
       pullPolicy: IfNotPresent
@@ -189,6 +191,10 @@ component:
         port:  8080
         protocol: TCP
         targetPort:  8080
+      - name: admin
+        port:  8081
+        protocol: TCP
+        targetPort:  8081
       - name: swagger
         port:  3003
         protocol: TCP
