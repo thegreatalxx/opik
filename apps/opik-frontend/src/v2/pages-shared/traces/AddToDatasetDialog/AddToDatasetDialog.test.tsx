@@ -6,30 +6,44 @@ import { Trace, Span, SPAN_TYPE } from "@/types/traces";
 import { ReactNode } from "react";
 import { PermissionsProvider } from "@/contexts/PermissionsContext";
 import { DEFAULT_PERMISSIONS } from "@/types/permissions";
+import { DATASET_TYPE } from "@/types/datasets";
 
-// Create mock functions that can be accessed in tests
 const mockAddTracesToDataset = vi.fn();
 const mockAddSpansToDataset = vi.fn();
 
-// Mock the API hooks
+const ALL_DATASETS = [
+  {
+    id: "dataset-1",
+    name: "Test Dataset 1",
+    description: "First test dataset",
+    type: DATASET_TYPE.DATASET,
+  },
+  {
+    id: "suite-1",
+    name: "Test Suite 1",
+    description: "First test suite",
+    type: DATASET_TYPE.TEST_SUITE,
+  },
+];
+
 vi.mock("@/api/datasets/useProjectDatasetsList", () => ({
-  default: vi.fn(() => ({
-    data: {
-      content: [
-        {
-          id: "dataset-1",
-          name: "Test Dataset 1",
-          description: "First test dataset",
-        },
-        {
-          id: "dataset-2",
-          name: "Test Dataset 2",
-          description: "Second test dataset",
-        },
-      ],
-      total: 2,
+  default: vi.fn(
+    (params: { filters?: Array<{ field: string; value: string }> }) => {
+      const typeFilter = params.filters?.find((f) => f.field === "type");
+      const content = typeFilter
+        ? ALL_DATASETS.filter((d) => d.type === typeFilter.value)
+        : ALL_DATASETS;
+      return {
+        data: { content, total: content.length },
+        isPending: false,
+      };
     },
-    isPending: false,
+  ),
+}));
+
+vi.mock("@/api/datasets/useDatasetVersionsList", () => ({
+  default: vi.fn(() => ({
+    data: { content: [], total: 0 },
   })),
 }));
 
@@ -45,7 +59,6 @@ vi.mock("@/api/datasets/useAddSpansToDatasetMutation", () => ({
   }),
 }));
 
-// Mock the store
 vi.mock("@/store/AppStore", () => ({
   default: vi.fn((selector) =>
     selector({
@@ -56,18 +69,23 @@ vi.mock("@/store/AppStore", () => ({
   useActiveProjectId: () => "test-project-id",
 }));
 
-// Mock the toast hook
 vi.mock("@/ui/use-toast", () => ({
   useToast: () => ({
     toast: vi.fn(),
   }),
 }));
 
-// Mock the AddEditEvaluationSuiteDialog component
 vi.mock(
-  "@/v2/shared/AddEditEvaluationSuiteDialog/AddEditEvaluationSuiteDialog",
+  "@/v2/pages-shared/datasets/AddEditTestSuiteDialog/AddEditTestSuiteDialog",
   () => ({
-    default: () => <div data-testid="add-edit-evaluation-suite-dialog" />,
+    default: () => <div data-testid="add-edit-test-suite-dialog" />,
+  }),
+);
+
+vi.mock(
+  "@/v2/pages-shared/datasets/AddEditDatasetDialog/AddEditDatasetDialog",
+  () => ({
+    default: () => <div data-testid="add-edit-dataset-dialog" />,
   }),
 );
 
@@ -129,25 +147,33 @@ describe("AddToDatasetDialog", () => {
     project_id: "project-1",
   };
 
-  const defaultProps = {
+  const baseProps = {
     selectedRows: [mockTrace],
     open: true,
     setOpen: vi.fn(),
   };
 
-  it("should render the dialog when open", () => {
-    render(<AddToDatasetDialog {...defaultProps} />, { wrapper });
+  const datasetModeProps = {
+    ...baseProps,
+    datasetType: DATASET_TYPE.DATASET,
+  };
 
-    expect(screen.getByText("Select an evaluation suite")).toBeInTheDocument();
-    expect(screen.getByText("Test Dataset 1")).toBeInTheDocument();
+  const testSuiteModeProps = {
+    ...baseProps,
+    datasetType: DATASET_TYPE.TEST_SUITE,
+  };
+
+  it("should render the test suite dialog when open", () => {
+    render(<AddToDatasetDialog {...testSuiteModeProps} />, { wrapper });
+
+    expect(screen.getByText("Select a test suite")).toBeInTheDocument();
+    expect(screen.getByText("Test Suite 1")).toBeInTheDocument();
   });
 
-  it("should display enrichment checkboxes when only traces are selected", () => {
-    render(<AddToDatasetDialog {...defaultProps} />, { wrapper });
+  it("should display enrichment checkboxes when selecting a dataset with traces", () => {
+    render(<AddToDatasetDialog {...datasetModeProps} />, { wrapper });
 
-    // Expand the accordion first
-    const accordionButton = screen.getByText("Trace metadata configuration");
-    fireEvent.click(accordionButton);
+    fireEvent.click(screen.getByText("Test Dataset 1"));
 
     expect(screen.getByLabelText("Nested spans")).toBeInTheDocument();
     expect(screen.getByLabelText("Tags")).toBeInTheDocument();
@@ -158,11 +184,9 @@ describe("AddToDatasetDialog", () => {
   });
 
   it("should have all enrichment checkboxes checked by default", () => {
-    render(<AddToDatasetDialog {...defaultProps} />, { wrapper });
+    render(<AddToDatasetDialog {...datasetModeProps} />, { wrapper });
 
-    // Expand the accordion first
-    const accordionButton = screen.getByText("Trace metadata configuration");
-    fireEvent.click(accordionButton);
+    fireEvent.click(screen.getByText("Test Dataset 1"));
 
     expect(screen.getByLabelText("Nested spans")).toBeChecked();
     expect(screen.getByLabelText("Tags")).toBeChecked();
@@ -173,11 +197,9 @@ describe("AddToDatasetDialog", () => {
   });
 
   it("should allow unchecking enrichment options", async () => {
-    render(<AddToDatasetDialog {...defaultProps} />, { wrapper });
+    render(<AddToDatasetDialog {...datasetModeProps} />, { wrapper });
 
-    // Expand the accordion first
-    const accordionButton = screen.getByText("Trace metadata configuration");
-    fireEvent.click(accordionButton);
+    fireEvent.click(screen.getByText("Test Dataset 1"));
 
     const spansCheckbox = screen.getByLabelText("Nested spans");
     const tagsCheckbox = screen.getByLabelText("Tags");
@@ -192,21 +214,17 @@ describe("AddToDatasetDialog", () => {
     expect(screen.getByLabelText("Feedback scores")).toBeChecked();
   });
 
-  it("should display span enrichment checkboxes when only spans are selected", () => {
+  it("should display span enrichment checkboxes when selecting a dataset with spans", () => {
     const propsWithSpan = {
-      ...defaultProps,
+      ...datasetModeProps,
       selectedRows: [mockSpan],
     };
 
     render(<AddToDatasetDialog {...propsWithSpan} />, { wrapper });
 
-    // Expand the accordion first
-    const accordionButton = screen.getByText("Span metadata configuration");
-    fireEvent.click(accordionButton);
+    fireEvent.click(screen.getByText("Test Dataset 1"));
 
-    // Spans don't have "Nested spans" option
     expect(screen.queryByLabelText("Nested spans")).not.toBeInTheDocument();
-    // But they have all other options
     expect(screen.getByLabelText("Tags")).toBeInTheDocument();
     expect(screen.getByLabelText("Feedback scores")).toBeInTheDocument();
     expect(screen.getByLabelText("Comments")).toBeInTheDocument();
@@ -216,17 +234,14 @@ describe("AddToDatasetDialog", () => {
 
   it("should have all span enrichment checkboxes checked by default", () => {
     const propsWithSpan = {
-      ...defaultProps,
+      ...datasetModeProps,
       selectedRows: [mockSpan],
     };
 
     render(<AddToDatasetDialog {...propsWithSpan} />, { wrapper });
 
-    // Expand the accordion first
-    const accordionButton = screen.getByText("Span metadata configuration");
-    fireEvent.click(accordionButton);
+    fireEvent.click(screen.getByText("Test Dataset 1"));
 
-    // Spans don't have "Nested spans" option, but all others should be checked
     expect(screen.getByLabelText("Tags")).toBeChecked();
     expect(screen.getByLabelText("Feedback scores")).toBeChecked();
     expect(screen.getByLabelText("Comments")).toBeChecked();
@@ -236,15 +251,13 @@ describe("AddToDatasetDialog", () => {
 
   it("should allow unchecking span enrichment options", async () => {
     const propsWithSpan = {
-      ...defaultProps,
+      ...datasetModeProps,
       selectedRows: [mockSpan],
     };
 
     render(<AddToDatasetDialog {...propsWithSpan} />, { wrapper });
 
-    // Expand the accordion first
-    const accordionButton = screen.getByText("Span metadata configuration");
-    fireEvent.click(accordionButton);
+    fireEvent.click(screen.getByText("Test Dataset 1"));
 
     const tagsCheckbox = screen.getByLabelText("Tags");
     const usageCheckbox = screen.getByLabelText("Usage metrics");
@@ -259,31 +272,38 @@ describe("AddToDatasetDialog", () => {
     expect(screen.getByLabelText("Feedback scores")).toBeChecked();
   });
 
-  it("should display available datasets", () => {
-    render(<AddToDatasetDialog {...defaultProps} />, { wrapper });
+  it("should list only datasets matching dataset type when adding to a dataset", () => {
+    render(<AddToDatasetDialog {...datasetModeProps} />, { wrapper });
 
     expect(screen.getByText("Test Dataset 1")).toBeInTheDocument();
     expect(screen.getByText("First test dataset")).toBeInTheDocument();
-    expect(screen.getByText("Test Dataset 2")).toBeInTheDocument();
-    expect(screen.getByText("Second test dataset")).toBeInTheDocument();
+    expect(screen.queryByText("Test Suite 1")).not.toBeInTheDocument();
+  });
+
+  it("should list only test suites when adding to a test suite", () => {
+    render(<AddToDatasetDialog {...testSuiteModeProps} />, { wrapper });
+
+    expect(screen.getByText("Test Suite 1")).toBeInTheDocument();
+    expect(screen.getByText("First test suite")).toBeInTheDocument();
+    expect(screen.queryByText("Test Dataset 1")).not.toBeInTheDocument();
   });
 
   it("should display search input", () => {
-    render(<AddToDatasetDialog {...defaultProps} />, { wrapper });
+    render(<AddToDatasetDialog {...datasetModeProps} />, { wrapper });
 
     const searchInput = screen.getByPlaceholderText("Search");
     expect(searchInput).toBeInTheDocument();
   });
 
-  it("should display create new evaluation suite button", () => {
-    render(<AddToDatasetDialog {...defaultProps} />, { wrapper });
+  it("should display create new test suite button", () => {
+    render(<AddToDatasetDialog {...testSuiteModeProps} />, { wrapper });
 
-    expect(screen.getByText("Create new evaluation suite")).toBeInTheDocument();
+    expect(screen.getByText("Create new test suite")).toBeInTheDocument();
   });
 
   it("should show alert when no valid rows are present", () => {
     const propsWithInvalidRows = {
-      ...defaultProps,
+      ...testSuiteModeProps,
       selectedRows: [{ ...mockTrace, input: undefined as unknown as object }],
     };
 
@@ -291,14 +311,14 @@ describe("AddToDatasetDialog", () => {
 
     expect(
       screen.getByText(
-        "There are no rows that can be added as evaluation suite items. The input field is missing.",
+        "There are no rows that can be added as test suite items. The input field is missing.",
       ),
     ).toBeInTheDocument();
   });
 
   it("should show alert when only some rows are valid", () => {
     const propsWithPartialValid = {
-      ...defaultProps,
+      ...testSuiteModeProps,
       selectedRows: [
         mockTrace,
         { ...mockTrace, id: "trace-2", input: undefined as unknown as object },
@@ -309,33 +329,29 @@ describe("AddToDatasetDialog", () => {
 
     expect(
       screen.getByText(
-        "Only rows with input fields will be added as evaluation suite items.",
+        "Only rows with input fields will be added as test suite items.",
       ),
     ).toBeInTheDocument();
   });
 
-  it("should disable create new evaluation suite button when no valid rows", () => {
+  it("should disable create new test suite button when no valid rows", () => {
     const propsWithInvalidRows = {
-      ...defaultProps,
+      ...testSuiteModeProps,
       selectedRows: [{ ...mockTrace, input: undefined as unknown as object }],
     };
 
     render(<AddToDatasetDialog {...propsWithInvalidRows} />, { wrapper });
 
-    const createButton = screen.getByText("Create new evaluation suite");
+    const createButton = screen.getByText("Create new test suite");
     expect(createButton).toBeDisabled();
   });
 
   it("should call addTracesToDataset mutation when clicking on dataset with only traces", async () => {
-    render(<AddToDatasetDialog {...defaultProps} />, { wrapper });
+    render(<AddToDatasetDialog {...datasetModeProps} />, { wrapper });
 
-    // Select the dataset
-    const dataset = screen.getByText("Test Dataset 1");
-    fireEvent.click(dataset);
+    fireEvent.click(screen.getByText("Test Dataset 1"));
 
-    // Click the "Add to evaluation suite" button
-    const addButton = screen.getAllByText("Add to evaluation suite")[1]; // Get the button, not the dialog title
-    fireEvent.click(addButton);
+    fireEvent.click(screen.getByRole("button", { name: "Add to dataset" }));
 
     await waitFor(() => {
       expect(mockAddTracesToDataset).toHaveBeenCalledWith(
@@ -359,19 +375,15 @@ describe("AddToDatasetDialog", () => {
 
   it("should call addSpansToDataset mutation when clicking on dataset with only spans", async () => {
     const propsWithSpan = {
-      ...defaultProps,
+      ...datasetModeProps,
       selectedRows: [mockSpan],
     };
 
     render(<AddToDatasetDialog {...propsWithSpan} />, { wrapper });
 
-    // Select the dataset
-    const dataset = screen.getByText("Test Dataset 1");
-    fireEvent.click(dataset);
+    fireEvent.click(screen.getByText("Test Dataset 1"));
 
-    // Click the "Add to evaluation suite" button
-    const addButton = screen.getAllByText("Add to evaluation suite")[1]; // Get the button, not the dialog title
-    fireEvent.click(addButton);
+    fireEvent.click(screen.getByRole("button", { name: "Add to dataset" }));
 
     await waitFor(() => {
       expect(mockAddSpansToDataset).toHaveBeenCalledWith(
@@ -393,24 +405,15 @@ describe("AddToDatasetDialog", () => {
   });
 
   it("should respect unchecked enrichment options when adding traces", async () => {
-    render(<AddToDatasetDialog {...defaultProps} />, { wrapper });
+    render(<AddToDatasetDialog {...datasetModeProps} />, { wrapper });
 
-    // Expand the accordion first
-    const accordionButton = screen.getByText("Trace metadata configuration");
-    fireEvent.click(accordionButton);
+    fireEvent.click(screen.getByText("Test Dataset 1"));
 
-    // Uncheck some options
     fireEvent.click(screen.getByLabelText("Nested spans"));
     fireEvent.click(screen.getByLabelText("Tags"));
     fireEvent.click(screen.getByLabelText("Usage metrics"));
 
-    // Select the dataset
-    const dataset = screen.getByText("Test Dataset 1");
-    fireEvent.click(dataset);
-
-    // Click the "Add to evaluation suite" button
-    const addButton = screen.getAllByText("Add to evaluation suite")[1]; // Get the button, not the dialog title
-    fireEvent.click(addButton);
+    fireEvent.click(screen.getByRole("button", { name: "Add to dataset" }));
 
     await waitFor(() => {
       expect(mockAddTracesToDataset).toHaveBeenCalledWith(
@@ -431,28 +434,19 @@ describe("AddToDatasetDialog", () => {
 
   it("should respect unchecked enrichment options when adding spans", async () => {
     const propsWithSpan = {
-      ...defaultProps,
+      ...datasetModeProps,
       selectedRows: [mockSpan],
     };
 
     render(<AddToDatasetDialog {...propsWithSpan} />, { wrapper });
 
-    // Expand the accordion first
-    const accordionButton = screen.getByText("Span metadata configuration");
-    fireEvent.click(accordionButton);
+    fireEvent.click(screen.getByText("Test Dataset 1"));
 
-    // Uncheck some options
     fireEvent.click(screen.getByLabelText("Tags"));
     fireEvent.click(screen.getByLabelText("Comments"));
     fireEvent.click(screen.getByLabelText("Metadata"));
 
-    // Select the dataset
-    const dataset = screen.getByText("Test Dataset 1");
-    fireEvent.click(dataset);
-
-    // Click the "Add to evaluation suite" button
-    const addButton = screen.getAllByText("Add to evaluation suite")[1]; // Get the button, not the dialog title
-    fireEvent.click(addButton);
+    fireEvent.click(screen.getByRole("button", { name: "Add to dataset" }));
 
     await waitFor(() => {
       expect(mockAddSpansToDataset).toHaveBeenCalledWith(

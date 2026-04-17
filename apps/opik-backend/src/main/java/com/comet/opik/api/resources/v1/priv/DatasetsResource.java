@@ -283,7 +283,7 @@ public class DatasetsResource {
 
         log.info("Finding dataset by name '{}', projectName '{}' on workspace_id '{}'", identifier.datasetName(),
                 identifier.projectName(), workspaceId);
-        Dataset dataset = service.findByName(identifier, visibility);
+        Dataset dataset = service.findByNameDetailed(identifier, visibility);
         log.info("Found dataset by name '{}', id '{}' on workspace_id '{}'", identifier.datasetName(), dataset.id(),
                 workspaceId);
 
@@ -530,7 +530,8 @@ public class DatasetsResource {
         log.info("Creating dataset items from traces for dataset '{}', trace count '{}' on workspaceId '{}'",
                 datasetId, request.traceIds().size(), workspaceId);
 
-        itemService.createFromTraces(datasetId, request.traceIds(), request.enrichmentOptions())
+        itemService.createFromTraces(datasetId, request.traceIds(), request.enrichmentOptions(),
+                request.evaluators(), request.executionPolicy())
                 .contextWrite(ctx -> setRequestContext(ctx, requestContext))
                 .retryWhen(RetryUtils.handleConnectionError())
                 .block();
@@ -556,7 +557,8 @@ public class DatasetsResource {
         log.info("Creating dataset items from spans for dataset '{}', span count '{}' on workspaceId '{}'",
                 datasetId, request.spanIds().size(), workspaceId);
 
-        itemService.createFromSpans(datasetId, request.spanIds(), request.enrichmentOptions())
+        itemService.createFromSpans(datasetId, request.spanIds(), request.enrichmentOptions(),
+                request.evaluators(), request.executionPolicy())
                 .contextWrite(ctx -> setRequestContext(ctx, requestContext))
                 .retryWhen(RetryUtils.handleConnectionError())
                 .block();

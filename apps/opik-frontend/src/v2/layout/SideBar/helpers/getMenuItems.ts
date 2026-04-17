@@ -3,7 +3,7 @@ import {
   Blocks,
   Bot,
   ChartLine,
-  FileTerminal,
+  Database,
   FlaskConical,
   LayoutDashboard,
   ListChecks,
@@ -25,10 +25,12 @@ const getMenuItems = ({
   projectId,
   canViewExperiments,
   canViewDatasets,
+  canUsePlayground,
 }: {
   projectId: string | null;
   canViewExperiments: boolean;
   canViewDatasets: boolean;
+  canUsePlayground: boolean;
 }): MenuItemGroup[] => {
   const projectPrefix = projectId
     ? "/$workspaceName/projects/$projectId"
@@ -51,11 +53,11 @@ const getMenuItems = ({
           disabled: !projectPrefix,
         },
         {
-          id: "insights",
-          path: projectPath("/insights"),
+          id: "dashboards",
+          path: projectPath("/dashboards"),
           type: MENU_ITEM_TYPE.router,
           icon: ChartLine,
-          label: "Insights",
+          label: "Dashboards",
           disabled: !projectPrefix,
         },
       ],
@@ -79,11 +81,19 @@ const getMenuItems = ({
         ...(canViewDatasets
           ? [
               {
-                id: "evaluation_suites",
-                path: projectPath("/evaluation-suites"),
+                id: "datasets",
+                path: projectPath("/datasets"),
+                type: MENU_ITEM_TYPE.router as const,
+                icon: Database,
+                label: "Datasets",
+                disabled: !projectPrefix,
+              },
+              {
+                id: "test_suites",
+                path: projectPath("/test-suites"),
                 type: MENU_ITEM_TYPE.router as const,
                 icon: ListChecks,
-                label: "Evaluation suites",
+                label: "Test suites",
                 disabled: !projectPrefix,
               },
             ]
@@ -102,22 +112,18 @@ const getMenuItems = ({
       id: "prompt_engineering",
       label: "Prompt engineering",
       items: [
-        {
-          id: "prompts",
-          path: projectPath("/prompts"),
-          type: MENU_ITEM_TYPE.router,
-          icon: FileTerminal,
-          label: "Prompt library",
-          disabled: !projectPrefix,
-        },
-        {
-          id: "playground",
-          path: projectPath("/playground"),
-          type: MENU_ITEM_TYPE.router,
-          icon: Blocks,
-          label: "Playground",
-          disabled: !projectPrefix,
-        },
+        ...(canUsePlayground
+          ? [
+              {
+                id: "playground",
+                path: projectPath("/playground"),
+                type: MENU_ITEM_TYPE.router as const,
+                icon: Blocks,
+                label: "Playground",
+                disabled: !projectPrefix,
+              },
+            ]
+          : []),
       ],
     },
     {
@@ -176,20 +182,14 @@ const getMenuItems = ({
   ];
 };
 
-export const getWorkspaceMenuItems = ({
-  canViewDashboards,
-}: {
-  canViewDashboards: boolean;
-}): MenuItemGroup[] => {
+export const getWorkspaceMenuItems = (): MenuItemGroup[] => {
   return [
     {
       id: "workspace-nav",
       items: [
         {
           id: "workspace",
-          path: canViewDashboards
-            ? "/$workspaceName/dashboards"
-            : "/$workspaceName/projects",
+          path: "/$workspaceName/projects",
           type: MENU_ITEM_TYPE.router,
           icon: LayoutDashboard,
           label: "Workspace",
@@ -218,13 +218,6 @@ export const getWorkspaceSidebarMenuItems = ({
       id: "workspace-sidebar",
       items: [
         {
-          id: "configuration",
-          path: "/$workspaceName/configuration",
-          type: MENU_ITEM_TYPE.router,
-          icon: Settings2,
-          label: "Configuration",
-        },
-        {
           id: "projects",
           path: "/$workspaceName/projects",
           type: MENU_ITEM_TYPE.router,
@@ -242,6 +235,13 @@ export const getWorkspaceSidebarMenuItems = ({
               },
             ]
           : []),
+        {
+          id: "configuration",
+          path: "/$workspaceName/configuration",
+          type: MENU_ITEM_TYPE.router,
+          icon: Settings2,
+          label: "Configuration",
+        },
       ],
     },
   ];

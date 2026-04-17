@@ -2,7 +2,7 @@ import type { ExecutionPolicyWrite } from "@/rest_api/api/types/ExecutionPolicyW
 import type { EvaluationTestResult } from "../types";
 
 /**
- * Execution policy for evaluation suite items.
+ * Execution policy for test suite items.
  * Mirrors the Fern-generated ExecutionPolicyWrite type.
  */
 export type ExecutionPolicy = ExecutionPolicyWrite;
@@ -13,9 +13,9 @@ export const DEFAULT_EXECUTION_POLICY: Required<ExecutionPolicy> = {
 };
 
 /**
- * A single item to be added to an evaluation suite via `addItems()`.
+ * A single item to be inserted into a test suite via `insert()`.
  */
-export interface EvaluationSuiteItem {
+export interface TestSuiteItem {
   data: Record<string, unknown>;
   assertions?: string[];
   description?: string;
@@ -23,11 +23,27 @@ export interface EvaluationSuiteItem {
 }
 
 /**
- * Result of an individual item in the evaluation suite.
+ * A single item to be updated in a test suite via `updateItems()`.
+ * Requires an ID to identify the item to update.
+ * All provided fields are merged with the existing item data - only the fields
+ * you specify will be updated, preserving all other existing values.
+ */
+export interface UpdateTestSuiteItem {
+  id: string;
+  data?: Record<string, unknown>;
+  assertions?: string[];
+  description?: string;
+  executionPolicy?: ExecutionPolicy;
+}
+
+/**
+ * Result of an individual item in the test suite.
  */
 export type ItemResult = {
   datasetItemId: string;
   passed: boolean;
+  /** Whether this item had at least one assertion evaluated across any of its runs. */
+  hasAssertions: boolean;
   runsPassed: number;
   runsTotal: number;
   passThreshold: number;
@@ -35,9 +51,9 @@ export type ItemResult = {
 };
 
 /**
- * Result of an evaluation suite run.
+ * Result of a test suite run.
  */
-export type EvaluationSuiteResult = {
+export type TestSuiteResult = {
   allItemsPassed: boolean;
   itemsPassed: number;
   itemsTotal: number;
