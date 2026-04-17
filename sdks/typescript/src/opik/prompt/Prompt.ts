@@ -206,23 +206,6 @@ export class Prompt extends BasePrompt {
   }
 
   /**
-   * Get a Prompt with a specific version by commit hash.
-   *
-   * @param commit - Commit hash (8-char short form or full)
-   * @returns Prompt instance representing that version, or null if not found
-   *
-   * @example
-   * ```typescript
-   * const prompt = await client.getPrompt({ name: "greeting" });
-   *
-   * // Get a specific version directly as a Prompt
-   * const versionedPrompt = await prompt.getVersion("abc123de");
-   * if (versionedPrompt) {
-   *   const text = versionedPrompt.format({ name: "Alice" });
-   * }
-   * ```
-   */
-  /**
    * Synchronize the prompt with the backend.
    *
    * Creates or updates the prompt on the Opik server. If the sync fails,
@@ -251,6 +234,12 @@ export class Prompt extends BasePrompt {
     }
   }
 
+  /**
+   * Get a Prompt with a specific version by commit hash.
+   *
+   * @param commit - Commit hash (8-char short form or full)
+   * @returns Prompt instance representing that version, or null if not found
+   */
   async getVersion(commit: string): Promise<Prompt | null> {
     const response = await this.retrieveVersionByCommit(commit);
     if (!response) {

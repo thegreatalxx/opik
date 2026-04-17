@@ -111,9 +111,10 @@ export abstract class BasePrompt {
     create: () => Promise<T>,
   ): Promise<void> {
     const TIMED_OUT = Symbol();
-    const timeout = new Promise<typeof TIMED_OUT>((resolve) =>
-      setTimeout(() => resolve(TIMED_OUT), PROMPT_SYNC_TIMEOUT_MS)
-    );
+    let timerId: ReturnType<typeof setTimeout> | undefined;
+    const timeout = new Promise<typeof TIMED_OUT>((resolve) => {
+      timerId = setTimeout(() => resolve(TIMED_OUT), PROMPT_SYNC_TIMEOUT_MS);
+    });
     try {
       const result = await Promise.race([create(), timeout]);
       if (result === TIMED_OUT) {
@@ -146,6 +147,8 @@ export abstract class BasePrompt {
           "You can retry by calling .syncWithBackend().",
         { error },
       );
+    } finally {
+      clearTimeout(timerId);
     }
   }
 

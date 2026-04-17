@@ -1965,13 +1965,18 @@ export class OpikClient {
       .map((v) => v.ready());
     if (pending.length === 0) return false;
     const TIMED_OUT = Symbol();
-    const result = await Promise.race([
-      Promise.all(pending).then(() => undefined),
-      new Promise<typeof TIMED_OUT>((resolve) =>
-        setTimeout(() => resolve(TIMED_OUT), AGENT_CONFIG_PROMPT_READY_TIMEOUT_MS)
-      ),
-    ]);
-    return result === TIMED_OUT;
+    let timerId: ReturnType<typeof setTimeout> | undefined;
+    try {
+      const result = await Promise.race([
+        Promise.allSettled(pending).then(() => undefined),
+        new Promise<typeof TIMED_OUT>((resolve) => {
+          timerId = setTimeout(() => resolve(TIMED_OUT), AGENT_CONFIG_PROMPT_READY_TIMEOUT_MS);
+        }),
+      ]);
+      return result === TIMED_OUT;
+    } finally {
+      clearTimeout(timerId);
+    }
   }
 
   private _makeFallbackConfig<T extends Record<string, unknown>>(
@@ -2114,6 +2119,14 @@ export class OpikClient {
     // Validate that all Prompt/ChatPrompt values in the fallback belong to this project.
     this._validatePromptProjects(fallback as Record<string, unknown>, projectName);
 
+    // Before auto-creating from fallback, wait for any unsynced prompts to finish syncing.
+    // Unsynced prompts lack commit/id, which would produce broken blueprint values.
+    const timedOut = await this._awaitConfigPromptValues(fallback as Record<string, unknown>);
+    if (timedOut) {
+      logger.warn("Timed out waiting for prompt sync before creating config; using fallback values.");
+      return this._makeFallbackConfig(fallback, maskId);
+    }
+
     // Auto-create from fallback (handle 409 race: another caller created it concurrently)
     let blueprint: Blueprint;
     try {
@@ -2193,16 +2206,6 @@ export class OpikClient {
     const fallback = options?.fallback;
     const projectName = options?.projectName ?? this.config.projectName;
     const maskId = getActiveConfigMask() ?? undefined;
-
-    // Before hitting the backend, wait for any unsynced prompts in fallback.
-    // If they time out, treat it like a fetch failure and use fallback immediately.
-    if (fallback) {
-      const timedOut = await this._awaitConfigPromptValues(fallback as Record<string, unknown>);
-      if (timedOut) {
-        logger.warn("Timed out waiting for prompt sync before getOrCreateConfig; using fallback values.");
-        return this._makeFallbackConfig(fallback, maskId);
-      }
-    }
 
     const blueprintName = getActiveConfigBlueprintName() ?? undefined;
     // A runner context that pins a blueprint name is an explicit request — no auto-create.

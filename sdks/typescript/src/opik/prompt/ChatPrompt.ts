@@ -243,23 +243,6 @@ export class ChatPrompt extends BasePrompt {
   }
 
   /**
-   * Get a ChatPrompt with a specific version by commit hash.
-   *
-   * @param commit - Commit hash (8-char short form or full)
-   * @returns ChatPrompt instance representing that version, or null if not found
-   *
-   * @example
-   * ```typescript
-   * const chatPrompt = await client.getChatPrompt({ name: "greeting" });
-   *
-   * // Get a specific version directly as a ChatPrompt
-   * const versionedPrompt = await chatPrompt.getVersion("abc123de");
-   * if (versionedPrompt) {
-   *   const messages = versionedPrompt.format({ name: "Alice" });
-   * }
-   * ```
-   */
-  /**
    * Synchronize the chat prompt with the backend.
    *
    * Creates or updates the chat prompt on the Opik server. If the sync fails,
@@ -288,6 +271,12 @@ export class ChatPrompt extends BasePrompt {
     }
   }
 
+  /**
+   * Get a ChatPrompt with a specific version by commit hash.
+   *
+   * @param commit - Commit hash (8-char short form or full)
+   * @returns ChatPrompt instance representing that version, or null if not found
+   */
   async getVersion(commit: string): Promise<ChatPrompt | null> {
     const response = await this.retrieveVersionByCommit(commit);
     if (!response) {

@@ -1,6 +1,7 @@
 import { Opik } from "opik";
 import { MockInstance } from "vitest";
 import { ConfigManager, Blueprint } from "@/agent-config";
+import { getGlobalBlueprintRegistry } from "@/agent-config/blueprintCache";
 import { OpikApiError } from "@/rest_api";
 import * as OpikApi from "@/rest_api/api";
 import { trackStorage } from "@/decorators/track";
@@ -740,16 +741,20 @@ describe("getOrCreateConfig option exclusivity", () => {
   });
 });
 
-describe("getOrCreateConfig — prompt readiness before backend call", () => {
+describe("getOrCreateConfig — prompt readiness before auto-create", () => {
   let client: Opik;
+  const notFound = new OpikApiError({ message: "Not found", statusCode: 404, rawResponse: {} as Response, body: undefined });
 
   beforeEach(() => {
     client = new Opik({ projectName: "test-project" });
     vi.spyOn(client.api.projects, "retrieveProject").mockResolvedValue(
       { id: "project-id", name: "test-project" } as never
     );
-    vi.spyOn(client.api.agentConfigs, "getLatestBlueprint").mockImplementation(mockAPIFunction);
-    vi.spyOn(client.api.agentConfigs, "getBlueprintByEnv").mockImplementation(mockAPIFunction);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    getGlobalBlueprintRegistry().clear();
   });
 
   function callInsideTrack<T extends Record<string, unknown>>(fallback: T) {
@@ -774,15 +779,37 @@ describe("getOrCreateConfig — prompt readiness before backend call", () => {
     return obj;
   }
 
-  it("proceeds to backend when all prompts are already synced", async () => {
-    const prompt = makeSyncedPromptLike();
-    await callInsideTrack({ system_prompt: prompt });
+  it("returns backend config when all prompts are already synced", async () => {
+    vi.spyOn(client.api.agentConfigs, "getBlueprintByEnv").mockImplementation(() =>
+      createMockHttpResponsePromise(mockBlueprintResponse)
+    );
 
-    expect(client.api.agentConfigs.getBlueprintByEnv).toHaveBeenCalled();
+    const prompt = makeSyncedPromptLike();
+    const config = await callInsideTrack({ temperature: prompt });
+
+    expect(config.isFallback).toBe(false);
+    expect(config.blueprintId).toBe("blueprint-id-1");
   });
 
-  it("uses fallback immediately when prompt sync times out before backend call", async () => {
+  it("returns backend config even when prompt is unsynced", async () => {
+    vi.spyOn(client.api.agentConfigs, "getBlueprintByEnv").mockImplementation(() =>
+      createMockHttpResponsePromise(mockBlueprintResponse)
+    );
+
+    const prompt = makeNeverSyncingPromptLike();
+    const config = await callInsideTrack({ temperature: prompt });
+
+    expect(config.isFallback).toBe(false);
+    expect(config.blueprintId).toBe("blueprint-id-1");
+  });
+
+  it("returns fallback when prompt sync times out before auto-creating config", async () => {
     vi.useFakeTimers();
+
+    // Empty project: both env and latest return 404
+    vi.spyOn(client.api.agentConfigs, "getBlueprintByEnv").mockRejectedValue(notFound);
+    vi.spyOn(client.api.agentConfigs, "getLatestBlueprint").mockRejectedValue(notFound);
+    const createSpy = vi.spyOn(client.api.agentConfigs, "createAgentConfig").mockImplementation(mockAPIFunction);
 
     const prompt = makeNeverSyncingPromptLike();
     const promise = callInsideTrack({ system_prompt: prompt });
@@ -791,8 +818,8 @@ describe("getOrCreateConfig — prompt readiness before backend call", () => {
     await vi.advanceTimersByTimeAsync(5001);
     const config = await promise;
 
-    // Backend was NOT called — timed out before reaching it
-    expect(client.api.agentConfigs.getBlueprintByEnv).not.toHaveBeenCalled();
+    // Unsynced prompts were not persisted to backend
+    expect(createSpy).not.toHaveBeenCalled();
     expect(config.isFallback).toBe(true);
     expect(config.system_prompt).toBe(prompt);
 
