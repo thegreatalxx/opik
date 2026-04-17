@@ -108,30 +108,28 @@ public class FilterUtils {
         var template = TemplateUtils.newST(query);
         Optional.ofNullable(traceSearchCriteria.filters())
                 .ifPresent(filters -> {
-                    var outerFilters = withoutTraceThreadIdPushdown(filters);
-
-                    FilterQueryBuilder.toAnalyticsDbFilters(outerFilters, FilterStrategy.TRACE)
+                    FilterQueryBuilder.toAnalyticsDbFilters(filters, FilterStrategy.TRACE)
                             .ifPresent(traceFilters -> template.add("filters", traceFilters));
-                    FilterQueryBuilder.toAnalyticsDbFilters(outerFilters, FilterStrategy.TRACE_AGGREGATION)
+                    FilterQueryBuilder.toAnalyticsDbFilters(filters, FilterStrategy.TRACE_AGGREGATION)
                             .ifPresent(traceAggregationFilters -> template.add("trace_aggregation_filters",
                                     traceAggregationFilters));
-                    FilterQueryBuilder.toAnalyticsDbFilters(outerFilters, FilterStrategy.FEEDBACK_SCORES)
+                    FilterQueryBuilder.toAnalyticsDbFilters(filters, FilterStrategy.FEEDBACK_SCORES)
                             .ifPresent(scoresFilters -> template.add("feedback_scores_filters", scoresFilters));
-                    FilterQueryBuilder.toAnalyticsDbFilters(outerFilters, FilterStrategy.TRACE_SPAN_FEEDBACK_SCORES)
+                    FilterQueryBuilder.toAnalyticsDbFilters(filters, FilterStrategy.TRACE_SPAN_FEEDBACK_SCORES)
                             .ifPresent(spanScoresFilters -> template.add("span_feedback_scores_filters",
                                     spanScoresFilters));
-                    FilterQueryBuilder.toAnalyticsDbFilters(outerFilters, FilterStrategy.ANNOTATION_AGGREGATION)
+                    FilterQueryBuilder.toAnalyticsDbFilters(filters, FilterStrategy.ANNOTATION_AGGREGATION)
                             .ifPresent(traceAnnotationFilters -> template.add("annotation_queue_filters",
                                     traceAnnotationFilters));
-                    FilterQueryBuilder.toAnalyticsDbFilters(outerFilters, FilterStrategy.EXPERIMENT_AGGREGATION)
+                    FilterQueryBuilder.toAnalyticsDbFilters(filters, FilterStrategy.EXPERIMENT_AGGREGATION)
                             .ifPresent(traceExperimentFilters -> template.add("experiment_filters",
                                     traceExperimentFilters));
-                    FilterQueryBuilder.toAnalyticsDbFilters(outerFilters, FilterStrategy.TRACE_THREAD)
+                    FilterQueryBuilder.toAnalyticsDbFilters(filters, FilterStrategy.TRACE_THREAD)
                             .ifPresent(threadFilters -> template.add("trace_thread_filters", threadFilters));
-                    FilterQueryBuilder.toAnalyticsDbFilters(outerFilters, FilterStrategy.FEEDBACK_SCORES_IS_EMPTY)
+                    FilterQueryBuilder.toAnalyticsDbFilters(filters, FilterStrategy.FEEDBACK_SCORES_IS_EMPTY)
                             .ifPresent(feedbackScoreIsEmptyFilters -> template.add("feedback_scores_empty_filters",
                                     feedbackScoreIsEmptyFilters));
-                    FilterQueryBuilder.toAnalyticsDbFilters(outerFilters,
+                    FilterQueryBuilder.toAnalyticsDbFilters(filters,
                             FilterStrategy.TRACE_SPAN_FEEDBACK_SCORES_IS_EMPTY)
                             .ifPresent(feedbackScoreIsEmptyFilters -> template.add("span_feedback_scores_empty_filters",
                                     feedbackScoreIsEmptyFilters));
@@ -189,13 +187,6 @@ public class FilterUtils {
         return filters.stream()
                 .filter(f -> f.field() == TraceThreadField.ID && f.operator() == Operator.EQUAL)
                 .findFirst();
-    }
-
-    private static List<? extends Filter> withoutTraceThreadIdPushdown(List<? extends Filter> filters) {
-        return findTraceThreadIdPushdownFilter(filters)
-                .<List<? extends Filter>>map(
-                        pushdown -> filters.stream().filter(f -> f != pushdown).collect(Collectors.toList()))
-                .orElse(filters);
     }
 
     public static ST getSTWithLogComment(String query, String queryName, String workspaceId, String userName,
