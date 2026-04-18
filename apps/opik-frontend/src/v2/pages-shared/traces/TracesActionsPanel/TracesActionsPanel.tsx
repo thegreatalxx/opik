@@ -1,5 +1,5 @@
-import React, { useState, useRef, useCallback } from "react";
-import { Tag, Trash } from "lucide-react";
+import React, { useState, useRef, useCallback, useMemo } from "react";
+import { Tag, Trash, Pencil } from "lucide-react";
 import slugify from "slugify";
 import { cn } from "@/lib/utils";
 import { Button } from "@/ui/button";
@@ -12,6 +12,7 @@ import useTracesBatchDeleteMutation from "@/api/traces/useTraceBatchDeleteMutati
 import TooltipWrapper from "@/shared/TooltipWrapper/TooltipWrapper";
 import ExportToButton from "@/shared/ExportToButton/ExportToButton";
 import AddTagDialog from "@/v2/pages-shared/traces/AddTagDialog/AddTagDialog";
+import BatchAnnotateTracesDialog from "@/v2/pages-shared/traces/BatchAnnotateTracesDialog/BatchAnnotateTracesDialog";
 import EvaluateButton from "@/v2/pages-shared/automations/EvaluateButton/EvaluateButton";
 import RunEvaluationDialog from "@/v2/pages-shared/automations/RunEvaluationDialog/RunEvaluationDialog";
 import useFilteredRulesList from "@/api/automations/useFilteredRulesList";
@@ -43,13 +44,17 @@ const TracesActionsPanel: React.FunctionComponent<TracesActionsPanelProps> = ({
 }) => {
   const resetKeyRef = useRef(0);
   const [open, setOpen] = useState<boolean | number>(false);
+  const tracesForAnnotation = useMemo(
+    () => (type === TRACE_DATA_TYPE.traces ? (selectedRows as Trace[]) : []),
+    [selectedRows, type],
+  );
 
   const { mutate } = useTracesBatchDeleteMutation();
   const disabled = !selectedRows?.length;
   const isExportEnabled = useIsFeatureEnabled(FeatureToggleKeys.EXPORT_ENABLED);
 
   const {
-    permissions: { canDeleteTraces },
+    permissions: { canDeleteTraces, canAnnotateTraceSpanThread },
   } = usePermissions();
 
   const showEvaluate =
@@ -108,6 +113,16 @@ const TracesActionsPanel: React.FunctionComponent<TracesActionsPanelProps> = ({
         projectId={projectId}
         type={type}
       />
+      {type === TRACE_DATA_TYPE.traces && canAnnotateTraceSpanThread && (
+        <BatchAnnotateTracesDialog
+          key={`annotate-${resetKeyRef.current}`}
+          open={open === 5}
+          setOpen={setOpen}
+          selectedTraces={tracesForAnnotation as Trace[]}
+          projectId={projectId}
+          projectName={projectName}
+        />
+      )}
       {enableEvaluate && (
         <RunEvaluationDialog
           key={`evaluation-${resetKeyRef.current}`}
@@ -127,6 +142,20 @@ const TracesActionsPanel: React.FunctionComponent<TracesActionsPanelProps> = ({
         dataType={type === TRACE_DATA_TYPE.traces ? "traces" : "spans"}
         buttonVariant={buttonVariant}
       />
+      <TooltipWrapper content="Annotate traces">
+        <Button
+          variant={buttonVariant}
+          size="sm"
+          onClick={() => {
+            setOpen(5);
+            resetKeyRef.current = resetKeyRef.current + 1;
+          }}
+          disabled={disabled || type !== TRACE_DATA_TYPE.traces || !canAnnotateTraceSpanThread}
+        >
+          <Pencil className="mr-1.5 size-3.5" />
+          <span>Annotate</span>
+        </Button>
+      </TooltipWrapper>
       <TooltipWrapper content="Manage tags">
         <Button
           variant={buttonVariant}
